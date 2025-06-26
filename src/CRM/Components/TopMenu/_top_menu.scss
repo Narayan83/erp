@@ -1,0 +1,481 @@
+@use "../../Styles/_variable.scss" as *;
+
+.top-menu {
+  padding: 12px 16px 0 16px;
+  width: 100%;
+  height: auto;
+  position: sticky;
+  top: 0;
+  margin-top: 50px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  // Header section 
+  .header-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 26px;
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 400;
+      color: $primary-black;
+      text-shadow: 1px 3px 3px rgba(0, 0, 0, 0.5);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: flex-end;
+      flex: 1;
+    }
+
+    .all-leads-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: $primary-gray;
+      border: 1px solid rgba($primary-blue, 0.6);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: $primary-blue;
+      cursor: pointer;
+
+      .pen-icon {
+        font-size: 12px;
+        color: $primary-blue;
+      }
+    }
+
+    .filters-btn {
+      background-color: $primary-blue;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: $primary-white;
+
+      &:hover {
+        color: $primary-blue;
+        background-color: $primary-white;
+        border: 1px solid $primary-blue;
+      }
+    }
+
+    .search-bar {
+      position: relative;
+      flex: 1;
+      max-width: 300px;
+
+      input {
+        width: 100%;
+        padding: 6px 30px;
+        border: 1px solid $primary-blue;
+        border-radius: 3px;
+        font-size: 13px;
+        background-color: $primary-white;
+        color: $primary-blue;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: $primary-blue;
+        font-size: 12px;
+      }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+
+      .add-lead-btn,
+      .import-btn {
+        background-color: $primary-orange;
+        color: $primary-white;
+        border: 1px solid $primary-orange;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+
+        &:hover {
+          background-color: $primary-white;
+          color: $primary-orange;
+          border: 1px solid $primary-orange; 
+        }
+      }
+
+      .customize-btn{
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        color: $primary-white;
+        background-color: $primary-blue;
+        border: 1px solid $primary-blue;
+
+        &:hover{
+         color: $primary-blue;
+        background-color: $primary-white;
+        border: 1px solid $primary-blue; 
+        }
+      }
+
+      .import-btn {
+        background-color: $primary-orange;
+        color: $primary-white;
+      }
+    }
+
+    .utility-buttons {
+      display: flex;
+      gap: 8px;
+
+      .icon-btn {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: $primary-blue;
+        border-radius: 4px;
+        color: $primary-white;
+        font-size: 12px;
+        cursor: pointer;
+
+        &:hover {
+          color: $primary-blue;
+          background-color: $primary-white;
+          border: 1px solid $primary-blue;
+        }
+      }
+    }
+  }
+
+  // Filter section 
+  .filter-section {
+    margin-bottom: 16px;
+    position: relative;
+
+    // View filters container
+    .view-filters-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+
+      .view-filters {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        flex: 1;
+      }
+    }
+
+    // Status and View filters common styles
+    .status-filters,
+    .view-filters {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+
+      button {
+        width: 120px;
+        padding: 4px 10px;
+        border: 1px solid $primary-blue;
+        background: $primary-white;
+        color: $primary-blue;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 4px;
+        white-space: nowrap;
+
+        &:hover {
+          background-color: #f0f0f0;
+        }
+
+        &.active {
+          background-color: $primary-blue;
+          color: $primary-white;
+          font-weight: 500;
+        }
+      }
+    }
+  }
+
+  // Stats section
+  .stats-section {
+    display: flex;
+    gap: 12px;
+    font-size: 13px;
+
+    .count, .potential {
+      color: $primary-blue;
+      font-weight: 600;
+      border: 1px solid $primary-blue;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background-color: $primary-white;
+    }
+
+    .selected-count {
+      display: none; // Hide from stats section
+    }
+  }
+
+  // Table container for unified scrolling
+  .table-container {
+    position: relative;
+    overflow: auto;
+    width: 100%;
+    background: $primary-white;
+    border-radius: 4px;
+    border: 1px solid rgba($primary-blue, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 40px;
+    margin-top: 0;
+    padding: 0;
+    flex: 1;
+    min-height: 506px;
+    max-height: calc(100vh - 300px); // Adjust for header, filters, and bottom bar
+    
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+        
+      th, td {
+        white-space: nowrap;
+        border-bottom: 1px solid rgba($primary-blue, 0.1);
+        
+        &:not(:last-child) {
+          border-right: 1px solid rgba($primary-blue, 0.1);
+        }
+      }
+
+      th {
+        padding: 12px;
+        background-color: $primary-white;
+        position: sticky;
+        top: 0px;
+        background: $primary-white;
+        z-index: 2;
+        font-weight: 700;
+        font-size: 14px;
+        color: $primary-blue;
+        text-align: left;
+        transition: background-color 0.2s;
+        height: 46px; // Fixed header height
+      }
+
+      td {
+        padding: 12px 16px;
+        font-size: 13px;
+        color: $primary-black;
+        text-align: left;
+        height: 46px; // Fixed row height
+      }
+
+      tr {
+
+        &:hover {
+          background-color: rgba($primary-orange,0.2);
+        }
+      }
+      
+
+      .checkbox-cell {
+        width: 20px;
+        padding: 8px 16px;
+        text-align: center;
+        
+        input[type="checkbox"] {
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          border: 1.5px solid rgba($primary-blue, 0.3);
+          border-radius: 3px;
+          cursor: pointer;
+          position: relative;
+          transition: all 0.2s;
+
+          &:hover {
+            border-color: $primary-blue;
+          }
+
+          &:checked {
+            background-color: $primary-blue;
+            border-color: $primary-blue;
+            
+            &::after {
+              content: '';
+              position: absolute;
+              left: 4px;
+              top: 1px;
+              width: 4px;
+              height: 8px;
+              border: solid $primary-white;
+              border-width: 0 2px 2px 0;
+              transform: rotate(45deg);
+            }
+          }
+        }
+      }
+
+      .serial-number {
+        width: 60px;
+        text-align: center;
+
+        .star-icon {
+        cursor: pointer;
+        margin-right: 8px; // Adds some space between the star and the number
+        color: $primary-dark-gray;
+        vertical-align: middle;
+
+        &.starred {
+            color: orange; // Color when the lead is starred
+        }
+    }
+        }
+      
+
+      .action-column {
+        width: 80px;
+        text-align: center;
+      }
+
+      .action-cell {
+        text-align: center;
+        padding: 8px;
+
+        .edit-btn{
+          background: none;
+          border: none;
+          color: $primary-blue;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          &:hover {
+            background: none;
+            color: $primary-orange;
+          }
+
+          svg {
+            width: 14px;
+            height: 14px;
+          }
+        }
+
+        .delete-btn {
+          background: none;
+          border: none;
+          color: $primary-orange;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          &:hover {
+            background: none;
+            color: $primary-blue;
+          }
+
+          svg {
+            width: 14px;
+            height: 14px;
+          }
+        }
+      }
+    }
+  }
+
+
+  // New styles for selected count overlay
+  .selected-count-overlay {
+    position: absolute;
+    top: 18%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: $primary-blue;
+    color: $primary-white;
+    padding: 4px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 2;
+    display: none;
+
+    &.visible {
+      display: block;
+    }
+  }
+}
+
+// Bottom Button Section
+
+.bottom-action-bar {
+  width: 100%;
+  padding: 0px 20px;
+  display: flex;
+  align-items: flex-start;
+  
+
+  .bottom-action-button {
+    .add-lead-btn,
+    .import-btn {
+        background-color: $primary-orange;
+        color: white;
+        border: 1px solid $primary-orange;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        margin-right: 10px;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+
+        &:hover{
+          background-color: $primary-white;
+          color: $primary-orange;
+          border: 1px solid $primary-orange; 
+        }
+      }
+     
+      .customize-btn,
+      .report-btn,
+      .filters-btn{
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        color: $primary-white;
+        background-color: $primary-blue;
+        border: 1px solid $primary-blue;
+        margin-right: 10px;
+
+
+        &:hover{
+         color: $primary-blue;
+        background-color: $primary-white;
+        border: 1px solid $primary-blue; 
+        }
+       }
+      }
+}
