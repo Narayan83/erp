@@ -22,8 +22,8 @@ export const menuItems = [
   //     { title: "Login Page", path: "/login" },
   //     { title: "User/Customer/supplier", path: "/registration" },
   //     { title: "View User/Customer/supplier", path: "/registration_view" },
-  //     { title: "Role Creation", path: "/rolecreation" }, 
-  //     { title: "Roles View", path: "/rolesview" }   
+  //     { title: "Role Creation", path: "/rolecreation" },
+  //     { title: "Roles View", path: "/rolesview" }
   //   ],
   // },
   {
@@ -33,8 +33,8 @@ export const menuItems = [
     submenu: [
       // { title: "User/Roles  Master", path: "/registration" },
       // { title: "View User/Customer/supplier", path: "/registration_view" },
-      // { title: "Role Creation", path: "/rolecreation" }, 
-      // { title: "Roles View", path: "/rolesview" } ,  
+      // { title: "Role Creation", path: "/rolecreation" },
+      // { title: "Roles View", path: "/rolesview" } ,
       // { title: "Product Master", path: "/product" },
       // { title: "Product Attributes", path: "/pattributes" },
       // { title: "Manage Product", path: "/manage-product" },
@@ -47,8 +47,6 @@ export const menuItems = [
       { title: "Product Master", path: "/ProductMaster" },
       { title: "Tag Management", path: "/ManageTag" },
       { title: "Store / Unit / Tax Setup", path: "/ManageUnitStoreTax" },
-    
-    
     ],
   },
 
@@ -56,52 +54,30 @@ export const menuItems = [
     id: 3,
     title: "Users Masters",
     icon: GiRingmaster,
-    submenu: [
-     
-      { title: "Users Management", path: "/users" },
-     
-    
-    
-    ],
+    submenu: [{ title: "Users Management", path: "/users" }],
   },
-
 
   {
     id: 6,
     title: "CRM Masters",
     icon: GiRingmaster,
     submenu: [
-     
       { title: "CRM", path: "/crm-master" },
       { title: "Account", path: "/account" },
-     
-    
-    
+      { title: "Quotation", path: "/quotation" },
     ],
   },
-
 
   {
     id: 4,
     title: "Setup",
     icon: MdOutlinePhonelinkSetup,
-    submenu: [
-      { title: "Company/Firm setups", path: "/" },
-     
-    
-    ],
+    submenu: [{ title: "Company/Firm setups", path: "/" }],
   },
   {
     id: 5,
     title: "Reports",
     icon: MdOutlinePhonelinkSetup,
-    submenu: [
-      { title: "reports", path: "/" },
-     
-    
-    ],
+    submenu: [{ title: "reports", path: "/" }],
   },
-
 ];
-
-

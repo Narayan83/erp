@@ -3,9 +3,11 @@
 /* Styles for the main Accounts Dashboard container */
 .accounts-dashboard {
   display: flex;
+  width: 100%;
   flex-direction: column; 
   height: 100%;
   margin-top: 50px;
+  gap: 1.5rem;
 }
 
 /* Styles for the top bar */

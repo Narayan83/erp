@@ -1,5 +1,5 @@
 import { createContext, useEffect, useState } from "react";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation, Outlet } from "react-router-dom";
 import "./styles/main.scss";
 // import HomePage from "./AdminSection/AdminPages/HomePage/HomePage";
  import Header from "./AdminSection/AdminComponents/Header/Header";
@@ -34,6 +34,7 @@ import CrmPage from "./CRM/Components/TopMenu/TopMenu";
 import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
+import QuotationForm from './CRM/Pages/Quotation/Quotation';
 
 
 const myContext = createContext();
@@ -74,7 +75,14 @@ function AppLayout({ children }) {
   );
 }
 
+function QuotationLayout() {
+  // Render nested routes here
+  return <Outlet />;
+}
 
+function QuotationTest() {
+  return <div style={{padding: 40}}>This is a Quotation Test Page (nested route).</div>;
+}
 
 function App() {
 
@@ -116,7 +124,13 @@ function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/customize" element={<Customize />} />
           <Route path="/reports" element={<Report />} />
-
+          
+          {/* Quotation nested routes */}
+          <Route path="/quotation" element={<QuotationLayout />}>
+            <Route index element={<QuotationForm />} />
+            <Route path="test" element={<QuotationTest />} />
+          </Route>
+          
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
