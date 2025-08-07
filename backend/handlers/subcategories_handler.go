@@ -1,0 +1,129 @@
+package handler
+
+import (
+	"erp.local/backend/models"
+	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
+)
+
+var subcategoriesDB *gorm.DB
+
+func SetsubcategoriesDB(db *gorm.DB) {
+	{
+		subcategoriesDB = db
+	}
+}
+
+func GetAllSubcategorie(c *fiber.Ctx) error {
+	var subcategories []models.Subcategory
+
+	// Query params
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	filter := c.Query("filter")
+
+	categoryID := c.Query("category_id")
+
+	// Offset calculation
+	offset := (page - 1) * limit
+
+	// DB instance
+
+	// Query builder
+	query := subcategoriesDB.Model(&models.Subcategory{})
+
+	// Optional search filter
+	if filter != "" {
+		query = query.Where("name ILIKE ?", "%"+filter+"%")
+	}
+
+	// Optional category filter
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
+	}
+
+	// Count total for pagination info
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Fetch data with pagination
+	if err := query.Preload("Category").Offset(offset).Limit(limit).Find(&subcategories).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Return paginated result
+	return c.JSON(fiber.Map{
+		"data":       subcategories,
+		"page":       page,
+		"limit":      limit,
+		"total":      total,
+		"totalPages": (total + int64(limit) - 1) / int64(limit),
+	})
+}
+
+func GetSubcategorieByID(c *fiber.Ctx) error {
+	{
+		id := c.Params("id")
+		var item models.Subcategory
+		if err := subcategoriesDB.First(&item, id).Error; err != nil {
+			{
+				return c.Status(404).JSON(fiber.Map{"error": "Not found"})
+			}
+		}
+		return c.JSON(item)
+	}
+}
+
+func CreateSubcategorie(c *fiber.Ctx) error {
+	{
+		var item models.Subcategory
+		if err := c.BodyParser(&item); err != nil {
+			{
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+			}
+		}
+		if err := subcategoriesDB.Create(&item).Error; err != nil {
+			{
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+		}
+		return c.JSON(item)
+	}
+}
+
+func UpdateSubcategorie(c *fiber.Ctx) error {
+	{
+		id := c.Params("id")
+		var item models.Subcategory
+		if err := subcategoriesDB.First(&item, id).Error; err != nil {
+			{
+				return c.Status(404).JSON(fiber.Map{"error": "Not found"})
+			}
+		}
+		if err := c.BodyParser(&item); err != nil {
+			{
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+			}
+		}
+		if err := subcategoriesDB.Save(&item).Error; err != nil {
+			{
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+		}
+		return c.JSON(item)
+	}
+}
+
+func DeleteSubcategorie(c *fiber.Ctx) error {
+	{
+		id := c.Params("id")
+		if err := subcategoriesDB.Delete(&models.Subcategory{}, id).Error; err != nil {
+			{
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+		}
+		return c.SendStatus(204)
+	}
+}
