@@ -25,6 +25,10 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Edit, Visibility, Search, TableView, WhatsApp, Mail } from "@mui/icons-material";
 import axios from "axios";
@@ -49,7 +53,9 @@ export default function UserListPage() {
     "Gender",
     "CountryCode",
     "MobileNumber",
-    "ContactNo",
+    "EmergencyNumber",
+    "AlternateNumber",
+    "WhatsappNumber",
     "Email",
     "Website",
     "BusinessName",
@@ -69,10 +75,20 @@ export default function UserListPage() {
     "PANNumber",
     "GSTIN",
     "MSMENo",
+    // --- Add Bank Information fields below ---
+    "BankName",
+    "BranchName",
+    "BranchAddress",
+    "AccountNumber",
+    "IFSCCode",
+    // --- End Bank Information fields ---
     "Active",
     "IsUser",
     "IsCustomer",
     "IsSupplier",
+    "IsEmployee",
+    "IsDealer",
+    "IsDistributor",
     "RoleID"
   ];
   const [checkedFields, setCheckedFields] = useState(() => {
@@ -163,7 +179,28 @@ export default function UserListPage() {
               <TableView />
             </IconButton>
           </Tooltip>
-          <Button variant="contained" color="primary" sx={{ ml: 0 }} onClick={() => navigate("/users/add")}>+ Add User</Button>
+           
+           {/* SELECT EXECUTIVE DROPDOWN */}
+
+          <Box flex={0.5}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="demo-simple-select-label">Select Executive</InputLabel>
+              <Select
+                labelId="demo-simple-select-label"
+                id="demo-simple-select"
+                value={filters.roleID}
+                label="Select Executive"
+                onChange={(e) => setFilters({ ...filters, roleID: e.target.value })}
+              >
+                <MenuItem value={1}>Executive 1</MenuItem>
+                <MenuItem value={2}>Executive 2</MenuItem>
+                <MenuItem value={3}>Executive 3</MenuItem>
+                <MenuItem value={4}>Executive 4</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Button variant="contained" color="primary" sx={{ ml: 2, flex: 0.3 }} onClick={() => navigate("/users/add")}>+ Add User</Button>
         </Box>
       </Paper>
 
@@ -203,13 +240,11 @@ export default function UserListPage() {
                           : field === "MobileNumber"
                           ? user.mobile_number
                           : field === "EmergencyNumber"
-                          ? user.emergecy_number
+                          ? user.emergency_number
                           : field === "AlternateNumber"
                           ? user.alternate_number
                           : field === "WhatsappNumber"
                           ? user.whatsapp_number
-                          : field === "ContactNo"
-                          ? user.contact_no
                           : field === "Email"
                           ? user.email
                           : field === "Website"
@@ -248,6 +283,18 @@ export default function UserListPage() {
                           ? user.gstin
                           : field === "MSMENo"
                           ? user.msme_no
+                          // --- Add Bank Information display logic below ---
+                          : field === "BankName"
+                          ? user.bank_name
+                          : field === "BranchName"
+                          ? user.branch_name
+                          : field === "BranchAddress"
+                          ? user.branch_address
+                          : field === "AccountNumber"
+                          ? user.account_number
+                          : field === "IFSCCode"
+                          ? user.ifsc_code
+                          // --- End Bank Information display logic ---
                           : field === "Active"
                           ? user.active ? "Yes" : "No"
                           : field === "IsUser"
@@ -256,6 +303,12 @@ export default function UserListPage() {
                           ? user.is_customer ? "Yes" : "No"
                           : field === "IsSupplier"
                           ? user.is_supplier ? "Yes" : "No"
+                          : field === "IsEmployee"
+                          ? user.is_employee ? "Yes" : "No"
+                          : field === "IsDealer"
+                          ? user.is_dealer ? "Yes" : "No"
+                          : field === "IsDistributor"
+                          ? user.is_distributor ? "Yes" : "No"
                           : field === "RoleID"
                           ? user.role_id
                           : ""
