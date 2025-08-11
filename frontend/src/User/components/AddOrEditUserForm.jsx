@@ -232,6 +232,9 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     is_user: false,
     is_customer: false,
     is_supplier: false,
+    is_employee: false,
+    is_dealer: false,
+    is_distributor: false,
     active: true,
     salutation: "",
     gender: "",
@@ -284,31 +287,6 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       console.log("defaultValues:", defaultValues);
     }, [defaultValues]);
 
-
-    useEffect(() => {
-      if (sameAsPermanent) {
-        // Map permanent to contact address fields
-        setValue("contact_address1", permanentAddress[0] || "");
-        setValue("contact_address2", permanentAddress[1] || "");
-        setValue("contact_address3", permanentAddress[2] || "");
-        setValue("contact_address4", permanentAddress[3] || "");
-        setValue("contact_address5", permanentAddress[4] || "");
-        setValue("contact_state", permanentAddress[5] || "");
-        setValue("contact_country", permanentAddress[6] || "");
-        setValue("contact_pincode", permanentAddress[7] || "");
-      }else {
-    // 🧹 Clear contact fields when unchecked
-    setValue("contact_address1", "");
-    setValue("contact_address2", "");
-    setValue("contact_address3", "");
-    setValue("contact_address4", "");
-    setValue("contact_address5", "");
-    setValue("contact_state", "");
-    setValue("contact_country", "");
-    setValue("contact_pincode", "");
-  }
-    }, [sameAsPermanent, permanentAddress, setValue]);
-
   // Reset form with default values if editing
   useEffect(() => {
     if (defaultValues) {
@@ -318,13 +296,10 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         is_user: !!defaultValues.is_user,
         is_customer: !!defaultValues.is_customer,
         is_supplier: !!defaultValues.is_supplier,
+        is_employee: !!defaultValues.is_employee,
+        is_dealer: !!defaultValues.is_dealer,
+        is_distributor: !!defaultValues.is_distributor,
         active: typeof defaultValues.active === 'boolean' ? defaultValues.active : true,
-        contact_address1: !!defaultValues.contact_address1,
-        contact_address2: !!defaultValues.contact_address2,
-        contact_address3:!!defaultValues.contact_address3,
-        contact_address4:!!defaultValues.contact_address4,
-        contact_address5:!!defaultValues.contact_address5,
-        contact_country:!!defaultValues.contact_country,
       });
     }
   }, [defaultValues, reset]);
@@ -394,6 +369,39 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       <FormControlLabel
         control={<Checkbox checked={field.value} onChange={field.onChange} />}
         label="Supplier"
+      />
+    )}
+  />
+  <Controller
+    name="is_employee"
+    control={control}
+    defaultValue={false}
+    render={({ field }) => (
+      <FormControlLabel
+        control={<Checkbox checked={field.value} onChange={field.onChange} />}
+        label="Employee"
+      />
+    )}
+  />
+  <Controller
+    name="is_dealer"
+    control={control}
+    defaultValue={false}
+    render={({ field }) => (
+      <FormControlLabel
+        control={<Checkbox checked={field.value} onChange={field.onChange} />}
+        label="Dealer"
+      />
+    )}
+  />
+  <Controller
+    name="is_distributor"
+    control={control}
+    defaultValue={false}
+    render={({ field }) => (
+      <FormControlLabel
+        control={<Checkbox checked={field.value} onChange={field.onChange} />}
+        label="Distributor"
       />
     )}
   />
@@ -574,7 +582,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 
         {/* === PERMANENT ADDRESS === */}
         <Grid size={{ xs: 12, md: 12 }}>
-          <Typography variant="h6">Primary Address</Typography>
+          <Typography variant="h6">Permanent Address</Typography>
         </Grid>
         {[1, 2, 3, 4, 5].map((n) => (
           <Grid size={{ xs: 12, md: 3 }}  key={`address${n}`}>
@@ -613,10 +621,11 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 
         {/* === ADDITIONAL ADDRESSES CARD SECTION === */}
         <Grid size={{ xs: 12, md: 12 }}>
+          <Typography variant="h6">Additional Address</Typography>
           <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
             {additionalAddresses.map((address, idx) => (
               <Box key={idx} border={1} borderRadius={2} p={2} minWidth={250} position="relative">
-                <Typography variant="subtitle1">Additional Address {idx + 1}</Typography>
+                <Typography variant="subtitle1">Address {idx + 1}</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
                     <TextField
@@ -738,42 +747,18 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         </Grid>
 
 
-         <Grid size={{ xs: 12, md: 6 }}>
+         {/* <Grid size={{ xs: 12, md: 6 }}>
           <FormControlLabel
             control={<Checkbox {...register("same_as_permanent")} />}
             label="Contact address same as Primary Address"
           />
-        </Grid>
+        </Grid> */}
 
-        {/* === CONTACT ADDRESS === */}
-        <Grid size={{ xs: 12, md: 12 }}>
-          <Typography variant="h6">Contact Information</Typography>
-        </Grid>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <Grid size={{ xs: 12, md: 3 }} key={`contact_address${n}`}>
-            <TextField size="small" InputLabelProps={{ shrink: true }} fullWidth label={`Contact Address ${n}`} {...register(`contact_address${n}`)} />
-          </Grid>
-        ))}
-        <Grid size={{ xs: 12, md: 3 }}>
-          <TextField size="small" InputLabelProps={{ shrink: true }} fullWidth label="Contact State" {...register("contact_state")} />
-        </Grid>
-        <Grid size={{ xs: 12, md: 3 }}>
-          <TextField size="small" InputLabelProps={{ shrink: true }} fullWidth label="Contact Country" {...register("contact_country")} />
-        </Grid>
-        <Grid size={{ xs: 12, md: 3 }}>
-          <TextField size="small" InputLabelProps={{ shrink: true }} fullWidth label="Contact Pincode" {...register("contact_pincode")} />
-        </Grid>
-
-
+        {/* LEAGAL INFORMATION */}
 
         <Grid size={{ xs: 12, md: 12 }}>
           <Typography variant="h6"> Legal Information </Typography>
         </Grid>
-
-
-
-
-
 
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField size="small" fullWidth label="Aadhar Number" {...register("aadhar_number")} />
@@ -788,14 +773,29 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           <TextField size="small" fullWidth label="MSME No" {...register("msme_no")} />
         </Grid>
         <Grid size={{ xs: 12, md: 12 }}>  
+
+       {/* BANK DETAILS */}
+
+       <Grid size={{ xs: 12, md: 12 }}>
+          <Typography variant="h6"> Bank Information </Typography>
+        </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField size="small" fullWidth label="Bank Name" {...register("bank_name")} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField size="small" fullWidth label="Branch Name" {...register("branch_name")} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField size="small" fullWidth label="Account Number" {...register("account_number")} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField size="small" fullWidth label="IFSC Code" {...register("ifsc_code")} />
+          </Grid>
+
+
+        {/* === AUTHENTICATION === */}
            <Typography variant="h6"> Authentication </Typography>
         </Grid>
-
-
-
-
-        {/* === MISC === */}
-
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               size="small"

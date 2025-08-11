@@ -61,8 +61,54 @@ func GetUserByID(c *fiber.Ctx) error {
 }
 
 // POST /api/users
+// func CreateUser(c *fiber.Ctx) error {
+// 	// Define request structure
+// 	type RegisterUserRequest struct {
+// 		models.User
+// 		ConfirmPassword string  `json:"confirmPassword"`
+// 		SameAsPermanent bool    `json:"same_as_permanent"`
+// 		DOB             *string `json:"dob"` // Override the embedded model.User.DOB
+// 	}
+
+// 	var req RegisterUserRequest
+
+// 	// Parse JSON body into struct
+// 	if err := c.BodyParser(&req); err != nil {
+// 		return c.Status(400).JSON(fiber.Map{
+// 			"error":   "Invalid input format",
+// 			"details": err.Error(),
+// 		})
+// 	}
+
+// 	// Parse DOB string to time.Time and assign to model
+// 	if req.DOB != nil && *req.DOB != "" {
+// 		parsedDOB, err := time.Parse("2006-01-02", *req.DOB)
+// 		if err != nil {
+// 			return c.Status(400).JSON(fiber.Map{
+// 				"error":   "Invalid DOB format (expected YYYY-MM-DD)",
+// 				"details": err.Error(),
+// 			})
+// 		}
+// 		req.User.DOB = &parsedDOB
+// 	}
+
+// 	// Save user to database
+// 	if err := usersDB.Create(&req.User).Error; err != nil {
+// 		return c.Status(500).JSON(fiber.Map{
+// 			"error":   "Failed to create user",
+// 			"details": err.Error(),
+// 		})
+// 	}
+
+// 	// Return response (without password ideally)
+// 	return c.Status(201).JSON(fiber.Map{
+// 		"message": "User created successfully",
+// 		"user":    req.User,
+// 	})
+// }
+
+// POST /api/users
 func CreateUser(c *fiber.Ctx) error {
-	// Define request structure
 	type RegisterUserRequest struct {
 		models.User
 		ConfirmPassword string  `json:"confirmPassword"`
@@ -72,7 +118,7 @@ func CreateUser(c *fiber.Ctx) error {
 
 	var req RegisterUserRequest
 
-	// Parse JSON body into struct
+	// Parse JSON body
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Invalid input format",
@@ -80,7 +126,14 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Parse DOB string to time.Time and assign to model
+	// Password confirmation
+	if req.Password != req.ConfirmPassword {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Passwords do not match",
+		})
+	}
+
+	// Parse DOB
 	if req.DOB != nil && *req.DOB != "" {
 		parsedDOB, err := time.Parse("2006-01-02", *req.DOB)
 		if err != nil {
@@ -92,7 +145,22 @@ func CreateUser(c *fiber.Ctx) error {
 		req.User.DOB = &parsedDOB
 	}
 
-	// Save user to database
+	// If same as permanent, copy addresses
+	// if req.SameAsPermanent {
+	// 	req.User.ContactAddress1 = req.User.Address1
+	// 	req.User.ContactAddress2 = req.User.Address2
+	// 	req.User.ContactAddress3 = req.User.Address3
+	// 	req.User.ContactAddress4 = req.User.Address4
+	// 	req.User.ContactAddress5 = req.User.Address5
+	// 	req.User.ContactState = req.User.State
+	// 	req.User.ContactCountry = req.User.Country
+	// 	req.User.ContactPincode = req.User.Pincode
+	// }
+
+	
+	req.User.Password = req.Password
+
+	// Save user
 	if err := usersDB.Create(&req.User).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error":   "Failed to create user",
@@ -100,7 +168,7 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return response (without password ideally)
+	// Return without password
 	return c.Status(201).JSON(fiber.Map{
 		"message": "User created successfully",
 		"user":    req.User,

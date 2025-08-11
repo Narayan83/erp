@@ -65,14 +65,6 @@ export default function UserListPage() {
     "State",
     "Country",
     "Pincode",
-    "ContactAddress1",
-    "ContactAddress2",
-    "ContactAddress3",
-    "ContactAddress4",
-    "ContactAddress5",
-    "ContactState",
-    "ContactCountry",
-    "ContactPincode",
     "AadharNumber",
     "PANNumber",
     "GSTIN",
@@ -210,6 +202,12 @@ export default function UserListPage() {
                           ? user.country_code
                           : field === "MobileNumber"
                           ? user.mobile_number
+                          : field === "EmergencyNumber"
+                          ? user.emergecy_number
+                          : field === "AlternateNumber"
+                          ? user.alternate_number
+                          : field === "WhatsappNumber"
+                          ? user.whatsapp_number
                           : field === "ContactNo"
                           ? user.contact_no
                           : field === "Email"
@@ -242,22 +240,6 @@ export default function UserListPage() {
                           ? user.country
                           : field === "Pincode"
                           ? user.pincode
-                          : field === "ContactAddress1"
-                          ? user.contact_address1
-                          : field === "ContactAddress2"
-                          ? user.contact_address2
-                          : field === "ContactAddress3"
-                          ? user.contact_address3
-                          : field === "ContactAddress4"
-                          ? user.contact_address4
-                          : field === "ContactAddress5"
-                          ? user.contact_address5
-                          : field === "ContactState"
-                          ? user.contact_state
-                          : field === "ContactCountry"
-                          ? user.contact_country
-                          : field === "ContactPincode"
-                          ? user.contact_pincode
                           : field === "AadharNumber"
                           ? user.aadhar_number
                           : field === "PANNumber"
