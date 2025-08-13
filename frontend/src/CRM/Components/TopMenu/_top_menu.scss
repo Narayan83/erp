@@ -14,9 +14,10 @@
   // Header section 
   .header-section {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column; // changed from row to column
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
     margin-bottom: 6px;
 
     .header-title {
@@ -24,13 +25,15 @@
       font-weight: 400;
       color: $primary-black;
       text-shadow: 1px 3px 3px rgba(0, 0, 0, 0.5);
+      margin-bottom: 10px;
+      text-align: center;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
       gap: 12px;
-      justify-content: flex-end;
+      justify-content: center;
       flex: 1;
     }
 
@@ -45,10 +48,43 @@
       font-size: 12px;
       color: $primary-blue;
       cursor: pointer;
+      position: relative;
 
-      .pen-icon {
-        font-size: 12px;
+      .dropdown-arrow {
+        font-size: 14px;
         color: $primary-blue;
+        margin-left: 6px;
+        vertical-align: middle;
+          }
+    }
+    }
+
+    .status-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      min-width: 140px;
+      background: $primary-white;
+      border: 1px solid $primary-blue;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba($primary-blue, 0.08);
+      z-index: 10;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+
+      .dropdown-item {
+        padding: 8px 10px;
+        font-size: 13px;
+        color: $primary-blue;
+        cursor: pointer;
+        transition: background 0.2s;
+
+        &:hover,
+        &.active {
+          background: $primary-blue;
+          color: $primary-white;
+        }
       }
     }
 
@@ -58,11 +94,51 @@
       border-radius: 4px;
       font-size: 12px;
       color: $primary-white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
 
-      &:hover {
+      .dropdown-arrow {
+        font-size: 14px;
+        color: $primary-white;
+        margin-left: 4px;
+        vertical-align: middle;
+        transition: color 0.2s;
+      }
+
+      &.active .dropdown-arrow {
         color: $primary-blue;
-        background-color: $primary-white;
-        border: 1px solid $primary-blue;
+      }
+    }
+
+    .view-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0; // Ensures dropdown aligns with button width if needed
+      min-width: 100px;
+      background: $primary-white;
+      border: 1px solid $primary-blue;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba($primary-blue, 0.08);
+      z-index: 10;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+
+      .dropdown-item {
+        text-align: center;
+        padding: 8px 10px;
+        font-size: 13px;
+        color: $primary-blue;
+        cursor: pointer;
+        transition: background 0.2s;
+
+        &:hover,
+        &.active {
+          background: $primary-blue;
+          color: $primary-white;
+        }
       }
     }
 
@@ -168,20 +244,12 @@
     // View filters container
     .view-filters-container {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end; // changed from space-between to flex-end
       align-items: center;
       margin-top: 8px;
-
-      .view-filters {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        flex: 1;
-      }
     }
 
     // Status and View filters common styles
-    .status-filters,
     .view-filters {
       display: flex;
       gap: 8px;
@@ -408,74 +476,20 @@
 
   // New styles for selected count overlay
   .selected-count-overlay {
-    position: absolute;
-    top: 16%;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: $primary-blue;
-    color: $primary-white;
-    padding: 4px 16px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    z-index: 2;
-    display: none;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  background-color: $primary-blue;
+  color: $primary-white;
+  padding: 4px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 2;
+  display: none;
 
-    &.visible {
-      display: block;
-    }
+  &.visible {
+    display: block;
   }
-}
-
-// Bottom Button Section
-
-.bottom-action-bar {
-  width: 100%;
-  padding: 0px 20px;
-  display: flex;
-  align-items: flex-start;
-  
-
-  .bottom-action-button {
-    .add-lead-btn,
-    .import-btn {
-        background-color: $primary-orange;
-        color: white;
-        border: 1px solid $primary-orange;
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        cursor: pointer;
-        margin-right: 10px;
-        text-decoration: none;
-        display: inline-block;
-        text-align: center;
-
-        &:hover{
-          background-color: $primary-white;
-          color: $primary-orange;
-          border: 1px solid $primary-orange; 
-        }
-      }
-     
-      .customize-btn,
-      .report-btn,
-      .filters-btn{
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        cursor: pointer;
-        color: $primary-white;
-        background-color: $primary-blue;
-        border: 1px solid $primary-blue;
-        margin-right: 10px;
-
-
-        &:hover{
-         color: $primary-blue;
-        background-color: $primary-white;
-        border: 1px solid $primary-blue; 
-        }
-       }
-      }
 }
