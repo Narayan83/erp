@@ -25,6 +25,10 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Edit, Visibility, Search, TableView, WhatsApp, Mail } from "@mui/icons-material";
 import axios from "axios";
@@ -49,7 +53,9 @@ export default function UserListPage() {
     "Gender",
     "CountryCode",
     "MobileNumber",
-    "ContactNo",
+    "EmergencyNumber",
+    "AlternateNumber",
+    "WhatsappNumber",
     "Email",
     "Website",
     "BusinessName",
@@ -69,11 +75,23 @@ export default function UserListPage() {
     "PANNumber",
     "GSTIN",
     "MSMENo",
+    // --- Add Bank Information fields below ---
+    "BankName",
+    "BranchName",
+    "BranchAddress",
+    "AccountNumber",
+    "IFSCCode",
+    // --- End Bank Information fields ---
     "Active",
     "IsUser",
     "IsCustomer",
     "IsSupplier",
-    "RoleID"
+    "IsEmployee",
+    "IsDealer",
+    "IsDistributor",
+    "RoleID",
+    "Additional Address",
+    "Additional Bank Info" // <-- Add this line
   ];
   const [checkedFields, setCheckedFields] = useState(() => {
     const stored = localStorage.getItem('userListCheckedFields');
@@ -163,7 +181,28 @@ export default function UserListPage() {
               <TableView />
             </IconButton>
           </Tooltip>
-          <Button variant="contained" color="primary" sx={{ ml: 0 }} onClick={() => navigate("/users/add")}>+ Add User</Button>
+           
+           {/* SELECT EXECUTIVE DROPDOWN */}
+
+          <Box flex={0.5}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="demo-simple-select-label">Select Executive</InputLabel>
+              <Select
+                labelId="demo-simple-select-label"
+                id="demo-simple-select"
+                value={filters.roleID !== undefined ? filters.roleID : ''}
+                label="Select Executive"
+                onChange={(e) => setFilters({ ...filters, roleID: e.target.value })}
+              >
+                <MenuItem value={1}>Executive 1</MenuItem>
+                <MenuItem value={2}>Executive 2</MenuItem>
+                <MenuItem value={3}>Executive 3</MenuItem>
+                <MenuItem value={4}>Executive 4</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Button variant="contained" color="primary" sx={{ ml: 2, flex: 0.3 }} onClick={() => navigate("/users/add")}>+ Add User</Button>
         </Box>
       </Paper>
 
@@ -203,13 +242,11 @@ export default function UserListPage() {
                           : field === "MobileNumber"
                           ? user.mobile_number
                           : field === "EmergencyNumber"
-                          ? user.emergecy_number
+                          ? user.emergency_number
                           : field === "AlternateNumber"
                           ? user.alternate_number
                           : field === "WhatsappNumber"
                           ? user.whatsapp_number
-                          : field === "ContactNo"
-                          ? user.contact_no
                           : field === "Email"
                           ? user.email
                           : field === "Website"
@@ -248,6 +285,18 @@ export default function UserListPage() {
                           ? user.gstin
                           : field === "MSMENo"
                           ? user.msme_no
+                          // --- Add Bank Information display logic below ---
+                          : field === "BankName"
+                          ? user.bank_name
+                          : field === "BranchName"
+                          ? user.branch_name
+                          : field === "BranchAddress"
+                          ? user.branch_address
+                          : field === "AccountNumber"
+                          ? user.account_number
+                          : field === "IFSCCode"
+                          ? user.ifsc_code
+                          // --- End Bank Information display logic ---
                           : field === "Active"
                           ? user.active ? "Yes" : "No"
                           : field === "IsUser"
@@ -256,8 +305,85 @@ export default function UserListPage() {
                           ? user.is_customer ? "Yes" : "No"
                           : field === "IsSupplier"
                           ? user.is_supplier ? "Yes" : "No"
+                          : field === "IsEmployee"
+                          ? user.is_employee ? "Yes" : "No"
+                          : field === "IsDealer"
+                          ? user.is_dealer ? "Yes" : "No"
+                          : field === "IsDistributor"
+                          ? user.is_distributor ? "Yes" : "No"
                           : field === "RoleID"
                           ? user.role_id
+                          : field === "Additional Address"
+                          ? (
+                              Array.isArray(user.additional_addresses) && user.additional_addresses.length > 0
+                                ? user.additional_addresses.map((addr, idx) => (
+                                    <div key={idx} style={{ marginBottom: 8 }}>
+                                      {Object.entries(addr).map(([key, value]) => (
+                                        key !== "keyValues"
+                                          ? value
+                                            ? <div key={key}><b>{key}:</b> {value}</div>
+                                            : null
+                                          : Array.isArray(value) && value.length > 0
+                                            ? <div key={key}><b>keyValues:</b>
+                                                {value.map((kv, i) => (
+                                                  <span key={i}> [{kv.key}: {kv.value}]</span>
+                                                ))}
+                                              </div>
+                                            : null
+                                      ))}
+                                    </div>
+                                  ))
+                                // Fallback: try to parse Addresses if additional_addresses is empty
+                                : Array.isArray(user.Addresses) && user.Addresses.length > 0
+                                  ? user.Addresses.map((addrStr, idx) => {
+                                      let addr;
+                                      try { addr = JSON.parse(addrStr); } catch { addr = {}; }
+                                      return (
+                                        <div key={idx} style={{ marginBottom: 8 }}>
+                                          {Object.entries(addr).map(([key, value]) =>
+                                            key !== "keyValues"
+                                              ? value
+                                                ? <div key={key}><b>{key}:</b> {value}</div>
+                                                : null
+                                              : Array.isArray(value) && value.length > 0
+                                                ? <div key={key}><b>keyValues:</b>
+                                                    {value.map((kv, i) => (
+                                                      <span key={i}> [{kv.key}: {kv.value}]</span>
+                                                    ))}
+                                                  </div>
+                                                : null
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  : ""
+                          )
+                          : field === "Additional Bank Info"
+                          ? (
+                              Array.isArray(user.AdditionalBankInfos) && user.AdditionalBankInfos.length > 0
+                                ? user.AdditionalBankInfos.map((biStr, idx) => {
+                                    let bi;
+                                    try { bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr; } catch { bi = {}; }
+                                    return (
+                                      <div key={idx} style={{ marginBottom: 8 }}>
+                                        {Object.entries(bi).map(([key, value]) =>
+                                          key !== "keyValues"
+                                            ? value
+                                              ? <div key={key}><b>{key}:</b> {value}</div>
+                                              : null
+                                            : Array.isArray(value) && value.length > 0
+                                              ? <div key={key}><b>keyValues:</b>
+                                                  {value.map((kv, i) => (
+                                                    <span key={i}> [{kv.key}: {kv.value}]</span>
+                                                  ))}
+                                                </div>
+                                              : null
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                : ""
+                          )
                           : ""
                         }
                       </TableCell>
@@ -316,7 +442,7 @@ export default function UserListPage() {
             <span style={{ fontWeight: 500, fontSize: 15 }}>Select All</span>
           </Box>
           {/* 8 rows x 5 columns grid, checkbox and label, visually improved */}
-          {Array.from({ length: 8 }).map((_, rowIdx) => (
+          {Array.from({ length: Math.ceil(userFields.length / 5) }).map((_, rowIdx) => (
             <Grid container spacing={2} key={rowIdx}>
               {userFields.slice(rowIdx * 5, rowIdx * 5 + 5).map((field) => (
                 <Grid item xs={2.4} key={field} style={{ display: 'flex', alignItems: 'center', minHeight: 40 }}>

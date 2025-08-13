@@ -18,7 +18,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
     city: '',
     state: '',
     gstin: '',
-    code: '',
     source: '',
     since: '',
     requirement: '',
@@ -52,6 +51,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           lastName = parts.slice(1).join(' ');
         }
       }
+      
       // Map assignedTo (name, id, or object) to id
       let assignedToId = '';
       if (leadData.assignedTo) {
@@ -63,7 +63,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         } else if (typeof leadData.assignedTo === 'object' && leadData.assignedTo !== null) {
           assignedToId = leadData.assignedTo.id || '';
         }
+      } else if (leadData.assigned_to_id) {
+        assignedToId = leadData.assigned_to_id;
       }
+      
       // Map product (id, name, or object) to id
       let productId = '';
       if (leadData.product) {
@@ -76,7 +79,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         } else if (typeof leadData.product === 'object' && leadData.product !== null) {
           productId = leadData.product.ID || leadData.product.id || '';
         }
+      } else if (leadData.product_id) {
+        productId = leadData.product_id;
       }
+      
       setFormData({
         business: leadData.business || '',
         prefix,
@@ -92,7 +98,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         city: leadData.city || '',
         state: leadData.state || '',
         gstin: leadData.gstin || '',
-        code: leadData.code || '',
         source: leadData.source || '',
         since: leadData.since || '',
         requirement: leadData.requirements || leadData.requirement || '',
@@ -120,7 +125,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         city: '',
         state: '',
         gstin: '',
-        code: '',
         source: '',
         since: '',
         requirement: '',
@@ -233,7 +237,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           requirements: formData.requirement,
           notes: formData.notes,
           assigned_to_id,
-          product_id
+          product_id,
+          addressLine1: formData.addressLine1,
+          addressLine2: formData.addressLine2,
+          category: formData.category,
+          tags: formData.tags
         };
         let res;
         if (leadData && leadData.id) {
@@ -268,7 +276,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             city: '',
             state: '',
             gstin: '',
-            code: '',
             source: '',
             since: '',
             requirement: '',
@@ -490,18 +497,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                     />
                   </div>
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Code</label>
-                    <input
-                      type="text"
-                      name="code"
-                      value={formData.code}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
+
               </div>
               
               <div className="form-section">
@@ -670,6 +666,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
               <th>City</th>
               <th>Stage</th>
               <th>Potential</th>
+              <th>Address Line 1</th>
+              <th>Address Line 2</th>
+              <th>Category</th>
+              <th>Tags</th>
               {/* Add more columns as needed */}
             </tr>
           </thead>
@@ -684,6 +684,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 <td>{lead.city}</td>
                 <td>{lead.stage}</td>
                 <td>{lead.potential}</td>
+                <td>{lead.addressLine1 || lead.addressline1 || lead.address_line1 || ''}</td>
+                <td>{lead.addressLine2 || lead.addressline2 || lead.address_line2 || ''}</td>
+                <td>{lead.category || lead.Category || ''}</td>
+                <td>{lead.tags || lead.Tags || ''}</td>
                 {/* Add more cells as needed */}
               </tr>
             ))}

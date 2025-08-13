@@ -23,6 +23,10 @@ type Lead struct {
 	TransferredOn time.Time `json:"transferredOn"`
 	Requirements  string    `json:"requirements"`
 	Notes         string    `json:"notes"`
+	AddressLine1  string    `json:"addressLine1"`
+	AddressLine2  string    `json:"addressLine2"`
+	Category      string    `json:"category"`
+	Tags          string    `json:"tags"`
 
 	// ✅ Assigned User
 	AssignedToID uint `json:"assigned_to_id"`
