@@ -219,7 +219,7 @@ const countries = [
 ];
 
 const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
-   const navigate = useNavigate();
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -244,7 +244,9 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 });
 
   // Additional addresses state and handlers
-  const [additionalAddresses, setAdditionalAddresses] = React.useState([]);
+  const [additionalAddresses, setAdditionalAddresses] = React.useState(defaultValues?.additional_addresses || []);
+  // Additional bank info state and handlers
+  const [additionalBankInfos, setAdditionalBankInfos] = React.useState([]);
 
   // Password visibility state
   const [showPassword, setShowPassword] = React.useState(false);
@@ -302,14 +304,39 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         is_distributor: !!defaultValues.is_distributor,
         active: typeof defaultValues.active === 'boolean' ? defaultValues.active : true,
       });
+      // Prefill additionalAddresses by parsing Addresses JSON strings
+      setAdditionalAddresses(
+        Array.isArray(defaultValues.Addresses)
+          ? defaultValues.Addresses.map(addrStr => {
+              try {
+                return JSON.parse(addrStr);
+              } catch {
+                return {};
+              }
+            })
+          : []
+      );
+      // Prefill additionalBankInfos if editing
+      setAdditionalBankInfos(
+        Array.isArray(defaultValues.AdditionalBankInfos)
+          ? defaultValues.AdditionalBankInfos.map(biStr => {
+              try {
+                return typeof biStr === "string" ? JSON.parse(biStr) : biStr;
+              } catch {
+                return {};
+              }
+            })
+          : []
+      );
     }
   }, [defaultValues, reset]);
 
   const onSubmit = async (data) => {
     try {
-      // Ensure all required fields are present and empty strings are converted to undefined for pointer fields
       const payload = {
         ...data,
+        Addresses: additionalAddresses.map(addr => JSON.stringify(addr)), // Convert to JSON string array
+        AdditionalBankInfos: additionalBankInfos.map(bi => JSON.stringify(bi)), // Convert to JSON string array
         id: defaultValues?.id || undefined,
         // Convert empty strings to undefined for pointer fields
         salutation: data.salutation || undefined,
@@ -336,6 +363,8 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         branch_address: data.branch_address || undefined,
         account_number: data.account_number || undefined,
         ifsc_code: data.ifsc_code || undefined,
+        // Add additional addresses to payload
+        additional_addresses: additionalAddresses,
       };
 
       // Check required fields before sending
@@ -379,7 +408,6 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     setAdditionalAddresses(addresses => {
       const updated = [...addresses];
       const prevKeyValues = Array.isArray(updated[idx].keyValues) ? updated[idx].keyValues : [];
-      // Always create a new array to avoid mutation issues
       updated[idx] = {
         ...updated[idx],
         keyValues: [...prevKeyValues, { key: "", value: "" }]
@@ -402,6 +430,55 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       if (!updated[addrIdx].keyValues) updated[addrIdx].keyValues = [];
       updated[addrIdx].keyValues[kvIdx] = {
         ...updated[addrIdx].keyValues[kvIdx],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  // --- Additional Bank Info handlers ---
+  const handleAddAdditionalBankInfo = () => {
+    setAdditionalBankInfos([...additionalBankInfos, {}]);
+  };
+
+  const handleRemoveAdditionalBankInfo = (idx) => {
+    setAdditionalBankInfos(additionalBankInfos.filter((_, i) => i !== idx));
+  };
+
+  const handleAdditionalBankInfoChange = (idx, field, value) => {
+    setAdditionalBankInfos(infos => {
+      const updated = [...infos];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleAddBankKeyValue = (idx) => {
+    setAdditionalBankInfos(infos => {
+      const updated = [...infos];
+      const prevKeyValues = Array.isArray(updated[idx].keyValues) ? updated[idx].keyValues : [];
+      updated[idx] = {
+        ...updated[idx],
+        keyValues: [...prevKeyValues, { key: "", value: "" }]
+      };
+      return updated;
+    });
+  };
+
+  const handleRemoveBankKeyValue = (infoIdx, kvIdx) => {
+    setAdditionalBankInfos(infos => {
+      const updated = [...infos];
+      updated[infoIdx].keyValues = (updated[infoIdx].keyValues || []).filter((_, i) => i !== kvIdx);
+      return updated;
+    });
+  };
+
+  const handleBankKeyValueChange = (infoIdx, kvIdx, field, value) => {
+    setAdditionalBankInfos(infos => {
+      const updated = [...infos];
+      if (!updated[infoIdx].keyValues) updated[infoIdx].keyValues = [];
+      updated[infoIdx].keyValues[kvIdx] = {
+        ...updated[infoIdx].keyValues[kvIdx],
         [field]: value
       };
       return updated;
@@ -926,6 +1003,131 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           </Grid>
 
 
+        {/* === ADDITIONAL BANK INFO CARD SECTION === */}
+        <Grid size={{ xs: 12, md: 12 }}>
+          <Typography variant="h6">Additional Bank Info</Typography>
+          <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
+            {additionalBankInfos.map((info, idx) => (
+              <Box key={idx} border={1} borderRadius={2} p={2} minWidth={250} position="relative">
+                <Typography variant="subtitle1">Bank Info {idx + 1}</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Bank Name"
+                      value={info.bank_name || ""}
+                      onChange={e => handleAdditionalBankInfoChange(idx, "bank_name", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Branch Name"
+                      value={info.branch_name || ""}
+                      onChange={e => handleAdditionalBankInfoChange(idx, "branch_name", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Branch Address"
+                      value={info.branch_address || ""}
+                      onChange={e => handleAdditionalBankInfoChange(idx, "branch_address", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Account Number"
+                      value={info.account_number || ""}
+                      onChange={e => handleAdditionalBankInfoChange(idx, "account_number", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="IFSC Code"
+                      value={info.ifsc_code || ""}
+                      onChange={e => handleAdditionalBankInfoChange(idx, "ifsc_code", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                  {/* === KEY-VALUE PAIRS SECTION === */}
+                  <Grid item xs={12}>
+                    {(info.keyValues || []).map((kv, kvIdx) => (
+                      <Box key={kvIdx} display="flex" alignItems="center" gap={1} mb={1}>
+                        <TextField
+                          size="small"
+                          label="Key"
+                          value={kv.key}
+                          onChange={e => handleBankKeyValueChange(idx, kvIdx, "key", e.target.value)}
+                          sx={{ minWidth: 120 }}
+                        />
+                        <TextField
+                          size="small"
+                          label="Value"
+                          value={kv.value}
+                          onChange={e => handleBankKeyValueChange(idx, kvIdx, "value", e.target.value)}
+                          sx={{ minWidth: 120 }}
+                        />
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          onClick={() => handleRemoveBankKeyValue(idx, kvIdx)}
+                        >
+                          Remove
+                        </Button>
+                      </Box>
+                    ))}
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleAddBankKeyValue(idx)}
+                      sx={{ mt: 1 }}
+                    >
+                      Add Key-Value
+                    </Button>
+                  </Grid>
+                </Grid>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={() => handleRemoveAdditionalBankInfo(idx)}
+                  sx={{ position: 'absolute', top: 8, right: 8 }}
+                >
+                  Remove
+                </Button>
+              </Box>
+            ))}
+            <Box
+              border={1}
+              borderRadius={2}
+              p={2}
+              minWidth={250}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              sx={{ cursor: 'pointer', borderStyle: 'dashed', color: 'grey.500' }}
+              onClick={handleAddAdditionalBankInfo}
+            >
+              <Typography variant="h6" color="primary" mr={1}>+</Typography>
+              <Typography color="primary">Add Bank Info</Typography>
+            </Box>
+          </Box>
+        </Grid>
+
+
         {/* === AUTHENTICATION === */}
         <Grid size={{ xs: 12, md: 12 }}> 
            <Typography variant="h6"> Authentication </Typography>
@@ -1007,14 +1209,17 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           <Button type="submit" variant="contained" color="primary">
             {defaultValues ? "Update User" : "Add User"}
           </Button>
-          <Button variant="outlined" onClick={() => reset({
-            ...Object.fromEntries(Object.keys(watch()).map(k => [k, ""])),
-            is_user: false,
-            is_customer: false,
-            is_supplier: false,
-            country: "",
-            country_code: ""
-          })} style={{ marginLeft: 8 }}>
+          <Button variant="outlined" onClick={() => {
+            reset({
+              ...Object.fromEntries(Object.keys(watch()).map(k => [k, ""])),
+              is_user: false,
+              is_customer: false,
+              is_supplier: false,
+              country: "",
+              country_code: ""
+            });
+            setAdditionalAddresses([]);
+          }} style={{ marginLeft: 8 }}>
             Reset
           </Button>
         </Grid>

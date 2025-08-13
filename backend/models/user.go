@@ -111,13 +111,14 @@ type User struct {
 	AccountNumber *string `json:"account_number,omitempty"`
 	IFSCCode      *string `json:"ifsc_code,omitempty"`
 	// --- End Bank Information fields ---
-	Password      string `json:"password"`
-	Active        bool   `json:"active"`
-	IsUser        bool   `json:"is_user"`
-	IsCustomer    bool   `json:"is_customer"`
-	IsSupplier    bool   `json:"is_supplier"`
-	IsEmployee    bool   `json:"IsEmployee"`
-	IsDealer      bool   `json:"IsDealer"`
-	IsDistributor bool   `json:"IsDistributor"`
-	RoleID        *int   `json:"role_id,omitempty"`
+	AdditionalBankInfos StringArray `gorm:"type:json" json:"AdditionalBankInfos,omitempty"`
+	Password            string      `json:"password"`
+	Active              bool        `json:"active"`
+	IsUser              bool        `json:"is_user"`
+	IsCustomer          bool        `json:"is_customer"`
+	IsSupplier          bool        `json:"is_supplier"`
+	IsEmployee          bool        `json:"IsEmployee"`
+	IsDealer            bool        `json:"IsDealer"`
+	IsDistributor       bool        `json:"IsDistributor"`
+	RoleID              *int        `json:"role_id,omitempty"`
 }
