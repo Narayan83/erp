@@ -33,6 +33,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
   const [errors, setErrors] = useState({});
   const [leads, setLeads] = useState([]);
   const [products, setProducts] = useState([]);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (leadData) {
@@ -177,6 +178,12 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
       newErrors.email = 'Enter a valid email address';
     }
     
+    // Validate assignedTo if provided
+    if (formData.assignedTo && 
+        !assignedToOptions.some(opt => String(opt.id) === String(formData.assignedTo))) {
+      newErrors.assignedTo = 'Please select a valid assignee';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -211,13 +218,28 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
   // Add new lead to backend
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaveError('');
     if (validateForm()) {
       try {
-        // Prepare contact field
         const contact = `${formData.prefix} ${formData.firstName} ${formData.lastName}`.trim();
-        const assigned_to_id = formData.assignedTo && !isNaN(Number(formData.assignedTo)) ? Number(formData.assignedTo) : 1;
-        const product_id = formData.product && !isNaN(Number(formData.product)) ? Number(formData.product) : 1;
-        const payload = {
+        
+        // Only set assigned_to_id if valid - improved validation
+        let assigned_to_id = undefined;
+        if (formData.assignedTo && formData.assignedTo !== '') {
+          const assignedToId = Number(formData.assignedTo);
+          if (!isNaN(assignedToId) && 
+              assignedToOptions.some(opt => Number(opt.id) === assignedToId)) {
+            assigned_to_id = assignedToId;
+          }
+        }
+        
+        let product_id = formData.product ? Number(formData.product) : undefined;
+        if (isNaN(product_id)) product_id = undefined;
+        
+        let potential = parseFloat(formData.potential);
+        if (isNaN(potential)) potential = 0;
+
+        let payload = {
           business: formData.business,
           contact,
           designation: formData.designation,
@@ -228,19 +250,37 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           country: formData.country,
           source: formData.source,
           stage: formData.stage,
-          potential: parseFloat(formData.potential) || 0,
+          potential,
           since: formData.since ? new Date(formData.since).toISOString() : new Date().toISOString(),
           gstin: formData.gstin,
           website: formData.website,
           requirements: formData.requirement,
           notes: formData.notes,
-          assigned_to_id,
-          product_id,
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
           category: formData.category,
           tags: formData.tags
         };
+        
+        // Only add assigned_to_id if it's valid
+        if (assigned_to_id !== undefined) {
+          payload.assigned_to_id = assigned_to_id;
+        }
+        
+        if (product_id !== undefined) {
+          payload.product_id = product_id;
+        }
+
+        // Remove empty string, undefined, or null fields
+        Object.keys(payload).forEach(key => {
+          if (
+            payload[key] === '' ||
+            payload[key] === undefined ||
+            payload[key] === null
+          ) {
+            delete payload[key];
+          }
+        });
 
         // Determine if imported lead (id is missing or is a string starting with 'imported_')
         const isImportedLead = leadData && (typeof leadData.id !== 'number' || String(leadData.id).startsWith('imported_'));
@@ -298,6 +338,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             body: JSON.stringify(payload),
           });
         }
+        
         if (res && res.ok) {
           await fetchLeads();
           setFormData({
@@ -311,7 +352,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             website: '',
             addressLine1: '',
             addressLine2: '',
-            country: '',
+            country: 'India',
             city: '',
             state: '',
             gstin: '',
@@ -327,15 +368,21 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             tags: ''
           });
           setErrors({});
+          setSaveError('');
           if (typeof onAddLeadSubmit === 'function') {
             onAddLeadSubmit();
           }
           onClose();
         } else if (res && !res.ok) {
-          // handle error
+          const errorData = await res.json().catch(() => ({ error: 'Failed to save lead' }));
+          const errorMessage = errorData.error || 'Failed to save lead';
+          setSaveError(errorMessage.includes('foreign key constraint') ? 
+            'Error: Invalid assignment. Please select a valid assignee.' : 
+            errorMessage);
         }
       } catch (err) {
-        // handle error
+        console.error('Error saving lead:', err);
+        setSaveError('Error saving lead. Please try again.');
       }
     }
   };
@@ -363,7 +410,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
               <h2>Enter Lead</h2>
               <button className="close-button" onClick={onClose}>&times;</button>
             </div>
-            
+            {saveError && <div className="error-message" style={{color:'red',marginBottom:'8px'}}>{saveError}</div>}
             <form onSubmit={handleSubmit}>
               <div className="form-section">
                 <h3>Core Data</h3>
@@ -632,12 +679,14 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                       name="assignedTo"
                       value={formData.assignedTo}
                       onChange={handleChange}
+                      className={errors.assignedTo ? 'error' : ''}
                     >
                       <option value="">Select Assignee</option>
                       {assignedToOptions.map(option => (
                         <option key={option.id} value={option.id}>{option.name}</option>
                       ))}
                     </select>
+                    {errors.assignedTo && <span className="error-message">{errors.assignedTo}</span>}
                   </div>
                   
                   <div className="form-group">

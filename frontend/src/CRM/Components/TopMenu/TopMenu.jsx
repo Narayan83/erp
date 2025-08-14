@@ -700,18 +700,6 @@ const TopMenu = () => {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          {/* Action Buttons */}
-          <div className="action-buttons">
-            <button className="add-lead-btn" onClick={() => setShowAddLead(true)}>
-              + Add Lead
-            </button>
-            <button className="import-btn" onClick={handleImportClick}>
-              <FaDownload /> Import
-            </button>
-            <button className="customize-btn" onClick={handleCustomizeClick}>
-              <FaWrench /> Customize
-            </button>
-          </div>
           {/* Utility Buttons */}
           <div className="utility-buttons">
             <button className="icon-btn" title="Sales Configuration"><FaCog /></button>
@@ -725,10 +713,28 @@ const TopMenu = () => {
 
       {/* Filter Section */}
       <div className="filter-section">
-        <div className="view-filters-container" style={{ position: 'relative' }}>
-          <div className={`selected-count-overlay ${selectedLeadsCount > 0 ? 'visible' : ''}`}>
-            Selected: {selectedLeadsCount}
+        <div className="view-filters-container">
+          {/* Left: Action buttons */}
+          <div className="action-buttons-center">
+            <div className="action-buttons">
+              <button className="add-lead-btn" onClick={() => setShowAddLead(true)}>
+                + Add Lead
+              </button>
+              <button className="import-btn" onClick={handleImportClick}>
+                <FaDownload /> Import
+              </button>
+              <button className="customize-btn" onClick={handleCustomizeClick}>
+                <FaWrench /> Customize
+              </button>
+            </div>
           </div>
+          {/* Center: Selected count overlay */}
+          <div className="selected-count-overlay-center">
+            <div className={`selected-count-overlay ${selectedLeadsCount > 0 ? 'visible' : ''}`}>
+              Selected: {selectedLeadsCount}
+            </div>
+          </div>
+          {/* Right: Stats section */}
           <div className="stats-section">
             <div className="count">Count: {leads.length}</div>
             <div className="selected-count">Selected: {selectedLeadsCount}</div>

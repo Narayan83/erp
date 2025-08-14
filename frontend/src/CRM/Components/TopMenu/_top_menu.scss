@@ -248,9 +248,94 @@
     // View filters container
     .view-filters-container {
       display: flex;
-      justify-content: flex-end; // changed from space-between to flex-end
       align-items: center;
+      justify-content: space-between;
       margin-top: 8px;
+      position: relative;
+
+      .action-buttons-center {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        min-width: 220px;
+      }
+
+      .selected-count-overlay-center {
+        flex: 1 1 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%; // ensure full height for vertical alignment
+      }
+
+      .selected-count-overlay {
+        position: static;
+        background-color: $primary-blue;
+        color: $primary-white;
+        padding: 4px 16px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        z-index: 2;
+        display: none;
+
+        &.visible {
+          display: block;
+        }
+      }
+
+      .stats-section {
+        flex: 0 0 auto;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: flex-end;
+        min-width: 220px;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+
+        .add-lead-btn,
+        .import-btn {
+          background-color: $primary-orange;
+          color: $primary-white;
+          border: 1px solid $primary-orange;
+          padding: 6px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          cursor: pointer;
+
+          &:hover {
+            background-color: $primary-white;
+            color: $primary-orange;
+            border: 1px solid $primary-orange; 
+          }
+        }
+
+        .customize-btn{
+          padding: 6px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          cursor: pointer;
+          color: $primary-white;
+          background-color: $primary-blue;
+          border: 1px solid $primary-blue;
+
+          &:hover{
+           color: $primary-blue;
+          background-color: $primary-white;
+          border: 1px solid $primary-blue; 
+          }
+        }
+
+        .import-btn {
+          background-color: $primary-orange;
+          color: $primary-white;
+        }
+      }
     }
 
     // Status and View filters common styles
@@ -316,7 +401,7 @@
     margin-top: 0;
     padding: 0;
     flex: 1;
-    min-height: 450px;
+    min-height: 410px;
     max-height: calc(100vh - 300px); // Adjust for header, filters, and bottom bar
     
     table {
