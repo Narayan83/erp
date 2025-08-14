@@ -84,16 +84,28 @@ const TopMenu = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Add products state to TopMenu
+  const [products, setProducts] = useState([]);
+
   // -------------------- Effects --------------------
   // Fetch leads from backend
   useEffect(() => {
     fetchLeads();
   }, []);
 
-  // Save leads to localStorage
+  // Fetch products on mount
   useEffect(() => {
-    localStorage.setItem('leads', JSON.stringify(leads));
-  }, [leads]);
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/products?page=1&limit=1000`);
+        const data = await res.json();
+        setProducts(data.data || []);
+      } catch (err) {
+        setProducts([]);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   // Collapse dropdowns when clicking outside
   useEffect(() => {
@@ -136,11 +148,8 @@ const TopMenu = () => {
       const res = await fetch(`${BASE_URL}/api/leads?page=1&limit=100`);
       const data = await res.json();
 
-      // Debug log to verify backend response structure
-      console.log('Fetched leads data:', data);
-
       const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
-      const leadsWithStar = (data.data || []).map(lead => ({
+      const backendLeads = (data.data || []).map(lead => ({
         ...lead,
         starred: !!starredMap[lead.id],
         assignedTo: assignedToOptions.find(opt => opt.id === lead.assigned_to_id)?.name || '',
@@ -151,7 +160,11 @@ const TopMenu = () => {
         tags: lead.tags || lead.Tags || lead.formData?.tags || ''
       }));
 
-      setLeads(leadsWithStar);
+      // Get imported leads from localStorage (those without backend id)
+      const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+
+      // Merge backend and imported leads
+      setLeads([...backendLeads, ...importedLeads]);
     } catch (err) {
       console.error('Failed to fetch leads:', err);
     } finally {
@@ -203,21 +216,63 @@ const TopMenu = () => {
         website: newLeadData.website,
         requirements: newLeadData.requirement,
         notes: newLeadData.notes,
+        assigned_to_id,
+        product: newLeadData.product,
+        addressLine1: newLeadData.addressLine1,
+        addressLine2: newLeadData.addressLine2,
+        category: newLeadData.category,
+        tags: newLeadData.tags
       };
       if (editLead && editLead.id) {
+        // Backend lead: update via API
         await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        await fetchLeads();
+      } else if (editLead && (!editLead.id || typeof editLead.id !== 'number')) {
+        // Imported lead: update in localStorage and state
+
+        // Get product name from products list
+        let productName = newLeadData.product;
+        const foundProduct = products.find(
+          p => p.ID === newLeadData.product || p.id === newLeadData.product
+        );
+        productName = foundProduct ? (foundProduct.Name || foundProduct.name) : newLeadData.product;
+
+        // Get assignedTo name from assignedToOptions
+        let assignedToName = newLeadData.assignedTo;
+        const foundAssignee = assignedToOptions.find(opt => opt.id === Number(newLeadData.assignedTo));
+        assignedToName = foundAssignee ? foundAssignee.name : newLeadData.assignedTo;
+
+        setLeads(prevLeads => {
+          const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+          const updatedImportedLeads = importedLeads.map(lead =>
+            lead.id === editLead.id
+              ? {
+                  ...lead,
+                  ...newLeadData,
+                  product: productName,
+                  assignedTo: assignedToName
+                }
+              : lead
+          );
+          localStorage.setItem('importedLeads', JSON.stringify(updatedImportedLeads));
+          const backendLeads = prevLeads.filter(l => l.id && typeof l.id === 'number');
+          return [...backendLeads, ...updatedImportedLeads];
+        });
+        setShowAddLead(false);
+        setEditLead(null);
       } else {
+        // New lead: add via API
         await fetch(`${BASE_URL}/api/leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        await fetchLeads();
       }
-      await fetchLeads();
       setShowAddLead(false);
       setEditLead(null);
     } catch (err) {
@@ -373,7 +428,8 @@ const TopMenu = () => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
           const newLeads = jsonData.map((row, index) => ({
-            id: leads.length + index + 1,
+            // Remove id or use a string id to avoid collision with backend ids
+            id: `imported_${Date.now()}_${index}`,
             business: row.Business || row.business || '',
             contact: row.Contact || row.contact || '',
             designation: row.Designation || row.designation || '',
@@ -385,23 +441,27 @@ const TopMenu = () => {
             source: row.Source || row.source || '',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
-            since: formatDate(parseExcelDate(row.Since || row.since || new Date().toISOString().split('T')[0])),
+            since: row.Since || row.since || new Date().toISOString().split('T')[0],
             assignedTo: row['Assigned to'] || row['AssignedTo'] || row['Assigned To'] || '',
             product: row.Product || row.product || '',
             gstin: row.GSTIN || row.gstin || '',
             website: row.Website || row.website || '',
-            lastTalk: formatDate(parseExcelDate(row['Last Talk'] || row.LastTalk || new Date().toISOString().split('T')[0])),
-            nextTalk: formatDate(parseExcelDate(row['Next Talk'] || row.NextTalk || row.Next || '')),
-            transferredOn: formatDate(parseExcelDate(row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || new Date().toISOString().split('T')[0])),
+            lastTalk: row['Last Talk'] || row.LastTalk || new Date().toISOString().split('T')[0],
+            nextTalk: row['Next Talk'] || row.NextTalk || row.Next || '',
+            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || new Date().toISOString().split('T')[0],
             requirements: row.Requirements || row.requirements || '',
             notes: row.Notes || row.notes || '',
             selected: false
           }));
           if (newLeads.length === 0) throw new Error('No valid data found in Excel file');
+          // Save imported leads separately
+          const prevImportedLeads = JSON.parse(localStorage.getItem('importedLeads') || '[]');
+          const updatedImportedLeads = [...prevImportedLeads, ...newLeads];
+          localStorage.setItem('importedLeads', JSON.stringify(updatedImportedLeads));
+          // Merge backend and imported leads
           setLeads(prevLeads => {
-            const updatedLeads = [...prevLeads, ...newLeads];
-            localStorage.setItem('leads', JSON.stringify(updatedLeads));
-            return updatedLeads;
+            const backendLeads = prevLeads.filter(l => l.id && typeof l.id === 'number');
+            return [...backendLeads, ...updatedImportedLeads];
           });
           if (fileInputRef.current) fileInputRef.current.value = '';
           alert(`Successfully imported ${newLeads.length} leads`);
@@ -415,30 +475,64 @@ const TopMenu = () => {
 
   const handleExportToExcel = () => {
     const wb = XLSX.utils.book_new();
-    const exportData = leads.map(({ selected, ...lead }) => ({
-      'Business': lead.business,
-      'Contact': lead.contact,
-      'Designation': lead.designation,
-      'Mobile': lead.mobile,
-      'Email': lead.email,
-      'City': lead.city,
-      'State': lead.state,
-      'Country': lead.country,
-      'Source': lead.source,
-      'Stage': lead.stage,
-      'Potential (₹)': lead.potential,
-      'Since': formatDate(lead.since),
-      'Assigned to': lead.assignedTo,
-      'Product': lead.product,
-      'GSTIN': lead.gstin,
-      'Website': lead.website,
-      'Last Talk': formatDate(lead.lastTalk),
-      'Next': formatDate(lead.nextTalk),
-      'Transferred on': formatDate(lead.transferredOn),
-      'Requirements': lead.requirements,
-      'Notes': lead.notes
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    // Only export columns that are selected in displayFields
+    const exportFields = displayFields.map(field => field.key);
+    const exportHeaders = displayFields.map(field => field.label);
+
+    // Build export data using only selected fields
+    const exportData = leads.map(lead => {
+      const row = {};
+      displayFields.forEach(field => {
+        let value;
+        if (field.key === 'name') {
+          value = lead.name && lead.name.trim()
+            ? lead.name
+            : lead.contact && lead.contact.trim()
+              ? lead.contact
+              : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
+        } else if (field.key === 'potential') {
+          value = lead.potential || '';
+        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
+          value = formatDate(lead[field.key]);
+        } else if (field.key === 'assignedTo') {
+          value = typeof lead.assignedTo === 'object' && lead.assignedTo !== null
+            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
+            : (lead.assignedTo || '');
+        } else if (field.key === 'product') {
+          value = typeof lead.product === 'object' && lead.product !== null
+            ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
+            : (lead.product || '');
+        } else if (field.key === 'addressLine1') {
+          value = lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '';
+        } else if (field.key === 'addressLine2') {
+          value = lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '';
+        } else if (field.key === 'category') {
+          value = lead.category || lead.Category || lead.formData?.category || '';
+        } else if (field.key === 'tags') {
+          value = lead.tags || lead.Tags || lead.formData?.tags || '';
+        } else if (field.key === 'lastTalk') {
+          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+        } else if (field.key === 'nextTalk') {
+          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+        } else if (field.key === 'transferredOn') {
+          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+        } else if (field.key === 'assignedToId') {
+          value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
+        } else if (field.key === 'productId') {
+          value = lead.product_id || lead.productId || lead.ProductID || '';
+        } else if (field.key === 'createdAt') {
+          value = formatDateTime(lead.createdAt || lead.CreatedAt || '');
+        } else if (field.key === 'updatedAt') {
+          value = formatDateTime(lead.updatedAt || lead.UpdatedAt || '');
+        } else {
+          value = lead[field.key] || '';
+        }
+        row[field.label] = value;
+      });
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders });
     XLSX.utils.book_append_sheet(wb, ws, "Leads");
     XLSX.writeFile(wb, "Leads_List_Exported.xlsx");
   };
@@ -498,6 +592,48 @@ const TopMenu = () => {
   const handleRowsPerPageChange = (e) => {
     setRowsPerPage(Number(e.target.value));
     setPageNo(1); // Reset to first page
+  };
+
+  // Add this function before the return statement
+  const handleAddLeadModalSubmit = (leadOrNothing) => {
+    // If leadOrNothing is an object, it's an imported lead update
+    if (leadOrNothing && (!leadOrNothing.id || typeof leadOrNothing.id !== 'number' || String(leadOrNothing.id).startsWith('imported_'))) {
+      // Get product name from products list
+      let productName = leadOrNothing.product;
+      const foundProduct = products.find(
+        p => p.ID === leadOrNothing.product || p.id === leadOrNothing.product
+      );
+      productName = foundProduct ? (foundProduct.Name || foundProduct.name) : leadOrNothing.product;
+
+      // Get assignedTo name from assignedToOptions
+      let assignedToName = leadOrNothing.assignedTo;
+      const foundAssignee = assignedToOptions.find(opt => opt.id === Number(leadOrNothing.assignedTo));
+      assignedToName = foundAssignee ? foundAssignee.name : leadOrNothing.assignedTo;
+
+      setLeads(prevLeads => {
+        const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+        const updatedImportedLeads = importedLeads.map(lead =>
+          lead.id === leadOrNothing.id
+            ? {
+                ...lead,
+                ...leadOrNothing,
+                product: productName,
+                assignedTo: assignedToName
+              }
+            : lead
+        );
+        localStorage.setItem('importedLeads', JSON.stringify(updatedImportedLeads));
+        const backendLeads = prevLeads.filter(l => l.id && typeof l.id === 'number');
+        return [...backendLeads, ...updatedImportedLeads];
+      });
+      setShowAddLead(false);
+      setEditLead(null);
+    } else {
+      // For backend leads, just refresh from backend
+      fetchLeads();
+      setShowAddLead(false);
+      setEditLead(null);
+    }
   };
 
   // -------------------- Render --------------------
@@ -623,106 +759,114 @@ const TopMenu = () => {
             </tr>
           </thead>
           <tbody>
-            {/* Render each lead row */}
-            {Array.isArray(paginatedLeads) && paginatedLeads.map((lead, index) => (
-              <tr key={lead.id || index}>
-                <td className="checkbox-cell">
-                  <input
-                    type="checkbox"
-                    checked={!!lead.selected}
-                    onChange={() => handleSelectRow(lead.id)}
-                  />
-                </td>
-                <td className="serial-number">
-                  <span
-                    className={`star-icon ${lead.starred ? 'starred' : ''}`}
-                    title={lead.starred ? 'Unmark as Star' : 'Mark as Star'}
-                    onClick={() => handleToggleStar(lead.id)}
-                  >
-                    <FaStar />
-                  </span>
-                  {(pageNo - 1) * rowsPerPage + index + 1}
-                </td>
-                {/* Render only selected fields */}
-                {displayFields.map(field => (
-                  <td key={field.key}>
-                    {/* Highlight searched characters for string fields */}
-                    {(() => {
-                      let value;
-                      if (field.key === 'name') {
-                        value = lead.name && lead.name.trim()
-                          ? lead.name
-                          : lead.contact && lead.contact.trim()
-                            ? lead.contact
-                            : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
-                      } else if (field.key === 'potential') {
-                        value = `₹${lead.potential || ''}`;
-                      } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
-                        value = formatDate(lead[field.key]);
-                      } else if (field.key === 'assignedTo') {
-                        value = typeof lead.assignedTo === 'object' && lead.assignedTo !== null
-                          ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
-                          : (lead.assignedTo || '');
-                      } else if (field.key === 'product') {
-                        value = typeof lead.product === 'object' && lead.product !== null
-                          ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
-                          : (lead.product || '');
-                      } else if (field.key === 'addressLine1') {
-                        value = lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '';
-                      } else if (field.key === 'addressLine2') {
-                        value = lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '';
-                      } else if (field.key === 'category') {
-                        value = lead.category || lead.Category || lead.formData?.category || '';
-                      } else if (field.key === 'tags') {
-                        value = lead.tags || lead.Tags || lead.formData?.tags || '';
-                      } else if (field.key === 'lastTalk') {
-                        value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
-                      } else if (field.key === 'nextTalk') {
-                        value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
-                      } else if (field.key === 'transferredOn') {
-                        value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
-                      } else if (field.key === 'assignedToId') {
-                        value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
-                      } else if (field.key === 'productId') {
-                        value = lead.product_id || lead.productId || lead.ProductID || '';
-                      } else if (field.key === 'createdAt') {
-                        value = formatDateTime(lead.createdAt || lead.CreatedAt || '');
-                      } else if (field.key === 'updatedAt') {
-                        value = formatDateTime(lead.updatedAt || lead.UpdatedAt || '');
-                      } else {
-                        value = lead[field.key] || '';
-                      }
-                      // Only highlight for string values and if searchTerm is present
-                      return typeof value === 'string' && searchTerm
-                        ? highlightText(value, searchTerm)
-                        : value;
-                    })()}
-                  </td>
-                ))}
-                <td className="action-cell">
-                  <button
-                    className="edit-btn"
-                    title="Edit Lead"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditRow(lead);
-                    }}
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteRow(lead.id);
-                    }}
-                    className="delete-btn"
-                    title="Delete Lead"
-                  >
-                    <FaTrash />
-                  </button>
+            {/* If no displayFields, show "No items to display" */}
+            {displayFields.length === 0 ? (
+              <tr>
+                <td colSpan={2 + 1 + 1} style={{ textAlign: 'center', color: '#888' }}>
+                  No items to display
                 </td>
               </tr>
-            ))}
+            ) : (
+              Array.isArray(paginatedLeads) && paginatedLeads.map((lead, index) => (
+                <tr key={lead.id || index}>
+                  <td className="checkbox-cell">
+                    <input
+                      type="checkbox"
+                      checked={!!lead.selected}
+                      onChange={() => handleSelectRow(lead.id)}
+                    />
+                  </td>
+                  <td className="serial-number">
+                    <span
+                      className={`star-icon ${lead.starred ? 'starred' : ''}`}
+                      title={lead.starred ? 'Unmark as Star' : 'Mark as Star'}
+                      onClick={() => handleToggleStar(lead.id)}
+                    >
+                      <FaStar />
+                    </span>
+                    {(pageNo - 1) * rowsPerPage + index + 1}
+                  </td>
+                  {/* Render only selected fields */}
+                  {displayFields.map(field => (
+                    <td key={field.key}>
+                      {/* Highlight searched characters for string fields */}
+                      {(() => {
+                        let value;
+                        if (field.key === 'name') {
+                          value = lead.name && lead.name.trim()
+                            ? lead.name
+                            : lead.contact && lead.contact.trim()
+                              ? lead.contact
+                              : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
+                        } else if (field.key === 'potential') {
+                          value = `₹${lead.potential || ''}`;
+                        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
+                          value = formatDate(lead[field.key]);
+                        } else if (field.key === 'assignedTo') {
+                          value = typeof lead.assignedTo === 'object' && lead.assignedTo !== null
+                            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
+                            : (lead.assignedTo || '');
+                        } else if (field.key === 'product') {
+                          value = typeof lead.product === 'object' && lead.product !== null
+                            ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
+                            : (lead.product || '');
+                        } else if (field.key === 'addressLine1') {
+                          value = lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '';
+                        } else if (field.key === 'addressLine2') {
+                          value = lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '';
+                        } else if (field.key === 'category') {
+                          value = lead.category || lead.Category || lead.formData?.category || '';
+                        } else if (field.key === 'tags') {
+                          value = lead.tags || lead.Tags || lead.formData?.tags || '';
+                        } else if (field.key === 'lastTalk') {
+                          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+                        } else if (field.key === 'nextTalk') {
+                          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+                        } else if (field.key === 'transferredOn') {
+                          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+                        } else if (field.key === 'assignedToId') {
+                          value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
+                        } else if (field.key === 'productId') {
+                          value = lead.product_id || lead.productId || lead.ProductID || '';
+                        } else if (field.key === 'createdAt') {
+                          value = formatDateTime(lead.createdAt || lead.CreatedAt || '');
+                        } else if (field.key === 'updatedAt') {
+                          value = formatDateTime(lead.updatedAt || lead.UpdatedAt || '');
+                        } else {
+                          value = lead[field.key] || '';
+                        }
+                        // Only highlight for string values and if searchTerm is present
+                        return typeof value === 'string' && searchTerm
+                          ? highlightText(value, searchTerm)
+                          : value;
+                      })()}
+                    </td>
+                  ))}
+                  <td className="action-cell">
+                    <button
+                      className="edit-btn"
+                      title="Edit Lead"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditRow(lead);
+                      }}
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRow(lead.id);
+                      }}
+                      className="delete-btn"
+                      title="Delete Lead"
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -751,8 +895,9 @@ const TopMenu = () => {
       <AddLead
         isOpen={showAddLead}
         onClose={() => { setShowAddLead(false); setEditLead(null); }}
-        onAddLeadSubmit={fetchLeads}
+        onAddLeadSubmit={handleAddLeadModalSubmit}
         leadData={editLead}
+        products={products}
       />
       <input
         type="file"

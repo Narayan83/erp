@@ -215,10 +215,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
       try {
         // Prepare contact field
         const contact = `${formData.prefix} ${formData.firstName} ${formData.lastName}`.trim();
-        // Map assignedTo and product to IDs (use 1 as fallback if not selected)
         const assigned_to_id = formData.assignedTo && !isNaN(Number(formData.assignedTo)) ? Number(formData.assignedTo) : 1;
         const product_id = formData.product && !isNaN(Number(formData.product)) ? Number(formData.product) : 1;
-        // Only send fields expected by backend
         const payload = {
           business: formData.business,
           contact,
@@ -243,15 +241,56 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           category: formData.category,
           tags: formData.tags
         };
+
+        // Determine if imported lead (id is missing or is a string starting with 'imported_')
+        const isImportedLead = leadData && (typeof leadData.id !== 'number' || String(leadData.id).startsWith('imported_'));
+
+        if (isImportedLead) {
+          // Imported lead: update in localStorage and local state via TopMenu
+          if (typeof onAddLeadSubmit === 'function') {
+            onAddLeadSubmit({ ...leadData, ...formData, ...payload, id: leadData.id });
+          }
+          setFormData({
+            business: '',
+            prefix: 'Mr.',
+            firstName: '',
+            lastName: '',
+            designation: '',
+            mobile: '',
+            email: '',
+            website: '',
+            addressLine1: '',
+            addressLine2: '',
+            country: '',
+            city: '',
+            state: '',
+            gstin: '',
+            source: '',
+            since: '',
+            requirement: '',
+            category: '',
+            product: '',
+            potential: '',
+            assignedTo: '',
+            stage: '',
+            notes: '',
+            tags: ''
+          });
+          setErrors({});
+          onClose();
+          return;
+        }
+
         let res;
         if (leadData && leadData.id) {
-          // Edit mode: send PUT request
+          // Edit mode: send PUT request for backend leads only
           res = await fetch(`${BASE_URL}/api/leads/${leadData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-        } else {
+        }
+        if (!leadData || !leadData.id) {
           // Add mode: send POST request
           res = await fetch(`${BASE_URL}/api/leads`, {
             method: 'POST',
@@ -259,7 +298,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             body: JSON.stringify(payload),
           });
         }
-        if (res.ok) {
+        if (res && res.ok) {
           await fetchLeads();
           setFormData({
             business: '',
@@ -292,7 +331,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             onAddLeadSubmit();
           }
           onClose();
-        } else {
+        } else if (res && !res.ok) {
           // handle error
         }
       } catch (err) {

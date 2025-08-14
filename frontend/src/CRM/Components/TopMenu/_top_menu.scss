@@ -502,7 +502,7 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  gap: clamp(200px, 10vw, 320px); // min 32px, max 120px, responsive
+  gap: clamp(100px, 10vw, 320px); // min 32px, max 120px, responsive
 
   button {
     padding: 6px 18px;
