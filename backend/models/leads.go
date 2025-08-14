@@ -28,12 +28,12 @@ type Lead struct {
 	Category      string    `json:"category"`
 	Tags          string    `json:"tags"`
 
-	// ✅ Assigned User
-	AssignedToID uint `json:"assigned_to_id"`
-	AssignedTo   User `gorm:"foreignKey:AssignedToID" json:"assigned_to"`
+	// ✅ Assigned User (make pointer for optional)
+	AssignedToID *uint `json:"assigned_to_id"`
+	AssignedTo   User  `gorm:"foreignKey:AssignedToID" json:"assigned_to"`
 
-	// ✅ Product Reference
-	ProductID uint    `json:"product_id"`
+	// ✅ Product Reference (make pointer for optional)
+	ProductID *uint   `json:"product_id"`
 	Product   Product `gorm:"foreignKey:ProductID" json:"product"`
 
 	CreatedAt time.Time `json:"created_at"`
