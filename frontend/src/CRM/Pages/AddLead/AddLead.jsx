@@ -18,7 +18,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
     city: '',
     state: '',
     gstin: '',
-    code: '',
     source: '',
     since: '',
     requirement: '',
@@ -34,6 +33,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
   const [errors, setErrors] = useState({});
   const [leads, setLeads] = useState([]);
   const [products, setProducts] = useState([]);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (leadData) {
@@ -52,6 +52,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           lastName = parts.slice(1).join(' ');
         }
       }
+      
       // Map assignedTo (name, id, or object) to id
       let assignedToId = '';
       if (leadData.assignedTo) {
@@ -63,7 +64,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         } else if (typeof leadData.assignedTo === 'object' && leadData.assignedTo !== null) {
           assignedToId = leadData.assignedTo.id || '';
         }
+      } else if (leadData.assigned_to_id) {
+        assignedToId = leadData.assigned_to_id;
       }
+      
       // Map product (id, name, or object) to id
       let productId = '';
       if (leadData.product) {
@@ -76,7 +80,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         } else if (typeof leadData.product === 'object' && leadData.product !== null) {
           productId = leadData.product.ID || leadData.product.id || '';
         }
+      } else if (leadData.product_id) {
+        productId = leadData.product_id;
       }
+      
       setFormData({
         business: leadData.business || '',
         prefix,
@@ -92,7 +99,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         city: leadData.city || '',
         state: leadData.state || '',
         gstin: leadData.gstin || '',
-        code: leadData.code || '',
         source: leadData.source || '',
         since: leadData.since || '',
         requirement: leadData.requirements || leadData.requirement || '',
@@ -120,7 +126,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         city: '',
         state: '',
         gstin: '',
-        code: '',
         source: '',
         since: '',
         requirement: '',
@@ -173,6 +178,12 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
       newErrors.email = 'Enter a valid email address';
     }
     
+    // Validate assignedTo if provided
+    if (formData.assignedTo && 
+        !assignedToOptions.some(opt => String(opt.id) === String(formData.assignedTo))) {
+      newErrors.assignedTo = 'Please select a valid assignee';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -207,15 +218,28 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
   // Add new lead to backend
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaveError('');
     if (validateForm()) {
       try {
-        // Prepare contact field
         const contact = `${formData.prefix} ${formData.firstName} ${formData.lastName}`.trim();
-        // Map assignedTo and product to IDs (use 1 as fallback if not selected)
-        const assigned_to_id = formData.assignedTo && !isNaN(Number(formData.assignedTo)) ? Number(formData.assignedTo) : 1;
-        const product_id = formData.product && !isNaN(Number(formData.product)) ? Number(formData.product) : 1;
-        // Only send fields expected by backend
-        const payload = {
+        
+        // Only set assigned_to_id if valid - improved validation
+        let assigned_to_id = undefined;
+        if (formData.assignedTo && formData.assignedTo !== '') {
+          const assignedToId = Number(formData.assignedTo);
+          if (!isNaN(assignedToId) && 
+              assignedToOptions.some(opt => Number(opt.id) === assignedToId)) {
+            assigned_to_id = assignedToId;
+          }
+        }
+        
+        let product_id = formData.product ? Number(formData.product) : undefined;
+        if (isNaN(product_id)) product_id = undefined;
+        
+        let potential = parseFloat(formData.potential);
+        if (isNaN(potential)) potential = 0;
+
+        let payload = {
           business: formData.business,
           contact,
           designation: formData.designation,
@@ -226,33 +250,46 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           country: formData.country,
           source: formData.source,
           stage: formData.stage,
-          potential: parseFloat(formData.potential) || 0,
+          potential,
           since: formData.since ? new Date(formData.since).toISOString() : new Date().toISOString(),
           gstin: formData.gstin,
           website: formData.website,
           requirements: formData.requirement,
           notes: formData.notes,
-          assigned_to_id,
-          product_id
+          addressLine1: formData.addressLine1,
+          addressLine2: formData.addressLine2,
+          category: formData.category,
+          tags: formData.tags
         };
-        let res;
-        if (leadData && leadData.id) {
-          // Edit mode: send PUT request
-          res = await fetch(`${BASE_URL}/api/leads/${leadData.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } else {
-          // Add mode: send POST request
-          res = await fetch(`${BASE_URL}/api/leads`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
+        
+        // Only add assigned_to_id if it's valid
+        if (assigned_to_id !== undefined) {
+          payload.assigned_to_id = assigned_to_id;
         }
-        if (res.ok) {
-          await fetchLeads();
+        
+        if (product_id !== undefined) {
+          payload.product_id = product_id;
+        }
+
+        // Remove empty string, undefined, or null fields
+        Object.keys(payload).forEach(key => {
+          if (
+            payload[key] === '' ||
+            payload[key] === undefined ||
+            payload[key] === null
+          ) {
+            delete payload[key];
+          }
+        });
+
+        // Determine if imported lead (id is missing or is a string starting with 'imported_')
+        const isImportedLead = leadData && (typeof leadData.id !== 'number' || String(leadData.id).startsWith('imported_'));
+
+        if (isImportedLead) {
+          // Imported lead: update in localStorage and local state via TopMenu
+          if (typeof onAddLeadSubmit === 'function') {
+            onAddLeadSubmit({ ...leadData, ...formData, ...payload, id: leadData.id });
+          }
           setFormData({
             business: '',
             prefix: 'Mr.',
@@ -268,7 +305,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             city: '',
             state: '',
             gstin: '',
-            code: '',
             source: '',
             since: '',
             requirement: '',
@@ -281,15 +317,72 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             tags: ''
           });
           setErrors({});
+          onClose();
+          return;
+        }
+
+        let res;
+        if (leadData && leadData.id) {
+          // Edit mode: send PUT request for backend leads only
+          res = await fetch(`${BASE_URL}/api/leads/${leadData.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+        if (!leadData || !leadData.id) {
+          // Add mode: send POST request
+          res = await fetch(`${BASE_URL}/api/leads`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+        
+        if (res && res.ok) {
+          await fetchLeads();
+          setFormData({
+            business: '',
+            prefix: 'Mr.',
+            firstName: '',
+            lastName: '',
+            designation: '',
+            mobile: '',
+            email: '',
+            website: '',
+            addressLine1: '',
+            addressLine2: '',
+            country: 'India',
+            city: '',
+            state: '',
+            gstin: '',
+            source: '',
+            since: '',
+            requirement: '',
+            category: '',
+            product: '',
+            potential: '',
+            assignedTo: '',
+            stage: '',
+            notes: '',
+            tags: ''
+          });
+          setErrors({});
+          setSaveError('');
           if (typeof onAddLeadSubmit === 'function') {
             onAddLeadSubmit();
           }
           onClose();
-        } else {
-          // handle error
+        } else if (res && !res.ok) {
+          const errorData = await res.json().catch(() => ({ error: 'Failed to save lead' }));
+          const errorMessage = errorData.error || 'Failed to save lead';
+          setSaveError(errorMessage.includes('foreign key constraint') ? 
+            'Error: Invalid assignment. Please select a valid assignee.' : 
+            errorMessage);
         }
       } catch (err) {
-        // handle error
+        console.error('Error saving lead:', err);
+        setSaveError('Error saving lead. Please try again.');
       }
     }
   };
@@ -317,7 +410,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
               <h2>Enter Lead</h2>
               <button className="close-button" onClick={onClose}>&times;</button>
             </div>
-            
+            {saveError && <div className="error-message" style={{color:'red',marginBottom:'8px'}}>{saveError}</div>}
             <form onSubmit={handleSubmit}>
               <div className="form-section">
                 <h3>Core Data</h3>
@@ -490,18 +583,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                     />
                   </div>
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Code</label>
-                    <input
-                      type="text"
-                      name="code"
-                      value={formData.code}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
+
               </div>
               
               <div className="form-section">
@@ -597,12 +679,14 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                       name="assignedTo"
                       value={formData.assignedTo}
                       onChange={handleChange}
+                      className={errors.assignedTo ? 'error' : ''}
                     >
                       <option value="">Select Assignee</option>
                       {assignedToOptions.map(option => (
                         <option key={option.id} value={option.id}>{option.name}</option>
                       ))}
                     </select>
+                    {errors.assignedTo && <span className="error-message">{errors.assignedTo}</span>}
                   </div>
                   
                   <div className="form-group">
@@ -670,6 +754,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
               <th>City</th>
               <th>Stage</th>
               <th>Potential</th>
+              <th>Address Line 1</th>
+              <th>Address Line 2</th>
+              <th>Category</th>
+              <th>Tags</th>
               {/* Add more columns as needed */}
             </tr>
           </thead>
@@ -684,6 +772,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 <td>{lead.city}</td>
                 <td>{lead.stage}</td>
                 <td>{lead.potential}</td>
+                <td>{lead.addressLine1 || lead.addressline1 || lead.address_line1 || ''}</td>
+                <td>{lead.addressLine2 || lead.addressline2 || lead.address_line2 || ''}</td>
+                <td>{lead.category || lead.Category || ''}</td>
+                <td>{lead.tags || lead.Tags || ''}</td>
                 {/* Add more cells as needed */}
               </tr>
             ))}
