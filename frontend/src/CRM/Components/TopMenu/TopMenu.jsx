@@ -482,6 +482,24 @@ const TopMenu = () => {
   );
   const selectedLeadsCount = leads.filter(lead => lead.selected).length;
 
+  // -------------------- Pagination State --------------------
+  const [pageNo, setPageNo] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Calculate total pages based on filtered leads
+  const totalPages = Math.max(1, Math.ceil(displayedLeads.length / rowsPerPage));
+
+  // Paginated leads for current page
+  const paginatedLeads = displayedLeads.slice((pageNo - 1) * rowsPerPage, pageNo * rowsPerPage);
+
+  // Pagination handlers
+  const handlePrevPage = () => setPageNo(prev => Math.max(prev - 1, 1));
+  const handleNextPage = () => setPageNo(prev => Math.min(prev + 1, totalPages));
+  const handleRowsPerPageChange = (e) => {
+    setRowsPerPage(Number(e.target.value));
+    setPageNo(1); // Reset to first page
+  };
+
   // -------------------- Render --------------------
   return (
     <div className="top-menu">
@@ -606,7 +624,7 @@ const TopMenu = () => {
           </thead>
           <tbody>
             {/* Render each lead row */}
-            {Array.isArray(displayedLeads) && displayedLeads.map((lead, index) => (
+            {Array.isArray(paginatedLeads) && paginatedLeads.map((lead, index) => (
               <tr key={lead.id || index}>
                 <td className="checkbox-cell">
                   <input
@@ -623,7 +641,7 @@ const TopMenu = () => {
                   >
                     <FaStar />
                   </span>
-                  {index + 1}
+                  {(pageNo - 1) * rowsPerPage + index + 1}
                 </td>
                 {/* Render only selected fields */}
                 {displayFields.map(field => (
@@ -707,6 +725,21 @@ const TopMenu = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Section */}
+      <div className="pagination-section">
+        <button onClick={handlePrevPage} disabled={pageNo === 1}>Previous</button>
+        <span>Page {pageNo} of {totalPages}</span>
+        <span>
+          Rows per page:
+          <select value={rowsPerPage} onChange={handleRowsPerPageChange}>
+            {[5, 10, 25, 50].map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </span>
+        <button onClick={handleNextPage} disabled={pageNo === totalPages}>Next</button>
       </div>
 
       {/* Display Preferences Modal */}

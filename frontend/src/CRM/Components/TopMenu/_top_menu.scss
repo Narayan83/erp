@@ -14,9 +14,9 @@
   // Header section 
   .header-section {
     display: flex;
-    flex-direction: column; // changed from row to column
-    align-items: stretch;
-    justify-content: flex-start;
+    flex-direction: row; // changed from column to row
+    align-items: center; // align vertically center
+    justify-content: space-between; // space between title and actions
     gap: 0;
     margin-bottom: 6px;
 
@@ -25,16 +25,20 @@
       font-weight: 400;
       color: $primary-black;
       text-shadow: 1px 3px 3px rgba(0, 0, 0, 0.5);
-      margin-bottom: 10px;
-      text-align: center;
+      margin-bottom: 0; // remove bottom margin
+      text-align: left; // align left
+      flex: 0 0 auto; // don't grow/shrink
+      padding-right: 24px; // add some space to the right
+      min-width: 220px; // ensure title doesn't shrink too much
     }
 
     .header-actions {
       display: flex;
       align-items: center;
       gap: 12px;
-      justify-content: center;
+      justify-content: flex-end;
       flex: 1;
+      flex-wrap: wrap; // allow wrapping on small screens
     }
 
     .all-leads-btn {
@@ -312,7 +316,7 @@
     margin-top: 0;
     padding: 0;
     flex: 1;
-    min-height: 506px;
+    min-height: 450px;
     max-height: calc(100vh - 300px); // Adjust for header, filters, and bottom bar
     
     table {
@@ -491,5 +495,59 @@
 
   &.visible {
     display: block;
+  }
+}
+
+.pagination-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: clamp(200px, 10vw, 320px); // min 32px, max 120px, responsive
+
+  button {
+    padding: 6px 18px;
+    border-radius: 4px;
+    border: 1px solid $primary-blue;
+    background: $primary-white;
+    color: $primary-blue;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+
+    &:hover:not(:disabled) {
+      background: $primary-blue;
+      color: $primary-white;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  span {
+    font-size: 14px;
+    color: $primary-black;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  select {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid $primary-blue;
+    font-size: 14px;
+    background: $primary-white;
+    color: $primary-blue;
+    margin-left: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: $primary-orange;
+    }
   }
 }
