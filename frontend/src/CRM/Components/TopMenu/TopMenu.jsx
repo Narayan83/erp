@@ -479,8 +479,14 @@ const TopMenu = () => {
     const exportFields = displayFields.map(field => field.key);
     const exportHeaders = displayFields.map(field => field.label);
 
+    // Check if any leads are selected
+    const selectedLeads = leads.filter(lead => lead.selected);
+    
+    // Use selected leads if available, otherwise use filtered leads
+    const leadsToExport = selectedLeads.length > 0 ? selectedLeads : displayedLeads;
+
     // Build export data using only selected fields
-    const exportData = leads.map(lead => {
+    const exportData = leadsToExport.map(lead => {
       const row = {};
       displayFields.forEach(field => {
         let value;
@@ -532,9 +538,30 @@ const TopMenu = () => {
       return row;
     });
 
+    // Generate filename based on selection and active filters
+    let filename = "Leads_";
+    
+    // Add information about selected leads if any
+    if (selectedLeads.length > 0) {
+      filename += `Selected_${selectedLeads.length}_`;
+    } else {
+      // Add filter information only if not exporting selected leads
+      if (activeStatusFilter !== 'All Active Leads') {
+        filename += `${activeStatusFilter}_`;
+      }
+      if (activeViewFilter !== 'Newest First') {
+        filename += `${activeViewFilter}_`;
+      }
+      if (searchTerm) {
+        filename += `Search_${searchTerm.replace(/[^a-z0-9]/gi, '_').substring(0, 10)}_`;
+      }
+    }
+    
+    filename += "Exported.xlsx";
+
     const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders });
     XLSX.utils.book_append_sheet(wb, ws, "Leads");
-    XLSX.writeFile(wb, "Leads_List_Exported.xlsx");
+    XLSX.writeFile(wb, filename);
   };
 
   // -------------------- Filtering --------------------
