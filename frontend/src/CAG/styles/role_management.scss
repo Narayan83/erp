@@ -1,0 +1,40 @@
+.role-management-root {
+  background-color: #f5f7fa;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.role-management-header {
+  background-color: #0074d9;
+  color: #fff;
+  padding: 16px 24px;
+  border-radius: 8px 8px 0 0;
+}
+
+.role-management-content {
+  padding: 24px;
+}
+
+.role-management-permissions {
+  margin-top: 32px;
+}
+
+.role-management-permissions-paper {
+  background-color: #e8f0fe !important;
+  padding: 16px;
+}
+
+.role-management-permission-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  background-color: #dbeafe;
+  border-radius: 16px;
+  padding: 8px;
+}
+
+.role-management-permission-checkboxes {
+  display: flex;
+  gap: 16px;
+  margin-left: 16px;
+}
