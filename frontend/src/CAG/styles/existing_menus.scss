@@ -1,0 +1,49 @@
+.existing-menus-root {
+  background-color: #f5f7fa;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.existing-menus-content {
+  padding: 24px;
+}
+
+.existing-menus-search-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.existing-menus-search-input {
+  width: 250px;
+  background-color: #fff;
+  border-radius: 16px;
+  margin-right: 16px;
+}
+
+.existing-menus-refresh-btn {
+  border-radius: 16px;
+  text-transform: none;
+  min-width: 100px;
+}
+
+.existing-menus-table-container {
+  border-radius: 24px;
+}
+
+.existing-menus-table-head-row {
+  background-color: #e8f0fe !important;
+}
+
+.existing-menus-table-head-cell {
+  font-weight: 700 !important;
+}
+
+.existing-menus-edit-btn {
+  color: #2ecc40 !important;
+  margin-right: 8px;
+}
+
+.existing-menus-delete-btn {
+  color: #ff4136 !important;
+}

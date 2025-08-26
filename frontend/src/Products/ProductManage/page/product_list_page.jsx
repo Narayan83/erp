@@ -22,6 +22,14 @@ import {
   FormControlLabel,
   Checkbox,
   Tooltip,
+  Dialog,           // added
+  DialogTitle,      // added
+  DialogContent,    // added
+  DialogActions,    // added
+  Divider,          // added
+  List,             // added
+  ListItem,         // added
+  ListItemText      // added
 } from "@mui/material";
 import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn } from "@mui/icons-material";
 import axios from "axios";
@@ -135,7 +143,7 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
   );
 });
 
-const ProductTableBody = memo(function ProductTableBody({ products, navigate, loading, visibleColumns }) {
+const ProductTableBody = memo(function ProductTableBody({ products, navigate, loading, visibleColumns, onView }) {
   // Add extra safety check for null/undefined products
   if (!products) {
     return (
@@ -170,10 +178,16 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
           {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.subcategory && <TableCell sx={{ py: 0.5 }}>{p.Subcategory?.Name || ''}</TableCell>}
-          {visibleColumns.stock && <TableCell sx={{ py: 0.5 }}>{p.Stock ?? ''}</TableCell>}
+          {visibleColumns.stock && (
+            // show common fallback fields for stock if p.Stock is not present
+            <TableCell sx={{ py: 0.5 }}>
+              {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
+            </TableCell>
+          )}
           <TableCell align="center">
             <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
-              <IconButton onClick={() => navigate(`/products/${p.ID}`)}><Visibility /></IconButton>
+              {/* View now uses onView callback to open read-only dialog */}
+              <IconButton onClick={() => onView && onView(p.ID)}><Visibility /></IconButton>
               <IconButton onClick={() => navigate(`/products/${p.ID}/edit`)}><Edit /></IconButton>
             </Box>
           </TableCell>
@@ -524,6 +538,138 @@ export default function ProductListPage() {
     setDisplayPrefsAnchor(null);
   };
 
+  const [selectedProduct, setSelectedProduct] = useState(null); // product details for view
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+
+  const handleOpenView = async (id) => {
+    try {
+      setViewLoading(true);
+      // fetch full product details
+      const res = await axios.get(`${BASE_URL}/api/products/${id}`);
+      let product = res?.data?.data ?? res?.data ?? null;
+
+      // Helper to extract numeric stock from an object/field
+      const extractStock = (obj) => {
+        if (obj == null) return null;
+        const candidates = [
+          obj.Stock,
+          obj.StockQuantity,
+          obj.stock,
+          obj.quantity,
+          obj.qty,
+          obj.total_stock,
+          obj.TotalStock,
+        ];
+        for (const c of candidates) {
+          if (c === 0) return 0;
+          if (c == null) continue;
+          const n = Number(c);
+          if (!Number.isNaN(n)) return n;
+        }
+        return null;
+      };
+
+      // Helper to pick the first available image URL from variant image structures
+      const extractImages = (v) => {
+        const imgs = v.Images ?? v.images ?? v.ImagesList ?? v.images_list ?? v.pictures ?? v.pictures_list ?? v.photos;
+        if (!imgs) {
+          // sometimes a single image field exists
+          const single = v.Image ?? v.image ?? v.thumbnail ?? v.thumb;
+          return single ? [single] : [];
+        }
+        // normalize array items to strings when possible
+        if (Array.isArray(imgs)) {
+          return imgs.map(i => {
+            if (!i) return null;
+            if (typeof i === 'string') return i;
+            // common shapes: { url } or { path } or { src }
+            return i.url ?? i.src ?? i.path ?? i.file ?? null;
+          }).filter(Boolean);
+        }
+        // if it's an object with url
+        if (typeof imgs === 'object' && imgs !== null) {
+          return [imgs.url ?? imgs.src ?? imgs.path ?? null].filter(Boolean);
+        }
+        return [];
+      };
+
+      // Normalize variants if present on product or fetch separately
+      let variants = product?.Variants ?? product?.variants ?? product?.product_variants ?? null;
+      if (!Array.isArray(variants)) {
+        try {
+          const vr = await axios.get(`${BASE_URL}/api/products/${id}/variants`);
+          variants = vr?.data?.data ?? vr?.data ?? [];
+        } catch (e) {
+          variants = [];
+        }
+      }
+
+      // map/normalize each variant to required fields
+      variants = Array.isArray(variants) ? variants.map((v, idx) => {
+        const sku = v.SKU ?? v.Code ?? v.code ?? v.sku ?? v.id ?? v.ID ?? `#${idx + 1}`;
+        const barcode = v.Barcode ?? v.barcode ?? v.EAN ?? v.ean ?? v.UPC ?? v.upc ?? '';
+        const purchaseCost = v.PurchaseCost ?? v.purchase_cost ?? v.Cost ?? v.cost_price ?? v.CostPrice ?? v.cost ?? null;
+        const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? null;
+        const stockVal = extractStock(v);
+        const leadTime = v.LeadTime ?? v.lead_time ?? v.leadtime ?? v.delivery_days ?? v.lead ?? null;
+
+        // Color / Size may be present as top-level fields or inside Attributes/options
+        const attrsSource = v.Attributes ?? v.attributes ?? v.options ?? v.Options ?? v.variables ?? {};
+        const color = v.Color ?? v.color ?? attrsSource.Color ?? attrsSource.color ?? attrsSource.color_name ?? '';
+        const size = v.Size ?? v.size ?? attrsSource.Size ?? attrsSource.size ?? attrsSource.size_name ?? '';
+
+        const images = extractImages(v);
+
+        return {
+          ...v,
+          SKU: sku,
+          Barcode: barcode,
+          PurchaseCost: purchaseCost,
+          SalesPrice: salesPrice,
+          stock: stockVal,
+          LeadTime: leadTime,
+          Color: color,
+          Size: size,
+          Images: images,
+        };
+      }) : [];
+
+      // Determine product-level stock: prefer explicit fields, else sum variant stocks
+      let productStock = extractStock(product);
+      if (productStock == null) {
+        if (Array.isArray(variants) && variants.length > 0) {
+          const s = variants.reduce((acc, v) => {
+            const n = extractStock(v);
+            return acc + (n != null ? n : 0);
+          }, 0);
+          productStock = s;
+        }
+      }
+
+      // Attach normalized fields to product
+      const normalizedProduct = {
+        ...product,
+        Variants: Array.isArray(variants) ? variants : [],
+        Stock: productStock,
+      };
+
+      setSelectedProduct(normalizedProduct);
+      setViewOpen(true);
+    } catch (err) {
+      console.error("Error fetching product details:", err);
+      setSelectedProduct(null);
+      setViewOpen(true); // open so user sees message
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const handleCloseView = () => {
+    setViewOpen(false);
+    setSelectedProduct(null);
+  };
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -541,6 +687,118 @@ export default function ProductListPage() {
         open={Boolean(displayPrefsAnchor)}
         onClose={handleCloseDisplayPrefs}
       />
+
+      {/* Product view dialog (read-only) */}
+      <Dialog open={viewOpen} onClose={handleCloseView} maxWidth="lg" fullWidth>
+        <DialogTitle>Product Details (Read-only)</DialogTitle>
+        <DialogContent dividers>
+          {viewLoading ? (
+            <Box display="flex" justifyContent="center" p={2}><CircularProgress /></Box>
+          ) : selectedProduct ? (
+            <Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Product Name" value={selectedProduct.Name ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Code" value={selectedProduct.Code ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="HSN/SAC Code" value={selectedProduct.HsnSacCode ?? selectedProduct.HSN ?? selectedProduct.hsn ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Importance" value={selectedProduct.Importance ?? selectedProduct.importance ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Minimum Stock" value={selectedProduct.MinimumStock ?? selectedProduct.minimumStock ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Category" value={selectedProduct.Category?.Name ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Subcategory" value={selectedProduct.Subcategory?.Name ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Unit" value={selectedProduct.Unit?.Name ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Product Mode" value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Tax" value={selectedProduct.Tax?.Name ? `${selectedProduct.Tax.Name} (${selectedProduct.Tax.Percentage}%)` : ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="GST %" value={selectedProduct.GstPercent ?? selectedProduct.gstPercent ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Description" value={selectedProduct.Description ?? selectedProduct.description ?? ''} fullWidth size="small" disabled multiline rows={2} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Internal Notes" value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''} fullWidth size="small" disabled multiline rows={2} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Is Active" value={typeof selectedProduct.isActive !== 'undefined' ? (selectedProduct.isActive ? 'Yes' : 'No') : ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
+                </Grid>
+              </Grid>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2">Variants</Typography>
+              {Array.isArray(selectedProduct.Variants) && selectedProduct.Variants.length > 0 ? (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{fontWeight: 'bold'}}>Color</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Size</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>SKU</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Barcode</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Purchase Cost</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Sales Price</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Stock</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Lead Time</TableCell>
+                      <TableCell sx={{fontWeight: 'bold'}}>Images</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedProduct.Variants.map((v, i) => (
+                      <TableRow key={v.ID ?? v.SKU ?? i}>
+                        <TableCell>{v.Color ?? v.ColorCaption ?? ''}</TableCell>
+                        <TableCell>{v.Size ?? ''}</TableCell>
+                        <TableCell>{v.SKU ?? ''}</TableCell>
+                        <TableCell>{v.Barcode ?? ''}</TableCell>
+                        <TableCell>{v.PurchaseCost != null ? String(v.PurchaseCost) : ''}</TableCell>
+                        <TableCell>{v.SalesPrice != null ? String(v.SalesPrice) : ''}</TableCell>
+                        <TableCell>{v.stock != null ? String(v.stock) : ''}</TableCell>
+                        <TableCell>{v.LeadTime ?? ''}</TableCell>
+                        <TableCell>
+                          <Box display="flex" gap={1} alignItems="center">
+                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => (
+                              <img key={idx} src={img} alt={`img-${idx}`} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
+                            )) : <Typography variant="caption" color="textSecondary">No images</Typography>}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Typography color="textSecondary">No variants available for this product.</Typography>
+              )}
+
+              <Divider />
+            </Box>
+          ) : (
+            <Typography color="textSecondary">No product data available.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseView}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Paper>
         <TableContainer sx={{ position: 'relative' }}>
@@ -632,12 +890,13 @@ export default function ProductListPage() {
                 visibleColumns={visibleColumns}
               />
             </TableHead>
-            {/* UPDATED: pass visibleColumns into body */}
+            {/* UPDATED: pass visibleColumns into body and onView handler */}
             <ProductTableBody 
               products={products} 
               navigate={navigate} 
               loading={loading} 
-              visibleColumns={visibleColumns} 
+              visibleColumns={visibleColumns}
+              onView={handleOpenView}
             />
           </Table>
         </TableContainer>

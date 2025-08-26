@@ -70,6 +70,20 @@ export const menuItems = [
   },
 
   {
+    id: 7,
+    title: "CAG Masters",
+    icon: GiRingmaster,
+    submenu: [
+      { title: "Role Creation", path: "/rolecreation" },
+      { title: "Role Management", path: "/rolemanagement" },
+      { title: "Menu Creation", path: "/menucreation" },
+      { title: "User Management", path: "/usermanagement" },
+      { title: "Existing Menus", path: "/existingmenus" },
+      { title: "Audit Logs", path: "/auditlogs" },
+    ],
+  },
+
+  {
     id: 4,
     title: "Setup",
     icon: MdOutlinePhonelinkSetup,

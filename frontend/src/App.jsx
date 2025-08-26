@@ -16,7 +16,6 @@ import LoginPage from "./AdminSection/AdminPages/Login/Login";
 import Registration from "./Roles/Registration/Registration";
 import RegistrationView from "./Roles/Registration/RegistrationView";
 import NotFoundPage from "./AdminSection/AdminPages/NotFoundPage/NotFoundPage";
-import RoleCreation from "./Roles/RoleCreation/RoleCreation";
 import RolesView from "./Roles/RoleCreation/RolesView";
 import CategoryPage from "./Products/Category/page/CategoryPage";
 import SubcategoryPage from "./Products/Subcategory/page/SubcategoryPage";
@@ -34,9 +33,14 @@ import CrmPage from "./CRM/Components/TopMenu/TopMenu";
 import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
-// import QuotationForm from './CRM/Pages/Quotation/Quotation';
 import QuotationNewForm from './CRM/Pages/Quotation/QuotationForm';
 import QuotationList from './CRM/Pages/Quotation/QuotationList';
+
+
+import RoleCreation from "./CAG/page/RoleCreation/RoleCreation";
+import MenuCreation from "./CAG/page/MenuCreation/MenuCreation";
+import RoleManagement from './CAG/page/RoleManagement/RoleManagement';
+import ExistingMenus from './CAG/page/ExistingMenus/ExistingMenus';
 
 const myContext = createContext();
 
@@ -135,7 +139,11 @@ function App() {
             <Route index element={<QuotationForm />} />
             <Route path="test" element={<QuotationTest />} />
           </Route> */}
-          
+
+          <Route path="/rolecreation" element={<RoleCreation />} />
+          <Route path="/menucreation" element={<MenuCreation />} />
+          <Route path="/existingmenus" element={<ExistingMenus />} />
+          <Route path="/rolemanagement" element={<RoleManagement />} />
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

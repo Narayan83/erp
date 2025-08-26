@@ -152,6 +152,10 @@ export default function UserListPage() {
     fetchUsers();
   };
 
+  // Add state for view dialog and selected user
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+
   return (
     <Box p={3}>
       <Typography variant="h5" mb={2}>👤 User Master</Typography>
@@ -390,7 +394,17 @@ export default function UserListPage() {
                     ))}
                     {checkedFields.length > 0 && (
                       <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                        <Tooltip title="View"><IconButton onClick={() => navigate(`/users/${user.id}`)}><Visibility /></IconButton></Tooltip>
+                        {/* Change View button to open dialog */}
+                        <Tooltip title="View">
+                          <IconButton
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setViewDialogOpen(true);
+                            }}
+                          >
+                            <Visibility />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Edit"><IconButton onClick={() => navigate(`/users/${user.id}/edit`)}><Edit /></IconButton></Tooltip>
                         <Tooltip title="WhatsApp"><IconButton><WhatsApp /></IconButton></Tooltip>
                         <Tooltip title="Mail"><IconButton><Mail /></IconButton></Tooltip>
@@ -460,6 +474,208 @@ export default function UserListPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDisplayPrefClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View User Dialog */}
+      <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>User Details</DialogTitle>
+        <DialogContent dividers sx={{ maxHeight: '70vh', overflowY: 'auto', bgcolor: '#fafafa' }}>
+          {selectedUser ? (
+            <Grid container spacing={2}>
+              {userFields.map((field) => (
+                <Grid item xs={6} key={field}>
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 2,
+                      mb: 2,
+                      border: '1px solid #e0e0e0',
+                      bgcolor: '#f9f9fc',
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main', mb: 0.5 }}>
+                      {field}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.primary', wordBreak: 'break-word' }}>
+                      {field === "Name"
+                        ? [selectedUser.salutation, selectedUser.firstname, selectedUser.lastname].filter(Boolean).join(" ")
+                        : field === "DOB"
+                        ? selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : ""
+                        : field === "Gender"
+                        ? selectedUser.gender
+                        : field === "CountryCode"
+                        ? selectedUser.country_code
+                        : field === "MobileNumber"
+                        ? selectedUser.mobile_number
+                        : field === "EmergencyNumber"
+                        ? selectedUser.emergency_number
+                        : field === "AlternateNumber"
+                        ? selectedUser.alternate_number
+                        : field === "WhatsappNumber"
+                        ? selectedUser.whatsapp_number
+                        : field === "Email"
+                        ? selectedUser.email
+                        : field === "Website"
+                        ? selectedUser.website
+                        : field === "BusinessName"
+                        ? selectedUser.business_name
+                        : field === "Title"
+                        ? selectedUser.title
+                        : field === "CompanyName"
+                        ? selectedUser.companyname
+                        : field === "Designation"
+                        ? selectedUser.designation
+                        : field === "IndustrySegment"
+                        ? selectedUser.industry_segment
+                        : field === "Address1"
+                        ? selectedUser.address1
+                        : field === "Address2"
+                        ? selectedUser.address2
+                        : field === "Address3"
+                        ? selectedUser.address3
+                        : field === "Address4"
+                        ? selectedUser.address4
+                        : field === "Address5"
+                        ? selectedUser.address5
+                        : field === "State"
+                        ? selectedUser.state
+                        : field === "Country"
+                        ? selectedUser.country
+                        : field === "Pincode"
+                        ? selectedUser.pincode
+                        : field === "AadharNumber"
+                        ? selectedUser.aadhar_number
+                        : field === "PANNumber"
+                        ? selectedUser.pan_number
+                        : field === "GSTIN"
+                        ? selectedUser.gstin
+                        : field === "MSMENo"
+                        ? selectedUser.msme_no
+                        : field === "BankName"
+                        ? selectedUser.bank_name
+                        : field === "BranchName"
+                        ? selectedUser.branch_name
+                        : field === "BranchAddress"
+                        ? selectedUser.branch_address
+                        : field === "AccountNumber"
+                        ? selectedUser.account_number
+                        : field === "IFSCCode"
+                        ? selectedUser.ifsc_code
+                        : field === "Active"
+                        ? selectedUser.active ? "Yes" : "No"
+                        : field === "IsUser"
+                        ? selectedUser.is_user ? "Yes" : "No"
+                        : field === "IsCustomer"
+                        ? selectedUser.is_customer ? "Yes" : "No"
+                        : field === "IsSupplier"
+                        ? selectedUser.is_supplier ? "Yes" : "No"
+                        : field === "IsEmployee"
+                        ? selectedUser.is_employee ? "Yes" : "No"
+                        : field === "IsDealer"
+                        ? selectedUser.is_dealer ? "Yes" : "No"
+                        : field === "IsDistributor"
+                        ? selectedUser.is_distributor ? "Yes" : "No"
+                        : field === "RoleID"
+                        ? selectedUser.role_id
+                        : field === "Additional Address"
+                        ? (
+                            Array.isArray(selectedUser.additional_addresses) && selectedUser.additional_addresses.length > 0
+                              ? selectedUser.additional_addresses.map((addr, idx) => (
+                                  <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                                    {Object.entries(addr).map(([key, value]) =>
+                                      key !== "keyValues"
+                                        ? value
+                                          ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
+                                              <span style={{ color: '#1976d2' }}>{key}:</span> {value}
+                                            </Typography>
+                                          : null
+                                        : Array.isArray(value) && value.length > 0
+                                          ? <Box key={key} sx={{ mt: 0.5 }}>
+                                              <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
+                                              {value.map((kv, i) => (
+                                                <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
+                                                  [{kv.key}: {kv.value}]
+                                                </span>
+                                              ))}
+                                            </Box>
+                                          : null
+                                    )}
+                                  </Paper>
+                                ))
+                              : Array.isArray(selectedUser.Addresses) && selectedUser.Addresses.length > 0
+                                ? selectedUser.Addresses.map((addrStr, idx) => {
+                                    let addr;
+                                    try { addr = JSON.parse(addrStr); } catch { addr = {}; }
+                                    return (
+                                      <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                                        {Object.entries(addr).map(([key, value]) =>
+                                          key !== "keyValues"
+                                            ? value
+                                              ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
+                                                  <span style={{ color: '#1976d2' }}>{key}:</span> {value}
+                                                </Typography>
+                                              : null
+                                            : Array.isArray(value) && value.length > 0
+                                              ? <Box key={key} sx={{ mt: 0.5 }}>
+                                                  <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
+                                                  {value.map((kv, i) => (
+                                                    <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
+                                                      [{kv.key}: {kv.value}]
+                                                    </span>
+                                                  ))}
+                                                </Box>
+                                              : null
+                                        )}
+                                      </Paper>
+                                    );
+                                  })
+                                : ""
+                          )
+                        : field === "Additional Bank Info"
+                        ? (
+                            Array.isArray(selectedUser.AdditionalBankInfos) && selectedUser.AdditionalBankInfos.length > 0
+                              ? selectedUser.AdditionalBankInfos.map((biStr, idx) => {
+                                  let bi;
+                                  try { bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr; } catch { bi = {}; }
+                                  return (
+                                    <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                                      {Object.entries(bi).map(([key, value]) =>
+                                        key !== "keyValues"
+                                          ? value
+                                            ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
+                                                <span style={{ color: '#1976d2' }}>{key}:</span> {value}
+                                              </Typography>
+                                            : null
+                                          : Array.isArray(value) && value.length > 0
+                                            ? <Box key={key} sx={{ mt: 0.5 }}>
+                                                <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
+                                                {value.map((kv, i) => (
+                                                  <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
+                                                    [{kv.key}: {kv.value}]
+                                                  </span>
+                                                ))}
+                                              </Box>
+                                            : null
+                                      )}
+                                    </Paper>
+                                  );
+                                })
+                              : ""
+                          )
+                        : ""
+                      }
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Typography>No user selected.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewDialogOpen(false)} variant="contained" color="primary">Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
