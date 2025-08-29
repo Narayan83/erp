@@ -6,15 +6,16 @@ const users = [
   // ...add more users as needed
 ];
 
-const roles = [
-  { label: "superadmin - Super Administrator with access to all p", value: "superadmin" },
-  // ...add more roles as needed
-];
-
-const menus = [
-  { label: "All menus...", value: "all" },
-  // ...add more menus as needed
-];
+const roles = (() => {
+  const stored = JSON.parse(localStorage.getItem("roles") || "[]");
+  if (stored.length > 0) {
+    return stored.map(role => ({ label: `${role.name} - ${role.description}`, value: role.name }));
+  } else {
+    return [
+      { label: "superadmin - Super Administrator with access to all p", value: "superadmin" },
+    ];
+  }
+})();
 
 const permissionsData = [
   { menu: "Home", permissions: ["All", "View", "Create", "Update", "Delete"] },
@@ -25,8 +26,16 @@ const permissionsData = [
 ];
 
 export default function RoleManagement() {
-  const [selectedUser, setSelectedUser] = useState(users[0].value);
   const [selectedRole, setSelectedRole] = useState(roles[0].value);
+
+  const [menus, setMenus] = useState(() => {
+    const stored = JSON.parse(localStorage.getItem("menus") || "[]");
+    return [
+      { label: "All menus...", value: "all" },
+      ...stored.map(m => ({ label: m.name, value: m.name }))
+    ];
+  });
+
   const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
 
   // Permissions state: { [menu]: { [perm]: boolean } }

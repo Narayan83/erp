@@ -75,10 +75,11 @@ export const menuItems = [
     icon: GiRingmaster,
     submenu: [
       { title: "Role Creation", path: "/rolecreation" },
+      { title: "Existing Roles", path: "/existingroles" },
       { title: "Role Management", path: "/rolemanagement" },
       { title: "Menu Creation", path: "/menucreation" },
-      { title: "User Management", path: "/usermanagement" },
       { title: "Existing Menus", path: "/existingmenus" },
+      { title: "User Management", path: "/usermanagement" },
       { title: "Audit Logs", path: "/auditlogs" },
     ],
   },

@@ -5,7 +5,7 @@
   height: 100%;
   padding: 0;
   font-family: sans-serif;
-  margin-top: 60px;
+  margin-top: 50px;
 }
 .role-creation-container {
   background: #f8fafc;
@@ -13,7 +13,7 @@
   max-width: 100%;
   margin: 0 auto;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 20px 28px;
 }
 .role-creation-title {
@@ -67,7 +67,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 50px auto;
+  margin: 0 auto;
   width: 60%;
   background: #1677ff;
   color: #fff;
@@ -76,6 +76,17 @@
   border-radius: 6px;
   padding: 8px 0;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(22,119,255,0.08);
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
   transition: background 0.2s;
+}
+
+.embedded {
+  margin-top: 0;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
