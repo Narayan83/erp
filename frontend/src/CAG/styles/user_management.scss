@@ -1,4 +1,4 @@
-.role-management-container {
+.user-management-container {
   background: #f8f9fc;
   padding: 0 24px;
   width: 100vw;
@@ -6,17 +6,16 @@
   margin-top: 50px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 
-  .role-management-header {
+  .user-management-header {
     color: #1677ff;
     font-size: 1.2rem;
     font-weight: 600;
     text-align: left;
     border-radius: 8px 8px 0 0;
     padding: 16px 0;
-    
   }
 
-  .role-management-selectors {
+  .user-management-selectors {
     display: flex;
     gap: 32px;
     margin-bottom: 24px;
@@ -39,8 +38,8 @@
     }
   }
 
-  .role-management-permissions {
-    .role-management-permissions-title {
+  .user-management-permissions {
+    .user-management-permissions-title {
       font-size: 1rem;
       font-weight: 500;
       margin-bottom: 12px;

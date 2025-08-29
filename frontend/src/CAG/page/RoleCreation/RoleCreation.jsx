@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/role_creation.scss";
 
-export default function RoleCreation() {
+export default function RoleCreation({ isEditing = false, editingRole = null, onUpdateRole, onCancel }) {
   const [roleName, setRoleName] = useState("");
   const [description, setDescription] = useState("");
   const [permissions, setPermissions] = useState({
@@ -11,6 +11,31 @@ export default function RoleCreation() {
     update: false,
     view: false,
   });
+
+  useEffect(() => {
+    if (isEditing && editingRole) {
+      setRoleName(editingRole.name || "");
+      setDescription(editingRole.description || "");
+      const perms = editingRole.permissions || {};
+      setPermissions({
+        view: !!perms.view,
+        create: !!perms.create,
+        update: !!perms.update,
+        delete: !!perms.delete,
+        all: !!perms.view && !!perms.create && !!perms.update && !!perms.delete,
+      });
+    } else {
+      setRoleName("");
+      setDescription("");
+      setPermissions({
+        all: false,
+        create: false,
+        delete: false,
+        update: false,
+        view: false,
+      });
+    }
+  }, [isEditing, editingRole]);
 
   const handlePermissionChange = (perm) => {
     if (perm === "all") {
@@ -29,11 +54,38 @@ export default function RoleCreation() {
     }
   };
 
+  const handleSubmit = () => {
+    const trimmedName = roleName.trim();
+    if (!trimmedName) return;
+    const perms = { ...permissions };
+    delete perms.all;
+    const role = { name: trimmedName, description, permissions: perms };
+    console.log("RoleCreation: submitting role", role);
+    if (isEditing) {
+      onUpdateRole(role, editingRole.name);
+    } else {
+      const existingRoles = JSON.parse(localStorage.getItem("roles") || "[]");
+      const duplicate = existingRoles.find(r => r.name === role.name);
+      if (duplicate) {
+        alert("Role name already exists");
+        return;
+      }
+      existingRoles.push(role);
+      localStorage.setItem("roles", JSON.stringify(existingRoles));
+      console.log("RoleCreation: added to localStorage", role);
+      // Reset form
+      setRoleName("");
+      setDescription("");
+      setPermissions({ all: false, create: false, delete: false, update: false, view: false });
+      alert("Role created successfully!");
+    }
+  };
+
   return (
-    <div className="role-creation-bg">
+    <div className={`role-creation-bg ${isEditing ? 'embedded' : ''}`}>
       <div className="role-creation-container">
         <h1 className="role-creation-title">
-          Create New Role
+          {isEditing ? "Edit Role" : "Create New Role"}
         </h1>
         <div className="role-creation-field">
           <label className="role-creation-label">Role Name</label>
@@ -68,10 +120,10 @@ export default function RoleCreation() {
             <label>
               <input
                 type="checkbox"
-                checked={permissions.delete}
-                onChange={() => handlePermissionChange("delete")}
+                checked={permissions.view}
+                onChange={() => handlePermissionChange("view")}
               />
-              Delete
+              View
             </label>
             <label>
               <input
@@ -92,18 +144,25 @@ export default function RoleCreation() {
             <label>
               <input
                 type="checkbox"
-                checked={permissions.view}
-                onChange={() => handlePermissionChange("view")}
+                checked={permissions.delete}
+                onChange={() => handlePermissionChange("delete")}
               />
-              View
+              Delete
             </label>
           </div>
         </div>
-        <button className="role-creation-btn">
-          Create Role
-        </button>
+        <div className="form-buttons">
+          {isEditing && (
+            <button className="role-creation-btn" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button className="role-creation-btn" onClick={handleSubmit}>
+            {isEditing ? "Update Role" : "Create Role"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-     
+

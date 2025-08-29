@@ -1,73 +1,172 @@
 import React, { useState } from "react";
-import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import "../../styles/existing_menus.scss";
+import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
+import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
 
-const menuRows = [
-  { name: "about", remarks: "Menu: About" },
-  { name: "admin", remarks: "Menu: Admin" },
-  { name: "assigned_documents", remarks: "Menu: Assigned Documents" },
-  { name: "audit_logs", remarks: "Menu: Audit Logs" },
-  { name: "bulk_upload", remarks: "Menu: Bulk Upload" },
-  { name: "data_validation", remarks: "Menu: Data Validation" },
-  { name: "existing_menus", remarks: "Menu: Existing Menus" },
-  { name: "feedback", remarks: "Menu: Feedback" },
-  { name: "home", remarks: "Menu: Home" }
-];
+const defaultOnEdit = () => {};
 
-export default function ExistingMenus() {
+export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMenu = defaultOnEdit }) {
   const [search, setSearch] = useState("");
-  const filteredRows = menuRows.filter(row => row.name.includes(search.toLowerCase()));
+  const [localMenus, setLocalMenus] = useState(() => {
+    if (menus) return menus;
+    return JSON.parse(localStorage.getItem("menus") || "[]");
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingMenu, setEditingMenu] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
+
+  const displayMenus = menus || localMenus;
+
+  const displaySetMenus = (newMenus) => {
+    if (setMenus && typeof setMenus === "function") {
+      setMenus(newMenus);
+    } else {
+      setLocalMenus(newMenus);
+      localStorage.setItem("menus", JSON.stringify(newMenus));
+    }
+  };
+
+  const safeMenus = Array.isArray(displayMenus) ? displayMenus : [];
+
+  const handleDelete = (name) => {
+    if (setMenus && typeof setMenus !== "function") {
+      console.error("ExistingMenus: setMenus provided but not a function");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this menu?")) {
+      return;
+    }
+    displaySetMenus(safeMenus.filter((menu) => menu.name !== name));
+  };
+
+  const handleEdit = (menu) => {
+    setIsEditing(true);
+    setEditingMenu(menu);
+  };
+
+  const handleUpdateMenu = (updatedMenu, oldName) => {
+    const updatedMenus = safeMenus.map((menu) =>
+      menu.name === oldName ? updatedMenu : menu
+    );
+    displaySetMenus(updatedMenus);
+    setIsEditing(false);
+    setEditingMenu(null);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingMenu(null);
+  };
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const handleRefresh = () => {
+    if (setMenus && typeof setMenus !== "function") {
+      console.error("ExistingMenus: setMenus provided but not a function");
+      return;
+    }
+    if (Array.isArray(initialMenus) && initialMenus.length > 0) {
+      displaySetMenus(initialMenus);
+    }
+    setSearch("");
+  };
+
+  const handleSort = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
+  const filteredMenus = safeMenus.filter((menu) =>
+    menu.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const sortedMenus = [...filteredMenus].sort((a, b) => {
+    if (sortOrder === 'asc') {
+      return a.name.localeCompare(b.name);
+    } else {
+      return b.name.localeCompare(a.name);
+    }
+  });
 
   return (
-    <Box className="existing-menus-root">
-      <Box className="existing-menus-content">
-        <Typography variant="h5" fontWeight={700} color="#1a237e">Existing Menus</Typography>
-        <Typography variant="subtitle2" color="text.secondary" mb={3}>
-          Manage all your available menus
-        </Typography>
-        <Box className="existing-menus-search-row">
-          <TextField
+    <div className="existing-menus-container">
+      <section className="title-section">
+        <div>
+          <h1 className="page-title">Existing Menus</h1>
+          <div className="subtitle">Manage all your available menus</div>
+        </div>
+        <div className="actions-row">
+          <input
+            type="text"
+            className="search-input"
             placeholder="Search menu..."
-            size="small"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="existing-menus-search-input"
+            onChange={handleSearch}
           />
-          <Button variant="outlined" className="existing-menus-refresh-btn">
+          <button className="refresh-btn" onClick={handleRefresh}>
             Refresh
-          </Button>
-        </Box>
-        <TableContainer component={Paper} className="existing-menus-table-container">
-          <Table>
-            <TableHead>
-              <TableRow className="existing-menus-table-head-row">
-                <TableCell className="existing-menus-table-head-cell">Menu Name &#8593;</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Permissions</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Remarks</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredRows.map((row, idx) => (
-                <TableRow key={row.name}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell></TableCell>
-                  <TableCell>{row.remarks}</TableCell>
-                  <TableCell>
-                    <IconButton className="existing-menus-edit-btn">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton className="existing-menus-delete-btn">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
-    </Box>
+          </button>
+        </div>
+      </section>
+      {isEditing && (
+        <div className="editing-container">
+          <MenuCreation
+            isEditing={isEditing}
+            editingMenu={editingMenu}
+            onUpdateMenu={handleUpdateMenu}
+            onCancel={handleCancelEdit}
+          />
+        </div>
+      )}
+      {!isEditing && (
+        <table className="menus-table">
+          <thead>
+            <tr>
+              <th onClick={handleSort} style={{ cursor: 'pointer' }}>
+                Menu Name {sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />}
+              </th>
+              <th>Permissions</th>
+              <th>Remarks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedMenus.map((menu) => (
+              <tr key={menu.name}>
+                <td>{menu.name}</td>
+                <td>
+                  {menu.permissions
+                    ? Object.entries(menu.permissions)
+                        .filter(([k, v]) => v && k !== "all")
+                        .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1))
+                        .join(", ")
+                    : ""}
+                </td>
+                <td>{menu.remarks}</td>
+                <td>
+                  <button
+                    className="action-btn edit-btn"
+                    title="Edit"
+                    onClick={() => handleEdit(menu)}
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    className="action-btn delete-btn"
+                    title="Delete"
+                    onClick={() => handleDelete(menu.name)}
+                  >
+                    <FaTrash />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
+
+

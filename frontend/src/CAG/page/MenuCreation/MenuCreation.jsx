@@ -1,15 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/menu_creation.scss";
 
-export default function MenuCreation() {
+const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCancel }) => {
   const [menuName, setMenuName] = useState("");
   const [permissions, setPermissions] = useState({
     all: false,
     view: false,
+    create: false,
     update: false,
     delete: false,
   });
   const [remarks, setRemarks] = useState("");
+
+  useEffect(() => {
+    if (isEditing && editingMenu) {
+      setMenuName(editingMenu.name || "");
+      setRemarks(editingMenu.remarks || "");
+      const perms = editingMenu.permissions || {};
+      setPermissions({
+        view: !!perms.view,
+        create: !!perms.create,
+        update: !!perms.update,
+        delete: !!perms.delete,
+        all: perms.view && perms.create && perms.update && perms.delete,
+      });
+    } else {
+      setMenuName("");
+      setPermissions({
+        all: false,
+        view: false,
+        create: false,
+        update: false,
+        delete: false,
+      });
+      setRemarks("");
+    }
+  }, [isEditing, editingMenu]);
 
   const handlePermissionChange = (perm) => {
     if (perm === "all") {
@@ -17,82 +43,146 @@ export default function MenuCreation() {
       setPermissions({
         all: newVal,
         view: newVal,
+        create: newVal,
         update: newVal,
         delete: newVal,
       });
     } else {
       const newPerms = { ...permissions, [perm]: !permissions[perm] };
-      newPerms.all = newPerms.view && newPerms.update && newPerms.delete;
+      newPerms.all = newPerms.view && newPerms.create && newPerms.update && newPerms.delete;
       setPermissions(newPerms);
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmedName = menuName.trim();
+    if (!trimmedName) return;
+    const perms = { ...permissions };
+    delete perms.all;
+    const newMenu = {
+      name: trimmedName,
+      permissions: perms,
+      remarks,
+    };
+    console.log("MenuCreation: submitting menu", newMenu);
+    if (isEditing) {
+      if (typeof onUpdateMenu === "function") {
+        onUpdateMenu(newMenu, editingMenu.name);
+      }
+    } else {
+      if (typeof onAddMenu === "function") {
+        onAddMenu(newMenu);
+      } else {
+        const stored = JSON.parse(localStorage.getItem('menus') || '[]');
+        const exists = stored.some((m) => m.name === newMenu.name);
+        if (exists) {
+          console.warn(`MenuCreation: menu with name "${newMenu.name}" already exists`);
+          return;
+        }
+        stored.push(newMenu);
+        localStorage.setItem('menus', JSON.stringify(stored));
+        console.log("MenuCreation: added to localStorage", newMenu);
+      }
+      setMenuName("");
+      setPermissions({
+        all: false,
+        view: false,
+        create: false,
+        update: false,
+        delete: false,
+      });
+      setRemarks("");
+    }
+  };
+
   return (
-    <div className="menu-creation-bg">
-      <div className="menu-creation-container">
-        <h1 className="menu-creation-title">
-          Menu Management
-        </h1>
-        <div className="menu-creation-field">
-          <label className="menu-creation-label">Menu Name</label>
-          <input
-            type="text"
-            placeholder="Enter menu name"
-            value={menuName}
-            onChange={e => setMenuName(e.target.value)}
-            className="menu-creation-input"
-          />
+    <div className={`menu-creation-container ${isEditing ? 'embedded' : ''}`}>
+      <h1 className="menu-title">{isEditing ? "Edit Menu" : "Menu Management"}</h1>
+      <form className="menu-form" onSubmit={handleSubmit}>
+        <label className="menu-label">Menu Name</label>
+        <input
+          className="menu-input"
+          type="text"
+          placeholder="Enter menu name"
+          value={menuName}
+          onChange={(e) => setMenuName(e.target.value)}
+        />
+
+        <label className="menu-label">Permissions</label>
+        <div className="permissions-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={permissions.all}
+              onChange={() => handlePermissionChange("all")}
+            />
+            All
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={permissions.view}
+              onChange={() => handlePermissionChange("view")}
+            />
+            View
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              checked={permissions.create}
+              onChange={() => handlePermissionChange("create")}
+            />
+            Create
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={permissions.update}
+              onChange={() => handlePermissionChange("update")}
+            />
+            Update
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={permissions.delete}
+              onChange={() => handlePermissionChange("delete")}
+            />
+            Delete
+          </label>
         </div>
-        <div className="menu-creation-field">
-          <label className="menu-creation-label">Permissions</label>
-          <div className="menu-creation-permissions">
-            <label>
-              <input
-                type="checkbox"
-                checked={permissions.all}
-                onChange={() => handlePermissionChange("all")}
-              />
-              All
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={permissions.view}
-                onChange={() => handlePermissionChange("view")}
-              />
-              View
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={permissions.update}
-                onChange={() => handlePermissionChange("update")}
-              />
-              Update
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={permissions.delete}
-                onChange={() => handlePermissionChange("delete")}
-              />
-              Delete
-            </label>
-          </div>
+
+        <label className="menu-label">Remarks</label>
+        <textarea
+          className="menu-textarea"
+          placeholder="Enter remarks (optional)"
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+        />
+
+        <div className="form-buttons">
+          {isEditing && (
+            <button
+              className="menu-submit-btn"
+              type="button"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            className="menu-submit-btn"
+            type="submit"
+            disabled={isEditing && !editingMenu}
+          >
+            {isEditing ? "Update Menu" : "Create Menu"}
+          </button>
         </div>
-        <div className="menu-creation-field">
-          <label className="menu-creation-label">Remarks</label>
-          <textarea
-            placeholder="Enter remarks (optional)"
-            value={remarks}
-            onChange={e => setRemarks(e.target.value)}
-            className="menu-creation-textarea"
-          />
-        </div>
-        <button className="menu-creation-btn">
-          Create Menu
-        </button>
-      </div>
+      </form>
     </div>
   );
-}
+};
+
+export default MenuCreation;
