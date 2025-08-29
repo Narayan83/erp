@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "../../styles/existing_menus.scss";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
 
 const defaultOnEdit = () => {};
@@ -13,6 +13,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const displayMenus = menus || localMenus;
 
@@ -72,9 +73,21 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     setSearch("");
   };
 
+  const handleSort = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
   const filteredMenus = safeMenus.filter((menu) =>
     menu.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const sortedMenus = [...filteredMenus].sort((a, b) => {
+    if (sortOrder === 'asc') {
+      return a.name.localeCompare(b.name);
+    } else {
+      return b.name.localeCompare(a.name);
+    }
+  });
 
   return (
     <div className="existing-menus-container">
@@ -110,14 +123,16 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
         <table className="menus-table">
           <thead>
             <tr>
-              <th>Menu Name &#8593;</th>
+              <th onClick={handleSort} style={{ cursor: 'pointer' }}>
+                Menu Name {sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />}
+              </th>
               <th>Permissions</th>
               <th>Remarks</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredMenus.map((menu) => (
+            {sortedMenus.map((menu) => (
               <tr key={menu.name}>
                 <td>{menu.name}</td>
                 <td>
@@ -153,5 +168,5 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     </div>
   );
 }
-  
+
 

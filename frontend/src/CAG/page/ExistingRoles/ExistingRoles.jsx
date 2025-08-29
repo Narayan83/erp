@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "../../styles/existing_roles.scss";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import RoleCreation from "../RoleCreation/RoleCreation"; // Adjust the import based on your file structure
 
 const defaultOnEdit = () => {};
@@ -13,6 +13,7 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const displayRoles = roles || localRoles;
 
@@ -72,9 +73,21 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
     setSearch("");
   };
 
+  const handleSort = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
   const filteredRoles = safeRoles.filter((role) =>
     role.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const sortedRoles = [...filteredRoles].sort((a, b) => {
+    if (sortOrder === 'asc') {
+      return a.name.localeCompare(b.name);
+    } else {
+      return b.name.localeCompare(a.name);
+    }
+  });
 
   return (
     <div className="existing-roles-container">
@@ -110,14 +123,16 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
         <table className="roles-table">
           <thead>
             <tr>
-              <th>Role Name &#8593;</th>
+              <th onClick={handleSort} style={{ cursor: 'pointer' }}>
+                Role Name {sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />}
+              </th>
               <th>Description</th>
               <th>Permissions</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRoles.map((role) => (
+            {sortedRoles.map((role) => (
               <tr key={role.name}>
                 <td>{role.name}</td>
                 <td>{role.description}</td>
