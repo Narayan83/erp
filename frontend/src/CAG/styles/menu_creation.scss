@@ -1,69 +1,83 @@
-.menu-creation-bg {
-  background: #f7f8fa;
-  min-height: 100vh;
-  padding: 40px 0;
-  font-family: sans-serif;
-}
 .menu-creation-container {
-  background: #fff;
-  max-width: 900px;
-  margin: 0 auto;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  padding: 32px 28px;
+  width: 100vw;
+  max-width: 100%;
+  background: #f7f8fa;
+  height: 100%;
+  padding: 40px;
+  font-family: sans-serif;
+  margin-top: 50px;
 }
-.menu-creation-title {
-  color: #1677ff;
-  font-weight: 700;
-  font-size: 32px;
-  margin-bottom: 32px;
-}
-.menu-creation-field {
-  margin-bottom: 24px;
-}
-.menu-creation-label {
+
+.menu-title {
+  color: #1877f2;
+  font-size: 1.2rem;
   font-weight: 600;
-  font-size: 17px;
+  margin-bottom: 2rem;
 }
-.menu-creation-input {
-  display: block;
-  margin-top: 8px;
+
+.menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.menu-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  
+  color: #333;
+}
+
+.menu-input {
+  padding: 0.7rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
+  margin-bottom: 1rem;
   width: 100%;
   max-width: 500px;
-  padding: 10px 14px;
-  font-size: 16px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  outline: none;
-  margin-bottom: 0;
 }
-.menu-creation-permissions {
+
+.permissions-group {
   display: flex;
-  gap: 28px;
-  margin-top: 8px;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  align-items: center;
 }
-.menu-creation-textarea {
-  display: block;
-  margin-top: 8px;
-  width: 100%;
+
+.permissions-group label {
+  font-weight: 500;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.menu-textarea {
+  padding: 0.7rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
   min-height: 60px;
   max-width: 100%;
-  padding: 10px 14px;
-  font-size: 16px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  outline: none;
+  width: 100%;
   resize: vertical;
 }
-.menu-creation-btn {
-  width: 100%;
+
+.menu-submit-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+  width: 60%;
   background: #1677ff;
   color: #fff;
-  font-weight: 600;
-  font-size: 18px;
+  font-size: 1rem;
   border: none;
   border-radius: 6px;
-  padding: 14px 0;
+  padding: 8px 0;
   cursor: pointer;
   margin-top: 8px;
   box-shadow: 0 2px 8px rgba(22,119,255,0.08);

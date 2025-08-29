@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import "../../styles/existing_menus.scss";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
-const menuRows = [
+const initialMenus = [
   { name: "about", remarks: "Menu: About" },
   { name: "admin", remarks: "Menu: Admin" },
   { name: "assigned_documents", remarks: "Menu: Assigned Documents" },
@@ -12,62 +11,81 @@ const menuRows = [
   { name: "data_validation", remarks: "Menu: Data Validation" },
   { name: "existing_menus", remarks: "Menu: Existing Menus" },
   { name: "feedback", remarks: "Menu: Feedback" },
-  { name: "home", remarks: "Menu: Home" }
+  { name: "home", remarks: "Menu: Home" },
 ];
 
 export default function ExistingMenus() {
+  const [menus, setMenus] = useState(initialMenus);
   const [search, setSearch] = useState("");
-  const filteredRows = menuRows.filter(row => row.name.includes(search.toLowerCase()));
+
+  const handleDelete = (name) => {
+    setMenus(menus.filter((menu) => menu.name !== name));
+  };
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const handleRefresh = () => {
+    setMenus(initialMenus);
+    setSearch("");
+  };
+
+  const filteredMenus = menus.filter((menu) =>
+    menu.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <Box className="existing-menus-root">
-      <Box className="existing-menus-content">
-        <Typography variant="h5" fontWeight={700} color="#1a237e">Existing Menus</Typography>
-        <Typography variant="subtitle2" color="text.secondary" mb={3}>
-          Manage all your available menus
-        </Typography>
-        <Box className="existing-menus-search-row">
-          <TextField
+    <div className="existing-menus-container">
+      <section className="title-section">
+        <div>
+          <h1 className="page-title">Existing Menus</h1>
+          <div className="subtitle">Manage all your available menus</div>
+        </div>
+        <div className="actions-row">
+          <input
+            type="text"
+            className="search-input"
             placeholder="Search menu..."
-            size="small"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="existing-menus-search-input"
+            onChange={handleSearch}
           />
-          <Button variant="outlined" className="existing-menus-refresh-btn">
+          <button className="refresh-btn" onClick={handleRefresh}>
             Refresh
-          </Button>
-        </Box>
-        <TableContainer component={Paper} className="existing-menus-table-container">
-          <Table>
-            <TableHead>
-              <TableRow className="existing-menus-table-head-row">
-                <TableCell className="existing-menus-table-head-cell">Menu Name &#8593;</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Permissions</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Remarks</TableCell>
-                <TableCell className="existing-menus-table-head-cell">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredRows.map((row, idx) => (
-                <TableRow key={row.name}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell></TableCell>
-                  <TableCell>{row.remarks}</TableCell>
-                  <TableCell>
-                    <IconButton className="existing-menus-edit-btn">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton className="existing-menus-delete-btn">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
-    </Box>
+          </button>
+        </div>
+      </section>
+      <table className="menus-table">
+        <thead>
+          <tr>
+            <th>Menu Name &#8593;</th>
+            <th>Permissions</th>
+            <th>Remarks</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredMenus.map((menu) => (
+            <tr key={menu.name}>
+              <td>{menu.name}</td>
+              <td></td>
+              <td>{menu.remarks}</td>
+              <td>
+                <button className="action-btn edit-btn" title="Edit">
+                  <FaEdit />
+                </button>
+                <button
+                  className="action-btn delete-btn"
+                  title="Delete"
+                  onClick={() => handleDelete(menu.name)}
+                >
+                  <FaTrash />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

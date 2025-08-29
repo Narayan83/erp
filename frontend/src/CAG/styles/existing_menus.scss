@@ -1,49 +1,112 @@
-.existing-menus-root {
-  background-color: #f5f7fa;
-  min-height: 100vh;
-  padding: 0;
+.existing-menus-container {
+  width: 100vw;
+  max-width: 100%;
+  background: #f7f8fa;
+  height: 100%;
+  padding: 40px;
+  font-family: sans-serif;
+  margin-top: 50px;
 }
 
-.existing-menus-content {
-  padding: 24px;
-}
-
-.existing-menus-search-row {
+.title-section {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
 }
 
-.existing-menus-search-input {
-  width: 250px;
-  background-color: #fff;
-  border-radius: 16px;
-  margin-right: 16px;
+.page-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1677ff;
+  margin-bottom: 0.25em;
 }
 
-.existing-menus-refresh-btn {
-  border-radius: 16px;
-  text-transform: none;
-  min-width: 100px;
+.subtitle {
+  color: #666;
+  margin-bottom: 1.5em;
+  font-size: 0.9rem;
 }
 
-.existing-menus-table-container {
-  border-radius: 24px;
+.actions-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 0; // Remove bottom margin since it's inside title-section
 }
 
-.existing-menus-table-head-row {
-  background-color: #e8f0fe !important;
+.search-input {
+  padding: 8px 12px;
+  border: 1px solid #cfd8dc;
+  border-radius: 6px;
+  font-size: 1rem;
+  width: 220px;
 }
 
-.existing-menus-table-head-cell {
-  font-weight: 700 !important;
+.refresh-btn {
+  background: #e3f2fd;
+  color: #1976d2;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover {
+    background: #bbdefb;
+  }
 }
 
-.existing-menus-edit-btn {
-  color: #2ecc40 !important;
-  margin-right: 8px;
+.menus-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-.existing-menus-delete-btn {
-  color: #ff4136 !important;
+.menus-table th,
+.menus-table td {
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.menus-table th {
+  color: #f1f5f9;
+  font-weight: 600;
+  background: #345;
+  font-size: 0.9rem;
+}
+
+.menus-table tr {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.menus-table tr:last-child {
+  border-bottom: none;
+}
+
+.action-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 6px;
+  margin-right: 4px;
+  border-radius: 4px;
+  font-size: 1.2em;
+  transition: background 0.2s;
+}
+
+.edit-btn {
+  color: #388e3c;
+  &:hover {
+    background: #e8f5e9;
+  }
+}
+
+.delete-btn {
+  color: #d32f2f;
+  &:hover {
+    background: #ffebee;
+  }
 }
