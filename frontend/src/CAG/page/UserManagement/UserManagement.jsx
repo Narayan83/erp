@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "../../styles/role_management.scss";
+import "../../styles/user_management.scss";
 
 const users = [
   { label: "admin assignor (admin@cag.com)", value: "admin@cag.com" },
@@ -69,9 +69,15 @@ export default function RoleManagement() {
   };
 
   return (
-    <div className="role-management-container">
-      <div className="role-management-header">Role Management</div>
-      <div className="role-management-selectors">
+    <div className="user-management-container">
+      <div className="user-management-header">User Management</div>
+      <div className="user-management-selectors">
+        <div>
+          <label>Select User</label>
+          <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
+            {users.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+          </select>
+        </div>
         <div>
           <label>Select Role</label>
           <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}>
@@ -85,9 +91,9 @@ export default function RoleManagement() {
           </select>
         </div>
       </div>
-      <div className="role-management-permissions">
-        <div className="role-management-permissions-title">
-          Role Permissions for: <b>{selectedRole}</b>
+      <div className="user-management-permissions">
+        <div className="user-management-permissions-title">
+          Assign Permissions for: <b>{selectedRole}</b>
         </div>
         <div className="permissions-table">
           {permissionsData.map(({ menu, permissions: perms }) => (

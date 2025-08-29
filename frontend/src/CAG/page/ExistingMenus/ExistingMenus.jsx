@@ -1,25 +1,60 @@
 import React, { useState } from "react";
 import "../../styles/existing_menus.scss";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
 
-const initialMenus = [
-  { name: "about", remarks: "Menu: About" },
-  { name: "admin", remarks: "Menu: Admin" },
-  { name: "assigned_documents", remarks: "Menu: Assigned Documents" },
-  { name: "audit_logs", remarks: "Menu: Audit Logs" },
-  { name: "bulk_upload", remarks: "Menu: Bulk Upload" },
-  { name: "data_validation", remarks: "Menu: Data Validation" },
-  { name: "existing_menus", remarks: "Menu: Existing Menus" },
-  { name: "feedback", remarks: "Menu: Feedback" },
-  { name: "home", remarks: "Menu: Home" },
-];
+const defaultOnEdit = () => {};
 
-export default function ExistingMenus() {
-  const [menus, setMenus] = useState(initialMenus);
+export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMenu = defaultOnEdit }) {
   const [search, setSearch] = useState("");
+  const [localMenus, setLocalMenus] = useState(() => {
+    if (menus) return menus;
+    return JSON.parse(localStorage.getItem("menus") || "[]");
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingMenu, setEditingMenu] = useState(null);
+
+  const displayMenus = menus || localMenus;
+
+  const displaySetMenus = (newMenus) => {
+    if (setMenus && typeof setMenus === "function") {
+      setMenus(newMenus);
+    } else {
+      setLocalMenus(newMenus);
+      localStorage.setItem("menus", JSON.stringify(newMenus));
+    }
+  };
+
+  const safeMenus = Array.isArray(displayMenus) ? displayMenus : [];
 
   const handleDelete = (name) => {
-    setMenus(menus.filter((menu) => menu.name !== name));
+    if (setMenus && typeof setMenus !== "function") {
+      console.error("ExistingMenus: setMenus provided but not a function");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this menu?")) {
+      return;
+    }
+    displaySetMenus(safeMenus.filter((menu) => menu.name !== name));
+  };
+
+  const handleEdit = (menu) => {
+    setIsEditing(true);
+    setEditingMenu(menu);
+  };
+
+  const handleUpdateMenu = (updatedMenu, oldName) => {
+    const updatedMenus = safeMenus.map((menu) =>
+      menu.name === oldName ? updatedMenu : menu
+    );
+    displaySetMenus(updatedMenus);
+    setIsEditing(false);
+    setEditingMenu(null);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingMenu(null);
   };
 
   const handleSearch = (e) => {
@@ -27,11 +62,17 @@ export default function ExistingMenus() {
   };
 
   const handleRefresh = () => {
-    setMenus(initialMenus);
+    if (setMenus && typeof setMenus !== "function") {
+      console.error("ExistingMenus: setMenus provided but not a function");
+      return;
+    }
+    if (Array.isArray(initialMenus) && initialMenus.length > 0) {
+      displaySetMenus(initialMenus);
+    }
     setSearch("");
   };
 
-  const filteredMenus = menus.filter((menu) =>
+  const filteredMenus = safeMenus.filter((menu) =>
     menu.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -55,37 +96,62 @@ export default function ExistingMenus() {
           </button>
         </div>
       </section>
-      <table className="menus-table">
-        <thead>
-          <tr>
-            <th>Menu Name &#8593;</th>
-            <th>Permissions</th>
-            <th>Remarks</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredMenus.map((menu) => (
-            <tr key={menu.name}>
-              <td>{menu.name}</td>
-              <td></td>
-              <td>{menu.remarks}</td>
-              <td>
-                <button className="action-btn edit-btn" title="Edit">
-                  <FaEdit />
-                </button>
-                <button
-                  className="action-btn delete-btn"
-                  title="Delete"
-                  onClick={() => handleDelete(menu.name)}
-                >
-                  <FaTrash />
-                </button>
-              </td>
+      {isEditing && (
+        <div className="editing-container">
+          <MenuCreation
+            isEditing={isEditing}
+            editingMenu={editingMenu}
+            onUpdateMenu={handleUpdateMenu}
+            onCancel={handleCancelEdit}
+          />
+        </div>
+      )}
+      {!isEditing && (
+        <table className="menus-table">
+          <thead>
+            <tr>
+              <th>Menu Name &#8593;</th>
+              <th>Permissions</th>
+              <th>Remarks</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filteredMenus.map((menu) => (
+              <tr key={menu.name}>
+                <td>{menu.name}</td>
+                <td>
+                  {menu.permissions
+                    ? Object.entries(menu.permissions)
+                        .filter(([k, v]) => v && k !== "all")
+                        .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1))
+                        .join(", ")
+                    : ""}
+                </td>
+                <td>{menu.remarks}</td>
+                <td>
+                  <button
+                    className="action-btn edit-btn"
+                    title="Edit"
+                    onClick={() => handleEdit(menu)}
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    className="action-btn delete-btn"
+                    title="Delete"
+                    onClick={() => handleDelete(menu.name)}
+                  >
+                    <FaTrash />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
+  
+

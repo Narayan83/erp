@@ -24,7 +24,7 @@
 .menu-label {
   font-weight: 600;
   font-size: 0.9rem;
-  
+
   color: #333;
 }
 
@@ -80,6 +80,16 @@
   padding: 8px 0;
   cursor: pointer;
   margin-top: 8px;
-  box-shadow: 0 2px 8px rgba(22,119,255,0.08);
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
   transition: background 0.2s;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.embedded {
+  margin-top: 0;
 }

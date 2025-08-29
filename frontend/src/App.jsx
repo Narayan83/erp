@@ -41,6 +41,7 @@ import RoleCreation from "./CAG/page/RoleCreation/RoleCreation";
 import MenuCreation from "./CAG/page/MenuCreation/MenuCreation";
 import RoleManagement from './CAG/page/RoleManagement/RoleManagement';
 import ExistingMenus from './CAG/page/ExistingMenus/ExistingMenus';
+import UserManagement from './CAG/page/UserManagement/UserManagement';
 
 const myContext = createContext();
 
@@ -144,6 +145,7 @@ function App() {
           <Route path="/menucreation" element={<MenuCreation />} />
           <Route path="/existingmenus" element={<ExistingMenus />} />
           <Route path="/rolemanagement" element={<RoleManagement />} />
+          <Route path="/usermanagement" element={<UserManagement />} />
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
