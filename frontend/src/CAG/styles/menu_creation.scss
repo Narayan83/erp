@@ -39,6 +39,18 @@
   max-width: 500px;
 }
 
+.menu-input + ul {
+  // dropdown styling for the search field
+  margin-top: 2px;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.menu-input + ul li:hover {
+  background: #f0f4ff;
+}
+
 .permissions-group {
   display: flex;
   gap: 2rem;
@@ -82,6 +94,10 @@
   margin-top: 8px;
   box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
   transition: background 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
 }
 
 .form-buttons {
