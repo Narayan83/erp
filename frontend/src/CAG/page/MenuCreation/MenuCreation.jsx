@@ -11,6 +11,9 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
     delete: false,
   });
   const [remarks, setRemarks] = useState("");
+  const [existingMenus, setExistingMenus] = useState([]);
+  const [menuSearch, setMenuSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     if (isEditing && editingMenu) {
@@ -35,6 +38,10 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
       });
       setRemarks("");
     }
+
+    // Load existing menus from localStorage
+    const stored = JSON.parse(localStorage.getItem('menus') || '[]');
+    setExistingMenus(stored);
   }, [isEditing, editingMenu]);
 
   const handlePermissionChange = (perm) => {
@@ -96,9 +103,14 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
     }
   };
 
+  // Filtered menus for dropdown
+  const filteredMenus = existingMenus.filter(
+    m => m.name.toLowerCase().includes(menuSearch.toLowerCase()) && m.name !== menuName
+  );
+
   return (
     <div className={`menu-creation-container ${isEditing ? 'embedded' : ''}`}>
-      <h1 className="menu-title">{isEditing ? "Edit Menu" : "Menu Management"}</h1>
+      <h1 className="menu-title">{isEditing ? "Edit Menu" : "Menu Creation"}</h1>
       <form className="menu-form" onSubmit={handleSubmit}>
         <label className="menu-label">Menu Name</label>
         <input
@@ -108,6 +120,60 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
           value={menuName}
           onChange={(e) => setMenuName(e.target.value)}
         />
+
+        {/* Label for existing menus dropdown */}
+        <label className="menu-label">Existing Menus</label>
+        {/* 2-in-1 search/dropdown for existing menus */}
+        <div style={{ position: "relative", maxWidth: 500 }}>
+          <input
+            className="menu-input"
+            type="text"
+            placeholder="Search or select existing menu"
+            value={menuSearch}
+            onChange={e => {
+              setMenuSearch(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            autoComplete="off"
+          />
+          {showDropdown && filteredMenus.length > 0 && (
+            <ul style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: "100%",
+              background: "#fff",
+              border: "1px solid #e0e0e0",
+              borderRadius: "6px",
+              maxHeight: "150px",
+              overflowY: "auto",
+              zIndex: 10,
+              margin: 0,
+              padding: "4px 0",
+              listStyle: "none"
+            }}>
+              {filteredMenus.map(menu => (
+                <li
+                  key={menu.name}
+                  style={{
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    fontSize: "1rem"
+                  }}
+                  onMouseDown={() => {
+                    setMenuName(menu.name);
+                    setMenuSearch(menu.name);
+                    setShowDropdown(false);
+                  }}
+                >
+                  {menu.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <label className="menu-label">Permissions</label>
         <div className="permissions-group">
