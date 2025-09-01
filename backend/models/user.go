@@ -80,7 +80,9 @@ type User struct {
 	Gender          Gender      `gorm:"type:varchar(10)" json:"gender"`
 	CountryCode     string      `gorm:"not null" json:"country_code"`
 	MobileNumber    string      `gorm:"not null;unique" json:"mobile_number"`
-
+	EmergencyNumber string      `gorm:"unique" json:"emergency_number"`
+	AlternateNumber string      `gorm:"unique" json:"alternate_number"`
+	WhatsappNumber  string      `gorm:"unique" json:"whatsapp_number"`
 	ContactNo       *string     `json:"contact_no,omitempty"`
 	Email           string      `gorm:"unique;not null" json:"email"`
 	Website         *string     `json:"website,omitempty"`
@@ -97,7 +99,6 @@ type User struct {
 	State           *string     `json:"state,omitempty"`
 	Country         *string     `json:"country,omitempty"`
 	Pincode         *string     `json:"pincode,omitempty"`
-
 	AadharNumber    *string     `json:"aadhar_number,omitempty"`
 	PANNumber       *string     `json:"pan_number,omitempty"`
 	Addresses       StringArray `gorm:"type:json"`
