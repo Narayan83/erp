@@ -25,10 +25,10 @@ func main() {
 		&models.User{},
 		&models.Quotation{},
 		&models.QuotationItem{},
-
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+		&models.EmployeeCustomer{},
 	)
 
 	if err != nil {
