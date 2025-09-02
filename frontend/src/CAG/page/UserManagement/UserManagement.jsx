@@ -40,8 +40,10 @@ export default function UserManagement() {
   const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
 
   // Permissions state: { [menu]: { [perm]: boolean } }
-  const loadPermissions = (user) => {
-    const stored = localStorage.getItem(`permissions_${user}`);
+  const loadPermissions = (user, role) => {
+    let stored = localStorage.getItem(`permissions_${user}_${role}`);
+    if (stored) return JSON.parse(stored);
+    stored = localStorage.getItem(`permissions_${role}`);
     return stored ? JSON.parse(stored) : {
       Home: { All: false, View: false, Create: false, Update: false, Delete: false },
       About: { All: false, View: false, Create: false, Update: false, Delete: false },
@@ -51,12 +53,12 @@ export default function UserManagement() {
     };
   };
 
-  const [permissions, setPermissions] = useState(loadPermissions(selectedUser));
+  const [permissions, setPermissions] = useState(loadPermissions(selectedUser, selectedRole));
 
-  // Update permissions when selectedUser changes
+  // Update permissions when selectedUser or selectedRole changes
   useEffect(() => {
-    setPermissions(loadPermissions(selectedUser));
-  }, [selectedUser]);
+    setPermissions(loadPermissions(selectedUser, selectedRole));
+  }, [selectedUser, selectedRole]);
 
   const handlePermissionChange = (menu, perm) => {
     setPermissions(prev => {
@@ -133,8 +135,8 @@ export default function UserManagement() {
           ))}
         </div>
         <button className="save-button" onClick={() => {
-          localStorage.setItem(`permissions_${selectedUser}`, JSON.stringify(permissions));
-          console.log('Changes saved for user:', selectedUser);
+          localStorage.setItem(`permissions_${selectedUser}_${selectedRole}`, JSON.stringify(permissions));
+          console.log('Changes saved for user:', selectedUser, 'role:', selectedRole);
         }}>
           Save Changes
         </button>
@@ -142,3 +144,4 @@ export default function UserManagement() {
     </div>
   );
 }
+
