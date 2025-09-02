@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/user_management.scss";
 
 const users = [
@@ -40,13 +40,23 @@ export default function UserManagement() {
   const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
 
   // Permissions state: { [menu]: { [perm]: boolean } }
-  const [permissions, setPermissions] = useState({
-    Home: { All: false, View: false, Create: false, Update: false, Delete: false },
-    About: { All: false, View: false, Create: false, Update: false, Delete: false },
-    Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
-    "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
-    "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
-  });
+  const loadPermissions = (user) => {
+    const stored = localStorage.getItem(`permissions_${user}`);
+    return stored ? JSON.parse(stored) : {
+      Home: { All: false, View: false, Create: false, Update: false, Delete: false },
+      About: { All: false, View: false, Create: false, Update: false, Delete: false },
+      Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
+      "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
+      "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
+    };
+  };
+
+  const [permissions, setPermissions] = useState(loadPermissions(selectedUser));
+
+  // Update permissions when selectedUser changes
+  useEffect(() => {
+    setPermissions(loadPermissions(selectedUser));
+  }, [selectedUser]);
 
   const handlePermissionChange = (menu, perm) => {
     setPermissions(prev => {
@@ -122,6 +132,12 @@ export default function UserManagement() {
             </div>
           ))}
         </div>
+        <button className="save-button" onClick={() => {
+          localStorage.setItem(`permissions_${selectedUser}`, JSON.stringify(permissions));
+          console.log('Changes saved for user:', selectedUser);
+        }}>
+          Save Changes
+        </button>
       </div>
     </div>
   );

@@ -269,6 +269,8 @@ header .rounded-circle:hover svg {
     width: 80%;
     flex: 0 0 80%;
     transition: all 0.3s ease-in-out;
+    background: #fff;
+    min-height: 100vh;
 
     .right-content {
       padding: 85px 25px;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/role_management.scss";
 
 const users = [
@@ -39,13 +39,23 @@ export default function RoleManagement() {
   const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
 
   // Permissions state: { [menu]: { [perm]: boolean } }
-  const [permissions, setPermissions] = useState({
-    Home: { All: false, View: false, Create: false, Update: false, Delete: false },
-    About: { All: false, View: false, Create: false, Update: false, Delete: false },
-    Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
-    "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
-    "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
-  });
+  const loadPermissions = (role) => {
+    const stored = localStorage.getItem(`permissions_${role}`);
+    return stored ? JSON.parse(stored) : {
+      Home: { All: false, View: false, Create: false, Update: false, Delete: false },
+      About: { All: false, View: false, Create: false, Update: false, Delete: false },
+      Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
+      "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
+      "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
+    };
+  };
+
+  const [permissions, setPermissions] = useState(loadPermissions(selectedRole));
+
+  // Update permissions when selectedRole changes
+  useEffect(() => {
+    setPermissions(loadPermissions(selectedRole));
+  }, [selectedRole]);
 
   const handlePermissionChange = (menu, perm) => {
     setPermissions(prev => {
@@ -115,6 +125,12 @@ export default function RoleManagement() {
             </div>
           ))}
         </div>
+        <button className="save-button" onClick={() => {
+          localStorage.setItem(`permissions_${selectedRole}`, JSON.stringify(permissions));
+          console.log('Changes saved for role:', selectedRole);
+        }}>
+          Save Changes
+        </button>
       </div>
     </div>
   );
