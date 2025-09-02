@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/user_management.scss";
 
 const users = [
@@ -40,13 +40,25 @@ export default function UserManagement() {
   const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
 
   // Permissions state: { [menu]: { [perm]: boolean } }
-  const [permissions, setPermissions] = useState({
-    Home: { All: false, View: false, Create: false, Update: false, Delete: false },
-    About: { All: false, View: false, Create: false, Update: false, Delete: false },
-    Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
-    "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
-    "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
-  });
+  const loadPermissions = (user, role) => {
+    let stored = localStorage.getItem(`permissions_${user}_${role}`);
+    if (stored) return JSON.parse(stored);
+    stored = localStorage.getItem(`permissions_${role}`);
+    return stored ? JSON.parse(stored) : {
+      Home: { All: false, View: false, Create: false, Update: false, Delete: false },
+      About: { All: false, View: false, Create: false, Update: false, Delete: false },
+      Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
+      "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
+      "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
+    };
+  };
+
+  const [permissions, setPermissions] = useState(loadPermissions(selectedUser, selectedRole));
+
+  // Update permissions when selectedUser or selectedRole changes
+  useEffect(() => {
+    setPermissions(loadPermissions(selectedUser, selectedRole));
+  }, [selectedUser, selectedRole]);
 
   const handlePermissionChange = (menu, perm) => {
     setPermissions(prev => {
@@ -122,7 +134,14 @@ export default function UserManagement() {
             </div>
           ))}
         </div>
+        <button className="save-button" onClick={() => {
+          localStorage.setItem(`permissions_${selectedUser}_${selectedRole}`, JSON.stringify(permissions));
+          console.log('Changes saved for user:', selectedUser, 'role:', selectedRole);
+        }}>
+          Save Changes
+        </button>
       </div>
     </div>
   );
 }
+

@@ -163,7 +163,6 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
                     fontSize: "1rem"
                   }}
                   onMouseDown={() => {
-                    setMenuName(menu.name);
                     setMenuSearch(menu.name);
                     setShowDropdown(false);
                   }}

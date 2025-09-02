@@ -239,6 +239,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     active: true,
     salutation: "",
     gender: "",
+    username: "", // Added default value for new field
     // all your controlled values
   }
 });
@@ -303,6 +304,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         is_dealer: !!defaultValues.is_dealer,
         is_distributor: !!defaultValues.is_distributor,
         active: typeof defaultValues.active === 'boolean' ? defaultValues.active : true,
+        username: defaultValues.username || "", // Added prefill for new field
       });
       // Prefill additionalAddresses by parsing Addresses JSON strings
       setAdditionalAddresses(
@@ -654,7 +656,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         </Grid>
 
 
-        <Grid size={{ xs: 2, md: 2 }}>
+        <Grid size={{ xs: 4, md: 4 }}>
           <Controller
             name="country"
             control={control}
@@ -1133,6 +1135,9 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
            <Typography variant="h6"> Authentication </Typography>
         </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
+            <TextField size="small" fullWidth label="User Name/Code" {...register("username")} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               size="small"
               fullWidth
@@ -1216,7 +1221,8 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
               is_customer: false,
               is_supplier: false,
               country: "",
-              country_code: ""
+              country_code: "",
+              username: "", // Added reset for new field
             });
             setAdditionalAddresses([]);
           }} style={{ marginLeft: 8 }}>
