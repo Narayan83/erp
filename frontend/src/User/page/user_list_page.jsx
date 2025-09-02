@@ -30,10 +30,11 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { Edit, Visibility, Search, TableView, WhatsApp, Mail } from "@mui/icons-material";
+import { Edit, Visibility, Search, TableView, WhatsApp, Mail, FileUpload, FileDownload } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../Config";
+import * as XLSX from 'xlsx';
 
 export default function UserListPage() {
   const navigate = useNavigate();
@@ -183,6 +184,128 @@ export default function UserListPage() {
           <Tooltip title="Display Preferences">
             <IconButton sx={{ mx: 2 }} aria-label="table view" onClick={handleDisplayPrefOpen}>
               <TableView />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Import">
+            <IconButton sx={{ mx: 2 }} aria-label="import" onClick={() => {/* Add import logic here */}}>
+              <FileDownload />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Export">
+            <IconButton sx={{ mx: 2 }} aria-label="export" onClick={() => {
+              const data = users.map(user => {
+                const obj = {};
+                checkedFields.forEach(field => {
+                  obj[field] = field === "Name"
+                    ? [user.salutation, user.firstname, user.lastname].filter(Boolean).join(" ")
+                    : field === "DOB"
+                    ? user.dob ? new Date(user.dob).toLocaleDateString() : ""
+                    : field === "Gender"
+                    ? user.gender
+                    : field === "CountryCode"
+                    ? user.country_code
+                    : field === "MobileNumber"
+                    ? user.mobile_number
+                    : field === "EmergencyNumber"
+                    ? user.emergency_number
+                    : field === "AlternateNumber"
+                    ? user.alternate_number
+                    : field === "WhatsappNumber"
+                    ? user.whatsapp_number
+                    : field === "Email"
+                    ? user.email
+                    : field === "Website"
+                    ? user.website
+                    : field === "BusinessName"
+                    ? user.business_name
+                    : field === "Title"
+                    ? user.title
+                    : field === "CompanyName"
+                    ? user.companyname
+                    : field === "Designation"
+                    ? user.designation
+                    : field === "IndustrySegment"
+                    ? user.industry_segment
+                    : field === "Address1"
+                    ? user.address1
+                    : field === "Address2"
+                    ? user.address2
+                    : field === "Address3"
+                    ? user.address3
+                    : field === "Address4"
+                    ? user.address4
+                    : field === "Address5"
+                    ? user.address5
+                    : field === "State"
+                    ? user.state
+                    : field === "Country"
+                    ? user.country
+                    : field === "Pincode"
+                    ? user.pincode
+                    : field === "AadharNumber"
+                    ? user.aadhar_number
+                    : field === "PANNumber"
+                    ? user.pan_number
+                    : field === "GSTIN"
+                    ? user.gstin
+                    : field === "MSMENo"
+                    ? user.msme_no
+                    : field === "BankName"
+                    ? user.bank_name
+                    : field === "BranchName"
+                    ? user.branch_name
+                    : field === "BranchAddress"
+                    ? user.branch_address
+                    : field === "AccountNumber"
+                    ? user.account_number
+                    : field === "IFSCCode"
+                    ? user.ifsc_code
+                    : field === "Active"
+                    ? user.active ? "Yes" : "No"
+                    : field === "IsUser"
+                    ? user.is_user ? "Yes" : "No"
+                    : field === "IsCustomer"
+                    ? user.is_customer ? "Yes" : "No"
+                    : field === "IsSupplier"
+                    ? user.is_supplier ? "Yes" : "No"
+                    : field === "IsEmployee"
+                    ? user.is_employee ? "Yes" : "No"
+                    : field === "IsDealer"
+                    ? user.is_dealer ? "Yes" : "No"
+                    : field === "IsDistributor"
+                    ? user.is_distributor ? "Yes" : "No"
+                    : field === "RoleID"
+                    ? user.role_id
+                    : field === "Additional Address"
+                    ? Array.isArray(user.additional_addresses) && user.additional_addresses.length > 0
+                      ? user.additional_addresses.map(addr => Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ")).join(" | ")
+                      : Array.isArray(user.Addresses) && user.Addresses.length > 0
+                      ? user.Addresses.map(addrStr => {
+                          try {
+                            const addr = JSON.parse(addrStr);
+                            return Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
+                          } catch { return ""; }
+                        }).join(" | ")
+                      : ""
+                    : field === "Additional Bank Info"
+                    ? Array.isArray(user.AdditionalBankInfos) && user.AdditionalBankInfos.length > 0
+                      ? user.AdditionalBankInfos.map(biStr => {
+                          try {
+                            const bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr;
+                            return Object.entries(bi).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
+                          } catch { return ""; }
+                        }).join(" | ")
+                      : ""
+                    : "";
+                });
+                return obj;
+              });
+              const ws = XLSX.utils.json_to_sheet(data);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Users");
+              XLSX.writeFile(wb, "users_export.xlsx");
+            }}>
+              <FileUpload />
             </IconButton>
           </Tooltip>
            
