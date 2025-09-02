@@ -29,6 +29,12 @@ func main() {
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+
+		&models.Employee{},
+		&models.Customer{},
+		&models.Supplier{},
+		&models.Dealer{},
+		&models.Distributor{},
 	)
 
 	if err != nil {

@@ -110,7 +110,6 @@ type User struct {
 	BranchAddress *string `json:"branch_address,omitempty"`
 	AccountNumber *string `json:"account_number,omitempty"`
 	IFSCCode      *string `json:"ifsc_code,omitempty"`
-	// SWIFTCode     *string `json:"swift_code,omitempty"`
 	// --- End Bank Information fields ---
 	AdditionalBankInfos StringArray `gorm:"type:json" json:"AdditionalBankInfos,omitempty"`
 	Password            string      `json:"password"`
