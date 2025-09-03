@@ -90,6 +90,11 @@ export default function UserManagement() {
     }));
   };
 
+  const handleReset = () => {
+    localStorage.removeItem(`permissions_${selectedUser}_${selectedRole}`);
+    setPermissions(loadPermissions(selectedUser, selectedRole));
+  };
+
   return (
     <div className="user-management-container">
       <div className="user-management-header">User Management</div>
@@ -134,14 +139,18 @@ export default function UserManagement() {
             </div>
           ))}
         </div>
-        <button className="save-button" onClick={() => {
-          localStorage.setItem(`permissions_${selectedUser}_${selectedRole}`, JSON.stringify(permissions));
-          console.log('Changes saved for user:', selectedUser, 'role:', selectedRole);
-        }}>
-          Save Changes
-        </button>
+        <div className="buttons-container">
+          <button className="save-button" onClick={handleReset}>
+            Reset Permissions
+          </button>
+          <button className="save-button" onClick={() => {
+            localStorage.setItem(`permissions_${selectedUser}_${selectedRole}`, JSON.stringify(permissions));
+            console.log('Changes saved for user:', selectedUser, 'role:', selectedRole);
+          }}>
+            Save Changes
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-
