@@ -31,10 +31,11 @@ import {
   ListItem,         // added
   ListItemText      // added
 } from "@mui/material";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
+import * as XLSX from 'xlsx'; // added for Excel export
 
 // Improve the normalizeID helper to handle more edge cases
 const normalizeID = (val) => {
@@ -219,7 +220,8 @@ const FiltersRow = memo(function FiltersRow({
   stores,
   allSubcategories,
   setPage,
-  visibleColumns
+  visibleColumns,
+  handleExport // added prop for export handler
 }) {
   // Log for debugging
   console.log('Categories:', categories.map(c => ({ id: c.ID, name: c.Name })));
@@ -331,7 +333,14 @@ const FiltersRow = memo(function FiltersRow({
         </TableCell>
       )}
       <TableCell align="center">
-        {/* no button (auto) */}
+        <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
+          <Tooltip title="Import">
+            <IconButton onClick={() => console.log('Import')}><GetApp /></IconButton>
+          </Tooltip>
+          <Tooltip title="Export">
+            <IconButton onClick={handleExport}><Publish /></IconButton> 
+          </Tooltip>
+        </Box>
       </TableCell>
     </TableRow>
   );
@@ -670,6 +679,66 @@ export default function ProductListPage() {
     setSelectedProduct(null);
   };
 
+  const handleExport = async () => {
+    try {
+      // Fetch all products with current filters and sorting (remove pagination for export)
+      const filterParams = Object.entries({
+        name: debouncedFilters.name,
+        code: debouncedFilters.code,
+        category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
+        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
+        subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+        stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
+      }).reduce((acc, [key, value]) => {
+        if (value !== "" && value !== undefined && value !== null) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+      
+      // Add sorting params if set
+      let sortParams = {};
+      if (nameSort) {
+        sortParams = { sort_by: 'name', sort_order: nameSort };
+      } else if (stockSort) {
+        sortParams = { sort_by: 'stock', sort_order: stockSort };
+      }
+      
+      const res = await axios.get(`${BASE_URL}/api/products`, {
+        params: {
+          ...filterParams,
+          ...sortParams,
+          limit: 10000, // large limit to get all
+        },
+      });
+      
+      const products = res.data.data || [];
+      
+      // Flatten data for Excel based on visible columns
+      const exportData = products.map(p => {
+        const row = {};
+        if (visibleColumns.name) row.Name = p.Name;
+        if (visibleColumns.code) row.Code = p.Code;
+        if (visibleColumns.category) row.Category = p.Category?.Name;
+        if (visibleColumns.store) row.Store = p.Store?.Name;
+        if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
+        if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
+        return row;
+      });
+      
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Products');
+      
+      // Download file
+      XLSX.writeFile(wb, 'products_export.xlsx');
+    } catch (err) {
+      console.error('Error exporting products:', err);
+      alert('Failed to export products. Please try again.');
+    }
+  };
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -888,6 +957,7 @@ export default function ProductListPage() {
                 allSubcategories={allSubcategories}
                 setPage={setPage}
                 visibleColumns={visibleColumns}
+                handleExport={handleExport} // added prop
               />
             </TableHead>
             {/* UPDATED: pass visibleColumns into body and onView handler */}
