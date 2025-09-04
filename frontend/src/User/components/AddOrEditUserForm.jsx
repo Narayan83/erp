@@ -218,6 +218,16 @@ const countries = [
   { name: "Zimbabwe", code: "+263" },
 ];
 
+// Add account types array for the dropdown
+const accountTypes = [
+  { label: "User", value: "is_user" },
+  { label: "Customer", value: "is_customer" },
+  { label: "Supplier", value: "is_supplier" },
+  { label: "Employee", value: "is_employee" },
+  { label: "Dealer", value: "is_dealer" },
+  { label: "Distributor", value: "is_distributor" },
+];
+
 const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
   const navigate = useNavigate();
   const {
@@ -227,20 +237,21 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     reset,
     watch,
     setValue,
-    formState:  { isDirty, errors },
+    formState: { isDirty, errors },
   } = useForm({
     defaultValues: {
-    is_user: false,
-    is_customer: false,
-    is_supplier: false,
-    is_employee: false,
-    is_dealer: false,
-    is_distributor: false,
-    active: true,
-    salutation: "",
-    gender: "",
-    username: "", // Added default value for new field
-    // all your controlled values
+      is_user: false,
+      is_customer: false,
+      is_supplier: false,
+      is_employee: false,
+      is_dealer: false,
+      is_distributor: false,
+      active: true,
+      salutation: "",
+      gender: "",
+      username: "",
+      account_types: [], // New field for dropdown selections
+      // all your controlled values
   }
 });
 
@@ -330,8 +341,17 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
             })
           : []
       );
+      // Initialize account_types based on existing booleans
+      const selectedTypes = [];
+      if (defaultValues.is_user) selectedTypes.push("is_user");
+      if (defaultValues.is_customer) selectedTypes.push("is_customer");
+      if (defaultValues.is_supplier) selectedTypes.push("is_supplier");
+      if (defaultValues.is_employee) selectedTypes.push("is_employee");
+      if (defaultValues.is_dealer) selectedTypes.push("is_dealer");
+      if (defaultValues.is_distributor) selectedTypes.push("is_distributor");
+      setValue("account_types", selectedTypes);
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues, reset, setValue]);
 
   const onSubmit = async (data) => {
     try {
@@ -498,90 +518,64 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 
       {/* === USER ROLES === */}
       <Grid container spacing={2}>
-       <Grid size={{ xs: 12, md: 4 }}>
-  <Typography variant="h6">Account Type (Select all that apply)</Typography>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Box display="flex" flexDirection="column" justifyContent="center" height="100%">
+            <Typography variant="h6">Account Type</Typography>
+            {/* Multi-select dropdown */}
+            <Controller
+              name="account_types"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  multiple
+                  displayEmpty
+                  renderValue={(selected) =>
+                    selected.length === 0
+                      ? "Select account types"
+                      : selected.map(val => accountTypes.find(t => t.value === val)?.label).join(", ")
+                  }
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    field.onChange(selected);
+                    // Update individual boolean fields based on selection
+                    accountTypes.forEach(type => {
+                      setValue(type.value, selected.includes(type.value));
+                    });
+                  }}
+                  fullWidth
+                  size="small"
+                >
+                  {accountTypes.map(type => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              )}
+            />
+          </Box>
+        </Grid>
 
-  <Controller
-    name="is_user"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="User"
-      />
-    )}
-  />
-  <Controller
-    name="is_customer"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="Customer"
-      />
-    )}
-  />
-  <Controller
-    name="is_supplier"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="Supplier"
-      />
-    )}
-  />
-  <Controller
-    name="is_employee"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="Employee"
-      />
-    )}
-  />
-  <Controller
-    name="is_dealer"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="Dealer"
-      />
-    )}
-  />
-  <Controller
-    name="is_distributor"
-    control={control}
-    defaultValue={false}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={field.value} onChange={field.onChange} />}
-        label="Distributor"
-      />
-    )}
-  />
-  <Controller
-    name="active"
-    control={control}
-    defaultValue={true}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox checked={!!field.value} onChange={e => field.onChange(e.target.checked)} />}
-        label="Active"
-      />
-    )}
-  />
-</Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Box display="flex" alignItems="flex-end" justifyContent="center" height="100%">
+            {/* Active checkbox */}
+            <Controller
+              name="active"
+              control={control}
+              defaultValue={true}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={<Checkbox checked={!!field.value} onChange={e => field.onChange(e.target.checked)} />}
+                  label="Active"
+                />
+              )}
+            />
+          </Box>
+        </Grid>
 
-         <Grid  size={{ xs: 12, md: 4 }}>
-          <Box display="flex" alignItems="end" height="100%">
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Box display="flex" alignItems="flex-end" justifyContent="flex-end" height="100%">
             <Button
             variant="outlined" onClick={() => navigate(`/users`)}  > View </Button>
           </Box>
@@ -1220,11 +1214,17 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
               is_user: false,
               is_customer: false,
               is_supplier: false,
+              is_employee: false,
+              is_dealer: false,
+              is_distributor: false,
+              active: true,
               country: "",
               country_code: "",
-              username: "", // Added reset for new field
+              username: "",
+              account_types: [], // Reset dropdown
             });
             setAdditionalAddresses([]);
+            setAdditionalBankInfos([]);
           }} style={{ marginLeft: 8 }}>
             Reset
           </Button>
@@ -1233,6 +1233,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     </form>
   );
 };
+
 
 export default AddOrEditUserForm;
 
