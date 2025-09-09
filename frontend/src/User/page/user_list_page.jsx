@@ -670,204 +670,629 @@ export default function UserListPage() {
       </Dialog>
 
       {/* View User Dialog */}
-      <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>User Details</DialogTitle>
-        <DialogContent dividers sx={{ maxHeight: '70vh', overflowY: 'auto', bgcolor: '#fafafa' }}>
+        <DialogContent dividers sx={{ maxHeight: '80vh', overflowY: 'auto', bgcolor: '#fafafa' }}>
           {selectedUser ? (
-            <Grid container spacing={2}>
-              {userFields.map((field) => (
-                <Grid item xs={6} key={field}>
-                  <Paper
-                    elevation={1}
-                    sx={{
-                      p: 2,
-                      mb: 2,
-                      border: '1px solid #e0e0e0',
-                      bgcolor: '#f9f9fc',
-                    }}
-                  >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main', mb: 0.5 }}>
-                      {field}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.primary', wordBreak: 'break-word' }}>
-                      {field === "Name"
-                        ? [selectedUser.salutation, selectedUser.firstname, selectedUser.lastname].filter(Boolean).join(" ")
-                        : field === "DOB"
-                        ? selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : ""
-                        : field === "Gender"
-                        ? selectedUser.gender
-                        : field === "CountryCode"
-                        ? selectedUser.country_code
-                        : field === "MobileNumber"
-                        ? selectedUser.mobile_number
-                        : field === "EmergencyNumber"
-                        ? selectedUser.emergency_number
-                        : field === "AlternateNumber"
-                        ? selectedUser.alternate_number
-                        : field === "WhatsappNumber"
-                        ? selectedUser.whatsapp_number
-                        : field === "Email"
-                        ? selectedUser.email
-                        : field === "Website"
-                        ? selectedUser.website
-                        : field === "BusinessName"
-                        ? selectedUser.business_name
-                        : field === "Title"
-                        ? selectedUser.title
-                        : field === "CompanyName"
-                        ? selectedUser.companyname
-                        : field === "Designation"
-                        ? selectedUser.designation
-                        : field === "IndustrySegment"
-                        ? selectedUser.industry_segment
-                        : field === "Address1"
-                        ? selectedUser.address1
-                        : field === "Address2"
-                        ? selectedUser.address2
-                        : field === "Address3"
-                        ? selectedUser.address3
-                        : field === "Address4"
-                        ? selectedUser.address4
-                        : field === "Address5"
-                        ? selectedUser.address5
-                        : field === "State"
-                        ? selectedUser.state
-                        : field === "Country"
-                        ? selectedUser.country
-                        : field === "Pincode"
-                        ? selectedUser.pincode
-                        : field === "AadharNumber"
-                        ? selectedUser.aadhar_number
-                        : field === "PANNumber"
-                        ? selectedUser.pan_number
-                        : field === "GSTIN"
-                        ? selectedUser.gstin
-                        : field === "MSMENo"
-                        ? selectedUser.msme_no
-                        : field === "BankName"
-                        ? selectedUser.bank_name
-                        : field === "BranchName"
-                        ? selectedUser.branch_name
-                        : field === "BranchAddress"
-                        ? selectedUser.branch_address
-                        : field === "AccountNumber"
-                        ? selectedUser.account_number
-                        : field === "IFSCCode"
-                        ? selectedUser.ifsc_code
-                        : field === "Active"
-                        ? selectedUser.active ? "Yes" : "No"
-                        : field === "IsUser"
-                        ? selectedUser.is_user ? "Yes" : "No"
-                        : field === "IsCustomer"
-                        ? selectedUser.is_customer ? "Yes" : "No"
-                        : field === "IsSupplier"
-                        ? selectedUser.is_supplier ? "Yes" : "No"
-                        : field === "IsEmployee"
-                        ? selectedUser.is_employee ? "Yes" : "No"
-                        : field === "IsDealer"
-                        ? selectedUser.is_dealer ? "Yes" : "No"
-                        : field === "IsDistributor"
-                        ? selectedUser.is_distributor ? "Yes" : "No"
-                        : field === "RoleID"
-                        ? selectedUser.role_id
-                        : field === "Additional Address"
-                        ? (
-                            Array.isArray(selectedUser.additional_addresses) && selectedUser.additional_addresses.length > 0
-                              ? selectedUser.additional_addresses.map((addr, idx) => (
-                                  <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
-                                    {Object.entries(addr).map(([key, value]) =>
-                                      key !== "keyValues"
-                                        ? value
-                                          ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
-                                              <span style={{ color: '#1976d2' }}>{key}:</span> {value}
-                                            </Typography>
-                                          : null
-                                        : Array.isArray(value) && value.length > 0
-                                          ? <Box key={key} sx={{ mt: 0.5 }}>
-                                              <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
-                                              {value.map((kv, i) => (
-                                                <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
-                                                  [{kv.key}: {kv.value}]
-                                                </span>
-                                              ))}
-                                            </Box>
-                                          : null
-                                    )}
-                                  </Paper>
-                                ))
-                              : Array.isArray(selectedUser.Addresses) && selectedUser.Addresses.length > 0
-                                ? selectedUser.Addresses.map((addrStr, idx) => {
-                                    let addr;
-                                    try { addr = JSON.parse(addrStr); } catch { addr = {}; }
-                                    return (
-                                      <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
-                                        {Object.entries(addr).map(([key, value]) =>
-                                          key !== "keyValues"
-                                            ? value
-                                              ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
-                                                  <span style={{ color: '#1976d2' }}>{key}:</span> {value}
-                                                </Typography>
-                                              : null
-                                            : Array.isArray(value) && value.length > 0
-                                              ? <Box key={key} sx={{ mt: 0.5 }}>
-                                                  <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
-                                                  {value.map((kv, i) => (
-                                                    <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
-                                                      [{kv.key}: {kv.value}]
-                                                    </span>
-                                                  ))}
-                                                </Box>
-                                              : null
-                                        )}
-                                      </Paper>
-                                    );
-                                  })
-                                : ""
-                          )
-                        : field === "Additional Bank Info"
-                        ? (
-                            Array.isArray(selectedUser.AdditionalBankInfos) && selectedUser.AdditionalBankInfos.length > 0
-                              ? selectedUser.AdditionalBankInfos.map((biStr, idx) => {
-                                  let bi;
-                                  try { bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr; } catch { bi = {}; }
-                                  return (
-                                    <Paper key={idx} elevation={0} sx={{ p: 1, mb: 1, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
-                                      {Object.entries(bi).map(([key, value]) =>
-                                        key !== "keyValues"
-                                          ? value
-                                            ? <Typography key={key} variant="body2" sx={{ fontWeight: 500 }}>
-                                                <span style={{ color: '#1976d2' }}>{key}:</span> {value}
-                                              </Typography>
-                                            : null
-                                          : Array.isArray(value) && value.length > 0
-                                            ? <Box key={key} sx={{ mt: 0.5 }}>
-                                                <span style={{ color: '#1976d2', fontWeight: 500 }}>keyValues:</span>
-                                                {value.map((kv, i) => (
-                                                  <span key={i} style={{ marginLeft: 4, fontWeight: 400 }}>
-                                                    [{kv.key}: {kv.value}]
-                                                  </span>
-                                                ))}
-                                              </Box>
-                                            : null
-                                      )}
-                                    </Paper>
-                                  );
-                                })
-                              : ""
-                          )
-                        : ""
-                      }
-                    </Typography>
-                  </Paper>
+            <Box>
+              {/* User Type Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={8}>
+                    <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>Account Type</Typography>
+                    <Box display="flex" flexWrap="wrap" gap={2}>
+                      {/* Only show account types that are selected */}
+                      {[
+                        { value: "is_user", label: "User" },
+                        { value: "is_customer", label: "Customer" },
+                        { value: "is_supplier", label: "Supplier" },
+                        { value: "is_employee", label: "Employee" },
+                        { value: "is_dealer", label: "Dealer" },
+                        { value: "is_distributor", label: "Distributor" }
+                      ].filter(type => selectedUser[type.value]).map(type => (
+                        <Paper 
+                          key={type.value} 
+                          sx={{ 
+                            px: 2, 
+                            py: 1, 
+                            bgcolor: 'primary.light',
+                            color: 'white',
+                            borderRadius: 2
+                          }}
+                        >
+                          {type.label}
+                        </Paper>
+                      ))}
+                      {/* Show message if no account types are selected */}
+                      {!selectedUser.is_user && 
+                       !selectedUser.is_customer && 
+                       !selectedUser.is_supplier && 
+                       !selectedUser.is_employee && 
+                       !selectedUser.is_dealer && 
+                       !selectedUser.is_distributor && (
+                        <Typography color="text.secondary">No account types assigned</Typography>
+                      )}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Box display="flex" justifyContent="flex-end" alignItems="center" height="100%">
+                      <Paper 
+                        sx={{ 
+                          px: 3, 
+                          py: 1, 
+                          bgcolor: selectedUser.active ? 'success.light' : 'error.light',
+                          color: 'white',
+                          borderRadius: 2
+                        }}
+                      >
+                        Status: {selectedUser.active ? "Active" : "Inactive"}
+                      </Paper>
+                    </Box>
+                  </Grid>
                 </Grid>
-              ))}
-            </Grid>
+              </Paper>
+
+              {/* Personal Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Personal Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={2}>
+                    <TextField
+                      label="Salutation"
+                      value={selectedUser.salutation || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={5}>
+                    <TextField
+                      label="First Name"
+                      value={selectedUser.firstname || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={5}>
+                    <TextField
+                      label="Last Name"
+                      value={selectedUser.lastname || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Date of Birth"
+                      value={selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Gender"
+                      value={selectedUser.gender || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Contact Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Contact Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Country"
+                      value={selectedUser.country || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Country Code"
+                      value={selectedUser.country_code || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Mobile Number"
+                      value={selectedUser.mobile_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Emergency Number"
+                      value={selectedUser.emergency_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Alternate Number"
+                      value={selectedUser.alternate_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="WhatsApp Number"
+                      value={selectedUser.whatsapp_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Email"
+                      value={selectedUser.email || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Website"
+                      value={selectedUser.website || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+              
+              {/* Business Information (shown only if user is not a pure User) */}
+              {(selectedUser.is_customer || selectedUser.is_supplier || selectedUser.is_employee || selectedUser.is_dealer || selectedUser.is_distributor) && (
+                <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                  <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Business Information</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Business Name"
+                        value={selectedUser.business_name || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Company Name"
+                        value={selectedUser.companyname || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Designation"
+                        value={selectedUser.designation || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Title"
+                        value={selectedUser.title || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Industry Segment"
+                        value={selectedUser.industry_segment || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              )}
+
+              {/* Permanent Address */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Permanent Address</Typography>
+                <Grid container spacing={2}>
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Grid item xs={12} md={4} key={`address${n}`}>
+                      <TextField
+                        label={`Address ${n}`}
+                        value={selectedUser[`address${n}`] || ""}
+                        fullWidth
+                        InputProps={{ readOnly: true }}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                  ))}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="State"
+                      value={selectedUser.state || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Country"
+                      value={selectedUser.country || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Pincode"
+                      value={selectedUser.pincode || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Additional Addresses */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Additional Addresses</Typography>
+                {Array.isArray(selectedUser.additional_addresses) && selectedUser.additional_addresses.length > 0 ? (
+                  selectedUser.additional_addresses.map((addr, idx) => (
+                    <Paper key={idx} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                      <Typography variant="subtitle1" sx={{ mb: 1, color: 'primary.dark' }}>
+                        Address {idx + 1}: {addr.address_name || ""}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {/* Show only non-empty fields */}
+                        {Object.entries(addr).filter(([key, value]) => 
+                          key !== "keyValues" && value && typeof value === "string"
+                        ).map(([key, value]) => (
+                          <Grid item xs={12} md={4} key={key}>
+                            <TextField
+                              label={key.replace(/([A-Z])/g, ' $1').replace(/^./, function(str){ return str.toUpperCase(); })}
+                              value={value}
+                              fullWidth
+                              InputProps={{ readOnly: true }}
+                              variant="outlined"
+                              size="small"
+                            />
+                          </Grid>
+                        ))}
+                        
+                        {/* Key-Values section */}
+                        {Array.isArray(addr.keyValues) && addr.keyValues.length > 0 && (
+                          <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>Additional Information</Typography>
+                            <Grid container spacing={1}>
+                              {addr.keyValues.map((kv, kvIdx) => (
+                                <Grid item xs={12} md={4} key={kvIdx}>
+                                  <TextField
+                                    label={kv.key}
+                                    value={kv.value}
+                                    fullWidth
+                                    InputProps={{ readOnly: true }}
+                                    variant="outlined"
+                                    size="small"
+                                  />
+                                </Grid>
+                              ))}
+                            </Grid>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </Paper>
+                  ))
+                ) : Array.isArray(selectedUser.Addresses) && selectedUser.Addresses.length > 0 ? (
+                  selectedUser.Addresses.map((addrStr, idx) => {
+                    let addr;
+                    try { addr = JSON.parse(addrStr); } catch { addr = {}; }
+                    return (
+                      <Paper key={idx} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                        <Typography variant="subtitle1" sx={{ mb: 1, color: 'primary.dark' }}>
+                          Address {idx + 1}: {addr.address_name || ""}
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {/* Show only non-empty fields */}
+                          {Object.entries(addr).filter(([key, value]) => 
+                            key !== "keyValues" && value && typeof value === "string"
+                          ).map(([key, value]) => (
+                            <Grid item xs={12} md={4} key={key}>
+                              <TextField
+                                label={key.replace(/([A-Z])/g, ' $1').replace(/^./, function(str){ return str.toUpperCase(); })}
+                                value={value}
+                                fullWidth
+                                InputProps={{ readOnly: true }}
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Grid>
+                          ))}
+                          
+                          {/* Key-Values section */}
+                          {Array.isArray(addr.keyValues) && addr.keyValues.length > 0 && (
+                            <Grid item xs={12}>
+                              <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>Additional Information</Typography>
+                              <Grid container spacing={1}>
+                                {addr.keyValues.map((kv, kvIdx) => (
+                                  <Grid item xs={12} md={4} key={kvIdx}>
+                                    <TextField
+                                      label={kv.key}
+                                      value={kv.value}
+                                      fullWidth
+                                      InputProps={{ readOnly: true }}
+                                      variant="outlined"
+                                      size="small"
+                                    />
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Paper>
+                    );
+                  })
+                ) : (
+                  <Typography color="text.secondary">No additional addresses</Typography>
+                )}
+              </Paper>
+
+              {/* Legal Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Legal Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Aadhar Number"
+                      value={selectedUser.aadhar_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="PAN Number"
+                      value={selectedUser.pan_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="GSTIN"
+                      value={selectedUser.gstin || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="MSME No"
+                      value={selectedUser.msme_no || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Bank Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Bank Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Bank Name"
+                      value={selectedUser.bank_name || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Branch Name"
+                      value={selectedUser.branch_name || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Branch Address"
+                      value={selectedUser.branch_address || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Account Number"
+                      value={selectedUser.account_number || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="IFSC Code"
+                      value={selectedUser.ifsc_code || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Additional Bank Info */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Additional Bank Information</Typography>
+                {Array.isArray(selectedUser.AdditionalBankInfos) && selectedUser.AdditionalBankInfos.length > 0 ? (
+                  selectedUser.AdditionalBankInfos.map((biStr, idx) => {
+                    let bi;
+                    try { bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr; } catch { bi = {}; }
+                    return (
+                      <Paper key={idx} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+                        <Typography variant="subtitle1" sx={{ mb: 1, color: 'primary.dark' }}>
+                          Bank Info {idx + 1}
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {/* Show only non-empty fields */}
+                          {Object.entries(bi).filter(([key, value]) => 
+                            key !== "keyValues" && value && typeof value === "string"
+                          ).map(([key, value]) => (
+                            <Grid item xs={12} md={4} key={key}>
+                              <TextField
+                                label={key.replace(/([A-Z])/g, ' $1').replace(/^./, function(str){ return str.toUpperCase(); })}
+                                value={value}
+                                fullWidth
+                                InputProps={{ readOnly: true }}
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Grid>
+                          ))}
+                          
+                          {/* Key-Values section */}
+                          {Array.isArray(bi.keyValues) && bi.keyValues.length > 0 && (
+                            <Grid item xs={12}>
+                              <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>Additional Information</Typography>
+                              <Grid container spacing={1}>
+                                {bi.keyValues.map((kv, kvIdx) => (
+                                  <Grid item xs={12} md={4} key={kvIdx}>
+                                    <TextField
+                                      label={kv.key}
+                                      value={kv.value}
+                                      fullWidth
+                                      InputProps={{ readOnly: true }}
+                                      variant="outlined"
+                                      size="small"
+                                    />
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Paper>
+                    );
+                  })
+                ) : (
+                  <Typography color="text.secondary">No additional bank information</Typography>
+                )}
+              </Paper>
+
+              {/* Authentication Information */}
+              <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Authentication</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Username"
+                      value={selectedUser.username || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Role ID"
+                      value={selectedUser.role_id || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Box>
           ) : (
             <Typography>No user selected.</Typography>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewDialogOpen(false)} variant="contained" color="primary">Close</Button>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            onClick={() => {
+              setViewDialogOpen(false);
+              navigate(`/users/${selectedUser.id}/edit`);
+            }}
+          >
+            Edit User
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

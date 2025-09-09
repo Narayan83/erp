@@ -144,13 +144,13 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
   );
 });
 
-const ProductTableBody = memo(function ProductTableBody({ products, navigate, loading, visibleColumns, onView }) {
+const ProductTableBody = memo(function ProductTableBody({ products, navigate, loading, visibleColumns, onView, page, limit, selectedIds, onToggleOne }) {
   // Add extra safety check for null/undefined products
   if (!products) {
     return (
       <TableBody>
         <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 1} align="center" sx={{ py: 3 }}>
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} align="center" sx={{ py: 3 }}>
             <Typography color="error">Error loading products</Typography>
           </TableCell>
         </TableRow>
@@ -163,7 +163,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
     return (
       <TableBody>
         <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 1} align="center" sx={{ py: 4 }}>
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} align="center" sx={{ py: 4 }}>
             <CircularProgress size={28} />
           </TableCell>
         </TableRow>
@@ -172,8 +172,16 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
   }
   return (
     <TableBody>
-      {products.map((p) => (
+      {products.map((p, idx) => (
         <TableRow key={p.ID}>
+          <TableCell sx={{ py: 0.5 }}>
+            <Checkbox
+              size="small"
+              checked={selectedIds.includes(p.ID)}
+              onChange={() => onToggleOne(p.ID)}
+            />
+          </TableCell>
+          <TableCell sx={{ py: 0.5 }}>{page * limit + idx + 1}</TableCell>
           {visibleColumns.name && <TableCell sx={{ py: 0.5 }}>{p.Name}</TableCell>}
           {visibleColumns.code && <TableCell sx={{ py: 0.5 }}>{p.Code}</TableCell>}
           {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
@@ -196,14 +204,14 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
       ))}
       {loading && products.length > 0 && (
         <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 1} align="center" sx={{ py: 1 }}>
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} align="center" sx={{ py: 1 }}>
             <CircularProgress size={20} />
           </TableCell>
         </TableRow>
       )}
       {(!loading && products.length === 0) && (
         <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 1} align="center" sx={{ py: 3 }}>No products found.</TableCell>
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} align="center" sx={{ py: 3 }}>No products found.</TableCell>
         </TableRow>
       )}
     </TableBody>
@@ -228,6 +236,8 @@ const FiltersRow = memo(function FiltersRow({
   
   return (
     <TableRow>
+      <TableCell />
+      <TableCell />
       {visibleColumns.name && (
         <TableCell>
           <TextField
@@ -396,6 +406,30 @@ export default function ProductListPage() {
   useEffect(() => {
     localStorage.setItem('productListColumns', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
+
+  // Selection state for checkboxes
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      return [...prev, id];
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = products.map(p => p.ID);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+    } else {
+      setSelectedIds(prev => {
+        const s = new Set(prev);
+        pageIds.forEach(id => s.add(id));
+        return Array.from(s);
+      });
+    }
+  };
 
   useEffect(() => {
     fetchMeta();
@@ -739,6 +773,11 @@ export default function ProductListPage() {
     }
   };
 
+  // compute selection status for current page
+  const pageIds = products.map(p => p.ID);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
+  const somePageSelected = pageIds.some(id => selectedIds.includes(id)) && !allPageSelected;
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -760,7 +799,19 @@ export default function ProductListPage() {
       {/* Product view dialog (read-only) */}
       <Dialog open={viewOpen} onClose={handleCloseView} maxWidth="lg" fullWidth>
         <DialogTitle>Product Details (Read-only)</DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{
+          backgroundColor: 'white',
+          color: 'black',
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: 'transparent',
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23)' }
+          },
+          '& .MuiInputBase-input': { color: 'black' },
+          '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: 'black' },
+          '& .MuiInputLabel-root': { color: 'rgba(0,0,0,0.6)' },
+          '& .MuiTypography-root': { color: 'black' },
+          '& table': { backgroundColor: 'transparent' }
+        }}>
           {viewLoading ? (
             <Box display="flex" justifyContent="center" p={2}><CircularProgress /></Box>
           ) : selectedProduct ? (
@@ -880,6 +931,15 @@ export default function ProductListPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell>
+                  <Checkbox
+                    size="small"
+                    checked={allPageSelected}
+                    indeterminate={somePageSelected}
+                    onChange={toggleSelectAllOnPage}
+                  />
+                </TableCell>
+                <TableCell sx={{fontWeight : "bold"}}>SL</TableCell>
                 {visibleColumns.name && (
                   <TableCell sx={{fontWeight : "bold"}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
@@ -967,6 +1027,10 @@ export default function ProductListPage() {
               loading={loading} 
               visibleColumns={visibleColumns}
               onView={handleOpenView}
+              page={page}
+              limit={limit}
+              selectedIds={selectedIds}
+              onToggleOne={toggleSelectOne}
             />
           </Table>
         </TableContainer>
