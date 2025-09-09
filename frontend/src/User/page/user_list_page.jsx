@@ -39,7 +39,7 @@ import * as XLSX from 'xlsx';
 export default function UserListPage() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
-  const [filters, setFilters] = useState({ name: "" });
+  const [filters, setFilters] = useState({ name: "", roleID: '', deptHead: '', userType: '' });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -120,14 +120,14 @@ export default function UserListPage() {
     fetchUsers();
   }, [page, limit]);
 
-  // Debounced search effect for filters.name
+  // Debounced search effect for all filters
   useEffect(() => {
     const handler = setTimeout(() => {
       setPage(0);
       fetchUsers();
     }, 300);
     return () => clearTimeout(handler);
-  }, [filters.name]);
+  }, [filters.name, filters.roleID, filters.deptHead, filters.userType]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -137,6 +137,9 @@ export default function UserListPage() {
           page: page + 1,
           limit,
           filter: filters.name,
+          role_id: filters.roleID,
+          dept_head: filters.deptHead,
+          user_type: filters.userType,
         },
       });
       setUsers(res.data.data);
@@ -156,6 +159,19 @@ export default function UserListPage() {
   // Add state for view dialog and selected user
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Selection state for table rows
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const handleToggleSelectAll = (e) => {
+    const checked = e.target.checked;
+    if (checked) setSelectedIds(users.map(u => u.id));
+    else setSelectedIds([]);
+  };
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
 
   return (
     <Box p={3}>
@@ -309,9 +325,25 @@ export default function UserListPage() {
             </IconButton>
           </Tooltip>
            
-           {/* SELECT EXECUTIVE DROPDOWN */}
+           {/* DEPT HEAD DROPDOWN */}
+          <Box flex={0.5} sx={{ mr: 1 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Dept Head</InputLabel>
+              <Select
+                value={filters.deptHead}
+                label="Dept Head"
+                onChange={(e) => setFilters({ ...filters, deptHead: e.target.value })}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="1">Dept Head 1</MenuItem>
+                <MenuItem value="2">Dept Head 2</MenuItem>
+                <MenuItem value="3">Dept Head 3</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
 
-          <Box flex={0.5}>
+           {/* SELECT EXECUTIVE DROPDOWN */}
+          <Box flex={0.5} sx={{ mr: 1 }}>
             <FormControl fullWidth size="small">
               <InputLabel id="demo-simple-select-label">Select Executive</InputLabel>
               <Select
@@ -325,6 +357,26 @@ export default function UserListPage() {
                 <MenuItem value={2}>Executive 2</MenuItem>
                 <MenuItem value={3}>Executive 3</MenuItem>
                 <MenuItem value={4}>Executive 4</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* USER TYPE DROPDOWN */}
+          <Box flex={0.5}>
+            <FormControl fullWidth size="small">
+              <InputLabel>User Type</InputLabel>
+              <Select
+                value={filters.userType}
+                label="User Type"
+                onChange={(e) => setFilters({ ...filters, userType: e.target.value })}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="user">User</MenuItem>
+                <MenuItem value="customer">Customer</MenuItem>
+                <MenuItem value="supplier">Supplier</MenuItem>
+                <MenuItem value="employee">Employee</MenuItem>
+                <MenuItem value="dealer">Dealer</MenuItem>
+                <MenuItem value="distributor">Distributor</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -345,6 +397,15 @@ export default function UserListPage() {
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={users.length > 0 && selectedIds.length === users.length}
+                      indeterminate={selectedIds.length > 0 && selectedIds.length < users.length}
+                      onChange={handleToggleSelectAll}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>S.No</TableCell>
                   {userFields.filter(field => checkedFields.includes(field)).map((field) => (
                     <TableCell key={field} sx={{ fontWeight: "bold" }}>{field}</TableCell>
                   ))}
@@ -354,8 +415,16 @@ export default function UserListPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
+                {users.map((user, index) => (
+                  <TableRow key={user.id} selected={selectedIds.includes(user.id)}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedIds.includes(user.id)}
+                        onChange={() => handleToggleSelect(user.id)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{page * limit + index + 1}</TableCell>
                     {userFields.filter(field => checkedFields.includes(field)).map((field) => (
                       <TableCell key={field} sx={field === "Name" ? { whiteSpace: 'nowrap' } : {}}>
                         {field === "Name"
@@ -505,8 +574,8 @@ export default function UserListPage() {
                                                   ))}
                                                 </div>
                                               : null
-                                        )}
-                                      </div>
+                                      )}
+                                    </div>
                                     );
                                   })
                                 : ""
