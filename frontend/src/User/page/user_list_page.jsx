@@ -209,13 +209,15 @@ export default function UserListPage() {
           </Tooltip>
           <Tooltip title="Export">
             <IconButton sx={{ mx: 2 }} aria-label="export" onClick={() => {
-              const data = users.map(user => {
+              // Export only selected users if any are selected; otherwise export current page users
+              const exportSource = selectedIds.length > 0 ? users.filter(u => selectedIds.includes(u.id)) : users;
+              const data = exportSource.map(user => {
                 const obj = {};
                 checkedFields.forEach(field => {
                   obj[field] = field === "Name"
                     ? [user.salutation, user.firstname, user.lastname].filter(Boolean).join(" ")
                     : field === "DOB"
-                    ? user.dob ? new Date(user.dob).toLocaleDateString() : ""
+                    ? (user.dob ? new Date(user.dob).toLocaleDateString() : "")
                     : field === "Gender"
                     ? user.gender
                     : field === "CountryCode"
@@ -277,41 +279,41 @@ export default function UserListPage() {
                     : field === "IFSCCode"
                     ? user.ifsc_code
                     : field === "Active"
-                    ? user.active ? "Yes" : "No"
+                    ? (user.active ? "Yes" : "No")
                     : field === "IsUser"
-                    ? user.is_user ? "Yes" : "No"
+                    ? (user.is_user ? "Yes" : "No")
                     : field === "IsCustomer"
-                    ? user.is_customer ? "Yes" : "No"
+                    ? (user.is_customer ? "Yes" : "No")
                     : field === "IsSupplier"
-                    ? user.is_supplier ? "Yes" : "No"
+                    ? (user.is_supplier ? "Yes" : "No")
                     : field === "IsEmployee"
-                    ? user.is_employee ? "Yes" : "No"
+                    ? (user.is_employee ? "Yes" : "No")
                     : field === "IsDealer"
-                    ? user.is_dealer ? "Yes" : "No"
+                    ? (user.is_dealer ? "Yes" : "No")
                     : field === "IsDistributor"
-                    ? user.is_distributor ? "Yes" : "No"
+                    ? (user.is_distributor ? "Yes" : "No")
                     : field === "RoleID"
                     ? user.role_id
                     : field === "Additional Address"
-                    ? Array.isArray(user.additional_addresses) && user.additional_addresses.length > 0
-                      ? user.additional_addresses.map(addr => Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ")).join(" | ")
-                      : Array.isArray(user.Addresses) && user.Addresses.length > 0
-                      ? user.Addresses.map(addrStr => {
-                          try {
-                            const addr = JSON.parse(addrStr);
-                            return Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
-                          } catch { return ""; }
-                        }).join(" | ")
-                      : ""
+                    ? (Array.isArray(user.additional_addresses) && user.additional_addresses.length > 0
+                        ? user.additional_addresses.map(addr => Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ")).join(" | ")
+                        : Array.isArray(user.Addresses) && user.Addresses.length > 0
+                        ? user.Addresses.map(addrStr => {
+                            try {
+                              const addr = JSON.parse(addrStr);
+                              return Object.entries(addr).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
+                            } catch { return ""; }
+                          }).join(" | ")
+                        : "")
                     : field === "Additional Bank Info"
-                    ? Array.isArray(user.AdditionalBankInfos) && user.AdditionalBankInfos.length > 0
-                      ? user.AdditionalBankInfos.map(biStr => {
-                          try {
-                            const bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr;
-                            return Object.entries(bi).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
-                          } catch { return ""; }
-                        }).join(" | ")
-                      : ""
+                    ? (Array.isArray(user.AdditionalBankInfos) && user.AdditionalBankInfos.length > 0
+                        ? user.AdditionalBankInfos.map(biStr => {
+                            try {
+                              const bi = typeof biStr === "string" ? JSON.parse(biStr) : biStr;
+                              return Object.entries(bi).filter(([k, v]) => k !== "keyValues" && v).map(([k, v]) => `${k}: ${v}`).join("; ");
+                            } catch { return ""; }
+                          }).join(" | ")
+                        : "")
                     : "";
                 });
                 return obj;
@@ -319,7 +321,7 @@ export default function UserListPage() {
               const ws = XLSX.utils.json_to_sheet(data);
               const wb = XLSX.utils.book_new();
               XLSX.utils.book_append_sheet(wb, ws, "Users");
-              XLSX.writeFile(wb, "users_export.xlsx");
+              XLSX.writeFile(wb, `users_export${selectedIds.length>0? '_selected':''}.xlsx`);
             }}>
               <FileUpload />
             </IconButton>

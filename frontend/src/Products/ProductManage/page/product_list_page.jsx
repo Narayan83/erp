@@ -715,41 +715,50 @@ export default function ProductListPage() {
 
   const handleExport = async () => {
     try {
-      // Fetch all products with current filters and sorting (remove pagination for export)
-      const filterParams = Object.entries({
-        name: debouncedFilters.name,
-        code: debouncedFilters.code,
-        category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
-        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
-        subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
-        stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
-      }).reduce((acc, [key, value]) => {
-        if (value !== "" && value !== undefined && value !== null) {
-          acc[key] = value;
+      let productsToExport = [];
+
+      if (selectedIds.length > 0) {
+        // Fetch only selected products
+        const fetchPromises = selectedIds.map(id => axios.get(`${BASE_URL}/api/products/${id}`));
+        const responses = await Promise.all(fetchPromises);
+        productsToExport = responses.map(res => res.data.data || res.data);
+      } else {
+        // Fetch all products with current filters and sorting (remove pagination for export)
+        const filterParams = Object.entries({
+          name: debouncedFilters.name,
+          code: debouncedFilters.code,
+          category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
+          store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
+          subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+          stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
+        }).reduce((acc, [key, value]) => {
+          if (value !== "" && value !== undefined && value !== null) {
+            acc[key] = value;
+          }
+          return acc;
+        }, {});
+        
+        // Add sorting params if set
+        let sortParams = {};
+        if (nameSort) {
+          sortParams = { sort_by: 'name', sort_order: nameSort };
+        } else if (stockSort) {
+          sortParams = { sort_by: 'stock', sort_order: stockSort };
         }
-        return acc;
-      }, {});
-      
-      // Add sorting params if set
-      let sortParams = {};
-      if (nameSort) {
-        sortParams = { sort_by: 'name', sort_order: nameSort };
-      } else if (stockSort) {
-        sortParams = { sort_by: 'stock', sort_order: stockSort };
+        
+        const res = await axios.get(`${BASE_URL}/api/products`, {
+          params: {
+            ...filterParams,
+            ...sortParams,
+            limit: 10000, // large limit to get all
+          },
+        });
+        
+        productsToExport = res.data.data || [];
       }
       
-      const res = await axios.get(`${BASE_URL}/api/products`, {
-        params: {
-          ...filterParams,
-          ...sortParams,
-          limit: 10000, // large limit to get all
-        },
-      });
-      
-      const products = res.data.data || [];
-      
       // Flatten data for Excel based on visible columns
-      const exportData = products.map(p => {
+      const exportData = productsToExport.map(p => {
         const row = {};
         if (visibleColumns.name) row.Name = p.Name;
         if (visibleColumns.code) row.Code = p.Code;
