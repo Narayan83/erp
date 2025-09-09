@@ -8,17 +8,28 @@ import axios from "axios";
 import { BASE_URL }  from "../../../Config";
 
 export default function UnitDialog({ open, onClose, unit, onSuccess }) {
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: { name: "", description: "" }
+  });
 
   useEffect(() => {
-    if (unit) reset({"name": unit.Name});
-    else reset({ name: "" });
-  }, [unit]);
+    if (open) {
+      if (unit) {
+        reset({
+          name: unit.name ?? unit.Name ?? "",
+          description: unit.description ?? unit.Description ?? ""
+        });
+      } else {
+        reset({ name: "", description: "" });
+      }
+    }
+  }, [unit, open, reset]);
 
   const onSubmit = async (data) => {
     try {
-      if (unit?.ID) {
-        await axios.put(`${BASE_URL}/api/units/${unit.ID}`, data);
+      const id = unit?.ID ?? unit?.id;
+      if (id) {
+        await axios.put(`${BASE_URL}/api/units/${id}`, data);
       } else {
         await axios.post(`${BASE_URL}/api/units`, data);
       }
@@ -29,7 +40,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{unit ? "Edit Unit" : "Add Unit"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -40,6 +51,15 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
             margin="dense"
             size="small"
             {...register("name", { required: true })}
+          />
+          <TextField
+            label="Description"
+            fullWidth
+            margin="dense"
+            size="small"
+            multiline
+            minRows={2}
+            {...register("description")}
           />
         </DialogContent>
         <DialogActions>
