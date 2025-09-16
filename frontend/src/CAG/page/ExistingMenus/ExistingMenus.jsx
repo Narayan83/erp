@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import "../../styles/existing_menus.scss";
 import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
+import { BASE_URL } from "../../../Config"; // Add this import
 
 const defaultOnEdit = () => {};
 
@@ -14,6 +16,25 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
   const [isEditing, setIsEditing] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
+  const [loading, setLoading] = useState(false); // Added for fetch loading
+
+  // Load menus from backend
+  const loadMenus = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/api/loadMenus`); // Use BASE_URL
+      const menusArray = Array.isArray(res.data) ? res.data : res.data.data || [];
+      displaySetMenus(menusArray);
+    } catch (error) {
+      console.error("Failed to load menus", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMenus(); // Fetch on mount
+  }, []);
 
   const displayMenus = menus || localMenus;
 
@@ -26,9 +47,12 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     }
   };
 
+  // Create a map for menu ID to name for parent lookup
+  const menuMap = new Map(displayMenus.map(menu => [menu.id, menu.menu_name]));
+
   const safeMenus = Array.isArray(displayMenus) ? displayMenus : [];
 
-  const handleDelete = (name) => {
+  const handleDelete = async (id) => { // Make async
     if (setMenus && typeof setMenus !== "function") {
       console.error("ExistingMenus: setMenus provided but not a function");
       return;
@@ -36,7 +60,13 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     if (!window.confirm("Are you sure you want to delete this menu?")) {
       return;
     }
-    displaySetMenus(safeMenus.filter((menu) => menu.name !== name));
+    try {
+      await axios.delete(`${BASE_URL}/api/menus/${id}`); // Add DELETE request
+      displaySetMenus(safeMenus.filter((menu) => menu.id !== id)); // Update local state
+      loadMenus(); // Refresh from backend
+    } catch (error) {
+      console.error("Failed to delete menu", error);
+    }
   };
 
   const handleEdit = (menu) => {
@@ -44,11 +74,12 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     setEditingMenu(menu);
   };
 
-  const handleUpdateMenu = (updatedMenu, oldName) => {
+  const handleUpdateMenu = (updatedMenu) => {
     const updatedMenus = safeMenus.map((menu) =>
-      menu.name === oldName ? updatedMenu : menu
+      menu.id === updatedMenu.id ? updatedMenu : menu // Use id
     );
     displaySetMenus(updatedMenus);
+    loadMenus(); // Refresh from backend after update
     setIsEditing(false);
     setEditingMenu(null);
   };
@@ -67,9 +98,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
       console.error("ExistingMenus: setMenus provided but not a function");
       return;
     }
-    if (Array.isArray(initialMenus) && initialMenus.length > 0) {
-      displaySetMenus(initialMenus);
-    }
+    loadMenus(); // Fetch from backend on refresh
     setSearch("");
   };
 
@@ -78,14 +107,14 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
   };
 
   const filteredMenus = safeMenus.filter((menu) =>
-    menu.name.toLowerCase().includes(search.toLowerCase())
+    menu.menu_name.toLowerCase().includes(search.toLowerCase()) // Use menu_name
   );
 
   const sortedMenus = [...filteredMenus].sort((a, b) => {
     if (sortOrder === 'asc') {
-      return a.name.localeCompare(b.name);
+      return a.menu_name.localeCompare(b.menu_name); // Use menu_name
     } else {
-      return b.name.localeCompare(a.name);
+      return b.menu_name.localeCompare(a.menu_name); // Use menu_name
     }
   });
 
@@ -126,6 +155,13 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
               <th onClick={handleSort} style={{ cursor: 'pointer' }}>
                 Menu Name {sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />}
               </th>
+              <th>URL</th>
+              <th>Icon</th>
+              <th>Parent Menu</th>
+              <th>Sort Order</th>
+              <th>Menu Type</th>
+              <th>Active</th>
+              <th>Requires Auth</th>
               <th>Permissions</th>
               <th>Remarks</th>
               <th>Actions</th>
@@ -133,8 +169,15 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
           </thead>
           <tbody>
             {sortedMenus.map((menu) => (
-              <tr key={menu.name}>
-                <td>{menu.name}</td>
+              <tr key={menu.id}>
+                <td>{menu.menu_name}</td>
+                <td>{menu.url || ''}</td>
+                <td>{menu.icon || ''}</td>
+                <td>{menu.parent_id ? menuMap.get(menu.parent_id) || 'N/A' : 'N/A'}</td>
+                <td>{menu.sort_order || 0}</td>
+                <td>{menu.menu_type || 'main'}</td>
+                <td>{menu.is_active ? 'Yes' : 'No'}</td>
+                <td>{menu.requires_auth ? 'Yes' : 'No'}</td>
                 <td>
                   {menu.permissions
                     ? Object.entries(menu.permissions)
@@ -143,7 +186,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
                         .join(", ")
                     : ""}
                 </td>
-                <td>{menu.remarks}</td>
+                <td>{menu.description}</td>
                 <td>
                   <button
                     className="action-btn edit-btn"
@@ -155,7 +198,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
                   <button
                     className="action-btn delete-btn"
                     title="Delete"
-                    onClick={() => handleDelete(menu.name)}
+                    onClick={() => handleDelete(menu.id)} 
                   >
                     <FaTrash />
                   </button>
