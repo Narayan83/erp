@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -57,6 +59,8 @@ func GetAllMenus(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	fmt.Printf("Fetched menus: %+v\n", items) // Print the query output
+
 	return c.JSON(fiber.Map{
 		"data":  items,
 		"total": total,
@@ -79,7 +83,7 @@ func CreateMenu(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
-
+	fmt.Printf("Received item: %+v\n", item)
 	if item.MenuName == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Menu name is required"})
 	}

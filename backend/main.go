@@ -38,6 +38,7 @@ func main() {
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	handler.SetMenusDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
@@ -147,7 +148,7 @@ func main() {
 	api.Delete("/leads/:id", handler.DeleteLead)
 
 	// menu
-	api.Get("/menus", handler.GetAllMenus)
+	api.Get("/loadMenus", handler.GetAllMenus)
 	api.Get("/menus/:id", handler.GetMenuByID)
 	api.Post("/menus", handler.CreateMenu)
 	api.Put("/menus/:id", handler.UpdateMenu)
