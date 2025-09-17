@@ -63,12 +63,14 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  overflow-x: auto; // Add horizontal scroll for wide tables
 }
 
 .menus-table th,
 .menus-table td {
-  padding: 12px 16px;
+  padding: 8px 12px; // Reduce padding slightly for more columns
   text-align: center;
+  min-width: 80px; // Ensure minimum width for readability
 }
 
 .menus-table th {
