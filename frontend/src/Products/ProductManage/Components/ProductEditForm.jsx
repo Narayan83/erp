@@ -61,7 +61,7 @@ export default function ProductEditForm({ product, onSubmit }) {
           axios.get(`${BASE_URL}/api/units`),
           axios.get(`${BASE_URL}/api/stores`),
           axios.get(`${BASE_URL}/api/taxes`),
-          axios.get(`${BASE_URL}/api/hsn`).catch(() => ({ data: { data: [] } })),
+          axios.get(`${BASE_URL}/api/hsncode`).catch(() => ({ data: { data: [] } })),
         ]);
         setCategories(cat.data.data);
         setSubcategories(sub.data.data);
@@ -70,7 +70,7 @@ export default function ProductEditForm({ product, onSubmit }) {
         setTaxes(tax.data.data);
         setHsnCodes(hsn.data.data);
       } catch (err) {
-        // If any other API fails, still try to set what we can
+        console.error("Error loading options:", err);
         setCategories([]);
         setSubcategories([]);
         setUnits([]);
@@ -83,61 +83,79 @@ export default function ProductEditForm({ product, onSubmit }) {
     loadOptions().then(() => {
       // Pre-fill form only after options are loaded
       reset({
-        name: product.Name,
-        code: product.Code,
-        hsnSacCode: product.HsnSacCode,
-        importance: product.Importance || "Normal",
-        gstPercent: product.GstPercent,
-        categoryID: product.CategoryID != null ? String(product.CategoryID) : '',
-        subcategoryID: product.SubcategoryID != null ? String(product.SubcategoryID) : '',
-        unitID: product.UnitID != null ? String(product.UnitID) : '',
-        storeID: product.StoreID != null ? String(product.StoreID) : '',
-        taxID: product.TaxID != null ? String(product.TaxID) : '',
-        product_mode: product.ProductMode || "Purchase",
-        description: product.Description,
-        internalNotes: product.InternalNotes,
-        minimumStock: product.MinimumStock,
-        isActive: typeof product.isActive !== 'undefined' ? product.isActive : true,
+        Name: product.Name,
+        Code: product.Code, 
+        HsnID: product.HsnID || '', // Use HsnID for consistency
+        HsnSacCode: product.HsnSacCode || '',
+        Importance: product.Importance || "Normal",
+        GstPercent: product.GstPercent,
+        CategoryID: product.CategoryID, // Don't convert to string - keep original format
+        SubcategoryID: product.SubcategoryID,
+        UnitID: product.UnitID,
+        StoreID: product.StoreID,
+        TaxID: product.TaxID,
+        ProductMode: product.ProductMode || "Purchase",
+        Description: product.Description || '',
+        InternalNotes: product.InternalNotes || '',
+        MinimumStock: product.MinimumStock || 0,
+        IsActive: typeof product.IsActive !== 'undefined' ? product.IsActive : true,
+        ProductType: product.ProductType || 'All'
       });
     });
   }, [product, reset]);
 
-  console.log('categories', categories, 'subcategories', subcategories, 'units', units, 'stores', stores, 'taxes', taxes, 'hsnCodes', hsnCodes);
+  const handleFormSubmit = (data) => {
+    // Convert string IDs to numbers for the backend if needed
+    const formattedData = {
+      ...data,
+      CategoryID: data.CategoryID ? Number(data.CategoryID) : null,
+      SubcategoryID: data.SubcategoryID ? Number(data.SubcategoryID) : null,
+      UnitID: data.UnitID ? Number(data.UnitID) : null,
+      StoreID: data.StoreID ? Number(data.StoreID) : null,
+      TaxID: data.TaxID ? Number(data.TaxID) : null,
+      HsnID: data.HsnID ? Number(data.HsnID) : null,
+      MinimumStock: data.MinimumStock ? Number(data.MinimumStock) : 0,
+      GstPercent: data.GstPercent ? Number(data.GstPercent) : 0,
+      ID: product.ID // Make sure we include the product ID
+    };
+    
+    onSubmit(formattedData);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit(handleFormSubmit)}>
       <Typography variant="h6" gutterBottom>
-        {" "}
-        Edit Product Info{" "}
+        Edit Product Info
       </Typography>
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Product Name"
             fullWidth
             size="small"
-            {...register("name", { required: true })}
+            {...register("Name", { required: true })}
           />
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Code"
             fullWidth
             size="small"
-            {...register("code", { required: true })}
+            {...register("Code", { required: true })}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth size="small">
-            <InputLabel>HSN/SAC Code</InputLabel>
+            <InputLabel>HSN Code</InputLabel>
             <Select
-              label="HSN/SAC Code"
-              value={watch("hsnSacCode") || ''}
-              {...register("hsnSacCode")}
+              label="HSN Code"
+              value={watch("HsnID") || ''}
+              {...register("HsnID")}
             >
               {hsnCodes.length > 0 ? (
                 hsnCodes.map((hsn) => (
-                  <MenuItem key={hsn.id || hsn.ID || hsn.code} value={hsn.code}>
+                  <MenuItem key={hsn.id || hsn.ID} value={hsn.id || hsn.ID}>
                     {hsn.code}
                   </MenuItem>
                 ))
@@ -150,13 +168,12 @@ export default function ProductEditForm({ product, onSubmit }) {
           </FormControl>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth size="small">
             <InputLabel>Importance</InputLabel>
             <Select
               label="Importance"
-              defaultValue="Normal"
-              {...register("importance", { required: true })}
+              {...register("Importance", { required: true })}
             >
               {["Normal", "High", "Critical"].map((level) => (
                 <MenuItem key={level} value={level}>
@@ -167,52 +184,61 @@ export default function ProductEditForm({ product, onSubmit }) {
           </FormControl>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Product Type</InputLabel>
+            <Select
+              label="Product Type"
+              {...register("ProductType", { required: true })}
+            >
+              {['All','Finished Goods','Semi-Finished Goods','Raw Materials'].map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
           <TextField
             label="Minimum Stock"
             type="number"
             fullWidth
             size="small"
-            {...register("minimumStock", { valueAsNumber: true })}
+            {...register("MinimumStock", { valueAsNumber: true })}
           />
         </Grid>
 
-        {/* Dynamic Dropdowns */}
         {/* Category Dropdown */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <Controller
-            name="categoryID"
+            name="CategoryID"
             control={control}
             rules={{ required: true }}
-            render={({ field }) => {
-              const labelId = "category-label";
-              const selectId = "category-select";
-              return (
-                <FormControl fullWidth size="small">
-                  <InputLabel id={labelId}>Category *</InputLabel>
-                  <Select
-                    labelId={labelId}
-                    id={selectId}
-                    label="Category *"
-                    value={field.value || ''}
-                    onChange={e => field.onChange(e.target.value)}
-                  >
-                    {categories.map((cat) => (
-                      <MenuItem key={cat.ID} value={String(cat.ID)}>
+            render={({ field }) => (
+              <FormControl fullWidth size="small">
+                <InputLabel>Category *</InputLabel>
+                <Select
+                  label="Category *"
+                  value={field.value || ''}
+                  onChange={e => field.onChange(e.target.value)}
+                >
+                  {categories.map((cat) => (
+                    <MenuItem key={cat.ID} value={cat.ID}>
                       {cat.Name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              );
-            }}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           />
         </Grid>
 
         {/* Subcategory Dropdown */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <Controller
-            name="subcategoryID"
+            name="SubcategoryID"
             control={control}
             render={({ field }) => (
               <FormControl fullWidth size="small">
@@ -220,7 +246,7 @@ export default function ProductEditForm({ product, onSubmit }) {
                 <Select label="Subcategory" value={field.value || ''} onChange={e => field.onChange(e.target.value)}>
                   {subcategories.length > 0 ? (
                     subcategories.map((sub) => (
-                      <MenuItem key={sub.ID} value={String(sub.ID)}>
+                      <MenuItem key={sub.ID} value={sub.ID}>
                         {sub.Name}
                       </MenuItem>
                     ))
@@ -235,17 +261,17 @@ export default function ProductEditForm({ product, onSubmit }) {
           />
         </Grid>
 
-        {/* Unit and Product Mode */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        {/* Unit */}
+        <Grid item xs={12} md={4}>
           <Controller
-            name="unitID"
+            name="UnitID"
             control={control}
             render={({ field }) => (
               <FormControl fullWidth size="small">
                 <InputLabel>Unit</InputLabel>
                 <Select label="Unit" value={field.value || ''} onChange={e => field.onChange(e.target.value)}>
                   {units.map((unit) => (
-                    <MenuItem key={unit.ID} value={String(unit.ID)}>
+                    <MenuItem key={unit.ID} value={unit.ID}>
                       {unit.Name}
                     </MenuItem>
                   ))}
@@ -255,13 +281,12 @@ export default function ProductEditForm({ product, onSubmit }) {
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth size="small">
             <InputLabel>Product Mode</InputLabel>
             <Select
               label="Product Mode"
-              defaultValue="Purchase"
-              {...register("product_mode", { required: true })}
+              {...register("ProductMode", { required: true })}
             >
               {["Purchase", "Internal Manufacturing"].map((level) => (
                 <MenuItem key={level} value={level}>
@@ -273,16 +298,16 @@ export default function ProductEditForm({ product, onSubmit }) {
         </Grid>
 
         {/* Store Dropdown */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <Controller
-            name="storeID"
+            name="StoreID"
             control={control}
             render={({ field }) => (
               <FormControl fullWidth size="small">
                 <InputLabel>Store</InputLabel>
                 <Select label="Store" value={field.value || ''} onChange={e => field.onChange(e.target.value)}>
                   {stores.map((store) => (
-                    <MenuItem key={store.ID} value={String(store.ID)}>
+                    <MenuItem key={store.ID} value={store.ID}>
                       {store.Name}
                     </MenuItem>
                   ))}
@@ -293,16 +318,16 @@ export default function ProductEditForm({ product, onSubmit }) {
         </Grid>
 
         {/* Tax Dropdown */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <Controller
-            name="taxID"
+            name="TaxID"
             control={control}
             render={({ field }) => (
               <FormControl fullWidth size="small">
                 <InputLabel>Tax</InputLabel>
                 <Select label="Tax" value={field.value || ''} onChange={e => field.onChange(e.target.value)}>
                   {taxes.map((tax) => (
-                    <MenuItem key={tax.ID} value={String(tax.ID)}>
+                    <MenuItem key={tax.ID} value={tax.ID}>
                       {`${tax.Name} (${tax.Percentage}%)`}
                     </MenuItem>
                   ))}
@@ -312,43 +337,42 @@ export default function ProductEditForm({ product, onSubmit }) {
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="GST %"
             fullWidth
             size="small"
             InputProps={{ readOnly: true }}
             InputLabelProps={{ shrink: true }}
-            {...register("gstPercent", { valueAsNumber: true })}
+            {...register("GstPercent", { valueAsNumber: true })}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Description"
             multiline
             rows={2}
             fullWidth
             size="small"
-            {...register("description")}
+            {...register("Description")}
           />
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Internal Notes"
             multiline
             rows={2}
             fullWidth
             size="small"
-            {...register("internalNotes")}
+            {...register("InternalNotes")}
           />
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <FormControlLabel
             control={
               <Checkbox
-                defaultChecked
-                {...register("isActive")}
+                {...register("IsActive")}
               />
             }
             label="Is Active"

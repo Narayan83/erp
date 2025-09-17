@@ -182,7 +182,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
               >
                 {hsnCodes.map(h => (
                   <MenuItem key={h.id || h.ID} value={h.id || h.ID}>
-                    {h.code} {(() => { const tx = h.tax || taxes.find(t => (t.ID || t.id) === h.tax_id); return tx ? ` - ${tx.Name || tx.name} (${tx.Percentage ?? tx.percentage}%)` : ''; })()}
+                    {h.code}
                   </MenuItem>
                 ))}
               </Select>
