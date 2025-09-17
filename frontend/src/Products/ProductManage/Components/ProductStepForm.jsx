@@ -163,26 +163,26 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
         <Grid container spacing={2}>
           {/* Product Name */}
           <Grid item xs={12} md={4}>
-            <TextField label="Product Name" fullWidth size="small" {...register("name", { required: true })} />
+            <TextField label="Product Name" size="small" sx={{ width: '260px' }} {...register("name", { required: true })} />
           </Grid>
           {/* Code */}
           <Grid item xs={12} md={4}>
-            <TextField label="Code" fullWidth size="small" {...register("code", { required: true })} />
+            <TextField label="Code" size="small" sx={{ width: '260px' }} {...register("code", { required: true })} />
           </Grid>
           {/* HSN Dropdown */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>HSN Code</InputLabel>
               <Select
                 label="HSN Code"
                 value={watch('hsnID') || ''}
                 {...register('hsnID')}
                 onChange={(e) => setValue('hsnID', e.target.value)}
-                sx={{ minWidth: !watch('hsnID') ? 260 : '100%' }}
+                sx={{ width: '260px' }}
               >
                 {hsnCodes.map(h => (
                   <MenuItem key={h.id || h.ID} value={h.id || h.ID}>
-                    {h.code} {(() => { const tx = h.tax || taxes.find(t => (t.ID || t.id) === h.tax_id); return tx ? ` - ${tx.Name || tx.name} (${tx.Percentage ?? tx.percentage}%)` : ''; })()}
+                    {h.code}
                   </MenuItem>
                 ))}
               </Select>
@@ -190,40 +190,40 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           </Grid>
           {/* Importance */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Importance</InputLabel>
-              <Select label="Importance" defaultValue="Normal" {...register("importance", { required: true })} sx={{ minWidth: !watch('importance') ? 260 : '100%' }}>
+              <Select label="Importance" defaultValue="Normal" {...register("importance", { required: true })} sx={{ width: '260px' }}>
                 {['Normal','High','Critical'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Product Type */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Product Type</InputLabel>
-              <Select label="Product Type" defaultValue="All" {...register("productType", { required: true })} sx={{ minWidth: !watch('productType') ? 260 : '100%' }}>
+              <Select label="Product Type" defaultValue="All" {...register("productType", { required: true })} sx={{ width: '260px' }}>
                 {['All','Finished Goods','Semi-Finished Goods','Raw Materials'].map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Minimum Stock */}
           <Grid item xs={12} md={4}>
-            <TextField label="Minimum Stock" type="number" fullWidth size="small" {...register("minimumStock", { valueAsNumber: true })} />
+            <TextField label="Minimum Stock" type="number" size="small" sx={{ width: '260px' }} {...register("minimumStock", { valueAsNumber: true })} />
           </Grid>
           {/* Category */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Category *</InputLabel>
-              <Select label="Category *" value={watch("categoryID") || ''} {...register("categoryID", { required: true })} sx={{ minWidth: !watch('categoryID') ? 260 : '100%' }}>
+              <Select label="Category *" value={watch("categoryID") || ''} {...register("categoryID", { required: true })} sx={{ width: '260px' }}>
                 {categories.map(cat => <MenuItem key={cat.ID || cat.id} value={cat.ID || cat.id}>{cat.Name || cat.name}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Subcategory */}
             <Grid item xs={12} md={4}>
-              <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+              <FormControl size="small" InputLabelProps={{ shrink: true }}>
                 <InputLabel>Subcategory</InputLabel>
-                <Select label="Subcategory" value={watch("subcategoryID") || ''} {...register("subcategoryID")} sx={{ minWidth: !watch('subcategoryID') ? 240 : '100%' }}> 
+                <Select label="Subcategory" value={watch("subcategoryID") || ''} {...register("subcategoryID")} sx={{ width: '260px' }}> 
                   {subcategories.length > 0 ? (
                     subcategories.map(sub => <MenuItem key={sub.ID || sub.id} value={sub.ID || sub.id}>{sub.Name || sub.name}</MenuItem>)
                   ) : (
@@ -234,51 +234,51 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
             </Grid>
           {/* Unit */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Unit</InputLabel>
-              <Select label="Unit" value={watch("unitID") || ''} {...register("unitID")} sx={{ minWidth: !watch('unitID') ? 240 : '100%' }}> 
+              <Select label="Unit" value={watch("unitID") || ''} {...register("unitID")} sx={{ width: '260px' }}> 
                 {units.map(unit => <MenuItem key={unit.ID || unit.id} value={unit.ID || unit.id}>{unit.Name || unit.name}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Product Mode */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Product Mode</InputLabel>
-              <Select label="Product Mode" defaultValue="Purchase" {...register("product_mode", { required: true })} sx={{ minWidth: !watch('product_mode') ? 260 : '100%' }}>
+              <Select label="Product Mode" defaultValue="Purchase" {...register("product_mode", { required: true })} sx={{ width: '260px' }}>
                 {['Purchase','Internal Manufacturing'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Store */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Store</InputLabel>
-              <Select label="Store" value={watch("storeID") || ''} {...register("storeID")} sx={{ minWidth: !watch('storeID') ? 260 : '100%' }}> 
+              <Select label="Store" value={watch("storeID") || ''} {...register("storeID")} sx={{ width: '260px' }}> 
                 {stores.map(store => <MenuItem key={store.ID || store.id} value={store.ID || store.id}>{store.Name || store.name}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* Tax */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small" InputLabelProps={{ shrink: true }}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Tax</InputLabel>
-              <Select label="Tax" value={watch("taxID") || ''} {...register("taxID")} sx={{ minWidth: !watch('taxID') ? 260 : '100%' }}> 
+              <Select label="Tax" value={watch("taxID") || ''} {...register("taxID")} sx={{ width: '260px' }}> 
                 {taxes.map(tax => <MenuItem key={tax.ID || tax.id} value={tax.ID || tax.id}>{`${tax.Name || tax.name} (${tax.Percentage ?? tax.percentage}%)`}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           {/* GST % */}
           <Grid item xs={12} md={4}>
-            <TextField label="GST %" fullWidth size="small" InputProps={{ readOnly: true }} InputLabelProps={{ shrink: true }} {...register("gstPercent", { valueAsNumber: true })} />
+            <TextField label="GST %" size="small" InputProps={{ readOnly: true }} InputLabelProps={{ shrink: true }} sx={{ width: '260px' }} {...register("gstPercent", { valueAsNumber: true })} />
           </Grid>
           {/* Description */}
           <Grid item xs={12} md={4}>
-            <TextField label="Description" multiline rows={2} fullWidth size="small" {...register("description")} />
+            <TextField label="Description" multiline rows={2} size="small" sx={{ width: '260px' }} {...register("description")} />
           </Grid>
           {/* Internal Notes */}
           <Grid item xs={12} md={4}>
-            <TextField label="Internal Notes" multiline rows={2} fullWidth size="small" {...register("internalNotes")} />
+            <TextField label="Internal Notes" multiline rows={2} size="small" sx={{ width: '260px' }} {...register("internalNotes")} />
           </Grid>
           {/* Active */}
           <Grid item xs={12} md={4}>
