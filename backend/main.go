@@ -38,12 +38,16 @@ func main() {
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	handler.SetMenusDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
 
 	// Enable CORS
 	app.Use(cors.New())
+
+	//ADDING STATIC LINKING TO IMAGE
+	app.Static("/uploads", "./uploads")
 
 	// setup all routes
 	app.Get("/api", func(c *fiber.Ctx) error {
@@ -145,6 +149,35 @@ func main() {
 	api.Post("/leads", handler.CreateLead)
 	api.Put("/leads/:id", handler.UpdateLead)
 	api.Delete("/leads/:id", handler.DeleteLead)
+
+	// menu
+	api.Get("/loadMenus", handler.GetAllMenus)
+	api.Get("/menus/:id", handler.GetMenuByID)
+	api.Post("/menus", handler.CreateMenu)
+	api.Put("/menus/:id", handler.UpdateMenu)
+	api.Delete("/menus/:id", handler.DeleteMenu)
+	// Additional menu routes (if needed)
+	api.Get("/menus/tree", handler.GetMenuTree)
+	api.Patch("/menus/reorder", handler.ReorderMenus)
+
+	// role
+	api.Get("/roles", handler.GetAllRoles)
+	api.Get("/roles/:id", handler.GetRoleByID)
+	api.Post("/roles", handler.CreateRole)
+	api.Put("/roles/:id", handler.UpdateRole)
+	api.Delete("/roles/:id", handler.DeleteRole)
+
+	// Role permission management routes
+	api.Get("/roles/:id/permissions", handler.GetRolePermissions)
+	api.Get("/roles/:id/permissions/menu-tree", handler.GetRoleMenuTreeWithPermissions)
+	api.Put("/roles/:id/permissions", handler.UpdateRolePermissions)
+	api.Delete("/roles/:id/permissions", handler.ResetRolePermissions)
+
+	api.Get("/user/:user_id", handler.GetUserRoles)
+	api.Post("/user/:user_id/role/:role_id", handler.AssignRoleToUser)
+	api.Delete("/user/:user_id/role/:role_id", handler.RemoveRoleFromUser)
+	api.Get("/role/:role_id/users", handler.GetUsersByRole)
+	api.Put("/user/:user_id", handler.UpdateUserRoles)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))
