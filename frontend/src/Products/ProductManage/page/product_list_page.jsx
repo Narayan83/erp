@@ -369,6 +369,7 @@ export default function ProductListPage() {
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(false);
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
@@ -498,6 +499,9 @@ export default function ProductListPage() {
     }
   };
 
+  // New state for status filter
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -521,6 +525,8 @@ export default function ProductListPage() {
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
             : undefined,
+        // Add status filter to params
+        is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
           acc[key] = value;
@@ -548,11 +554,13 @@ export default function ProductListPage() {
       // Ensure products is always an array
       setProducts(res.data.data || []);
       setTotalItems(res.data.total || 0);
+      setTotalCost(res.data.totalCost || 0);
     } catch (err) {
       console.error("Error fetching products:", err);
       // Initialize with empty array instead of null
       setProducts([]);
       setTotalItems(0);
+      setTotalCost(0);
     } finally {
       setLoading(false);
     }
@@ -961,6 +969,35 @@ export default function ProductListPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Updated summary box to include status filter dropdown */}
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={6}>
+            <Typography variant="body1">
+              Total Products: {totalItems}<br />
+              Total Cost: ₹{totalCost.toFixed(2)}
+            </Typography>
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              select
+              label="Status Filter"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);  // reset page on filter change
+              }}
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+          </Grid>
+        </Grid>
+      </Box>
+
       <Paper>
         <TableContainer sx={{ position: 'relative' }}>
           {/* Optional small corner spinner overlay (does not remount inputs) */}
@@ -1004,7 +1041,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: nameSort === 'desc' ? 'primary.main' : 'inherit', opacity: nameSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: stockSort === 'desc' ? 'primary.main' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
