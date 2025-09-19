@@ -904,10 +904,42 @@ export default function ProductListPage() {
                         <TableCell>{v.stock != null ? String(v.stock) : ''}</TableCell>
                         <TableCell>{v.LeadTime ?? ''}</TableCell>
                         <TableCell>
-                          <Box display="flex" gap={1} alignItems="center">
-                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => (
-                              <img key={idx} src={img} alt={`img-${idx}`} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
-                            )) : <Typography variant="caption" color="textSecondary">No images</Typography>}
+                          <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
+                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => {
+                              // If img is an absolute URL, use as is; else construct relative path
+                              let imgSrc = '';
+                              if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
+                                imgSrc = img;
+                              } else if (typeof img === 'string' && img.trim() !== '') {
+                                // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
+                                // Also replace backslashes with forward slashes for URL safety
+                                const normalizedImg = img.replace(/\\/g, '/');
+                                if (normalizedImg.startsWith('uploads/')) {
+                                  imgSrc = `${BASE_URL}/${normalizedImg}`;
+                                } else {
+                                  imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
+                                }
+                              } else {
+                                imgSrc = 'https://via.placeholder.com/60?text=No+Image';
+                              }
+                              return (
+                                <img
+                                  key={idx}
+                                  src={imgSrc}
+                                  alt={`img-${idx}`}
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    objectFit: 'cover',
+                                    borderRadius: 4,
+                                    border: '1px solid #ccc',
+                                  }}
+                                  onError={(e) => {
+                                    e.target.src = 'https://via.placeholder.com/60?text=No+Image';
+                                  }}
+                                />
+                              );
+                            }) : <Typography variant="caption" color="textSecondary">No images</Typography>}
                           </Box>
                         </TableCell>
                       </TableRow>

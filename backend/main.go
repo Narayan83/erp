@@ -46,6 +46,9 @@ func main() {
 	// Enable CORS
 	app.Use(cors.New())
 
+	//ADDING STATIC LINKING TO IMAGE
+	app.Static("/uploads", "./uploads")
+
 	// setup all routes
 	app.Get("/api", func(c *fiber.Ctx) error {
 		return c.SendString("Welcome to the ERP API!")

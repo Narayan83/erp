@@ -18,7 +18,8 @@ import { DynamicDialog } from "../../../CommonComponents/DynamicDialog";
 
 import axios from "axios";
 import { useState } from "react";
-import { BASE_URL } from "../../../Config"; // adjust if needed
+import { BASE_URL } from "../../../Config"; // Import BASE_URL
+import { useNavigate } from "react-router-dom"; // Add this import for navigation
 
 export default function ReviewStep({
   product,
@@ -48,44 +49,99 @@ export default function ReviewStep({
   // };
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate(); // Add this to enable navigation
 
   const handleFinalSubmit = async () => {
     try {
       const formData = new FormData();
 
+      // Transform productData to match backend's capitalized field names
       const productData = { ...product };
       delete productData.variants;
       delete productData.tagIDs;
+      const transformedProduct = {
+        Name: productData.name,
+        Code: productData.code,
+        HsnID: productData.hsnID,
+        HsnSacCode: productData.hsnSacCode,
+        Importance: productData.importance,
+        ProductType: productData.productType,
+        MinimumStock: productData.minimumStock,
+        CategoryID: productData.categoryID,
+        SubcategoryID: productData.subcategoryID,
+        UnitID: productData.unitID,
+        ProductMode: productData.product_mode,
+        StoreID: productData.storeID,
+        TaxID: productData.taxID,
+        GstPercent: productData.gstPercent,
+        Description: productData.description,
+        InternalNotes: productData.internalNotes,
+        IsActive: productData.isActive,
+      };
 
-      formData.append("product", JSON.stringify(productData));
-      formData.append(
-        "variants",
-        JSON.stringify(variants.map(({ images, ...v }) => v))
-      );
+      formData.append("product", JSON.stringify(transformedProduct));
+
+      // Transform variants to match backend's capitalized field names
+      const transformedVariants = variants.map(({ images, ...v }) => ({
+        Color: v.color,
+        Size: v.size,
+        SKU: v.sku,
+        Barcode: v.barcode,
+        PurchaseCost: v.purchaseCost,
+        StdSalesPrice: v.stdSalesPrice,
+        Stock: v.stock,
+        LeadTime: v.leadTime,
+        IsActive: v.isActive,
+        // Don't include Images here - they'll be handled separately
+      }));
+
+      formData.append("variants", JSON.stringify(transformedVariants));
       formData.append("tagIDs", JSON.stringify(product.tagIDs || []));
 
-      variants.forEach((variant) => {
+      // Improved image handling - log each image for debugging
+      console.log("Appending images to FormData:");
+      variants.forEach((variant, variantIndex) => {
         if (Array.isArray(variant.images)) {
-          variant.images.forEach((file) => {
+          console.log(`Variant ${variant.sku} has ${variant.images.length} images`);
+          
+          variant.images.forEach((file, fileIndex) => {
             if (file instanceof File) {
-              formData.append(`images_${variant.sku}`, file);
+              const fieldName = `images_${variant.sku}`;
+              console.log(`Adding File: ${fieldName}, name: ${file.name}, size: ${file.size}, type: ${file.type}`);
+              formData.append(fieldName, file);
+            } else if (typeof file === 'string') {
+              console.log(`String image for ${variant.sku}: ${file}`);
+              // Keep the existing image reference in a separate field
+              formData.append(`variant_images`, JSON.stringify({
+                sku: variant.sku,
+                image: file
+              }));
+            } else {
+              console.log(`Unknown image type for ${variant.sku}:`, typeof file, file);
             }
           });
         }
       });
 
+      // Debug the form submission process more thoroughly
+      console.log("Debug product submission:");
+      console.log("- Product data:", transformedProduct);
+      console.log("- Variants:", transformedVariants);
+      
+      // Add special debug field to help track submission on backend
+      formData.append("_debug", "true");
+
+      console.log("Submitting product with FormData");
       const res = await axios.post(`${BASE_URL}/api/products`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       console.log("Submitted successfully:", res.data);
-      setDialogOpen(true); //  show success dialog
+      setDialogOpen(true); // Show success dialog
     } catch (error) {
-      console.error(
-        "Submission failed:",
-        error.response?.data || error.message
-      );
-      alert("Product submission failed.");
+      console.error("Submission failed:", error);
+      console.error("Error details:", error.response?.data);
+      alert(`Product submission failed: ${error.message}`);
     }
   };
 
@@ -171,19 +227,49 @@ export default function ReviewStep({
               <TableCell>
                 {Array.isArray(v.images) && v.images.length > 0 ? (
                   <Stack direction="row" spacing={1}>
-                    {v.images.map((img, j) => (
-                      <Avatar
-                        key={j}
-                        variant="rounded"
-                        src={
-                          typeof img === "string"
-                            ? `/uploads/${img}`
-                            : undefined
-                        }
-                        alt={`variant-${i}-img-${j}`}
-                        sx={{ width: 32, height: 32 }}
-                      />
-                    ))}
+                    {v.images.map((img, j) => {
+                      // Enhanced debugging to show complete image path
+                      const imgPath = typeof img === "string" 
+                        ? `${BASE_URL}/uploads/${img}` 
+                        : URL.createObjectURL(img);
+                      
+                      console.log(`Image ${j} for variant ${v.sku}:`, {
+                        original: img,
+                        type: typeof img,
+                        fullPath: imgPath,
+                        isFile: img instanceof File
+                      });
+                      
+                      // Try direct URL if it's a string that looks like a URL
+                      const isDirectUrl = typeof img === "string" && (
+                        img.startsWith("http://") || 
+                        img.startsWith("https://") || 
+                        img.startsWith("data:")
+                      );
+                      
+                      return (
+                        <Box key={j} position="relative">
+                          <img
+                            src={isDirectUrl ? img : imgPath}
+                            alt={`variant-${i}-img-${j}`}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              objectFit: 'cover',
+                              borderRadius: 4,
+                              border: '1px solid #ccc',
+                            }}
+                            onError={(e) => {
+                              console.error(`Failed to load image:`, {
+                                src: e.target.src,
+                                originalImg: img
+                              });
+                              e.target.src = 'https://via.placeholder.com/40?text=Error';
+                            }}
+                          />
+                        </Box>
+                      );
+                    })}
                   </Stack>
                 ) : (
                   "—"
@@ -237,7 +323,7 @@ export default function ReviewStep({
             label: "View Products",
             onClick: () => {
               setDialogOpen(false);
-              navigate("/ProductMaster"); // or your product list route
+              navigate("/ProductMaster"); // Now works with the added import
             },
             variant: "contained",
           },
