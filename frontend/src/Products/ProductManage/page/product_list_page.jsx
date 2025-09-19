@@ -154,6 +154,14 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             control={<Checkbox checked={columns.note} onChange={handleColumnToggle('note')} />}
             label="Note"
           />
+          <FormControlLabel
+            control={<Checkbox checked={columns.status} onChange={handleColumnToggle('status')} />}
+            label="Status"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.importance} onChange={handleColumnToggle('importance')} />}
+            label="Importance"
+          />
         </FormGroup>
       </Box>
     </Popover>
@@ -224,6 +232,16 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.note && (
             <TableCell sx={{ py: 0.5 }}>
               {p.Note ?? p.note ?? p.Notes ?? p.notes ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.status && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.IsActive ? 'Active' : 'Inactive'}
+            </TableCell>
+          )}
+          {visibleColumns.importance && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.Importance ?? 'Normal'}
             </TableCell>
           )}
           <TableCell align="center">
@@ -367,12 +385,21 @@ const FiltersRow = memo(function FiltersRow({
       {visibleColumns.productType && (
         <TableCell>
           <TextField
-            placeholder="Product Type"
+            select
             fullWidth
             size="small"
-            value={inputFilters.productType}
-            onChange={(e) => setInputFilters(f => ({ ...f, productType: e.target.value }))}
-          />
+            value={filters.productType != null ? filters.productType : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? "" : e.target.value;
+              setFilters({ ...filters, productType: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Finished Goods">Finished Goods</MenuItem>
+            <MenuItem value="Semi-Finished Goods">Semi-Finished Goods</MenuItem>
+            <MenuItem value="Raw Materials">Raw Materials</MenuItem>
+          </TextField>
         </TableCell>
       )}
       {visibleColumns.stock && (
@@ -419,6 +446,45 @@ const FiltersRow = memo(function FiltersRow({
           />
         </TableCell>
       )}
+      {visibleColumns.status && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={filters.status != null ? filters.status : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : e.target.value;
+              setFilters({ ...filters, status: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="true">Active</MenuItem>
+            <MenuItem value="false">Inactive</MenuItem>
+          </TextField>
+        </TableCell>
+      )}
+      {visibleColumns.importance && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={filters.importance != null ? filters.importance : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : e.target.value;
+              setFilters({ ...filters, importance: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Normal">Normal</MenuItem>
+            <MenuItem value="High">High</MenuItem>
+            <MenuItem value="Critical">Critical</MenuItem>
+          </TextField>
+        </TableCell>
+      )}
       <TableCell align="center">
         <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
           <Tooltip title="Import">
@@ -440,7 +506,7 @@ export default function ProductListPage() {
   const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "" });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
   // NEW: local input state to avoid re-fetch on every keystroke
   const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "" });
   const [page, setPage] = useState(0);
@@ -477,7 +543,9 @@ export default function ProductListPage() {
       stock: true,
       moq: true,
       leadTime: true,
-      note: true
+      note: true,
+      status: true,
+      importance: true
     };
   });
   
@@ -491,6 +559,9 @@ export default function ProductListPage() {
 
   // Selection state for checkboxes
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // Add state for stock filter dropdown
+  const [stockFilter, setStockFilter] = useState('all');
 
   const toggleSelectOne = (id) => {
     setSelectedIds(prev => {
@@ -578,13 +649,6 @@ export default function ProductListPage() {
     }
   };
 
-  // New state for status filter
-  const [statusFilter, setStatusFilter] = useState('all');
-  // New state for stock filter
-  const [stockFilter, setStockFilter] = useState('all');
-  // Add new state for importance filter (after existing filter states)
-  const [importanceFilter, setImportanceFilter] = useState('all');
-
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -615,12 +679,9 @@ export default function ProductListPage() {
             : undefined,
         lead_time: debouncedFilters.leadTime !== "" ? debouncedFilters.leadTime : undefined,
         note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
-        // Add status filter to params
-        is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
-        // Add stock filter to params
+        status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
+        importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
         stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
-        // Add importance filter to params (new)
-        importance: importanceFilter !== 'all' ? importanceFilter : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
           acc[key] = value;
@@ -675,7 +736,7 @@ export default function ProductListPage() {
   // Fetch products when filters or pagination change
   useEffect(() => {
     fetchProducts();
-  }, [debouncedFilters, page, limit, nameSort, stockSort, statusFilter, stockFilter, importanceFilter]);
+  }, [debouncedFilters, page, limit, nameSort, stockSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
@@ -852,11 +913,8 @@ export default function ProductListPage() {
           store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
           stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
-          // Add status and stock filters to export params
-          is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
-          stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
-          // Add importance filter to export params (new)
-          importance: importanceFilter !== 'all' ? importanceFilter : undefined,
+          status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
+          importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
         }).reduce((acc, [key, value]) => {
           if (value !== "" && value !== undefined && value !== null) {
             acc[key] = value;
@@ -895,6 +953,8 @@ export default function ProductListPage() {
         if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
         if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
         if (visibleColumns.note) row.Note = p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
+        if (visibleColumns.status) row.Status = p.IsActive ? 'Active' : 'Inactive';
+        if (visibleColumns.importance) row.Importance = p.Importance ?? 'Normal';
         return row;
       });
       
@@ -1108,31 +1168,14 @@ export default function ProductListPage() {
 
       {/* Updated summary box to include status, stock, and importance filter dropdowns */}
       <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={3}>
+        <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+          <Grid item xs="auto">
             <Typography variant="body1">
               Total Products: {totalItems}<br />
               Total Cost: ₹{totalCost.toFixed(2)}
             </Typography>
           </Grid>
-          <Grid item xs={3}>
-            <TextField
-              select
-              label="Status Filter"
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(0);  // reset page on filter change
-              }}
-              size="small"
-              fullWidth
-            >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
-          </Grid>
-          <Grid item xs={3}>
+          <Grid item xs="auto">
             <TextField
               select
               label="Stock Filter"
@@ -1142,30 +1185,12 @@ export default function ProductListPage() {
                 setPage(0);  // reset page on filter change
               }}
               size="small"
-              fullWidth
+              fullWidth={false}
+              sx={{ width: '180px' }}
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="less_than_moq">Less than MOQ</MenuItem>
-              <MenuItem value="greater_than_moq">Greater than MOQ</MenuItem>
-            </TextField>
-          </Grid>
-          {/* New importance filter dropdown (added after stock filter) */}
-          <Grid item xs={3}>
-            <TextField
-              select
-              label="Importance Filter"
-              value={importanceFilter}
-              onChange={(e) => {
-                setImportanceFilter(e.target.value);
-                setPage(0);  // reset page on filter change
-              }}
-              size="small"
-              fullWidth
-            >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="normal">Normal</MenuItem>
-              <MenuItem value="high">High</MenuItem>
-              <MenuItem value="critical">Critical</MenuItem>
+              <MenuItem value="greater_than_moq">More than MOQ</MenuItem>
             </TextField>
           </Grid>
         </Grid>
@@ -1259,6 +1284,8 @@ export default function ProductListPage() {
                 {visibleColumns.moq && <TableCell sx={{fontWeight : "bold"}}>MOQ</TableCell>}
                 {visibleColumns.leadTime && <TableCell sx={{fontWeight : "bold"}}>Lead Time</TableCell>}
                 {visibleColumns.note && <TableCell sx={{fontWeight : "bold"}}>Note</TableCell>}
+                {visibleColumns.status && <TableCell sx={{fontWeight : "bold"}}>Status</TableCell>}
+                {visibleColumns.importance && <TableCell sx={{fontWeight : "bold"}}>Importance</TableCell>}
                 <TableCell sx={{fontWeight : "bold"}} align="center">Actions</TableCell>
               </TableRow>
               {/* NEW: memoized filters row with visibleColumns prop */}
