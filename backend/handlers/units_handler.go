@@ -111,11 +111,45 @@ func UpdateUnit(c *fiber.Ctx) error {
 func DeleteUnit(c *fiber.Ctx) error {
 	{
 		id := c.Params("id")
-		if err := unitsDB.Delete(&models.Unit{}, id).Error; err != nil {
-			{
-				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		if id == "" || id == "undefined" {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID: empty or undefined"})
+		}
+
+		// First check if the unit exists
+		var unit models.Unit
+		if err := unitsDB.First(&unit, id).Error; err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "Unit not found"})
+		}
+
+		// Find products using this unit
+		var products []models.Product
+		if err := unitsDB.Where("unit_id = ?", id).Find(&products).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to find products for unit: " + err.Error()})
+		}
+
+		// If there are products, find and delete their variants, then the products themselves
+		if len(products) > 0 {
+			var productIDs []uint
+			for _, p := range products {
+				productIDs = append(productIDs, p.ID)
+			}
+
+			// Delete product variants associated with these products
+			if err := unitsDB.Where("product_id IN ?", productIDs).Delete(&models.ProductVariant{}).Error; err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to delete product variants: " + err.Error()})
+			}
+
+			// Delete the products
+			if err := unitsDB.Where("id IN ?", productIDs).Delete(&models.Product{}).Error; err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to delete products: " + err.Error()})
 			}
 		}
+
+		// Now, it's safe to delete the unit
+		if err := unitsDB.Delete(&unit).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete unit: " + err.Error()})
+		}
+
 		return c.SendStatus(204)
 	}
 }

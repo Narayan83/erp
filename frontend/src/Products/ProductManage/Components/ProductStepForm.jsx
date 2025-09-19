@@ -50,13 +50,14 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
         description: defaultValues.description || defaultValues.Description || '',
         internalNotes: defaultValues.internalNotes || defaultValues.InternalNotes || '',
         isActive: typeof defaultValues.isActive !== 'undefined' ? defaultValues.isActive : true,
+        moq: defaultValues.moq || defaultValues.MOQ || '', // Added for MOQ
       });
     } else {
       reset({
         name: '', code: '', hsnID: '', hsnSacCode: '', importance: 'Normal', productType: 'All', minimumStock: '',
         categoryID: '', subcategoryID: '', unitID: '', product_mode: 'Purchase',
         storeID: '', taxID: '', gstPercent: '', description: '', internalNotes: '',
-        isActive: true
+        isActive: true, moq: '', // Added for MOQ
       });
     }
   }, [defaultValues, reset]);
@@ -249,6 +250,20 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
                 {['Purchase','Internal Manufacturing'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
               </Select>
             </FormControl>
+          </Grid>
+          {/* MOQ (added after Product Mode) */}
+          <Grid item xs={12} md={4}>
+            <TextField 
+              label="MOQ" 
+              type="number" 
+              size="small" 
+              sx={{ 
+                width: '260px',
+                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { display: 'none' },
+                '& input[type=number]': { '-moz-appearance': 'textfield' }
+              }} 
+              {...register("moq", { valueAsNumber: true })} 
+            />
           </Grid>
           {/* Store */}
           <Grid item xs={12} md={4}>

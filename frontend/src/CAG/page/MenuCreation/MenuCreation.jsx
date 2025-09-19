@@ -30,11 +30,7 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
 const loadMenus = async () => {
   try {
     setLoading(true);
-// <<<<<<< staging
-//     const res = await axios.get(`${BASE_URL}/api/loadMenus`); // Updated endpoint to match backend GetAllMenus
-// =======
-//     const res = await axios.get(`${BASE_URL}/api/loadMenus`);
-// >>>>>>> staging
+    const res = await axios.get(`${BASE_URL}/api/loadMenus`); // Updated endpoint to match backend GetAllMenus
 
     console.log("Loaded menus raw:", res.data);
 
@@ -155,12 +151,9 @@ const loadMenus = async () => {
           onAddMenu(res.data);
         }
         
-// <<<<<<< staging
-//         // Reload menus to update dropdown with new menu
-//         await loadMenus();
+        // Reload menus to update dropdown with new menu
+        await loadMenus();
         
-// =======
-// >>>>>>> staging
         // Reset form
         setMenuName("");
         setUrl("");

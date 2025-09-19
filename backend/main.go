@@ -106,6 +106,8 @@ func main() {
 	api.Get("/products/:id", handler.GetProductByID)
 	api.Put("/products/:id", handler.UpdateProduct)
 
+	api.Get("/products/stats", handler.GetProductStats)
+
 	// Product Variants
 	api.Get("/product_variants", handler.GetAllProduct_variant)
 	api.Get("/product_variants/:id", handler.GetProduct_variantByID)

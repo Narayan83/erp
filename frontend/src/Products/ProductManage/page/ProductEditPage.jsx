@@ -29,17 +29,57 @@ export default function ProductEditPage() {
   }, [id]);
 
   const handleUpdate = async (data) => {
+    console.log("Sending update data:", data);
+    console.log("IsActive in data:", data.IsActive);
+
+    // Sanitize data to ensure correct types and prevent invalid input errors
+    const sanitizedData = {
+      ...data,
+      // Ensure ID is a number if present
+      ID: data.ID ? Number(data.ID) : data.ID,
+      // Ensure IsActive is a boolean
+      IsActive: Boolean(data.IsActive),
+      // Ensure numeric fields are numbers or null
+      Stock: data.Stock != null ? Number(data.Stock) : null,
+      MOQ: data.MOQ != null ? Number(data.MOQ) : null,
+      LeadTime: data.LeadTime != null ? Number(data.LeadTime) : null,
+      // Trim string fields to remove extra whitespace
+      Name: data.Name ? data.Name.trim() : data.Name,
+      Code: data.Code ? data.Code.trim() : data.Code,
+      Description: data.Description ? data.Description.trim() : data.Description,
+      Note: data.Note ? data.Note.trim() : data.Note,
+      // Ensure category/store IDs are numbers or null
+      CategoryID: data.CategoryID != null ? Number(data.CategoryID) : null,
+      StoreID: data.StoreID != null ? Number(data.StoreID) : null,
+      SubcategoryID: data.SubcategoryID != null ? Number(data.SubcategoryID) : null,
+      // Add more sanitization as needed based on your product schema
+    };
+
+    console.log("Sanitized update data:", sanitizedData);
+
     try {
-      await axios.put(`${BASE_URL}/api/products/${id}`, data);
+      const response = await axios.put(`${BASE_URL}/api/products/${id}`, sanitizedData);
+      console.log("Update response:", response.data);
+      console.log("IsActive in response:", response.data.IsActive);
+
+      // Refetch the updated product data to refresh the form
+      const refetchResponse = await axios.get(`${BASE_URL}/api/products/${id}`);
+      const refetchedProduct = refetchResponse.data;
+      // Ensure IsActive is a boolean for consistency
+      if (typeof refetchedProduct.IsActive !== 'boolean') {
+        refetchedProduct.IsActive = Boolean(refetchedProduct.IsActive);
+      }
+      setProduct(refetchedProduct);
+
       setDialogOpen(true);
-      
+
     } catch (err) {
+      console.error("Update failed", err);
       if (err.response && err.response.data) {
-        console.error("Update failed", err.response.data);
-        alert("Failed to update product: " + (err.response.data.error || JSON.stringify(err.response.data)));
+        console.error("Backend error details:", err.response.data);
+        alert("Failed to update product: " + (err.response.data.error || err.response.data.message || JSON.stringify(err.response.data)));
       } else {
-        console.error("Update failed", err);
-        alert("Failed to update product");
+        alert("Failed to update product: Network or server error");
       }
     }
   };

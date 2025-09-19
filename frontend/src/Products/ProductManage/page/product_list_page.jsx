@@ -135,8 +135,32 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Subcategory"
           />
           <FormControlLabel
+            control={<Checkbox checked={columns.productType} onChange={handleColumnToggle('productType')} />}
+            label="Product Type"
+          />
+          <FormControlLabel
             control={<Checkbox checked={columns.stock} onChange={handleColumnToggle('stock')} />}
             label="Stock"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.moq} onChange={handleColumnToggle('moq')} />}
+            label="MOQ"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.leadTime} onChange={handleColumnToggle('leadTime')} />}
+            label="Lead Time"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.note} onChange={handleColumnToggle('note')} />}
+            label="Note"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.status} onChange={handleColumnToggle('status')} />}
+            label="Status"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.importance} onChange={handleColumnToggle('importance')} />}
+            label="Importance"
           />
         </FormGroup>
       </Box>
@@ -178,7 +202,8 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             <Checkbox
               size="small"
               checked={selectedIds.includes(p.ID)}
-              onChange={() => onToggleOne(p.ID)}
+              onChange={() => onToggleOne(p.ID)
+              }
             />
           </TableCell>
           <TableCell sx={{ py: 0.5 }}>{page * limit + idx + 1}</TableCell>
@@ -187,10 +212,36 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
           {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.subcategory && <TableCell sx={{ py: 0.5 }}>{p.Subcategory?.Name || ''}</TableCell>}
+          {visibleColumns.productType && <TableCell sx={{ py: 0.5 }}>{p.ProductType || ''}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
             <TableCell sx={{ py: 0.5 }}>
               {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.moq && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.leadTime && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.LeadTime ?? p.lead_time ?? p.leadtime ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.note && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.Note ?? p.note ?? p.Notes ?? p.notes ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.status && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.IsActive ? 'Active' : 'Inactive'}
+            </TableCell>
+          )}
+          {visibleColumns.importance && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.Importance ?? 'Normal'}
             </TableCell>
           )}
           <TableCell align="center">
@@ -331,6 +382,26 @@ const FiltersRow = memo(function FiltersRow({
           </TextField>
         </TableCell>
       )}
+      {visibleColumns.productType && (
+        <TableCell>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={filters.productType != null ? filters.productType : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? "" : e.target.value;
+              setFilters({ ...filters, productType: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Finished Goods">Finished Goods</MenuItem>
+            <MenuItem value="Semi-Finished Goods">Semi-Finished Goods</MenuItem>
+            <MenuItem value="Raw Materials">Raw Materials</MenuItem>
+          </TextField>
+        </TableCell>
+      )}
       {visibleColumns.stock && (
         <TableCell sx={{ width: 120 }}>
           <TextField
@@ -340,6 +411,78 @@ const FiltersRow = memo(function FiltersRow({
             value={inputFilters.stock}
             onChange={(e) => setInputFilters(f => ({ ...f, stock: e.target.value }))}
           />
+        </TableCell>
+      )}
+      {visibleColumns.moq && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="MOQ"
+            fullWidth
+            size="small"
+            value={inputFilters.moq}
+            onChange={(e) => setInputFilters(f => ({ ...f, moq: e.target.value }))}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.leadTime && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="Lead Time"
+            fullWidth
+            size="small"
+            value={inputFilters.leadTime}
+            onChange={(e) => setInputFilters(f => ({ ...f, leadTime: e.target.value }))}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.note && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="Note"
+            fullWidth
+            size="small"
+            value={inputFilters.note}
+            onChange={(e) => setInputFilters(f => ({ ...f, note: e.target.value }))}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.status && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={filters.status != null ? filters.status : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : e.target.value;
+              setFilters({ ...filters, status: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="true">Active</MenuItem>
+            <MenuItem value="false">Inactive</MenuItem>
+          </TextField>
+        </TableCell>
+      )}
+      {visibleColumns.importance && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={filters.importance != null ? filters.importance : ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : e.target.value;
+              setFilters({ ...filters, importance: val });
+              setPage(0);
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Normal">Normal</MenuItem>
+            <MenuItem value="High">High</MenuItem>
+            <MenuItem value="Critical">Critical</MenuItem>
+          </TextField>
         </TableCell>
       )}
       <TableCell align="center">
@@ -363,12 +506,13 @@ export default function ProductListPage() {
   const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, stock: "" });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
   // NEW: local input state to avoid re-fetch on every keystroke
-  const [inputFilters, setInputFilters] = useState({ name: "", code: "", stock: "" });
+  const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "" });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(false);
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
@@ -395,7 +539,13 @@ export default function ProductListPage() {
       category: true,
       store: true,
       subcategory: true,
-      stock: true
+      productType: true,
+      stock: true,
+      moq: true,
+      leadTime: true,
+      note: true,
+      status: true,
+      importance: true
     };
   });
   
@@ -409,6 +559,9 @@ export default function ProductListPage() {
 
   // Selection state for checkboxes
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // Add state for stock filter dropdown
+  const [stockFilter, setStockFilter] = useState('all');
 
   const toggleSelectOne = (id) => {
     setSelectedIds(prev => {
@@ -450,7 +603,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, stock: filters.stock });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -460,14 +613,18 @@ export default function ProductListPage() {
         if (
           prev.name === inputFilters.name &&
           prev.code === inputFilters.code &&
-          prev.stock === inputFilters.stock
+          prev.productType === inputFilters.productType &&
+          prev.stock === inputFilters.stock &&
+          prev.moq === inputFilters.moq &&
+          prev.leadTime === inputFilters.leadTime &&
+          prev.note === inputFilters.note
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, stock: inputFilters.stock };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.stock]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -478,12 +635,6 @@ export default function ProductListPage() {
     }, 200);
     return () => clearTimeout(handler);
   }, [filters]);
-
-  // FIXED: Add proper dependency array with debouncedFilters (make sure it's defined)
-  useEffect(() => {
-    console.log('Fetching products with filters:', debouncedFilters);
-    fetchProducts();
-  }, [page, limit, debouncedFilters, nameSort, stockSort]);
 
   const fetchMeta = async () => {
     try {
@@ -514,6 +665,7 @@ export default function ProductListPage() {
       const filterParams = Object.entries({
         name: debouncedFilters.name,
         code: debouncedFilters.code,
+        product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
         store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
@@ -521,6 +673,15 @@ export default function ProductListPage() {
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
             : undefined,
+        moq:
+          debouncedFilters.moq !== "" && !isNaN(Number(debouncedFilters.moq))
+            ? Number(debouncedFilters.moq)
+            : undefined,
+        lead_time: debouncedFilters.leadTime !== "" ? debouncedFilters.leadTime : undefined,
+        note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
+        status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
+        importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
+        stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
           acc[key] = value;
@@ -548,11 +709,13 @@ export default function ProductListPage() {
       // Ensure products is always an array
       setProducts(res.data.data || []);
       setTotalItems(res.data.total || 0);
+      setTotalCost(res.data.totalCost || 0);
     } catch (err) {
       console.error("Error fetching products:", err);
       // Initialize with empty array instead of null
       setProducts([]);
       setTotalItems(0);
+      setTotalCost(0);
     } finally {
       setLoading(false);
     }
@@ -569,6 +732,11 @@ export default function ProductListPage() {
     setStockSort(currentSort => currentSort === direction ? null : direction);
     setNameSort(null);
   }, []);
+
+  // Fetch products when filters or pagination change
+  useEffect(() => {
+    fetchProducts();
+  }, [debouncedFilters, page, limit, nameSort, stockSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
@@ -591,6 +759,10 @@ export default function ProductListPage() {
       // fetch full product details
       const res = await axios.get(`${BASE_URL}/api/products/${id}`);
       let product = res?.data?.data ?? res?.data ?? null;
+
+      console.log("Raw product data from API:", product);
+      console.log("IsActive field:", product?.IsActive);
+      console.log("isActive field:", product?.isActive);
 
       // Helper to extract numeric stock from an object/field
       const extractStock = (obj) => {
@@ -690,12 +862,22 @@ export default function ProductListPage() {
         }
       }
 
+      // NEW: Normalize MOQ and Unit with fallbacks
+      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? null;
+      const productUnit = product?.Unit ?? product?.unit ?? null;
+
       // Attach normalized fields to product
       const normalizedProduct = {
         ...product,
         Variants: Array.isArray(variants) ? variants : [],
         Stock: productStock,
+        MOQ: productMOQ,
+        Unit: productUnit,
       };
+
+      console.log("Normalized product:", normalizedProduct);
+      console.log("Normalized IsActive:", normalizedProduct.IsActive);
+      console.log("Normalized isActive:", normalizedProduct.isActive);
 
       setSelectedProduct(normalizedProduct);
       setViewOpen(true);
@@ -731,6 +913,8 @@ export default function ProductListPage() {
           store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
           stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
+          status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
+          importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
         }).reduce((acc, [key, value]) => {
           if (value !== "" && value !== undefined && value !== null) {
             acc[key] = value;
@@ -766,6 +950,11 @@ export default function ProductListPage() {
         if (visibleColumns.store) row.Store = p.Store?.Name;
         if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
         if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
+        if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
+        if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
+        if (visibleColumns.note) row.Note = p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
+        if (visibleColumns.status) row.Status = p.IsActive ? 'Active' : 'Inactive';
+        if (visibleColumns.importance) row.Importance = p.Importance ?? 'Normal';
         return row;
       });
       
@@ -854,6 +1043,12 @@ export default function ProductListPage() {
                   <TextField label="Product Mode" value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
+                  <TextField label="Product Type" value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
                   <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -869,10 +1064,20 @@ export default function ProductListPage() {
                   <TextField label="Internal Notes" value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''} fullWidth size="small" disabled multiline rows={2} />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Is Active" value={typeof selectedProduct.isActive !== 'undefined' ? (selectedProduct.isActive ? 'Yes' : 'No') : ''} fullWidth size="small" disabled />
-                </Grid>
-                <Grid item xs={12} md={6}>
                   <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12}>
+                  {(() => {
+                    const isActiveValue = selectedProduct?.IsActive !== undefined ? selectedProduct.IsActive : selectedProduct?.isActive;
+                    console.log("Status display - IsActive:", selectedProduct?.IsActive);
+                    console.log("Status display - isActive:", selectedProduct?.isActive);
+                    console.log("Status display - final value:", isActiveValue);
+                    return (
+                      <Typography variant="body1">
+                        Status: {isActiveValue ? 'Active' : 'Inactive'}
+                      </Typography>
+                    );
+                  })()}
                 </Grid>
               </Grid>
               <Divider sx={{ my: 2 }} />
@@ -961,6 +1166,36 @@ export default function ProductListPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Updated summary box to include status, stock, and importance filter dropdowns */}
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
+        <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+          <Grid item xs="auto">
+            <Typography variant="body1">
+              Total Products: {totalItems}<br />
+              Total Cost: ₹{totalCost.toFixed(2)}
+            </Typography>
+          </Grid>
+          <Grid item xs="auto">
+            <TextField
+              select
+              label="Stock Filter"
+              value={stockFilter}
+              onChange={(e) => {
+                setStockFilter(e.target.value);
+                setPage(0);  // reset page on filter change
+              }}
+              size="small"
+              fullWidth={false}
+              sx={{ width: '180px' }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="less_than_moq">Less than MOQ</MenuItem>
+              <MenuItem value="greater_than_moq">More than MOQ</MenuItem>
+            </TextField>
+          </Grid>
+        </Grid>
+      </Box>
+
       <Paper>
         <TableContainer sx={{ position: 'relative' }}>
           {/* Optional small corner spinner overlay (does not remount inputs) */}
@@ -1004,7 +1239,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: nameSort === 'desc' ? 'primary.main' : 'inherit', opacity: nameSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: stockSort === 'desc' ? 'primary.main' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
@@ -1014,6 +1249,7 @@ export default function ProductListPage() {
                 {visibleColumns.category && <TableCell sx={{fontWeight : "bold"}}>Category</TableCell>}
                 {visibleColumns.store && <TableCell sx={{fontWeight : "bold"}}>Store</TableCell>}
                 {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold"}}>Subcategory</TableCell>}
+                {visibleColumns.productType && <TableCell sx={{fontWeight : "bold"}}>Product Type</TableCell>}
                 {visibleColumns.stock && (
                   <TableCell sx={{fontWeight : "bold"}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
@@ -1045,6 +1281,11 @@ export default function ProductListPage() {
                     </Box>
                   </TableCell>
                 )}
+                {visibleColumns.moq && <TableCell sx={{fontWeight : "bold"}}>MOQ</TableCell>}
+                {visibleColumns.leadTime && <TableCell sx={{fontWeight : "bold"}}>Lead Time</TableCell>}
+                {visibleColumns.note && <TableCell sx={{fontWeight : "bold"}}>Note</TableCell>}
+                {visibleColumns.status && <TableCell sx={{fontWeight : "bold"}}>Status</TableCell>}
+                {visibleColumns.importance && <TableCell sx={{fontWeight : "bold"}}>Importance</TableCell>}
                 <TableCell sx={{fontWeight : "bold"}} align="center">Actions</TableCell>
               </TableRow>
               {/* NEW: memoized filters row with visibleColumns prop */}
