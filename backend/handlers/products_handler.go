@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -122,6 +123,9 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if note := c.Query("note"); note != "" {
 		query = query.Where("internal_notes ILIKE ?", "%"+note+"%")
 	}
+	if productType := c.Query("product_type"); productType != "" {
+		query = query.Where("product_type ILIKE ?", "%"+productType+"%")
+	}
 
 	// Sorting
 	sortBy := c.Query("sort_by", "")
@@ -154,10 +158,11 @@ func GetAllProducts(c *fiber.Ctx) error {
 	// Add Stock field (sum of variant stocks) to each product
 	type ProductWithStock struct {
 		models.Product
-		Stock    int    `json:"Stock"`
-		MOQ      int    `json:"MOQ"`
-		LeadTime int    `json:"LeadTime"`
-		Note     string `json:"Note"`
+		Stock       int    `json:"Stock"`
+		MOQ         int    `json:"MOQ"`
+		LeadTime    int    `json:"LeadTime"`
+		Note        string `json:"Note"`
+		ProductType string `json:"ProductType"`
 	}
 	productsWithStock := make([]ProductWithStock, 0, len(allProducts))
 	for _, p := range allProducts {
@@ -170,11 +175,12 @@ func GetAllProducts(c *fiber.Ctx) error {
 			stock += v.Stock
 		}
 		productsWithStock = append(productsWithStock, ProductWithStock{
-			Product:  p,
-			Stock:    stock,
-			MOQ:      p.Moq,
-			LeadTime: leadTime,
-			Note:     p.InternalNotes,
+			Product:     p,
+			Stock:       stock,
+			MOQ:         p.Moq,
+			LeadTime:    leadTime,
+			Note:        p.InternalNotes,
+			ProductType: p.ProductType,
 		})
 	}
 
@@ -220,6 +226,27 @@ func GetAllProducts(c *fiber.Ctx) error {
 		}
 	}
 
+	// In-memory filtering for note
+	if noteQuery := c.Query("note"); noteQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			if strings.Contains(strings.ToLower(p.Note), strings.ToLower(noteQuery)) {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+	// In-memory filtering for product_type
+	if productTypeQuery := c.Query("product_type"); productTypeQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			if strings.Contains(strings.ToLower(p.ProductType), strings.ToLower(productTypeQuery)) {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
 	// In-memory sort for Stock
 	if sortBy == "stock" {
 		sort.Slice(productsWithStock, func(i, j int) bool {
@@ -247,6 +274,15 @@ func GetAllProducts(c *fiber.Ctx) error {
 				return productsWithStock[i].Note > productsWithStock[j].Note
 			}
 			return productsWithStock[i].Note < productsWithStock[j].Note
+		})
+	}
+	// In-memory sort for ProductType
+	if sortBy == "productType" {
+		sort.Slice(productsWithStock, func(i, j int) bool {
+			if sortOrder == "desc" {
+				return productsWithStock[i].ProductType > productsWithStock[j].ProductType
+			}
+			return productsWithStock[i].ProductType < productsWithStock[j].ProductType
 		})
 	}
 
@@ -281,6 +317,10 @@ func GetProductByID(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Not found"})
 	}
+
+	// Debug logging
+	fmt.Printf("Product ID: %d, IsActive from DB: %v\n", product.ID, product.IsActive)
+
 	return c.JSON(product)
 }
 
@@ -289,20 +329,23 @@ func UpdateProduct(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	type Request struct {
-		Name          string                  `json:"name"`
-		Code          string                  `json:"code"`
-		CategoryID    *uint                   `json:"categoryID"`
-		SubcategoryID *uint                   `json:"subcategoryID"`
-		UnitID        *uint                   `json:"unitID"`
-		StoreID       *uint                   `json:"storeID"`
-		TaxID         *uint                   `json:"taxID"`
-		Importance    string                  `json:"importance"`
-		ProductMode   string                  `json:"product_mode"`
-		GstPercent    float64                 `json:"gstPercent"`
-		HsnSacCode    string                  `json:"hsnSacCode"`
-		Description   string                  `json:"description"`
-		InternalNotes string                  `json:"internalNotes"`
-		MinimumStock  int                     `json:"minimumStock"`
+		Name          string                  `json:"Name"`
+		Code          string                  `json:"Code"`
+		CategoryID    *uint                   `json:"CategoryID"`
+		SubcategoryID *uint                   `json:"SubcategoryID"`
+		UnitID        *uint                   `json:"UnitID"`
+		StoreID       *uint                   `json:"StoreID"`
+		TaxID         *uint                   `json:"TaxID"`
+		Importance    string                  `json:"Importance"`
+		ProductMode   string                  `json:"ProductMode"`
+		ProductType   string                  `json:"ProductType"`
+		IsActive      bool                    `json:"IsActive"`
+		GstPercent    float64                 `json:"GstPercent"`
+		HsnSacCode    string                  `json:"HsnSacCode"`
+		Description   string                  `json:"Description"`
+		InternalNotes string                  `json:"InternalNotes"`
+		MinimumStock  int                     `json:"MinimumStock"`
+		Moq           int                     `json:"moq"`
 		TagIDs        []uint                  `json:"tagIDs"`
 		Variants      []models.ProductVariant `json:"variants"`
 	}
@@ -312,32 +355,51 @@ func UpdateProduct(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
+	// Debug logging
+	fmt.Printf("Received update request: %+v\n", req)
+	fmt.Printf("IsActive value: %v\n", req.IsActive)
+
+	// Debug logging
+	fmt.Printf("Received update request: %+v\n", req)
+	fmt.Printf("IsActive value: %v\n", req.IsActive)
+
 	var product models.Product
 	if err := productsDB.Preload("Variants").Preload("Tags").First(&product, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Product not found"})
 	}
 
-	// Update main product fields
-	if err := productsDB.Model(&product).Updates(models.Product{
-		Name:          req.Name,
-		Code:          req.Code,
-		CategoryID:    req.CategoryID,
-		SubcategoryID: req.SubcategoryID,
-		UnitID:        req.UnitID,
-		StoreID:       req.StoreID,
-		TaxID:         req.TaxID,
-		Importance:    req.Importance,
-		ProductMode:   req.ProductMode,
-		GstPercent:    req.GstPercent,
-		HsnSacCode:    req.HsnSacCode,
-		Description:   req.Description,
-		InternalNotes: req.InternalNotes,
-		MinimumStock:  req.MinimumStock,
-	}).Error; err != nil {
+	// Update main product fields using map to ensure boolean fields like IsActive are updated even when false
+	updateData := map[string]interface{}{
+		"Name":          req.Name,
+		"Code":          req.Code,
+		"CategoryID":    req.CategoryID,
+		"SubcategoryID": req.SubcategoryID,
+		"UnitID":        req.UnitID,
+		"StoreID":       req.StoreID,
+		"TaxID":         req.TaxID,
+		"Importance":    req.Importance,
+		"ProductMode":   req.ProductMode,
+		"ProductType":   req.ProductType,
+		"IsActive":      req.IsActive,
+		"GstPercent":    req.GstPercent,
+		"HsnSacCode":    req.HsnSacCode,
+		"Description":   req.Description,
+		"InternalNotes": req.InternalNotes,
+		"MinimumStock":  req.MinimumStock,
+		"Moq":           req.Moq,
+	}
+
+	if err := productsDB.Model(&product).Updates(updateData).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update product"})
 	}
 
-	return c.JSON(product)
+	// Fetch the updated product to return
+	var updatedProduct models.Product
+	if err := productsDB.Preload("Variants").Preload("Tags").First(&updatedProduct, id).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch updated product"})
+	}
+
+	return c.JSON(updatedProduct)
 
 }
 
