@@ -60,25 +60,26 @@ export default function ReviewStep({
       delete productData.variants;
       delete productData.tagIDs;
       const transformedProduct = {
-        Name: productData.name,
-        Code: productData.code,
-        HsnID: productData.hsnID,
-        HsnSacCode: productData.hsnSacCode,
-        Importance: productData.importance,
-        ProductType: productData.productType,
-        MinimumStock: productData.minimumStock,
-        CategoryID: productData.categoryID,
-        SubcategoryID: productData.subcategoryID,
-        UnitID: productData.unitID,
-        ProductMode: productData.product_mode,
-        StoreID: productData.storeID,
-        TaxID: productData.taxID,
-        GstPercent: productData.gstPercent,
-        Description: productData.description,
-        InternalNotes: productData.internalNotes,
-        IsActive: productData.isActive,
+        Name: productData.name || '',
+        Code: productData.code || '',
+        HsnID: productData.hsnID ? Number(productData.hsnID) : null,
+        HsnSacCode: productData.hsnSacCode || '',
+        Importance: productData.importance || '',
+        ProductType: productData.productType || '',
+        MinimumStock: productData.minimumStock ? Number(productData.minimumStock) : 0,
+        CategoryID: productData.categoryID ? Number(productData.categoryID) : null,
+        SubcategoryID: productData.subcategoryID ? Number(productData.subcategoryID) : null,
+        UnitID: productData.unitID ? Number(productData.unitID) : null,
+        ProductMode: productData.product_mode || '',
+        StoreID: productData.storeID ? Number(productData.storeID) : null,
+        TaxID: productData.taxID ? Number(productData.taxID) : null,
+        GstPercent: productData.gstPercent ? Number(productData.gstPercent) : 0,
+        Description: productData.description || '',
+        InternalNotes: productData.internalNotes || '',
+        IsActive: productData.isActive !== undefined ? Boolean(productData.isActive) : true,
       };
 
+      console.log("Transformed product JSON:", JSON.stringify(transformedProduct));
       formData.append("product", JSON.stringify(transformedProduct));
 
       // Transform variants to match backend's capitalized field names
@@ -164,6 +165,7 @@ export default function ReviewStep({
       { label: "HSN/SAC", value: product.hsnSacCode },
       { label: "GST %", value: `${product.gstPercent}%` },
       { label: "Importance", value: product.importance },
+      { label: "Product Type", value: product.productType },
       { label: "Minimum Stock", value: product.minimumStock },
       { label: "Store Id", value: product.storeID },
       { label: "Unit Id", value: product.unitID },

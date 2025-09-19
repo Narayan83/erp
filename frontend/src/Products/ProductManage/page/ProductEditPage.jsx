@@ -29,10 +29,25 @@ export default function ProductEditPage() {
   }, [id]);
 
   const handleUpdate = async (data) => {
+    console.log("Sending update data:", data);
+    console.log("IsActive in data:", data.IsActive);
+
     try {
-      await axios.put(`${BASE_URL}/api/products/${id}`, data);
+      const response = await axios.put(`${BASE_URL}/api/products/${id}`, data);
+      console.log("Update response:", response.data);
+      console.log("IsActive in response:", response.data.IsActive);
+
+      // Refetch the updated product data to refresh the form
+      const refetchResponse = await axios.get(`${BASE_URL}/api/products/${id}`);
+      const refetchedProduct = refetchResponse.data;
+      // Ensure IsActive is a boolean for consistency
+      if (typeof refetchedProduct.IsActive !== 'boolean') {
+        refetchedProduct.IsActive = Boolean(refetchedProduct.IsActive);
+      }
+      setProduct(refetchedProduct);
+
       setDialogOpen(true);
-      
+
     } catch (err) {
       if (err.response && err.response.data) {
         console.error("Update failed", err.response.data);

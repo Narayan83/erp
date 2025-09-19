@@ -135,6 +135,10 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Subcategory"
           />
           <FormControlLabel
+            control={<Checkbox checked={columns.productType} onChange={handleColumnToggle('productType')} />}
+            label="Product Type"
+          />
+          <FormControlLabel
             control={<Checkbox checked={columns.stock} onChange={handleColumnToggle('stock')} />}
             label="Stock"
           />
@@ -200,6 +204,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
           {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.subcategory && <TableCell sx={{ py: 0.5 }}>{p.Subcategory?.Name || ''}</TableCell>}
+          {visibleColumns.productType && <TableCell sx={{ py: 0.5 }}>{p.ProductType || ''}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
             <TableCell sx={{ py: 0.5 }}>
@@ -359,6 +364,17 @@ const FiltersRow = memo(function FiltersRow({
           </TextField>
         </TableCell>
       )}
+      {visibleColumns.productType && (
+        <TableCell>
+          <TextField
+            placeholder="Product Type"
+            fullWidth
+            size="small"
+            value={inputFilters.productType}
+            onChange={(e) => setInputFilters(f => ({ ...f, productType: e.target.value }))}
+          />
+        </TableCell>
+      )}
       {visibleColumns.stock && (
         <TableCell sx={{ width: 120 }}>
           <TextField
@@ -424,9 +440,9 @@ export default function ProductListPage() {
   const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, stock: "", moq: "", leadTime: "", note: "" });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "" });
   // NEW: local input state to avoid re-fetch on every keystroke
-  const [inputFilters, setInputFilters] = useState({ name: "", code: "", stock: "", moq: "", leadTime: "", note: "" });
+  const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "" });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -457,6 +473,7 @@ export default function ProductListPage() {
       category: true,
       store: true,
       subcategory: true,
+      productType: true,
       stock: true,
       moq: true,
       leadTime: true,
@@ -515,7 +532,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -525,17 +542,18 @@ export default function ProductListPage() {
         if (
           prev.name === inputFilters.name &&
           prev.code === inputFilters.code &&
+          prev.productType === inputFilters.productType &&
           prev.stock === inputFilters.stock &&
           prev.moq === inputFilters.moq &&
           prev.leadTime === inputFilters.leadTime &&
           prev.note === inputFilters.note
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -583,6 +601,7 @@ export default function ProductListPage() {
       const filterParams = Object.entries({
         name: debouncedFilters.name,
         code: debouncedFilters.code,
+        product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
         store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
@@ -679,6 +698,10 @@ export default function ProductListPage() {
       // fetch full product details
       const res = await axios.get(`${BASE_URL}/api/products/${id}`);
       let product = res?.data?.data ?? res?.data ?? null;
+
+      console.log("Raw product data from API:", product);
+      console.log("IsActive field:", product?.IsActive);
+      console.log("isActive field:", product?.isActive);
 
       // Helper to extract numeric stock from an object/field
       const extractStock = (obj) => {
@@ -778,12 +801,22 @@ export default function ProductListPage() {
         }
       }
 
+      // NEW: Normalize MOQ and Unit with fallbacks
+      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? null;
+      const productUnit = product?.Unit ?? product?.unit ?? null;
+
       // Attach normalized fields to product
       const normalizedProduct = {
         ...product,
         Variants: Array.isArray(variants) ? variants : [],
         Stock: productStock,
+        MOQ: productMOQ,
+        Unit: productUnit,
       };
+
+      console.log("Normalized product:", normalizedProduct);
+      console.log("Normalized IsActive:", normalizedProduct.IsActive);
+      console.log("Normalized isActive:", normalizedProduct.isActive);
 
       setSelectedProduct(normalizedProduct);
       setViewOpen(true);
@@ -950,6 +983,12 @@ export default function ProductListPage() {
                   <TextField label="Product Mode" value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
+                  <TextField label="Product Type" value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
                   <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -965,19 +1004,20 @@ export default function ProductListPage() {
                   <TextField label="Internal Notes" value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''} fullWidth size="small" disabled multiline rows={2} />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Is Active" value={typeof selectedProduct.isActive !== 'undefined' ? (selectedProduct.isActive ? 'Yes' : 'No') : ''} fullWidth size="small" disabled />
-                </Grid>
-                <Grid item xs={12} md={6}>
                   <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Lead Time" value={selectedProduct.LeadTime ?? selectedProduct.lead_time ?? selectedProduct.leadtime ?? ''} fullWidth size="small" disabled />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Note" value={selectedProduct.Note ?? selectedProduct.note ?? selectedProduct.Notes ?? selectedProduct.notes ?? ''} fullWidth size="small" disabled multiline rows={2} />
+                <Grid item xs={12}>
+                  {(() => {
+                    const isActiveValue = selectedProduct?.IsActive !== undefined ? selectedProduct.IsActive : selectedProduct?.isActive;
+                    console.log("Status display - IsActive:", selectedProduct?.IsActive);
+                    console.log("Status display - isActive:", selectedProduct?.isActive);
+                    console.log("Status display - final value:", isActiveValue);
+                    return (
+                      <Typography variant="body1">
+                        Status: {isActiveValue ? 'Active' : 'Inactive'}
+                      </Typography>
+                    );
+                  })()}
                 </Grid>
               </Grid>
               <Divider sx={{ my: 2 }} />
@@ -1184,6 +1224,7 @@ export default function ProductListPage() {
                 {visibleColumns.category && <TableCell sx={{fontWeight : "bold"}}>Category</TableCell>}
                 {visibleColumns.store && <TableCell sx={{fontWeight : "bold"}}>Store</TableCell>}
                 {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold"}}>Subcategory</TableCell>}
+                {visibleColumns.productType && <TableCell sx={{fontWeight : "bold"}}>Product Type</TableCell>}
                 {visibleColumns.stock && (
                   <TableCell sx={{fontWeight : "bold"}}>
                     <Box display="flex" alignItems="center" gap={0.5}>

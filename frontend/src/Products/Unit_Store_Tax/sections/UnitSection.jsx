@@ -8,7 +8,7 @@ export default function UnitSection() {
   const [units, setUnits] = useState([]);
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10); // Changed from 5 to 10
   const [total, setTotal] = useState(0);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,13 +41,16 @@ export default function UnitSection() {
   };
 
   const handleDelete = async (unit) => {
+    console.log("Deleting unit:", unit); // Debug the unit object
     if (!window.confirm("Are you sure?")) return;
     try {
-      await axios.delete(`${BASE_URL}/api/units/${unit.ID}`);
+      const response = await axios.delete(`${BASE_URL}/api/units/${unit.id || unit.ID}`);
+      console.log("Delete response:", response);
       setSnackbar({ open: true, message: "Deleted", severity: "success" });
       fetchUnits();
-    } catch {
-      setSnackbar({ open: true, message: "Failed to delete", severity: "error" });
+    } catch (error) {
+      console.error("Delete error:", error.response || error);
+      setSnackbar({ open: true, message: `Failed to delete: ${error.response?.data?.error || error.message}`, severity: "error" });
     }
   };
 
@@ -86,6 +89,7 @@ export default function UnitSection() {
         page={page}
         onPageChange={(e, newPage) => setPage(newPage)}
         rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[10, 25, 50, 100]} // Added standard options
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value));
           setPage(0);
