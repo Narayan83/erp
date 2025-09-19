@@ -138,6 +138,18 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             control={<Checkbox checked={columns.stock} onChange={handleColumnToggle('stock')} />}
             label="Stock"
           />
+          <FormControlLabel
+            control={<Checkbox checked={columns.moq} onChange={handleColumnToggle('moq')} />}
+            label="MOQ"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.leadTime} onChange={handleColumnToggle('leadTime')} />}
+            label="Lead Time"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.note} onChange={handleColumnToggle('note')} />}
+            label="Note"
+          />
         </FormGroup>
       </Box>
     </Popover>
@@ -178,7 +190,8 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             <Checkbox
               size="small"
               checked={selectedIds.includes(p.ID)}
-              onChange={() => onToggleOne(p.ID)}
+              onChange={() => onToggleOne(p.ID)
+              }
             />
           </TableCell>
           <TableCell sx={{ py: 0.5 }}>{page * limit + idx + 1}</TableCell>
@@ -191,6 +204,21 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             // show common fallback fields for stock if p.Stock is not present
             <TableCell sx={{ py: 0.5 }}>
               {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.moq && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.leadTime && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.LeadTime ?? p.lead_time ?? p.leadtime ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.note && (
+            <TableCell sx={{ py: 0.5 }}>
+              {p.Note ?? p.note ?? p.Notes ?? p.notes ?? ''}
             </TableCell>
           )}
           <TableCell align="center">
@@ -342,6 +370,39 @@ const FiltersRow = memo(function FiltersRow({
           />
         </TableCell>
       )}
+      {visibleColumns.moq && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="MOQ"
+            fullWidth
+            size="small"
+            value={inputFilters.moq}
+            onChange={(e) => setInputFilters(f => ({ ...f, moq: e.target.value }))}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.leadTime && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="Lead Time"
+            fullWidth
+            size="small"
+            value={inputFilters.leadTime}
+            onChange={(e) => setInputFilters(f => ({ ...f, leadTime: e.target.value }))}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.note && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="Note"
+            fullWidth
+            size="small"
+            value={inputFilters.note}
+            onChange={(e) => setInputFilters(f => ({ ...f, note: e.target.value }))}
+          />
+        </TableCell>
+      )}
       <TableCell align="center">
         <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
           <Tooltip title="Import">
@@ -363,9 +424,9 @@ export default function ProductListPage() {
   const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, stock: "" });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, stock: "", moq: "", leadTime: "", note: "" });
   // NEW: local input state to avoid re-fetch on every keystroke
-  const [inputFilters, setInputFilters] = useState({ name: "", code: "", stock: "" });
+  const [inputFilters, setInputFilters] = useState({ name: "", code: "", stock: "", moq: "", leadTime: "", note: "" });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -396,7 +457,10 @@ export default function ProductListPage() {
       category: true,
       store: true,
       subcategory: true,
-      stock: true
+      stock: true,
+      moq: true,
+      leadTime: true,
+      note: true
     };
   });
   
@@ -451,7 +515,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, stock: filters.stock });
+    setInputFilters({ name: filters.name, code: filters.code, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -461,14 +525,17 @@ export default function ProductListPage() {
         if (
           prev.name === inputFilters.name &&
           prev.code === inputFilters.code &&
-          prev.stock === inputFilters.stock
+          prev.stock === inputFilters.stock &&
+          prev.moq === inputFilters.moq &&
+          prev.leadTime === inputFilters.leadTime &&
+          prev.note === inputFilters.note
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, stock: inputFilters.stock };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.stock]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -523,6 +590,12 @@ export default function ProductListPage() {
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
             : undefined,
+        moq:
+          debouncedFilters.moq !== "" && !isNaN(Number(debouncedFilters.moq))
+            ? Number(debouncedFilters.moq)
+            : undefined,
+        lead_time: debouncedFilters.leadTime !== "" ? debouncedFilters.leadTime : undefined,
+        note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
         // Add status filter to params
         is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
         // Add stock filter to params
@@ -786,6 +859,9 @@ export default function ProductListPage() {
         if (visibleColumns.store) row.Store = p.Store?.Name;
         if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
         if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
+        if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
+        if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
+        if (visibleColumns.note) row.Note = p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
         return row;
       });
       
@@ -893,6 +969,15 @@ export default function ProductListPage() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Lead Time" value={selectedProduct.LeadTime ?? selectedProduct.lead_time ?? selectedProduct.leadtime ?? ''} fullWidth size="small" disabled />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Note" value={selectedProduct.Note ?? selectedProduct.note ?? selectedProduct.Notes ?? selectedProduct.notes ?? ''} fullWidth size="small" disabled multiline rows={2} />
                 </Grid>
               </Grid>
               <Divider sx={{ my: 2 }} />
@@ -1130,6 +1215,9 @@ export default function ProductListPage() {
                     </Box>
                   </TableCell>
                 )}
+                {visibleColumns.moq && <TableCell sx={{fontWeight : "bold"}}>MOQ</TableCell>}
+                {visibleColumns.leadTime && <TableCell sx={{fontWeight : "bold"}}>Lead Time</TableCell>}
+                {visibleColumns.note && <TableCell sx={{fontWeight : "bold"}}>Note</TableCell>}
                 <TableCell sx={{fontWeight : "bold"}} align="center">Actions</TableCell>
               </TableRow>
               {/* NEW: memoized filters row with visibleColumns prop */}
