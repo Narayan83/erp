@@ -126,6 +126,16 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if productType := c.Query("product_type"); productType != "" {
 		query = query.Where("product_type ILIKE ?", "%"+productType+"%")
 	}
+	if status := c.Query("status"); status != "" {
+		if status == "true" {
+			query = query.Where("is_active = ?", true)
+		} else if status == "false" {
+			query = query.Where("is_active = ?", false)
+		}
+	}
+	if importance := c.Query("importance"); importance != "" {
+		query = query.Where("importance = ?", importance)
+	}
 
 	// Sorting
 	sortBy := c.Query("sort_by", "")
