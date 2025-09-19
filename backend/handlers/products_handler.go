@@ -116,12 +116,18 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if code := c.Query("code"); code != "" {
 		query = query.Where("code ILIKE ?", "%"+code+"%")
 	}
+	if moq := c.Query("moq"); moq != "" {
+		query = query.Where("moq = ?", moq)
+	}
+	if note := c.Query("note"); note != "" {
+		query = query.Where("internal_notes ILIKE ?", "%"+note+"%")
+	}
 
 	// Sorting
 	sortBy := c.Query("sort_by", "")
 	sortOrder := c.Query("sort_order", "asc")
-	// Only apply DB sorting for non-stock fields
-	if sortBy != "" && sortBy != "stock" {
+	// Only apply DB sorting for non-in-memory fields
+	if sortBy != "" && sortBy != "stock" && sortBy != "leadTime" && sortBy != "note" {
 		orderStr := sortBy
 		if sortOrder == "desc" {
 			orderStr += " desc"
@@ -148,15 +154,28 @@ func GetAllProducts(c *fiber.Ctx) error {
 	// Add Stock field (sum of variant stocks) to each product
 	type ProductWithStock struct {
 		models.Product
-		Stock int `json:"Stock"`
+		Stock    int    `json:"Stock"`
+		MOQ      int    `json:"MOQ"`
+		LeadTime int    `json:"LeadTime"`
+		Note     string `json:"Note"`
 	}
 	productsWithStock := make([]ProductWithStock, 0, len(allProducts))
 	for _, p := range allProducts {
 		stock := 0
+		leadTime := 0
+		if len(p.Variants) > 0 {
+			leadTime = p.Variants[0].LeadTime // take from first variant
+		}
 		for _, v := range p.Variants {
 			stock += v.Stock
 		}
-		productsWithStock = append(productsWithStock, ProductWithStock{Product: p, Stock: stock})
+		productsWithStock = append(productsWithStock, ProductWithStock{
+			Product:  p,
+			Stock:    stock,
+			MOQ:      p.Moq,
+			LeadTime: leadTime,
+			Note:     p.InternalNotes,
+		})
 	}
 
 	// In-memory filtering for stock
@@ -173,6 +192,34 @@ func GetAllProducts(c *fiber.Ctx) error {
 		}
 	}
 
+	// In-memory filtering for moq
+	if moqQuery := c.Query("moq"); moqQuery != "" {
+		moqFilterVal, err := strconv.Atoi(moqQuery)
+		if err == nil {
+			filtered := make([]ProductWithStock, 0)
+			for _, p := range productsWithStock {
+				if p.MOQ == moqFilterVal {
+					filtered = append(filtered, p)
+				}
+			}
+			productsWithStock = filtered
+		}
+	}
+
+	// In-memory filtering for lead_time
+	if leadTimeQuery := c.Query("lead_time"); leadTimeQuery != "" {
+		leadTimeFilterVal, err := strconv.Atoi(leadTimeQuery)
+		if err == nil {
+			filtered := make([]ProductWithStock, 0)
+			for _, p := range productsWithStock {
+				if p.LeadTime == leadTimeFilterVal {
+					filtered = append(filtered, p)
+				}
+			}
+			productsWithStock = filtered
+		}
+	}
+
 	// In-memory sort for Stock
 	if sortBy == "stock" {
 		sort.Slice(productsWithStock, func(i, j int) bool {
@@ -180,6 +227,26 @@ func GetAllProducts(c *fiber.Ctx) error {
 				return productsWithStock[i].Stock > productsWithStock[j].Stock
 			}
 			return productsWithStock[i].Stock < productsWithStock[j].Stock
+		})
+	}
+
+	// In-memory sort for LeadTime
+	if sortBy == "leadTime" {
+		sort.Slice(productsWithStock, func(i, j int) bool {
+			if sortOrder == "desc" {
+				return productsWithStock[i].LeadTime > productsWithStock[j].LeadTime
+			}
+			return productsWithStock[i].LeadTime < productsWithStock[j].LeadTime
+		})
+	}
+
+	// In-memory sort for Note
+	if sortBy == "note" {
+		sort.Slice(productsWithStock, func(i, j int) bool {
+			if sortOrder == "desc" {
+				return productsWithStock[i].Note > productsWithStock[j].Note
+			}
+			return productsWithStock[i].Note < productsWithStock[j].Note
 		})
 	}
 
