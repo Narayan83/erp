@@ -30,18 +30,41 @@ export default function ProductVariantManager() {
 
   const navigate = useNavigate();
 
-  const loadProduct =()=> {
-    axios
-      .get(`${BASE_URL}/api/products/${id}`)
-        .then((res) => setProduct(res.data))
-        .catch(() => alert("Failed to load product"));
-  } 
+  // Add a utility function to inspect backend response
+  const inspectProduct = (product) => {
+    if (!product || !product.Variants) return;
+    
+    console.log(`Product ${product.ID} has ${product.Variants.length} variants`);
+    product.Variants.forEach((v, idx) => {
+      console.log(`Variant ${idx} (${v.SKU}):`, {
+        hasImages: Array.isArray(v.Images) && v.Images.length > 0,
+        imageCount: Array.isArray(v.Images) ? v.Images.length : 0,
+        images: v.Images
+      });
+    });
+  };
+
+  // Add this to useEffect after loading the product
   useEffect(() => {
     loadProduct();
     axios.get(`${BASE_URL}/api/sizes`)
       .then(res => setSizes(res.data.data || []))
       .catch(() => alert("Failed to load sizes"));
   }, [id]);
+
+  // Add a new function to be called after product loads
+  const loadProduct = () => {
+    axios
+      .get(`${BASE_URL}/api/products/${id}`)
+      .then((res) => {
+        setProduct(res.data);
+        inspectProduct(res.data); // Inspect the loaded product
+      })
+      .catch((err) => {
+        console.error("Failed to load product:", err);
+        alert("Failed to load product");
+      });
+  };
 
   const handleSave = async (variant) => {
     setVariantError("");
@@ -173,8 +196,86 @@ export default function ProductVariantManager() {
                 <TableCell>{v.Stock}</TableCell>
                 <TableCell>{v.LeadTime}</TableCell>
                 <TableCell>
-                  {Array.isArray(v.Images) &&
-                    v.Images.map((img, i) => <div key={i}>{img}</div>)}
+                  {Array.isArray(v.Images) && v.Images.length > 0 ? (
+                    <Box display="flex" gap={1} alignItems="center">
+                      {v.Images.slice(0, 3).map((img, i) => {
+                        // Enhanced debugging for image paths
+                        // If img is an absolute URL, use as is; else construct relative path
+                        let imgSrc = '';
+                        if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:'))) {
+                          imgSrc = img;
+                        } else if (typeof img === 'string' && img.trim() !== '') {
+                          // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
+                          // Also replace backslashes with forward slashes for URL safety
+                          const normalizedImg = img.replace(/\\/g, '/');
+                          if (normalizedImg.startsWith('uploads/')) {
+                            imgSrc = `${BASE_URL}/${normalizedImg}`;
+                          } else {
+                            imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
+                          }
+                        } else {
+                          imgSrc = 'https://via.placeholder.com/40?text=No+Image';
+                        }
+                        
+                        console.log(`Rendering image ${i} for variant ${v.SKU}:`, {
+                          original: img,
+                          fullPath: imgSrc
+                        });
+                        
+                        return (
+                          <img
+                            key={i}
+                            src={imgSrc}
+                            alt={`variant-${v.ID || i}-img-${i}`}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              objectFit: 'cover',
+                              borderRadius: 4,
+                              border: '1px solid #ccc',
+                            }}
+                            onLoad={() => console.log(`Successfully loaded image ${i} for ${v.SKU}`)}
+                            onError={(e) => {
+                              console.error(`Failed to load image for ${v.SKU}:`, {
+                                src: e.target.src,
+                                originalImg: img,
+                                variant: v.SKU
+                              });
+                              
+                              // Try alternative paths if the first one fails
+                              if (typeof img === 'string' && !imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
+                                // Try a few alternative paths
+                                const altPaths = [
+                                  `/uploads/${img.replace(/\\/g, '/')}`,
+                                  `${window.location.origin}/uploads/${img.replace(/\\/g, '/')}`,
+                                  `${BASE_URL}${img.startsWith('/') ? '' : '/'}${img.replace(/\\/g, '/')}`
+                                ];
+                                
+                                const tryNextPath = (pathIndex) => {
+                                  if (pathIndex >= altPaths.length) {
+                                    // If all alternatives fail, use placeholder
+                                    e.target.src = 'https://via.placeholder.com/40?text=Not+Found';
+                                    return;
+                                  }
+                                  
+                                  console.log(`Trying alternative path ${pathIndex+1}/${altPaths.length}: ${altPaths[pathIndex]}`);
+                                  e.target.src = altPaths[pathIndex];
+                                  e.target.onerror = () => tryNextPath(pathIndex + 1);
+                                };
+                                
+                                tryNextPath(0);
+                              } else {
+                                e.target.src = 'https://via.placeholder.com/40?text=Error';
+                              }
+                            }}
+                          />
+                        );
+                      })}
+                      {v.Images.length > 3 && <Typography variant="caption">+{v.Images.length - 3} more</Typography>}
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" color="textSecondary">No images</Typography>
+                  )}
                 </TableCell>
                 <TableCell>{v.IsActive ? "Yes" : "No"}</TableCell>
                 <TableCell>

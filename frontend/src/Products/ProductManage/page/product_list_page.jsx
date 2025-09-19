@@ -369,6 +369,7 @@ export default function ProductListPage() {
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(false);
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
@@ -479,12 +480,6 @@ export default function ProductListPage() {
     return () => clearTimeout(handler);
   }, [filters]);
 
-  // FIXED: Add proper dependency array with debouncedFilters (make sure it's defined)
-  useEffect(() => {
-    console.log('Fetching products with filters:', debouncedFilters);
-    fetchProducts();
-  }, [page, limit, debouncedFilters, nameSort, stockSort]);
-
   const fetchMeta = async () => {
     try {
       const [catRes, storeRes] = await Promise.all([
@@ -497,6 +492,13 @@ export default function ProductListPage() {
       console.error("Error fetching meta:", err);
     }
   };
+
+  // New state for status filter
+  const [statusFilter, setStatusFilter] = useState('all');
+  // New state for stock filter
+  const [stockFilter, setStockFilter] = useState('all');
+  // Add new state for importance filter (after existing filter states)
+  const [importanceFilter, setImportanceFilter] = useState('all');
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -521,6 +523,12 @@ export default function ProductListPage() {
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
             : undefined,
+        // Add status filter to params
+        is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
+        // Add stock filter to params
+        stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
+        // Add importance filter to params (new)
+        importance: importanceFilter !== 'all' ? importanceFilter : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
           acc[key] = value;
@@ -548,11 +556,13 @@ export default function ProductListPage() {
       // Ensure products is always an array
       setProducts(res.data.data || []);
       setTotalItems(res.data.total || 0);
+      setTotalCost(res.data.totalCost || 0);
     } catch (err) {
       console.error("Error fetching products:", err);
       // Initialize with empty array instead of null
       setProducts([]);
       setTotalItems(0);
+      setTotalCost(0);
     } finally {
       setLoading(false);
     }
@@ -569,6 +579,11 @@ export default function ProductListPage() {
     setStockSort(currentSort => currentSort === direction ? null : direction);
     setNameSort(null);
   }, []);
+
+  // Fetch products when filters or pagination change
+  useEffect(() => {
+    fetchProducts();
+  }, [debouncedFilters, page, limit, nameSort, stockSort, statusFilter, stockFilter, importanceFilter]);
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
@@ -731,6 +746,11 @@ export default function ProductListPage() {
           store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
           stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
+          // Add status and stock filters to export params
+          is_active: statusFilter !== 'all' ? (statusFilter === 'active') : undefined,
+          stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
+          // Add importance filter to export params (new)
+          importance: importanceFilter !== 'all' ? importanceFilter : undefined,
         }).reduce((acc, [key, value]) => {
           if (value !== "" && value !== undefined && value !== null) {
             acc[key] = value;
@@ -904,10 +924,42 @@ export default function ProductListPage() {
                         <TableCell>{v.stock != null ? String(v.stock) : ''}</TableCell>
                         <TableCell>{v.LeadTime ?? ''}</TableCell>
                         <TableCell>
-                          <Box display="flex" gap={1} alignItems="center">
-                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => (
-                              <img key={idx} src={img} alt={`img-${idx}`} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
-                            )) : <Typography variant="caption" color="textSecondary">No images</Typography>}
+                          <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
+                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => {
+                              // If img is an absolute URL, use as is; else construct relative path
+                              let imgSrc = '';
+                              if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
+                                imgSrc = img;
+                              } else if (typeof img === 'string' && img.trim() !== '') {
+                                // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
+                                // Also replace backslashes with forward slashes for URL safety
+                                const normalizedImg = img.replace(/\\/g, '/');
+                                if (normalizedImg.startsWith('uploads/')) {
+                                  imgSrc = `${BASE_URL}/${normalizedImg}`;
+                                } else {
+                                  imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
+                                }
+                              } else {
+                                imgSrc = 'https://via.placeholder.com/60?text=No+Image';
+                              }
+                              return (
+                                <img
+                                  key={idx}
+                                  src={imgSrc}
+                                  alt={`img-${idx}`}
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    objectFit: 'cover',
+                                    borderRadius: 4,
+                                    border: '1px solid #ccc',
+                                  }}
+                                  onError={(e) => {
+                                    e.target.src = 'https://via.placeholder.com/60?text=No+Image';
+                                  }}
+                                />
+                              );
+                            }) : <Typography variant="caption" color="textSecondary">No images</Typography>}
                           </Box>
                         </TableCell>
                       </TableRow>
@@ -928,6 +980,71 @@ export default function ProductListPage() {
           <Button onClick={handleCloseView}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Updated summary box to include status, stock, and importance filter dropdowns */}
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={3}>
+            <Typography variant="body1">
+              Total Products: {totalItems}<br />
+              Total Cost: ₹{totalCost.toFixed(2)}
+            </Typography>
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              select
+              label="Status Filter"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);  // reset page on filter change
+              }}
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              select
+              label="Stock Filter"
+              value={stockFilter}
+              onChange={(e) => {
+                setStockFilter(e.target.value);
+                setPage(0);  // reset page on filter change
+              }}
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="less_than_moq">Less than MOQ</MenuItem>
+              <MenuItem value="greater_than_moq">Greater than MOQ</MenuItem>
+            </TextField>
+          </Grid>
+          {/* New importance filter dropdown (added after stock filter) */}
+          <Grid item xs={3}>
+            <TextField
+              select
+              label="Importance Filter"
+              value={importanceFilter}
+              onChange={(e) => {
+                setImportanceFilter(e.target.value);
+                setPage(0);  // reset page on filter change
+              }}
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="normal">Normal</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+              <MenuItem value="critical">Critical</MenuItem>
+            </TextField>
+          </Grid>
+        </Grid>
+      </Box>
 
       <Paper>
         <TableContainer sx={{ position: 'relative' }}>
@@ -972,7 +1089,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: nameSort === 'desc' ? 'primary.main' : 'inherit', opacity: nameSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: stockSort === 'desc' ? 'primary.main' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
