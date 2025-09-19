@@ -21,6 +21,7 @@ type Product struct {
 	InternalNotes string
 	StdCode       string
 	MinimumStock  int
+	Moq           int
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 
