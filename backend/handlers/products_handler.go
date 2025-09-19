@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
-	"sort"
 
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
@@ -137,6 +137,14 @@ func GetAllProducts(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	// Calculate total cost from all variants
+	totalCost := 0.0
+	for _, p := range allProducts {
+		for _, v := range p.Variants {
+			totalCost += v.PurchaseCost * float64(v.Stock)
+		}
+	}
+
 	// Add Stock field (sum of variant stocks) to each product
 	type ProductWithStock struct {
 		models.Product
@@ -193,6 +201,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 		"limit":      limit,
 		"total":      total,
 		"totalPages": (total + int64(limit) - 1) / int64(limit),
+		"totalCost":  totalCost,
 	})
 }
 
@@ -262,4 +271,30 @@ func UpdateProduct(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(product)
+
+}
+
+// Stats
+
+// Get stats: total products and total cost
+func GetProductStats(c *fiber.Ctx) error {
+	var totalProducts int64
+	var totalCost float64
+
+	// Count products
+	if err := productsDB.Model(&models.Product{}).Count(&totalProducts).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Calculate total cost (sum of PurchaseCost * Stock from all variants)
+	if err := productsDB.Model(&models.ProductVariant{}).
+		Select("COALESCE(SUM(purchase_cost * stock), 0)").
+		Scan(&totalCost).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"total_products": totalProducts,
+		"total_cost":     totalCost,
+	})
 }
