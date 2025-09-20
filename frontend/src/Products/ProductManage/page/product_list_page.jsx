@@ -517,6 +517,7 @@ export default function ProductListPage() {
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
   const [stockSort, setStockSort] = useState(null); // null | 'asc' | 'desc'
+  const [leadTimeSort, setLeadTimeSort] = useState(null); // null | 'asc' | 'desc'
   
   // FIXED: Initialize debouncedFilters with same values as filters
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
@@ -695,6 +696,8 @@ export default function ProductListPage() {
         sortParams = { sort_by: 'name', sort_order: nameSort };
       } else if (stockSort) {
         sortParams = { sort_by: 'stock', sort_order: stockSort };
+      } else if (leadTimeSort) {
+        sortParams = { sort_by: 'leadTime', sort_order: leadTimeSort };
       }
       console.log('Product filter params:', { page: page + 1, limit, ...filterParams, ...sortParams });
       const res = await axios.get(`${BASE_URL}/api/products`, {
@@ -726,17 +729,25 @@ export default function ProductListPage() {
   const handleNameSort = useCallback((direction) => {
     setNameSort(currentSort => currentSort === direction ? null : direction);
     setStockSort(null);
+    setLeadTimeSort(null);
   }, []);
 
   const handleStockSort = useCallback((direction) => {
     setStockSort(currentSort => currentSort === direction ? null : direction);
     setNameSort(null);
+    setLeadTimeSort(null);
+  }, []);
+
+  const handleLeadTimeSort = useCallback((direction) => {
+    setLeadTimeSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
   }, []);
 
   // Fetch products when filters or pagination change
   useEffect(() => {
     fetchProducts();
-  }, [debouncedFilters, page, limit, nameSort, stockSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
+  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
@@ -928,6 +939,8 @@ export default function ProductListPage() {
           sortParams = { sort_by: 'name', sort_order: nameSort };
         } else if (stockSort) {
           sortParams = { sort_by: 'stock', sort_order: stockSort };
+        } else if (leadTimeSort) {
+          sortParams = { sort_by: 'leadTime', sort_order: leadTimeSort };
         }
         
         const res = await axios.get(`${BASE_URL}/api/products`, {
@@ -1282,7 +1295,37 @@ export default function ProductListPage() {
                   </TableCell>
                 )}
                 {visibleColumns.moq && <TableCell sx={{fontWeight : "bold"}}>MOQ</TableCell>}
-                {visibleColumns.leadTime && <TableCell sx={{fontWeight : "bold"}}>Lead Time</TableCell>}
+                {visibleColumns.leadTime && (
+                  <TableCell sx={{fontWeight : "bold"}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Lead Time
+                      <IconButton
+                        size="small"
+                        onClick={() => handleLeadTimeSort('asc')}
+                        color={leadTimeSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort lead time ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: leadTimeSort === 'asc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleLeadTimeSort('desc')}
+                        color={leadTimeSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort lead time descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: leadTimeSort === 'desc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
                 {visibleColumns.note && <TableCell sx={{fontWeight : "bold"}}>Note</TableCell>}
                 {visibleColumns.status && <TableCell sx={{fontWeight : "bold"}}>Status</TableCell>}
                 {visibleColumns.importance && <TableCell sx={{fontWeight : "bold"}}>Importance</TableCell>}
