@@ -112,10 +112,33 @@ export default function ProductVariantManager() {
     }
   };
 
-  const handleDelete = (idx) => {
-    const updatedVariants = [...product.Variants];
-    updatedVariants.splice(idx, 1);
-    setProduct({ ...product, Variants: updatedVariants });
+  const handleDelete = async (idx) => {
+    const variant = product.Variants[idx];
+    if (!variant || !variant.ID) {
+      console.error("Cannot delete variant: missing ID");
+      alert("Cannot delete variant: missing ID");
+      return;
+    }
+
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete variant with SKU: ${variant.SKU}?`)) {
+      return;
+    }
+
+    try {
+      // Make API call to delete from backend
+      await axios.delete(`${BASE_URL}/api/product_variants/${variant.ID}`);
+
+      // Update local state only if API call succeeds
+      const updatedVariants = [...product.Variants];
+      updatedVariants.splice(idx, 1);
+      setProduct({ ...product, Variants: updatedVariants });
+
+      console.log(`Successfully deleted variant ${variant.SKU}`);
+    } catch (err) {
+      console.error("Failed to delete variant:", err.response?.data || err.message);
+      alert(`Failed to delete variant: ${err.response?.data?.error || err.message}`);
+    }
   };
 
 
