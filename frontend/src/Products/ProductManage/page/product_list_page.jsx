@@ -29,13 +29,15 @@ import {
   Divider,          // added
   List,             // added
   ListItem,         // added
-  ListItemText      // added
+  ListItemText,     // added
+  Autocomplete      // added for autocomplete functionality
 } from "@mui/material";
 import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
 import * as XLSX from 'xlsx'; // added for Excel export
+import debounce from 'lodash/debounce';
 
 // Improve the normalizeID helper to handle more edge cases
 const normalizeID = (val) => {
@@ -127,12 +129,12 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Category"
           />
           <FormControlLabel
-            control={<Checkbox checked={columns.store} onChange={handleColumnToggle('store')} />}
-            label="Store"
-          />
-          <FormControlLabel
             control={<Checkbox checked={columns.subcategory} onChange={handleColumnToggle('subcategory')} />}
             label="Subcategory"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.store} onChange={handleColumnToggle('store')} />}
+            label="Store"
           />
           <FormControlLabel
             control={<Checkbox checked={columns.productType} onChange={handleColumnToggle('productType')} />}
@@ -210,8 +212,8 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.name && <TableCell sx={{ py: 0.5 }}>{p.Name}</TableCell>}
           {visibleColumns.code && <TableCell sx={{ py: 0.5 }}>{p.Code}</TableCell>}
           {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
-          {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.subcategory && <TableCell sx={{ py: 0.5 }}>{p.Subcategory?.Name || ''}</TableCell>}
+          {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.productType && <TableCell sx={{ py: 0.5 }}>{p.ProductType || ''}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
@@ -276,11 +278,14 @@ const FiltersRow = memo(function FiltersRow({
   filters,
   setFilters,
   categories,
-  stores,
   allSubcategories,
+  stores,
   setPage,
   visibleColumns,
-  handleExport // added prop for export handler
+  handleExport, // added prop for export handler
+  autocompleteOptions,
+  autocompleteLoading,
+  onAutocompleteInputChange
 }) {
   // Log for debugging
   console.log('Categories:', categories.map(c => ({ id: c.ID, name: c.Name })));
@@ -291,198 +296,424 @@ const FiltersRow = memo(function FiltersRow({
       <TableCell />
       {visibleColumns.name && (
         <TableCell>
-          <TextField
-            placeholder="Search Name"
-            fullWidth
-            size="small"
-            value={inputFilters.name}
-            onChange={(e) => setInputFilters(f => ({ ...f, name: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.names}
+            loading={autocompleteLoading.names}
+            inputValue={inputFilters.name}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, name: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('names', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                // Clear options when input is cleared
+                setAutocompleteOptions(prev => ({ ...prev, names: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, name: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search Name"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.names ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.names.length > 0 || autocompleteLoading.names || inputFilters.name.length > 0}
+            filterOptions={(x) => x} // Disable built-in filtering
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.code && (
         <TableCell>
-          <TextField
-            placeholder="Code"
-            fullWidth
-            size="small"
-            value={inputFilters.code}
-            onChange={(e) => setInputFilters(f => ({ ...f, code: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.codes}
+            loading={autocompleteLoading.codes}
+            inputValue={inputFilters.code}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, code: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('codes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, codes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, code: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Code"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.codes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.codes.length > 0 || autocompleteLoading.codes || inputFilters.code.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.category && (
         <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.categoryID != null ? filters.categoryID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={categories}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={categories.find(c => c.ID === filters.categoryID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
               console.log(`Selected category: ${val}`);
               setFilters({ ...filters, categoryID: val, subcategoryID: null });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            {categories.map(c => (
-              <MenuItem key={c.ID} value={c.ID}>{c.Name}</MenuItem>
-            ))}
-          </TextField>
-        </TableCell>
-      )}
-      {visibleColumns.store && (
-        <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.storeID != null ? filters.storeID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : Number(e.target.value);
-              setFilters({ ...filters, storeID: val });
-              setPage(0);
-            }}
-          >
-            <MenuItem value="">All</MenuItem>
-            {stores.map(s => <MenuItem key={s.ID} value={s.ID}>{s.Name}</MenuItem>)}
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Category"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.subcategory && (
         <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.subcategoryID != null ? filters.subcategoryID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={allSubcategories.filter(sub => {
+              if (!filters.categoryID) return false;
+              const catID = filters.categoryID.toString();
+              const subCatID = sub.CategoryID?.toString();
+              return catID === subCatID;
+            })}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={allSubcategories.find(sub => sub.ID === filters.subcategoryID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
               console.log(`Selected subcategory: ${val}`);
               setFilters({ ...filters, subcategoryID: val });
               setPage(0);
             }}
             disabled={filters.categoryID == null}
-          >
-            <MenuItem value="">All</MenuItem>
-            {/* Safely filter subcategories */}
-            {allSubcategories
-              .filter(sub => {
-                // More lenient comparison that handles both string and number IDs
-                if (!filters.categoryID) return false;
-                const catID = filters.categoryID.toString();
-                const subCatID = sub.CategoryID?.toString();
-                return catID === subCatID;
-              })
-              .map(sub => (
-                <MenuItem key={sub.ID} value={sub.ID}>{sub.Name}</MenuItem>
-              ))
-            }
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Subcategory"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
+        </TableCell>
+      )}
+       {visibleColumns.store && (
+        <TableCell>
+          <Autocomplete
+            options={stores}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={stores.find(s => s.ID === filters.storeID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
+              setFilters({ ...filters, storeID: val });
+              setPage(0);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Store"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.productType && (
         <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.productType != null ? filters.productType : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? "" : e.target.value;
+          <Autocomplete
+            options={[
+              { value: 'Finished Goods', label: 'Finished Goods' },
+              { value: 'Semi-Finished Goods', label: 'Semi-Finished Goods' },
+              { value: 'Raw Materials', label: 'Raw Materials' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.productType ? { value: filters.productType, label: filters.productType } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : "";
               setFilters({ ...filters, productType: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="Finished Goods">Finished Goods</MenuItem>
-            <MenuItem value="Semi-Finished Goods">Semi-Finished Goods</MenuItem>
-            <MenuItem value="Raw Materials">Raw Materials</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Product Type"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.stock && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Stock"
-            fullWidth
-            size="small"
-            value={inputFilters.stock}
-            onChange={(e) => setInputFilters(f => ({ ...f, stock: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.stocks}
+            loading={autocompleteLoading.stocks}
+            inputValue={inputFilters.stock}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, stock: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('stocks', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, stocks: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, stock: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Stock"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.stocks ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.stocks.length > 0 || autocompleteLoading.stocks || inputFilters.stock.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.moq && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="MOQ"
-            fullWidth
-            size="small"
-            value={inputFilters.moq}
-            onChange={(e) => setInputFilters(f => ({ ...f, moq: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.moqs}
+            loading={autocompleteLoading.moqs}
+            inputValue={inputFilters.moq}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, moq: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('moqs', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, moqs: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, moq: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="MOQ"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.moqs ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.moqs.length > 0 || autocompleteLoading.moqs || inputFilters.moq.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.leadTime && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Lead Time"
-            fullWidth
-            size="small"
-            value={inputFilters.leadTime}
-            onChange={(e) => setInputFilters(f => ({ ...f, leadTime: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.leadTimes}
+            loading={autocompleteLoading.leadTimes}
+            inputValue={inputFilters.leadTime}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, leadTime: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('leadTimes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, leadTimes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, leadTime: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Lead Time"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.leadTimes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.leadTimes.length > 0 || autocompleteLoading.leadTimes || inputFilters.leadTime.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.note && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Note"
-            fullWidth
-            size="small"
-            value={inputFilters.note}
-            onChange={(e) => setInputFilters(f => ({ ...f, note: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.notes}
+            loading={autocompleteLoading.notes}
+            inputValue={inputFilters.note}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, note: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('notes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, notes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, note: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Note"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.notes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.notes.length > 0 || autocompleteLoading.notes || inputFilters.note.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.status && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.status != null ? filters.status : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={[
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.status ? { value: filters.status, label: filters.status === 'true' ? 'Active' : 'Inactive' } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : null;
               setFilters({ ...filters, status: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="true">Active</MenuItem>
-            <MenuItem value="false">Inactive</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Status"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.importance && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.importance != null ? filters.importance : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={[
+              { value: 'Normal', label: 'Normal' },
+              { value: 'High', label: 'High' },
+              { value: 'Critical', label: 'Critical' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.importance ? { value: filters.importance, label: filters.importance } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : null;
               setFilters({ ...filters, importance: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="Normal">Normal</MenuItem>
-            <MenuItem value="High">High</MenuItem>
-            <MenuItem value="Critical">Critical</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Importance"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       <TableCell align="center">
@@ -503,10 +734,10 @@ export default function ProductListPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
+  const [stores, setStores] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, subcategoryID: null,  storeID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
   // NEW: local input state to avoid re-fetch on every keystroke
   const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "" });
   const [page, setPage] = useState(0);
@@ -538,8 +769,8 @@ export default function ProductListPage() {
       name: true,
       code: true,
       category: true,
-      store: true,
       subcategory: true,
+      store: true,
       productType: true,
       stock: true,
       moq: true,
@@ -564,6 +795,32 @@ export default function ProductListPage() {
   // Add state for stock filter dropdown
   const [stockFilter, setStockFilter] = useState('all');
 
+  // Autocomplete state
+  const [autocompleteOptions, setAutocompleteOptions] = useState({
+    names: [],
+    codes: [],
+    stocks: [],
+    moqs: [],
+    leadTimes: [],
+    notes: []
+  });
+  const [autocompleteLoading, setAutocompleteLoading] = useState({
+    names: false,
+    codes: false,
+    stocks: false,
+    moqs: false,
+    leadTimes: false,
+    notes: false
+  });
+  const [autocompleteSource, setAutocompleteSource] = useState({
+    names: 'local', // 'local' or 'api'
+    codes: 'local',
+    stocks: 'local',
+    moqs: 'local',
+    leadTimes: 'local',
+    notes: 'local'
+  });
+
   const toggleSelectOne = (id) => {
     setSelectedIds(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
@@ -585,9 +842,26 @@ export default function ProductListPage() {
     }
   };
 
+  // Update autocomplete options when products data changes
   useEffect(() => {
-    fetchMeta();
-  }, []);
+    // Clear existing autocomplete options when products change
+    setAutocompleteOptions({
+      names: [],
+      codes: [],
+      stocks: [],
+      moqs: [],
+      leadTimes: [],
+      notes: []
+    });
+    setAutocompleteSource({
+      names: 'local',
+      codes: 'local',
+      stocks: 'local',
+      moqs: 'local',
+      leadTimes: 'local',
+      notes: 'local'
+    });
+  }, [products]);
 
   // Fetch subcategories on mount
   useEffect(() => {
@@ -650,6 +924,151 @@ export default function ProductListPage() {
     }
   };
 
+  // Autocomplete fetch functions
+  const fetchAutocompleteOptions = async (field, query = '') => {
+    if (!query.trim()) return;
+
+    console.log(`Fetching autocomplete for ${field} with query: "${query}"`);
+    setAutocompleteLoading(prev => ({ ...prev, [field]: true }));
+
+    try {
+      // First try to get suggestions from current table data
+      const localSuggestions = getLocalSuggestions(field, query);
+
+      if (localSuggestions.length > 0) {
+        console.log(`Using local suggestions for ${field}:`, localSuggestions);
+        setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
+        setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
+        setAutocompleteLoading(prev => ({ ...prev, [field]: false }));
+        return;
+      }
+
+      // If no local suggestions, fall back to API
+      console.log(`No local suggestions found for ${field}, trying API...`);
+      const response = await axios.get(`${BASE_URL}/api/products/autocomplete`, {
+        params: { field, query, limit: 10 }
+      });
+      console.log(`Autocomplete response for ${field}:`, response.data);
+      setAutocompleteOptions(prev => ({ ...prev, [field]: response.data.data || [] }));
+      setAutocompleteSource(prev => ({ ...prev, [field]: 'api' }));
+    } catch (error) {
+      console.error(`Error fetching ${field} autocomplete:`, error);
+      // Even on error, try to use local suggestions as fallback
+      const localSuggestions = getLocalSuggestions(field, query);
+      console.log(`Using local suggestions as fallback for ${field}:`, localSuggestions);
+      setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
+      setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
+    } finally {
+      setAutocompleteLoading(prev => ({ ...prev, [field]: false }));
+    }
+  };
+
+  // Get suggestions from current table data
+  const getLocalSuggestions = (field, query) => {
+    if (!products || products.length === 0) return [];
+
+    const queryLower = query.toLowerCase();
+    const suggestions = new Set();
+
+    switch (field) {
+      case 'names':
+        products.forEach(product => {
+          if (product.Name && product.Name.toLowerCase().includes(queryLower)) {
+            suggestions.add(product.Name);
+          }
+        });
+        break;
+
+      case 'codes':
+        products.forEach(product => {
+          if (product.Code && product.Code.toLowerCase().includes(queryLower)) {
+            suggestions.add(product.Code);
+          }
+        });
+        break;
+
+      case 'stocks':
+        products.forEach(product => {
+          // Get stock from product or variants
+          let stock = null;
+          if (product.Stock !== undefined && product.Stock !== null) {
+            stock = product.Stock;
+          } else if (product.Variants && product.Variants.length > 0) {
+            stock = product.Variants.reduce((sum, variant) => sum + (variant.Stock || 0), 0);
+          }
+
+          if (stock !== null && stock !== undefined && stock.toString().includes(query)) {
+            suggestions.add(stock.toString());
+          }
+        });
+        break;
+
+      case 'moqs':
+        products.forEach(product => {
+          if (product.MOQ !== undefined && product.MOQ !== null && product.MOQ.toString().includes(query)) {
+            suggestions.add(product.MOQ.toString());
+          }
+        });
+        break;
+
+      case 'leadTimes':
+        products.forEach(product => {
+          let leadTime = null;
+          if (product.LeadTime !== undefined && product.LeadTime !== null) {
+            leadTime = product.LeadTime;
+          } else if (product.Variants && product.Variants.length > 0 && product.Variants[0].LeadTime) {
+            leadTime = product.Variants[0].LeadTime;
+          }
+
+          if (leadTime !== null && leadTime !== undefined && leadTime.toString().includes(query)) {
+            suggestions.add(leadTime.toString());
+          }
+        });
+        break;
+
+      case 'notes':
+        products.forEach(product => {
+          const note = product.Note || product.InternalNotes || product.internal_notes || '';
+          if (note && note.toLowerCase().includes(queryLower)) {
+            suggestions.add(note);
+          }
+        });
+        break;
+
+      default:
+        return [];
+    }
+
+    // Convert Set to Array and limit to 10 suggestions
+    return Array.from(suggestions).slice(0, 10);
+  };
+
+  // Debounced autocomplete functions (reduced delay for instant local suggestions)
+  const debouncedFetchNames = useCallback(
+    debounce((query) => fetchAutocompleteOptions('names', query), 100),
+    [products]
+  );
+  const debouncedFetchCodes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('codes', query), 100),
+    [products]
+  );
+  const debouncedFetchStocks = useCallback(
+    debounce((query) => fetchAutocompleteOptions('stocks', query), 100),
+    [products]
+  );
+  const debouncedFetchMoqs = useCallback(
+    debounce((query) => fetchAutocompleteOptions('moqs', query), 100),
+    [products]
+  );
+  const debouncedFetchLeadTimes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('leadTimes', query), 100),
+    [products]
+  );
+  const debouncedFetchNotes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('notes', query), 100),
+    [products]
+  );
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -668,8 +1087,8 @@ export default function ProductListPage() {
         code: debouncedFilters.code,
         product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
-        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         stock:
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
@@ -822,11 +1241,14 @@ export default function ProductListPage() {
 
       // Normalize variants if present on product or fetch separately
       let variants = product?.Variants ?? product?.variants ?? product?.product_variants ?? null;
-      if (!Array.isArray(variants)) {
+      if (!Array.isArray(variants) || variants.length === 0) {
         try {
+          console.log("Fetching variants separately for product:", id);
           const vr = await axios.get(`${BASE_URL}/api/products/${id}/variants`);
           variants = vr?.data?.data ?? vr?.data ?? [];
+          console.log("Fetched variants:", variants);
         } catch (e) {
+          console.error("Error fetching variants separately:", e);
           variants = [];
         }
       }
@@ -836,7 +1258,22 @@ export default function ProductListPage() {
         const sku = v.SKU ?? v.Code ?? v.code ?? v.sku ?? v.id ?? v.ID ?? `#${idx + 1}`;
         const barcode = v.Barcode ?? v.barcode ?? v.EAN ?? v.ean ?? v.UPC ?? v.upc ?? '';
         const purchaseCost = v.PurchaseCost ?? v.purchase_cost ?? v.Cost ?? v.cost_price ?? v.CostPrice ?? v.cost ?? null;
-        const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? null;
+        const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? v.StdSalesPrice ?? v.std_sales_price ?? null;
+        
+        // Debug logging for sales price
+        if (salesPrice == null) {
+          console.log("Variant sales price not found for variant:", v.ID ?? v.SKU ?? idx);
+          console.log("Available price fields:", {
+            Price: v.Price,
+            UnitPrice: v.UnitPrice,
+            price: v.price,
+            unit_price: v.unit_price,
+            SalesPrice: v.SalesPrice,
+            sales_price: v.sales_price,
+            StdSalesPrice: v.StdSalesPrice,
+            std_sales_price: v.std_sales_price
+          });
+        }
         const stockVal = extractStock(v);
         const leadTime = v.LeadTime ?? v.lead_time ?? v.leadtime ?? v.delivery_days ?? v.lead ?? null;
 
@@ -874,8 +1311,21 @@ export default function ProductListPage() {
       }
 
       // NEW: Normalize MOQ and Unit with fallbacks
-      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? null;
-      const productUnit = product?.Unit ?? product?.unit ?? null;
+      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? product?.Moq ?? null;
+      let productUnit = product?.Unit ?? product?.unit ?? null;
+
+      // If Unit relationship is not loaded but UnitID exists, try to get unit name from a cached units list
+      if (!productUnit && product?.UnitID) {
+        // This is a fallback - in a real app, you'd want to fetch units data or cache it
+        console.log("Unit relationship not loaded, UnitID:", product.UnitID);
+      }
+
+      console.log("Product Unit data:", product?.Unit);
+      console.log("Product unit field:", product?.unit);
+      console.log("Product UnitID:", product?.UnitID);
+      console.log("Product MOQ data:", productMOQ);
+      console.log("Product Moq field:", product?.Moq);
+      console.log("Product moq field:", product?.moq);
 
       // Attach normalized fields to product
       const normalizedProduct = {
@@ -921,8 +1371,8 @@ export default function ProductListPage() {
           name: debouncedFilters.name,
           code: debouncedFilters.code,
           category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
-          store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+          store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
           status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
           importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
@@ -960,8 +1410,8 @@ export default function ProductListPage() {
         if (visibleColumns.name) row.Name = p.Name;
         if (visibleColumns.code) row.Code = p.Code;
         if (visibleColumns.category) row.Category = p.Category?.Name;
-        if (visibleColumns.store) row.Store = p.Store?.Name;
         if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
+        if (visibleColumns.store) row.Store = p.Store?.Name;
         if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
         if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
         if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
@@ -1050,7 +1500,13 @@ export default function ProductListPage() {
                   <TextField label="Subcategory" value={selectedProduct.Subcategory?.Name ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Unit" value={selectedProduct.Unit?.Name ?? ''} fullWidth size="small" disabled />
+                  <TextField 
+                    label="Unit" 
+                    value={selectedProduct.Unit?.Name || selectedProduct.Unit?.name || selectedProduct.unit_name || ''} 
+                    fullWidth 
+                    size="small" 
+                    disabled 
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Product Mode" value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''} fullWidth size="small" disabled />
@@ -1059,7 +1515,13 @@ export default function ProductListPage() {
                   <TextField label="Product Type" value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
+                  <TextField 
+                    label="MOQ" 
+                    value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? selectedProduct.Moq ?? ''} 
+                    fullWidth 
+                    size="small" 
+                    disabled 
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
@@ -1260,8 +1722,8 @@ export default function ProductListPage() {
                 )}
                 {visibleColumns.code && <TableCell sx={{fontWeight : "bold"}}>Code</TableCell>}
                 {visibleColumns.category && <TableCell sx={{fontWeight : "bold"}}>Category</TableCell>}
-                {visibleColumns.store && <TableCell sx={{fontWeight : "bold"}}>Store</TableCell>}
                 {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold"}}>Subcategory</TableCell>}
+                {visibleColumns.store && <TableCell sx={{fontWeight : "bold"}}>Store</TableCell>}
                 {visibleColumns.productType && <TableCell sx={{fontWeight : "bold"}}>Product Type</TableCell>}
                 {visibleColumns.stock && (
                   <TableCell sx={{fontWeight : "bold"}}>
@@ -1338,11 +1800,37 @@ export default function ProductListPage() {
                 filters={filters}
                 setFilters={setFilters}
                 categories={categories}
-                stores={stores}
                 allSubcategories={allSubcategories}
+                stores={stores}
                 setPage={setPage}
                 visibleColumns={visibleColumns}
                 handleExport={handleExport} // added prop
+                autocompleteOptions={autocompleteOptions}
+                autocompleteLoading={autocompleteLoading}
+                onAutocompleteInputChange={(field, query) => {
+                  switch(field) {
+                    case 'names':
+                      debouncedFetchNames(query);
+                      break;
+                    case 'codes':
+                      debouncedFetchCodes(query);
+                      break;
+                    case 'stocks':
+                      debouncedFetchStocks(query);
+                      break;
+                    case 'moqs':
+                      debouncedFetchMoqs(query);
+                      break;
+                    case 'leadTimes':
+                      debouncedFetchLeadTimes(query);
+                      break;
+                    case 'notes':
+                      debouncedFetchNotes(query);
+                      break;
+                    default:
+                      break;
+                  }
+                }}
               />
             </TableHead>
             {/* UPDATED: pass visibleColumns into body and onView handler */}

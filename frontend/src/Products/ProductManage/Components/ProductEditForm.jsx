@@ -81,7 +81,10 @@ export default function ProductEditForm({ product, onSubmit }) {
           axios.get(`${BASE_URL}/api/subcategories`, {
             params: { category_id: product.CategoryID },
           }),
-          axios.get(`${BASE_URL}/api/units`),
+          axios.get(`${BASE_URL}/api/units`).catch((err) => {
+            console.error("Error loading units:", err);
+            return { data: { data: [] } };
+          }),
           axios.get(`${BASE_URL}/api/stores`),
           axios.get(`${BASE_URL}/api/taxes`),
           axios.get(`${BASE_URL}/api/hsncode`).catch(() => ({ data: { data: [] } })),
@@ -95,6 +98,16 @@ export default function ProductEditForm({ product, onSubmit }) {
         setStores(store.data.data);
         setTaxes(tax.data.data);
         setHsnCodes(hsn.data.data);
+
+        // Return the loaded data for prefilling
+        return {
+          categories: cat.data.data,
+          subcategories: sub.data.data,
+          units: unit.data.data,
+          stores: store.data.data,
+          taxes: tax.data.data,
+          hsnCodes: hsn.data.data
+        };
       } catch (err) {
         console.error("Error loading options:", err);
         setCategories([]);
@@ -103,31 +116,37 @@ export default function ProductEditForm({ product, onSubmit }) {
         setStores([]);
         setTaxes([]);
         setHsnCodes([]);
+        return null;
       }
     };
 
-    loadOptions().then(() => {
+    loadOptions().then((loadedData) => {
+      if (!loadedData) return;
+
       // Find HsnID based on HsnSacCode if it exists
       let hsnID = '';
-      if (product.HsnSacCode && hsnCodes.length > 0) {
-        const matchingHsn = hsnCodes.find(hsn => hsn.code === product.HsnSacCode);
+      if (product.HsnSacCode && loadedData.hsnCodes.length > 0) {
+        const matchingHsn = loadedData.hsnCodes.find(hsn => hsn.code === product.HsnSacCode);
         if (matchingHsn) {
           hsnID = String(matchingHsn.id || matchingHsn.ID);
         }
       }
       
       console.log("Product data:", product);
-      console.log("Units loaded:", units);
+      console.log("Units loaded:", loadedData.units);
       
-      // Check if UnitID exists in the data
+      // Check if UnitID exists in the loaded data
       let unitID = '';
-      if (product.UnitID && units.length > 0) {
+      if (product.UnitID && loadedData.units.length > 0) {
         // Ensure we're dealing with a number
         const unitIdNum = typeof product.UnitID === 'number' ? product.UnitID : Number(product.UnitID);
-        // Check if unit with this ID exists
-        const unitExists = units.some(unit => (unit.ID === unitIdNum || unit.id === unitIdNum));
+        // Check if unit with this ID exists in loaded data
+        const unitExists = loadedData.units.some(unit => (unit.ID === unitIdNum || unit.id === unitIdNum));
         if (unitExists) {
           unitID = String(product.UnitID);
+          console.log("Unit found and set:", unitID);
+        } else {
+          console.log("Unit not found in loaded data:", product.UnitID);
         }
       }
 
@@ -370,11 +389,17 @@ export default function ProductEditForm({ product, onSubmit }) {
                     onChange={e => field.onChange(e.target.value)}
                     sx={{ width: '260px' }}
                   >
-                    {units.map((unit) => (
-                      <MenuItem key={unit.ID} value={String(unit.ID)}>
-                        {unit.Name}
+                    {units.length > 0 ? (
+                      units.map((unit) => (
+                        <MenuItem key={unit.ID || unit.id} value={String(unit.ID || unit.id)}>
+                          {unit.Name || unit.name}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled value="">
+                        No Units Available
                       </MenuItem>
-                    ))}
+                    )}
                   </Select>
                 </FormControl>
               );
