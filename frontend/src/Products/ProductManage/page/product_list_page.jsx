@@ -2362,6 +2362,38 @@ export default function ProductListPage() {
     }
   };
 
+  const downloadTemplateCSV = () => {
+    // Create template CSV headers
+    const headers = [
+      'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
+      'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
+      'GST %', 'Description', 'Internal Notes', 'Status', 'Color Code', 'Size',
+      'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time', 'Images'
+    ].join(',');
+    
+    // Create template data row with example values
+    const exampleRow = [
+      'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
+      'Electronics', 'Mobiles', 'Piece', 'Physical', '5', 'Main Store', 'GST',
+      '18', 'Product description', 'Internal notes', 'Active', 'Red', 'Large',
+      'SKU001', 'BAR001', '100', '150', '20', '3', 'image1.jpg;image2.jpg'
+    ].join(',');
+    
+    // Combine headers and example row
+    const csvContent = `${headers}\n${exampleRow}`;
+    
+    // Create blob and download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'product_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleImport = async () => {
     if (!importFile) {
       alert('Please select a file to import.');
@@ -2384,22 +2416,65 @@ export default function ProductListPage() {
           }
 
           // Parse CSV
-          const lines = csvText.split('\n').filter(line => line.trim());
+          let lines = csvText.split('\n').filter(line => line.trim());
           if (lines.length === 0) {
             alert('The CSV file appears to be empty.');
             setImportLoading(false);
             return;
           }
 
-          // Parse headers
-          const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          // Handle different line endings (CR, LF, CRLF)
+          if (lines.length === 1 && lines[0].includes('\r')) {
+            lines = csvText.split('\r').filter(line => line.trim());
+          }
+
+          // Parse headers - handle CSV that might be exported from Excel 
+          // which can use semicolons instead of commas in some regions
+          const delimiter = lines[0].includes(';') ? ';' : ',';
+          const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
           const dataRows = lines.slice(1);
 
           console.log('Headers:', headers); // Debug log
           console.log('Data rows:', dataRows.length); // Debug log
+          
+          // Validate required headers
+          const requiredHeaders = ['Name', 'Code'];
+          const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+          
+          if (missingHeaders.length > 0) {
+            alert(`Missing required headers: ${missingHeaders.join(', ')}. Please check your CSV file format.`);
+            setImportLoading(false);
+            return;
+          }
 
           const objectData = dataRows.map(row => {
-            const values = row.split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+            // Handle quoted CSV values that might contain commas within quotes
+            let values = [];
+            let inQuote = false;
+            let currentValue = '';
+            
+            if (delimiter === ';') {
+              values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            } else {
+              // More complex parsing for comma-delimited CSV with potential quoted values
+              for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                
+                if (char === '"' && (i === 0 || row[i-1] !== '\\')) {
+                  inQuote = !inQuote;
+                } else if (char === delimiter && !inQuote) {
+                  values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                  currentValue = '';
+                } else {
+                  currentValue += char;
+                }
+              }
+              
+              // Add the last value
+              values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            }
+            
+            // Create object from headers and values
             const obj = {};
             headers.forEach((header, index) => {
               obj[header] = values[index] || '';
@@ -2414,6 +2489,51 @@ export default function ProductListPage() {
             setImportLoading(false);
             return;
           }
+          
+          // Basic validation of required fields
+          const invalidRows = [];
+          objectData.forEach((row, index) => {
+            if (!row.Name || !row.Code) {
+              invalidRows.push(`Row ${index + 2}: Missing Name or Code`);
+            }
+            
+            // Validate numeric fields
+            if (row['Minimum Stock'] && isNaN(Number(row['Minimum Stock']))) {
+              invalidRows.push(`Row ${index + 2}: Minimum Stock must be a number`);
+            }
+            if (row['MOQ'] && isNaN(Number(row['MOQ']))) {
+              invalidRows.push(`Row ${index + 2}: MOQ must be a number`);
+            }
+            if (row['GST %'] && isNaN(Number(row['GST %']))) {
+              invalidRows.push(`Row ${index + 2}: GST % must be a number`);
+            }
+            if (row['Purchase Cost'] && isNaN(Number(row['Purchase Cost']))) {
+              invalidRows.push(`Row ${index + 2}: Purchase Cost must be a number`);
+            }
+            if (row['Sales Price'] && isNaN(Number(row['Sales Price']))) {
+              invalidRows.push(`Row ${index + 2}: Sales Price must be a number`);
+            }
+            if (row['Stock'] && isNaN(Number(row['Stock']))) {
+              invalidRows.push(`Row ${index + 2}: Stock must be a number`);
+            }
+            if (row['Lead Time'] && isNaN(Number(row['Lead Time']))) {
+              invalidRows.push(`Row ${index + 2}: Lead Time must be a number`);
+            }
+            
+            // Validate Status field if present
+            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+              invalidRows.push(`Row ${index + 2}: Status must be 'Active' or 'Inactive'`);
+            }
+          });
+          
+          if (invalidRows.length > 0) {
+            const errorMessage = `Found ${invalidRows.length} validation error(s):\n\n${invalidRows.slice(0, 5).join('\n')}${
+              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more errors.` : ''
+            }`;
+            alert(errorMessage);
+            setImportLoading(false);
+            return;
+          }
 
           // Send data to backend as JSON
           console.log('Sending import data:', objectData); // Debug log
@@ -2425,8 +2545,17 @@ export default function ProductListPage() {
           });
 
           console.log('Import response:', response.data); // Debug log
-
-          alert(`Successfully imported ${response.data.imported || objectData.length} products!`);
+          
+          // Show success message or error details
+          if (response.data.errors && response.data.errors.length > 0) {
+            const errorMessage = `Imported ${response.data.imported} product(s) with ${response.data.errors.length} error(s):\n\n${response.data.errors.slice(0, 5).join('\n')}${
+              response.data.errors.length > 5 ? `\n\n...and ${response.data.errors.length - 5} more errors.` : ''
+            }`;
+            alert(errorMessage);
+          } else {
+            alert(`Successfully imported ${response.data.imported || objectData.length} products!`);
+          }
+          
           setImportDialogOpen(false);
           setImportFile(null);
           
@@ -2739,12 +2868,56 @@ export default function ProductListPage() {
         setImportDialogOpen(false);
         setImportFile(null);
         setImportLoading(false);
-      }} maxWidth="sm" fullWidth>
+      }} maxWidth="md" fullWidth>
         <DialogTitle>Import Products</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import products from a CSV file. Make sure your file follows the correct format.
+            Import products from a CSV file. Make sure your file follows the correct format with the following headers:
           </Typography>
+          
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Required CSV Headers:
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Name</Typography>
+                <Typography variant="body2" color="textSecondary">• Code</Typography>
+                <Typography variant="body2" color="textSecondary">• HSN Code</Typography>
+                <Typography variant="body2" color="textSecondary">• Importance</Typography>
+                <Typography variant="body2" color="textSecondary">• Product Type</Typography>
+                <Typography variant="body2" color="textSecondary">• Minimum Stock</Typography>
+                <Typography variant="body2" color="textSecondary">• Category</Typography>
+                <Typography variant="body2" color="textSecondary">• Subcategory</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Unit</Typography>
+                <Typography variant="body2" color="textSecondary">• Product Mode</Typography>
+                <Typography variant="body2" color="textSecondary">• MOQ</Typography>
+                <Typography variant="body2" color="textSecondary">• Store</Typography>
+                <Typography variant="body2" color="textSecondary">• Tax</Typography>
+                <Typography variant="body2" color="textSecondary">• GST %</Typography>
+                <Typography variant="body2" color="textSecondary">• Description</Typography>
+                <Typography variant="body2" color="textSecondary">• Internal Notes</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Status</Typography>
+                <Typography variant="body2" color="textSecondary">• Color Code</Typography>
+                <Typography variant="body2" color="textSecondary">• Size</Typography>
+                <Typography variant="body2" color="textSecondary">• SKU</Typography>
+                <Typography variant="body2" color="textSecondary">• Barcode</Typography>
+                <Typography variant="body2" color="textSecondary">• Purchase Cost</Typography>
+                <Typography variant="body2" color="textSecondary">• Sales Price</Typography>
+                <Typography variant="body2" color="textSecondary">• Stock</Typography>
+                <Typography variant="body2" color="textSecondary">• Lead Time</Typography>
+                <Typography variant="body2" color="textSecondary">• Images</Typography>
+              </Grid>
+            </Grid>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+              Note: Name and Code are required. Category, Unit, Store, and Tax must match existing entries in the system.
+            </Typography>
+          </Box>
+          
           <input
             type="file"
             accept=".csv"
@@ -2756,6 +2929,13 @@ export default function ProductListPage() {
               Selected file: {importFile.name}
             </Typography>
           )}
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} 
+              onClick={() => downloadTemplateCSV()}>
+              ↓ Download template CSV file
+            </Typography>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
