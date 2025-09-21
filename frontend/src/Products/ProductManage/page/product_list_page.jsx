@@ -1,4 +1,3 @@
-// ProductListPage.jsx
 import React, { useEffect, useState, useCallback, memo, useRef } from "react";
 import {
   Box,
@@ -22,29 +21,243 @@ import {
   FormControlLabel,
   Checkbox,
   Tooltip,
-  Dialog,           // added
-  DialogTitle,      // added
-  DialogContent,    // added
-  DialogActions,    // added
-  Divider,          // added
-  List,             // added
-  ListItem,         // added
-  ListItemText,     // added
-  Autocomplete      // added for autocomplete functionality
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+  Autocomplete
 } from "@mui/material";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
-import * as XLSX from 'xlsx'; // added for Excel export
 import debounce from 'lodash/debounce';
 
-// Improve the normalizeID helper to handle more edge cases
+// RAL colors data (complete list from color.csv)
+const ralColors = [
+  { name: 'RAL 1000 - Green beige', value: 'RAL 1000', hex: '#CDBA88' },
+  { name: 'RAL 1001 - Beige', value: 'RAL 1001', hex: '#D0B084' },
+  { name: 'RAL 1002 - Sand yellow', value: 'RAL 1002', hex: '#D2AA6D' },
+  { name: 'RAL 1003 - Signal yellow', value: 'RAL 1003', hex: '#F9A900' },
+  { name: 'RAL 1004 - Golden yellow', value: 'RAL 1004', hex: '#E49E00' },
+  { name: 'RAL 1005 - Honey yellow', value: 'RAL 1005', hex: '#CB8F00' },
+  { name: 'RAL 1006 - Maize yellow', value: 'RAL 1006', hex: '#E19000' },
+  { name: 'RAL 1007 - Daffodil yellow', value: 'RAL 1007', hex: '#E88C00' },
+  { name: 'RAL 1011 - Brown beige', value: 'RAL 1011', hex: '#AF8050' },
+  { name: 'RAL 1012 - Lemon yellow', value: 'RAL 1012', hex: '#DDAF28' },
+  { name: 'RAL 1013 - Oyster white', value: 'RAL 1013', hex: '#E3D9C7' },
+  { name: 'RAL 1014 - Ivory', value: 'RAL 1014', hex: '#DDC49B' },
+  { name: 'RAL 1015 - Light ivory', value: 'RAL 1015', hex: '#E6D2B5' },
+  { name: 'RAL 1016 - Sulfur yellow', value: 'RAL 1016', hex: '#F1DD39' },
+  { name: 'RAL 1017 - Saffron yellow', value: 'RAL 1017', hex: '#F6A951' },
+  { name: 'RAL 1018 - Zinc yellow', value: 'RAL 1018', hex: '#FACA31' },
+  { name: 'RAL 1019 - Grey beige', value: 'RAL 1019', hex: '#A48F7A' },
+  { name: 'RAL 1020 - Olive yellow', value: 'RAL 1020', hex: '#A08F65' },
+  { name: 'RAL 1021 - Colza yellow', value: 'RAL 1021', hex: '#F6B600' },
+  { name: 'RAL 1023 - Traffic yellow', value: 'RAL 1023', hex: '#F7B500' },
+  { name: 'RAL 1024 - Ochre yellow', value: 'RAL 1024', hex: '#BA8F4C' },
+  { name: 'RAL 1026 - Luminous yellow', value: 'RAL 1026', hex: '#FFFF00' },
+  { name: 'RAL 1027 - Curry', value: 'RAL 1027', hex: '#A77F0F' },
+  { name: 'RAL 1028 - Melon yellow', value: 'RAL 1028', hex: '#FF9C00' },
+  { name: 'RAL 1032 - Broom yellow', value: 'RAL 1032', hex: '#E2A300' },
+  { name: 'RAL 1033 - Dahlia yellow', value: 'RAL 1033', hex: '#F99A1D' },
+  { name: 'RAL 1034 - Pastel yellow', value: 'RAL 1034', hex: '#EB9C52' },
+  { name: 'RAL 1035 - Pearl beige', value: 'RAL 1035', hex: '#8F8370' },
+  { name: 'RAL 1036 - Pearl gold', value: 'RAL 1036', hex: '#806440' },
+  { name: 'RAL 1037 - Sun yellow', value: 'RAL 1037', hex: '#F09200' },
+  { name: 'RAL 2000 - Yellow orange', value: 'RAL 2000', hex: '#DA6E00' },
+  { name: 'RAL 2001 - Red orange', value: 'RAL 2001', hex: '#BA481C' },
+  { name: 'RAL 2002 - Vermilion', value: 'RAL 2002', hex: '#BF3922' },
+  { name: 'RAL 2003 - Pastel orange', value: 'RAL 2003', hex: '#F67829' },
+  { name: 'RAL 2004 - Pure orange', value: 'RAL 2004', hex: '#E25304' },
+  { name: 'RAL 2005 - Luminous orange', value: 'RAL 2005', hex: '#FF4D08' },
+  { name: 'RAL 2007 - Luminous bright orange', value: 'RAL 2007', hex: '#FFB200' },
+  { name: 'RAL 2008 - Bright red orange', value: 'RAL 2008', hex: '#EC6B22' },
+  { name: 'RAL 2009 - Traffic orange', value: 'RAL 2009', hex: '#DE5308' },
+  { name: 'RAL 2010 - Signal orange', value: 'RAL 2010', hex: '#D05D29' },
+  { name: 'RAL 2011 - Deep orange', value: 'RAL 2011', hex: '#E26E0F' },
+  { name: 'RAL 2012 - Salmon orange', value: 'RAL 2012', hex: '#D5654E' },
+  { name: 'RAL 2013 - Pearl orange', value: 'RAL 2013', hex: '#923E25' },
+  { name: 'RAL 2017 - RAL orange', value: 'RAL 2017', hex: '#FC5500' },
+  { name: 'RAL 3000 - Flame red', value: 'RAL 3000', hex: '#A72920' },
+  { name: 'RAL 3001 - Signal red', value: 'RAL 3001', hex: '#9B2423' },
+  { name: 'RAL 3002 - Carmine red', value: 'RAL 3002', hex: '#9B2321' },
+  { name: 'RAL 3003 - Ruby red', value: 'RAL 3003', hex: '#861A22' },
+  { name: 'RAL 3004 - Purple red', value: 'RAL 3004', hex: '#6B1C23' },
+  { name: 'RAL 3005 - Wine red', value: 'RAL 3005', hex: '#59191F' },
+  { name: 'RAL 3007 - Black red', value: 'RAL 3007', hex: '#3E2022' },
+  { name: 'RAL 3009 - Oxide red', value: 'RAL 3009', hex: '#6D342D' },
+  { name: 'RAL 3011 - Brown red', value: 'RAL 3011', hex: '#782423' },
+  { name: 'RAL 3012 - Beige red', value: 'RAL 3012', hex: '#C5856D' },
+  { name: 'RAL 3013 - Tomato red', value: 'RAL 3013', hex: '#972E25' },
+  { name: 'RAL 3014 - Antique pink', value: 'RAL 3014', hex: '#CB7375' },
+  { name: 'RAL 3015 - Light pink', value: 'RAL 3015', hex: '#D8A0A6' },
+  { name: 'RAL 3016 - Coral red', value: 'RAL 3016', hex: '#A63D30' },
+  { name: 'RAL 3017 - Rose', value: 'RAL 3017', hex: '#CA555D' },
+  { name: 'RAL 3018 - Strawberry red', value: 'RAL 3018', hex: '#C63F4A' },
+  { name: 'RAL 3020 - Traffic red', value: 'RAL 3020', hex: '#BB1F11' },
+  { name: 'RAL 3022 - Salmon pink', value: 'RAL 3022', hex: '#CF6955' },
+  { name: 'RAL 3024 - Luminous red', value: 'RAL 3024', hex: '#FF2D21' },
+  { name: 'RAL 3026 - Luminous bright red', value: 'RAL 3026', hex: '#FF2A1C' },
+  { name: 'RAL 3027 - Raspberry red', value: 'RAL 3027', hex: '#AB273C' },
+  { name: 'RAL 3028 - Pure red', value: 'RAL 3028', hex: '#CC2C24' },
+  { name: 'RAL 3031 - Orient red', value: 'RAL 3031', hex: '#A63437' },
+  { name: 'RAL 3032 - Pearl ruby red', value: 'RAL 3032', hex: '#701D24' },
+  { name: 'RAL 3033 - Pearl pink', value: 'RAL 3033', hex: '#A53A2E' },
+  { name: 'RAL 4001 - Red lilac', value: 'RAL 4001', hex: '#816183' },
+  { name: 'RAL 4002 - Red violet', value: 'RAL 4002', hex: '#8D3C4B' },
+  { name: 'RAL 4003 - Heather violet', value: 'RAL 4003', hex: '#C4618C' },
+  { name: 'RAL 4004 - Claret violet', value: 'RAL 4004', hex: '#651E38' },
+  { name: 'RAL 4005 - Blue lilac', value: 'RAL 4005', hex: '#76689A' },
+  { name: 'RAL 4006 - Traffic purple', value: 'RAL 4006', hex: '#903373' },
+  { name: 'RAL 4007 - Purple violet', value: 'RAL 4007', hex: '#47243C' },
+  { name: 'RAL 4008 - Signal violet', value: 'RAL 4008', hex: '#844C82' },
+  { name: 'RAL 4009 - Pastel violet', value: 'RAL 4009', hex: '#9D8692' },
+  { name: 'RAL 4010 - Telemagenta', value: 'RAL 4010', hex: '#BB4077' },
+  { name: 'RAL 4011 - Pearl violet', value: 'RAL 4011', hex: '#6E6387' },
+  { name: 'RAL 4012 - Pearl blackberry', value: 'RAL 4012', hex: '#6A6B7F' },
+  { name: 'RAL 5000 - Violet blue', value: 'RAL 5000', hex: '#304F6E' },
+  { name: 'RAL 5001 - Green blue', value: 'RAL 5001', hex: '#0E4C64' },
+  { name: 'RAL 5002 - Ultramarine blue', value: 'RAL 5002', hex: '#00387A' },
+  { name: 'RAL 5003 - Sapphire blue', value: 'RAL 5003', hex: '#1F3855' },
+  { name: 'RAL 5004 - Black blue', value: 'RAL 5004', hex: '#191E28' },
+  { name: 'RAL 5005 - Signal blue', value: 'RAL 5005', hex: '#005387' },
+  { name: 'RAL 5007 - Brillant blue', value: 'RAL 5007', hex: '#376B8C' },
+  { name: 'RAL 5008 - Grey blue', value: 'RAL 5008', hex: '#2B3A44' },
+  { name: 'RAL 5009 - Azure blue', value: 'RAL 5009', hex: '#215F78' },
+  { name: 'RAL 5010 - Gentian blue', value: 'RAL 5010', hex: '#004F7C' },
+  { name: 'RAL 5011 - Steel blue', value: 'RAL 5011', hex: '#1A2B3C' },
+  { name: 'RAL 5012 - Light blue', value: 'RAL 5012', hex: '#0089B6' },
+  { name: 'RAL 5013 - Cobalt blue', value: 'RAL 5013', hex: '#193153' },
+  { name: 'RAL 5014 - Pigeon blue', value: 'RAL 5014', hex: '#637D96' },
+  { name: 'RAL 5015 - Sky blue', value: 'RAL 5015', hex: '#007CAF' },
+  { name: 'RAL 5017 - Traffic blue', value: 'RAL 5017', hex: '#005B8C' },
+  { name: 'RAL 5018 - Turquoise blue', value: 'RAL 5018', hex: '#048B8C' },
+  { name: 'RAL 5019 - Capri blue', value: 'RAL 5019', hex: '#005E83' },
+  { name: 'RAL 5020 - Ocean blue', value: 'RAL 5020', hex: '#00414B' },
+  { name: 'RAL 5021 - Water blue', value: 'RAL 5021', hex: '#007577' },
+  { name: 'RAL 5022 - Night blue', value: 'RAL 5022', hex: '#222D5A' },
+  { name: 'RAL 5023 - Distant blue', value: 'RAL 5023', hex: '#41698C' },
+  { name: 'RAL 5024 - Pastel blue', value: 'RAL 5024', hex: '#6093AC' },
+  { name: 'RAL 5025 - Pearl gentian blue', value: 'RAL 5025', hex: '#20697C' },
+  { name: 'RAL 5026 - Pearl night blue', value: 'RAL 5026', hex: '#0F3052' },
+  { name: 'RAL 6000 - Patina green', value: 'RAL 6000', hex: '#3C7460' },
+  { name: 'RAL 6001 - Emerald green', value: 'RAL 6001', hex: '#366735' },
+  { name: 'RAL 6002 - Leaf green', value: 'RAL 6002', hex: '#325928' },
+  { name: 'RAL 6003 - Olive green', value: 'RAL 6003', hex: '#50533C' },
+  { name: 'RAL 6004 - Blue green', value: 'RAL 6004', hex: '#024442' },
+  { name: 'RAL 6005 - Moss green', value: 'RAL 6005', hex: '#114232' },
+  { name: 'RAL 6006 - Grey olive', value: 'RAL 6006', hex: '#3C392E' },
+  { name: 'RAL 6007 - Bottle green', value: 'RAL 6007', hex: '#2C3222' },
+  { name: 'RAL 6008 - Brown green', value: 'RAL 6008', hex: '#36342A' },
+  { name: 'RAL 6009 - Fir green', value: 'RAL 6009', hex: '#27352A' },
+  { name: 'RAL 6010 - Grass green', value: 'RAL 6010', hex: '#4D6F39' },
+  { name: 'RAL 6011 - Reseda green', value: 'RAL 6011', hex: '#6B7C59' },
+  { name: 'RAL 6012 - Black green', value: 'RAL 6012', hex: '#2F3D3A' },
+  { name: 'RAL 6013 - Reed green', value: 'RAL 6013', hex: '#7C765A' },
+  { name: 'RAL 6014 - Yellow olive', value: 'RAL 6014', hex: '#474135' },
+  { name: 'RAL 6015 - Black olive', value: 'RAL 6015', hex: '#3D3D36' },
+  { name: 'RAL 6016 - Turquoise green', value: 'RAL 6016', hex: '#00694C' },
+  { name: 'RAL 6017 - May green', value: 'RAL 6017', hex: '#587F40' },
+  { name: 'RAL 6018 - Yellow green', value: 'RAL 6018', hex: '#60993B' },
+  { name: 'RAL 6019 - Pastel green', value: 'RAL 6019', hex: '#B9CEAC' },
+  { name: 'RAL 6020 - Chrome green', value: 'RAL 6020', hex: '#37422F' },
+  { name: 'RAL 6021 - Pale green', value: 'RAL 6021', hex: '#8A9977' },
+  { name: 'RAL 6022 - Olive drab', value: 'RAL 6022', hex: '#3A3327' },
+  { name: 'RAL 6024 - Traffic green', value: 'RAL 6024', hex: '#008351' },
+  { name: 'RAL 6025 - Fern green', value: 'RAL 6025', hex: '#5E6E3B' },
+  { name: 'RAL 6026 - Opal green', value: 'RAL 6026', hex: '#005F4E' },
+  { name: 'RAL 6027 - Light green', value: 'RAL 6027', hex: '#7EBAB5' },
+  { name: 'RAL 6028 - Pine green', value: 'RAL 6028', hex: '#315442' },
+  { name: 'RAL 6029 - Mint green', value: 'RAL 6029', hex: '#006F3D' },
+  { name: 'RAL 6032 - Signal green', value: 'RAL 6032', hex: '#237F52' },
+  { name: 'RAL 6033 - Mint turquoise', value: 'RAL 6033', hex: '#45877F' },
+  { name: 'RAL 6034 - Pastel turquoise', value: 'RAL 6034', hex: '#7AADAC' },
+  { name: 'RAL 6035 - Pearl green', value: 'RAL 6035', hex: '#194D25' },
+  { name: 'RAL 6036 - Pearl opal green', value: 'RAL 6036', hex: '#04574B' },
+  { name: 'RAL 6037 - Pure green', value: 'RAL 6037', hex: '#008B29' },
+  { name: 'RAL 6038 - Luminous green', value: 'RAL 6038', hex: '#00B51B' },
+  { name: 'RAL 6039 - Fibrous green', value: 'RAL 6039', hex: '#B3C43E' },
+  { name: 'RAL 7000 - Squirrel grey', value: 'RAL 7000', hex: '#7A888E' },
+  { name: 'RAL 7001 - Silver grey', value: 'RAL 7001', hex: '#8C979C' },
+  { name: 'RAL 7002 - Olive grey', value: 'RAL 7002', hex: '#817863' },
+  { name: 'RAL 7003 - Moss grey', value: 'RAL 7003', hex: '#797669' },
+  { name: 'RAL 7004 - Signal grey', value: 'RAL 7004', hex: '#9A9B9B' },
+  { name: 'RAL 7005 - Mouse grey', value: 'RAL 7005', hex: '#6B6E6B' },
+  { name: 'RAL 7006 - Beige grey', value: 'RAL 7006', hex: '#766A5E' },
+  { name: 'RAL 7008 - Khaki grey', value: 'RAL 7008', hex: '#745F3D' },
+  { name: 'RAL 7009 - Green grey', value: 'RAL 7009', hex: '#5D6058' },
+  { name: 'RAL 7010 - Tarpaulin grey', value: 'RAL 7010', hex: '#585C56' },
+  { name: 'RAL 7011 - Iron grey', value: 'RAL 7011', hex: '#52595D' },
+  { name: 'RAL 7012 - Basalt grey', value: 'RAL 7012', hex: '#575D5E' },
+  { name: 'RAL 7013 - Brown grey', value: 'RAL 7013', hex: '#575044' },
+  { name: 'RAL 7015 - Slate grey', value: 'RAL 7015', hex: '#4F5358' },
+  { name: 'RAL 7016 - Anthracite grey', value: 'RAL 7016', hex: '#383E42' },
+  { name: 'RAL 7021 - Black grey', value: 'RAL 7021', hex: '#2F3234' },
+  { name: 'RAL 7022 - Umbra grey', value: 'RAL 7022', hex: '#4C4A44' },
+  { name: 'RAL 7023 - Concrete grey', value: 'RAL 7023', hex: '#808076' },
+  { name: 'RAL 7024 - Graphite grey', value: 'RAL 7024', hex: '#45494E' },
+  { name: 'RAL 7026 - Granite grey', value: 'RAL 7026', hex: '#374345' },
+  { name: 'RAL 7030 - Stone grey', value: 'RAL 7030', hex: '#928E85' },
+  { name: 'RAL 7031 - Blue grey', value: 'RAL 7031', hex: '#5B686D' },
+  { name: 'RAL 7032 - Pebble grey', value: 'RAL 7032', hex: '#B5B0A1' },
+  { name: 'RAL 7033 - Cement grey', value: 'RAL 7033', hex: '#7F8274' },
+  { name: 'RAL 7034 - Yellow grey', value: 'RAL 7034', hex: '#92886F' },
+  { name: 'RAL 7035 - Light grey', value: 'RAL 7035', hex: '#C5C7C4' },
+  { name: 'RAL 7036 - Platinum grey', value: 'RAL 7036', hex: '#979392' },
+  { name: 'RAL 7037 - Dusty grey', value: 'RAL 7037', hex: '#7A7B7A' },
+  { name: 'RAL 7038 - Agate grey', value: 'RAL 7038', hex: '#B0B0A9' },
+  { name: 'RAL 7039 - Quartz grey', value: 'RAL 7039', hex: '#6B665E' },
+  { name: 'RAL 7040 - Window grey', value: 'RAL 7040', hex: '#989EA1' },
+  { name: 'RAL 7042 - Traffic grey A', value: 'RAL 7042', hex: '#8E9291' },
+  { name: 'RAL 7043 - Traffic grey B', value: 'RAL 7043', hex: '#4F5250' },
+  { name: 'RAL 7044 - Silk grey', value: 'RAL 7044', hex: '#B7B3A8' },
+  { name: 'RAL 7045 - Telegrey 1', value: 'RAL 7045', hex: '#8D9295' },
+  { name: 'RAL 7046 - Telegrey 2', value: 'RAL 7046', hex: '#7E868A' },
+  { name: 'RAL 7047 - Telegrey 4', value: 'RAL 7047', hex: '#C8C8C7' },
+  { name: 'RAL 7048 - Pearl mouse grey', value: 'RAL 7048', hex: '#817B73' },
+  { name: 'RAL 8000 - Green brown', value: 'RAL 8000', hex: '#89693F' },
+  { name: 'RAL 8001 - Ochre brown', value: 'RAL 8001', hex: '#9D622B' },
+  { name: 'RAL 8002 - Signal brown', value: 'RAL 8002', hex: '#794D3E' },
+  { name: 'RAL 8003 - Clay brown', value: 'RAL 8003', hex: '#7E4B27' },
+  { name: 'RAL 8004 - Copper brown', value: 'RAL 8004', hex: '#8D4931' },
+  { name: 'RAL 8007 - Fawn brown', value: 'RAL 8007', hex: '#70462B' },
+  { name: 'RAL 8008 - Olive brown', value: 'RAL 8008', hex: '#724A25' },
+  { name: 'RAL 8011 - Nut brown', value: 'RAL 8011', hex: '#5A3827' },
+  { name: 'RAL 8012 - Red brown', value: 'RAL 8012', hex: '#66332B' },
+  { name: 'RAL 8014 - Sepia brown', value: 'RAL 8014', hex: '#4A3526' },
+  { name: 'RAL 8015 - Chestnut brown', value: 'RAL 8015', hex: '#5E2F26' },
+  { name: 'RAL 8016 - Mahogany brown', value: 'RAL 8016', hex: '#4C2B20' },
+  { name: 'RAL 8017 - Chocolate brown', value: 'RAL 8017', hex: '#442F29' },
+  { name: 'RAL 8019 - Grey brown', value: 'RAL 8019', hex: '#3D3635' },
+  { name: 'RAL 8022 - Black brown', value: 'RAL 8022', hex: '#1A1719' },
+  { name: 'RAL 8023 - Orange brown', value: 'RAL 8023', hex: '#A45729' },
+  { name: 'RAL 8024 - Beige brown', value: 'RAL 8024', hex: '#795038' },
+  { name: 'RAL 8025 - Pale brown', value: 'RAL 8025', hex: '#755847' },
+  { name: 'RAL 8028 - Terra brown', value: 'RAL 8028', hex: '#513A2A' },
+  { name: 'RAL 8029 - Pearl copper', value: 'RAL 8029', hex: '#7F4031' },
+  { name: 'RAL 9001 - Cream', value: 'RAL 9001', hex: '#E9E0D2' },
+  { name: 'RAL 9002 - Grey white', value: 'RAL 9002', hex: '#D6D5CB' },
+  { name: 'RAL 9003 - Signal white', value: 'RAL 9003', hex: '#ECECE7' },
+  { name: 'RAL 9004 - Signal black', value: 'RAL 9004', hex: '#2B2B2C' },
+  { name: 'RAL 9005 - Jet black', value: 'RAL 9005', hex: '#0E0E10' },
+  { name: 'RAL 9006 - White aluminium', value: 'RAL 9006', hex: '#A1A1A0' },
+  { name: 'RAL 9007 - Grey aluminium', value: 'RAL 9007', hex: '#868581' },
+  { name: 'RAL 9010 - Pure white', value: 'RAL 9010', hex: '#F1EDE1' },
+  { name: 'RAL 9011 - Graphite black', value: 'RAL 9011', hex: '#27292B' },
+  { name: 'RAL 9012 - Cleanroom white', value: 'RAL 9012', hex: '#F8F2E1' },
+  { name: 'RAL 9016 - Traffic white', value: 'RAL 9016', hex: '#F1F1EA' },
+  { name: 'RAL 9017 - Traffic black', value: 'RAL 9017', hex: '#29292A' },
+  { name: 'RAL 9018 - Papyrus white', value: 'RAL 9018', hex: '#C8CBC4' },
+  { name: 'RAL 9022 - Pearl light grey', value: 'RAL 9022', hex: '#858583' },
+  { name: 'RAL 9023 - Pearl dark grey', value: 'RAL 9023', hex: '#787B7A' },
+];
+
 const normalizeID = (val) => {
   if (val === "" || val === null || val === undefined) return null;
-  // Try to convert to number, fallback to original value if it fails
   const n = Number(val);
-  return Number.isNaN(n) ? val : n; // Return original value if can't convert to number
+  return Number.isNaN(n) ? val : n;
 };
 
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
@@ -281,25 +494,33 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             <TableCell sx={{ py: 0.5, width: 120 }}>
               {p.Variants && p.Variants.length > 0 ? (
                 <Box display="flex" flexWrap="wrap" gap={0.5} alignItems="center">
-                  {p.Variants.map((v, idx) => (
-                    <Box key={idx} display="flex" alignItems="center" gap={0.5}>
-                      {/* Color visual indicator */}
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: 1,
-                          border: '1px solid #ccc',
-                          backgroundColor: v.Color || '#ffffff',
-                          flexShrink: 0
-                        }}
-                      />
-                      {/* Color code/name */}
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                        {v.Color || 'N/A'}
-                      </Typography>
-                    </Box>
-                  ))}
+                  {p.Variants.map((v, idx) => {
+                    // Find color data by hex or RAL code
+                    let colorData = ralColors.find(c => c.hex.toLowerCase() === (v.Color || '').toLowerCase());
+                    if (!colorData) {
+                      // Try to find by RAL code
+                      colorData = ralColors.find(c => c.value.toLowerCase() === (v.Color || '').toLowerCase());
+                    }
+                    return (
+                      <Box key={idx} display="flex" alignItems="center" gap={0.5}>
+                        {/* Color visual indicator */}
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 1,
+                            border: '1px solid #ccc',
+                            backgroundColor: colorData ? colorData.hex : (v.Color || '#ffffff'),
+                            flexShrink: 0
+                          }}
+                        />
+                        {/* Color code and name */}
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                          {colorData ? `${colorData.value} - ${colorData.name.split(' - ')[1]}` : (v.Color || 'N/A')}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
               ) : (
                 <Typography variant="caption" color="textSecondary">No colors</Typography>
@@ -349,7 +570,6 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                       } else {
                         imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
                       }
-                      console.log(`Constructed image URL:`, { original: img, normalized: normalizedImg, final: imgSrc });
                     } else {
                       imgSrc = 'https://via.placeholder.com/30?text=No+Image';
                     }
@@ -413,7 +633,6 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
   );
 });
 
-// Memoized filters row so product list updates do not re-render inputs
 const FiltersRow = memo(function FiltersRow({
   inputFilters,
   setInputFilters,
@@ -424,15 +643,12 @@ const FiltersRow = memo(function FiltersRow({
   stores,
   setPage,
   visibleColumns,
-  handleExport, // added prop for export handler
-  setImportDialogOpen, // added prop for import dialog
+  handleExport,
+  setImportDialogOpen,
   autocompleteOptions,
   autocompleteLoading,
   onAutocompleteInputChange
 }) {
-  // Log for debugging
-  console.log('Categories:', categories.map(c => ({ id: c.ID, name: c.Name })));
-  
   return (
     <TableRow>
       <TableCell sx={{ width: 60 }} />
@@ -536,7 +752,6 @@ const FiltersRow = memo(function FiltersRow({
             value={categories.find(c => c.ID === filters.categoryID) || null}
             onChange={(event, newValue) => {
               const val = newValue ? newValue.ID : null;
-              console.log(`Selected category: ${val}`);
               setFilters({ ...filters, categoryID: val, subcategoryID: null });
               setPage(0);
             }}
@@ -564,7 +779,6 @@ const FiltersRow = memo(function FiltersRow({
             value={allSubcategories.find(sub => sub.ID === filters.subcategoryID) || null}
             onChange={(event, newValue) => {
               const val = newValue ? newValue.ID : null;
-              console.log(`Selected subcategory: ${val}`);
               setFilters({ ...filters, subcategoryID: val });
               setPage(0);
             }}
@@ -1153,15 +1367,30 @@ export default function ProductListPage() {
   const [categories, setCategories] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   const [stores, setStores] = useState([]);
+  
+  // Define default filters
+  const defaultFilters = { 
+    name: "", code: "", categoryID: null, subcategoryID: null, storeID: null, 
+    productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, 
+    importance: null, color: "", size: "", sku: "", barcode: "", 
+    purchaseCost: "", salesPrice: "" 
+  };
+  
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, subcategoryID: null,  storeID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null, color: "", size: "", sku: "", barcode: "", purchaseCost: "", salesPrice: "" });
+  const [filters, setFilters] = useState(defaultFilters);
+  
   // NEW: local input state to avoid re-fetch on every keystroke
-  const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "", color: "", size: "", sku: "", barcode: "", purchaseCost: "", salesPrice: "" });
+  const [inputFilters, setInputFilters] = useState({ 
+    name: "", code: "", productType: "", stock: "", moq: "", 
+    leadTime: "", note: "", color: "", size: "", sku: "", 
+    barcode: "", purchaseCost: "", salesPrice: "" 
+  });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState(null);
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
   const [stockSort, setStockSort] = useState(null); // null | 'asc' | 'desc'
@@ -1169,8 +1398,11 @@ export default function ProductListPage() {
   const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
   const [salesPriceSort, setSalesPriceSort] = useState(null); // null | 'asc' | 'desc'
   
-  // FIXED: Initialize debouncedFilters with same values as filters
-  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  // Force refresh flag
+  const [forceRefresh, setForceRefresh] = useState(0);
+  
+  // FIXED: Initialize debouncedFilters directly with defaultFilters instead of filters reference
+  const [debouncedFilters, setDebouncedFilters] = useState({...defaultFilters});
 
   // New state for display preferences
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -1210,12 +1442,6 @@ export default function ProductListPage() {
   
   // State for display preferences popover
   const [displayPrefsAnchor, setDisplayPrefsAnchor] = useState(null);
-
-  // State for import dialog
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-
-  // Ref for file input
-  const fileInputRef = useRef(null);
 
   // Save column preferences to localStorage whenever they change
   useEffect(() => {
@@ -1368,7 +1594,6 @@ export default function ProductListPage() {
   useEffect(() => {
     // Update debouncedFilters with current filters
     const handler = setTimeout(() => {
-      console.log('Updating debounced filters:', filters);
       setDebouncedFilters(filters);
     }, 500);
     return () => clearTimeout(handler);
@@ -1396,7 +1621,6 @@ export default function ProductListPage() {
   const fetchAutocompleteOptions = async (field, query = '') => {
     if (!query.trim()) return;
 
-    console.log(`Fetching autocomplete for ${field} with query: "${query}"`);
     setAutocompleteLoading(prev => ({ ...prev, [field]: true }));
 
     try {
@@ -1404,7 +1628,6 @@ export default function ProductListPage() {
       const localSuggestions = getLocalSuggestions(field, query);
 
       if (localSuggestions.length > 0) {
-        console.log(`Using local suggestions for ${field}:`, localSuggestions);
         setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
         setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
         setAutocompleteLoading(prev => ({ ...prev, [field]: false }));
@@ -1412,18 +1635,15 @@ export default function ProductListPage() {
       }
 
       // If no local suggestions, fall back to API
-      console.log(`No local suggestions found for ${field}, trying API...`);
       const response = await axios.get(`${BASE_URL}/api/products/autocomplete`, {
         params: { field, query, limit: 10 }
       });
-      console.log(`Autocomplete response for ${field}:`, response.data);
       setAutocompleteOptions(prev => ({ ...prev, [field]: response.data.data || [] }));
       setAutocompleteSource(prev => ({ ...prev, [field]: 'api' }));
     } catch (error) {
       console.error(`Error fetching ${field} autocomplete:`, error);
       // Even on error, try to use local suggestions as fallback
       const localSuggestions = getLocalSuggestions(field, query);
-      console.log(`Using local suggestions as fallback for ${field}:`, localSuggestions);
       setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
       setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
     } finally {
@@ -1647,16 +1867,17 @@ export default function ProductListPage() {
       // FIXED: Added check to ensure debouncedFilters is defined before using it
       if (!debouncedFilters) {
         console.error('debouncedFilters is undefined');
+        setLoading(false);
         return;
       }
       
-      // Log categories and selected category for debugging
-      console.log(`Current category: ${debouncedFilters.categoryID}, type: ${typeof debouncedFilters.categoryID}`);
+      console.log('fetchProducts called with filters:', debouncedFilters); // Debug log
+      console.log('Current page:', page, 'limit:', limit); // Debug log
       
       // Always send category_id/subcategory_id/store_id as they are (don't force conversion)
       const filterParams = Object.entries({
-        name: debouncedFilters.name,
-        code: debouncedFilters.code,
+        name: debouncedFilters.name || "",
+        code: debouncedFilters.code || "",
         product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
@@ -1706,26 +1927,55 @@ export default function ProductListPage() {
       } else if (salesPriceSort) {
         sortParams = { sort_by: 'salesPrice', sort_order: salesPriceSort };
       }
-      console.log('Product filter params:', { page: page + 1, limit, ...filterParams, ...sortParams });
-      const res = await axios.get(`${BASE_URL}/api/products`, {
-        params: {
-          page: page + 1,
-          limit,
-          ...filterParams,
-          ...sortParams,
-        },
+      
+      console.log('Fetching products with params:', {
+        page: page + 1,
+        limit,
+        ...filterParams,
+        ...sortParams,
       });
       
-      // Ensure products is always an array
-      setProducts(res.data.data || []);
-      setTotalItems(res.data.total || 0);
-      setTotalCost(res.data.totalCost || 0);
+      try {
+        const res = await axios.get(`${BASE_URL}/api/products`, {
+          params: {
+            page: page + 1,
+            limit,
+            ...filterParams,
+            ...sortParams,
+          },
+          // Add timeout to prevent hanging requests
+          timeout: 15000
+        });
+        
+        console.log('fetchProducts API response status:', res.status);
+        console.log('fetchProducts API response data:', res.data);
+        
+        // Ensure products is always an array
+        if (res.data && res.data.data) {
+          const newProducts = Array.isArray(res.data.data) ? res.data.data : [];
+          console.log('Setting products to:', newProducts.length, 'items');
+          setProducts(newProducts);
+          setTotalItems(res.data.total || 0);
+          setTotalCost(res.data.totalCost || 0);
+        } else {
+          console.error('Invalid API response format:', res.data);
+          setProducts([]);
+          setTotalItems(0);
+          setTotalCost(0);
+        }
+      } catch (apiError) {
+        console.error('API request failed:', apiError);
+        setProducts([]);
+        setTotalItems(0);
+        setTotalCost(0);
+      }
     } catch (err) {
       console.error("Error fetching products:", err);
       // Initialize with empty array instead of null
       setProducts([]);
       setTotalItems(0);
       setTotalCost(0);
+      setApiError(err.message || "Failed to load products. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -1769,25 +2019,68 @@ export default function ProductListPage() {
     setPurchaseCostSort(null);
   }, []);
 
-  // Fetch products when filters or pagination change
   useEffect(() => {
-    fetchProducts();
-  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
+    console.log('Effect triggered - fetchProducts will be called');
+    console.log('Current filters state:', { 
+      debouncedFilters, 
+      page, 
+      limit, 
+      sorts: { nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort }, 
+      stockFilter 
+    });
+    
+    // Safeguard against undefined debouncedFilters
+    if (debouncedFilters) {
+      fetchProducts();
+    } else {
+      console.error('debouncedFilters is undefined in useEffect - cannot fetch products');
+    }
+  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter]);
+
+  // Debug: Monitor products state changes
+  useEffect(() => {
+    console.log('Products state changed:', products?.length || 0, 'items');
+  }, [products]);
+
+  // Force cleanup and fetch on component mount
+  useEffect(() => {
+    // Reset key states on mount
+    setLoading(true);
+    setApiError(null);
+    setProducts([]);
+    
+    // Check if BASE_URL is configured correctly
+    if (!BASE_URL) {
+      setApiError('BASE_URL is not configured. Please check Config.jsx');
+      setLoading(false);
+      return;
+    }
+    
+    // Start with a direct API check instead of using filters
+    // This ensures we at least get data even if there's an issue with filters
+    checkAPI();
+    
+    return () => {
+      // Cleanup function
+      console.log('Component unmounting - cleaning up');
+    };
+  }, []);
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
-    console.log('Opening display preferences');
     setDisplayPrefsAnchor(event.currentTarget);
   };
 
   const handleCloseDisplayPrefs = () => {
-    console.log('Closing display preferences');
     setDisplayPrefsAnchor(null);
   };
 
   const [selectedProduct, setSelectedProduct] = useState(null); // product details for view
   const [viewOpen, setViewOpen] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
 
   const handleOpenView = async (id) => {
     try {
@@ -1796,9 +2089,7 @@ export default function ProductListPage() {
       const res = await axios.get(`${BASE_URL}/api/products/${id}`);
       let product = res?.data?.data ?? res?.data ?? null;
 
-      console.log("Raw product data from API:", product);
-      console.log("IsActive field:", product?.IsActive);
-      console.log("isActive field:", product?.isActive);
+
 
       // Helper to extract numeric stock from an object/field
       const extractStock = (obj) => {
@@ -1849,10 +2140,8 @@ export default function ProductListPage() {
       let variants = product?.Variants ?? product?.variants ?? product?.product_variants ?? null;
       if (!Array.isArray(variants) || variants.length === 0) {
         try {
-          console.log("Fetching variants separately for product:", id);
           const vr = await axios.get(`${BASE_URL}/api/products/${id}/variants`);
           variants = vr?.data?.data ?? vr?.data ?? [];
-          console.log("Fetched variants:", variants);
         } catch (e) {
           console.error("Error fetching variants separately:", e);
           variants = [];
@@ -1865,21 +2154,6 @@ export default function ProductListPage() {
         const barcode = v.Barcode ?? v.barcode ?? v.EAN ?? v.ean ?? v.UPC ?? v.upc ?? '';
         const purchaseCost = v.PurchaseCost ?? v.purchase_cost ?? v.Cost ?? v.cost_price ?? v.CostPrice ?? v.cost ?? null;
         const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? v.StdSalesPrice ?? v.std_sales_price ?? null;
-        
-        // Debug logging for sales price
-        if (salesPrice == null) {
-          console.log("Variant sales price not found for variant:", v.ID ?? v.SKU ?? idx);
-          console.log("Available price fields:", {
-            Price: v.Price,
-            UnitPrice: v.UnitPrice,
-            price: v.price,
-            unit_price: v.unit_price,
-            SalesPrice: v.SalesPrice,
-            sales_price: v.sales_price,
-            StdSalesPrice: v.StdSalesPrice,
-            std_sales_price: v.std_sales_price
-          });
-        }
         const stockVal = extractStock(v);
         const leadTime = v.LeadTime ?? v.lead_time ?? v.leadtime ?? v.delivery_days ?? v.lead ?? null;
 
@@ -1920,19 +2194,6 @@ export default function ProductListPage() {
       const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? product?.Moq ?? null;
       let productUnit = product?.Unit ?? product?.unit ?? null;
 
-      // If Unit relationship is not loaded but UnitID exists, try to get unit name from a cached units list
-      if (!productUnit && product?.UnitID) {
-        // This is a fallback - in a real app, you'd want to fetch units data or cache it
-        console.log("Unit relationship not loaded, UnitID:", product.UnitID);
-      }
-
-      console.log("Product Unit data:", product?.Unit);
-      console.log("Product unit field:", product?.unit);
-      console.log("Product UnitID:", product?.UnitID);
-      console.log("Product MOQ data:", productMOQ);
-      console.log("Product Moq field:", product?.Moq);
-      console.log("Product moq field:", product?.moq);
-
       // Attach normalized fields to product
       const normalizedProduct = {
         ...product,
@@ -1941,10 +2202,6 @@ export default function ProductListPage() {
         MOQ: productMOQ,
         Unit: productUnit,
       };
-
-      console.log("Normalized product:", normalizedProduct);
-      console.log("Normalized IsActive:", normalizedProduct.IsActive);
-      console.log("Normalized isActive:", normalizedProduct.isActive);
 
       setSelectedProduct(normalizedProduct);
       setViewOpen(true);
@@ -1960,6 +2217,27 @@ export default function ProductListPage() {
   const handleCloseView = () => {
     setViewOpen(false);
     setSelectedProduct(null);
+  };
+
+  // CSV download function
+  const downloadCSV = (data, filename = "products.csv") => {
+    const headers = Object.keys(data[0] || {}).map(h => `"${h}"`).join(",");
+    const rows = data.map(row =>
+      Object.values(row).map(cell => {
+        const cellStr = (cell ?? "").toString().replace(/"/g, '""');
+        return `"${cellStr}"`;
+      }).join(",")
+    );
+    const csv = [headers, ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleExport = async () => {
@@ -2010,34 +2288,42 @@ export default function ProductListPage() {
         productsToExport = res.data.data || [];
       }
       
-      // Flatten data for Excel based on visible columns
+      // Flatten data for CSV based on import template format
       const exportData = productsToExport.map(p => {
         const row = {};
-        if (visibleColumns.name) row.Name = p.Name;
-        if (visibleColumns.code) row.Code = p.Code;
-        if (visibleColumns.category) row.Category = p.Category?.Name;
-        if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
-        if (visibleColumns.store) row.Store = p.Store?.Name;
-        if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
-        if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
-        if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
-        if (visibleColumns.note) row.Note = p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
-        if (visibleColumns.status) row.Status = p.IsActive ? 'Active' : 'Inactive';
-        if (visibleColumns.importance) row.Importance = p.Importance ?? 'Normal';
-        // Variant columns
-        if (visibleColumns.color) {
-          const colorData = p.Variants && p.Variants.length > 0
-            ? p.Variants.map(v => `${v.Color || 'N/A'}`).join('; ')
-            : '';
-          row.Color = colorData;
-        }
-        if (visibleColumns.size) row.Size = p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Size?.Name || v.Size).join('; ') : '';
-        if (visibleColumns.sku) row.SKU = p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.SKU).join('; ') : '';
-        if (visibleColumns.barcode) row.Barcode = p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Barcode).join('; ') : '';
-        if (visibleColumns.purchaseCost) row['Purchase Cost'] = p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.PurchaseCost || 0).join('; ') : '';
-        if (visibleColumns.salesPrice) row['Sales Price'] = p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.StdSalesPrice || 0).join('; ') : '';
-        if (visibleColumns.image) {
-          const allImages = p.Variants && p.Variants.length > 0 ? p.Variants.flatMap(v => v.Images || []) : [];
+        
+        // Product details - match import template exactly
+        row.Name = p.Name;
+        row.Code = p.Code;
+        row['HSN Code'] = p.HsnSacCode ?? p.HSN ?? p.hsn ?? '';
+        row.Importance = p.Importance ?? 'Normal';
+        row['Product Type'] = p.ProductType ?? p.productType ?? 'Single';
+        row['Minimum Stock'] = p.MinimumStock ?? p.minimumStock ?? '';
+        row.Category = p.Category?.Name;
+        row.Subcategory = p.Subcategory?.Name;
+        row.Unit = p.Unit?.Name || p.Unit?.name || p.unit_name || '';
+        row['Product Mode'] = p.ProductMode ?? p.product_mode ?? 'Physical';
+        row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
+        row.Store = p.Store?.Name;
+        row.Tax = p.Tax?.Name ?? '';
+        row['GST %'] = p.GstPercent ?? p.gstPercent ?? p.Tax?.Percentage ?? '';
+        row.Description = p.Description ?? p.description ?? '';
+        row['Internal Notes'] = p.InternalNotes ?? p.internalNotes ?? p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
+        row.Status = p.IsActive ? 'Active' : 'Inactive';
+        
+        // Variant details - handle multiple variants by joining with semicolons
+        if (p.Variants && p.Variants.length > 0) {
+          row['Color Code'] = p.Variants.map(v => v.Color ?? v.ColorCaption ?? 'N/A').join('; ');
+          row.Size = p.Variants.map(v => v.Size?.Name || v.Size || 'N/A').join('; ');
+          row.SKU = p.Variants.map(v => v.SKU ?? 'N/A').join('; ');
+          row.Barcode = p.Variants.map(v => v.Barcode ?? 'N/A').join('; ');
+          row['Purchase Cost'] = p.Variants.map(v => v.PurchaseCost ?? 0).join('; ');
+          row['Sales Price'] = p.Variants.map(v => v.StdSalesPrice ?? v.SalesPrice ?? 0).join('; ');
+          row.Stock = p.Variants.map(v => v.Stock ?? v.stock ?? v.quantity ?? v.qty ?? 0).join('; ');
+          row['Lead Time'] = p.Variants.map(v => v.LeadTime ?? v.lead_time ?? v.leadtime ?? 0).join('; ');
+          
+          // Handle images
+          const allImages = p.Variants.flatMap(v => v.Images || []);
           const imageUrls = allImages.map(img => {
             if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:'))) {
               return img;
@@ -2051,162 +2337,126 @@ export default function ProductListPage() {
             }
             return '';
           }).filter(url => url !== '');
-          row.Image = imageUrls.join('; ');
+          row.Images = imageUrls.join('; ');
+        } else {
+          // No variants - empty fields
+          row['Color Code'] = '';
+          row.Size = '';
+          row.SKU = '';
+          row.Barcode = '';
+          row['Purchase Cost'] = '';
+          row['Sales Price'] = '';
+          row.Stock = '';
+          row['Lead Time'] = '';
+          row.Images = '';
         }
+        
         return row;
       });
       
-      // Create worksheet
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Products');
-      
-      // Download file
-      XLSX.writeFile(wb, 'products_export.xlsx');
+      // Download CSV file
+      downloadCSV(exportData, 'products_export.csv');
     } catch (err) {
       console.error('Error exporting products:', err);
       alert('Failed to export products. Please try again.');
     }
   };
 
-  const handleDownloadTemplate = () => {
-    try {
-      // Create template data with proper headers and sample data
-      const templateData = [
-        {
-          'PRODUCT DETAILS': '',
-          'Name': 'Sample Product 1',  // Same product, different variant
-          'Code': 'SP001',
-          'HSN Code': '1234',
-          'Importance': 'Normal',
-          'Product Type': 'Single',
-          'Minimum Stock': 10,
-          'Category': 'Electronics',
-          'Subcategory': 'Mobile Phones',
-          'Unit': 'Piece',
-          'Product Mode': 'Physical',
-          'MOQ': 1,
-          'Store': 'Main Store',
-          'Tax': 'GST',
-          'GST %': 18,
-          'Description': 'A sample product for demonstration.',
-          'Internal Notes': 'For internal use only.',
-          'Status': 'Active',
-          
-          'VARIANT DETAILS': '',
-          'Variant Name': 'Blue-Large', 
-          'Color & Code': 'blue',
-          'Size': 'L',
-          'SKU': 'SP001-BLUE-L',
-          'Barcode': '1234567890124',
-          'Purchase Cost': 550,
-          'Sales Price': 800,
-          'Stock': 75,
-          'Lead Time': 5,
-          'Images': 'http://example.com/image3.jpg, http://example.com/image4.jpg'
-        }
-      ];
-
-      // Create worksheet with proper formatting
-      const ws = XLSX.utils.json_to_sheet(templateData);
-
-      // Add cell styles to make section headers stand out
-      const productHeaderIndex = XLSX.utils.encode_cell({r: 0, c: 0}); // A1 cell
-      const variantHeaderIndex = XLSX.utils.encode_cell({r: 0, c: 18}); // S1 cell for first row
-      const productHeaderIndex2 = XLSX.utils.encode_cell({r: 1, c: 0}); // A2 cell for second row
-      const variantHeaderIndex2 = XLSX.utils.encode_cell({r: 1, c: 18}); // S2 cell for second row
-
-      // Set column widths for better readability
-      ws['!cols'] = [
-        { wch: 20 }, // PRODUCT DETAILS header
-        { wch: 20 }, // Name
-        { wch: 10 }, // Code
-        { wch: 10 }, // HSN Code
-        { wch: 10 }, // Importance
-        { wch: 15 }, // Product Type
-        { wch: 12 }, // Minimum Stock
-        { wch: 15 }, // Category
-        { wch: 15 }, // Subcategory
-        { wch: 8 },  // Unit
-        { wch: 12 }, // Product Mode
-        { wch: 8 },  // MOQ
-        { wch: 12 }, // Store
-        { wch: 8 },  // Tax
-        { wch: 8 },  // GST %
-        { wch: 25 }, // Description
-        { wch: 20 }, // Internal Notes
-        { wch: 8 },  // Status
-        { wch: 20 }, // VARIANT DETAILS header
-        { wch: 15 }, // Variant Name
-        { wch: 15 }, // Color & Code
-        { wch: 8 },  // Size
-        { wch: 15 }, // SKU
-        { wch: 15 }, // Barcode
-        { wch: 12 }, // Purchase Cost
-        { wch: 12 }, // Sales Price
-        { wch: 8 },  // Stock
-        { wch: 10 }, // Lead Time
-        { wch: 30 }  // Images
-      ];
-
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'ProductTemplate');
-
-      // Write file with proper Excel format
-      XLSX.writeFile(wb, 'product_import_template.xlsx');
-    } catch (err) {
-      console.error('Error downloading template:', err);
-      alert('Failed to download template. Please try again.');
+  const handleImport = async () => {
+    if (!importFile) {
+      alert('Please select a file to import.');
+      return;
     }
-  };
 
-  const handleImportFile = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
+    setImportLoading(true);
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      
-      // Process JSON data based on the new template structure with section headers
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      
-      // Clean up data - remove section headers before sending to server
-      const cleanedData = jsonData.map(row => {
-        const newRow = {...row};
-        // Remove the section header fields
-        delete newRow['PRODUCT DETAILS'];
-        delete newRow['VARIANT DETAILS'];
-        return newRow;
-      });
+      // Read the CSV file
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target.result;
+          console.log('Raw CSV data:', csvText); // Debug log
 
-      // Send to backend
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // You can also add the processed data as JSON if your backend supports it
-      formData.append('jsonData', JSON.stringify(cleanedData));
+          if (!csvText.trim()) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
 
-      const response = await axios.post(`${BASE_URL}/api/products/import`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+          // Parse CSV
+          const lines = csvText.split('\n').filter(line => line.trim());
+          if (lines.length === 0) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
 
-      alert('Products imported successfully!');
-      setImportDialogOpen(false);
-      // Refresh the product list
-      fetchProducts();
-    } catch (err) {
-      console.error('Error importing products:', err);
-      alert('Failed to import products. Please check the file format and try again.');
+          // Parse headers
+          const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const dataRows = lines.slice(1);
+
+          console.log('Headers:', headers); // Debug log
+          console.log('Data rows:', dataRows.length); // Debug log
+
+          const objectData = dataRows.map(row => {
+            const values = row.split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+            const obj = {};
+            headers.forEach((header, index) => {
+              obj[header] = values[index] || '';
+            });
+            return obj;
+          });
+
+          console.log('Converted object data:', objectData); // Debug log
+
+          if (objectData.length === 0) {
+            alert('The CSV file has headers but no data rows.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Send data to backend as JSON
+          console.log('Sending import data:', objectData); // Debug log
+
+          const response = await axios.post(`${BASE_URL}/api/products/import`, objectData, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('Import response:', response.data); // Debug log
+
+          alert(`Successfully imported ${response.data.imported || objectData.length} products!`);
+          setImportDialogOpen(false);
+          setImportFile(null);
+          
+          // Reset filters and pagination to show newly imported products
+          setPage(0);
+          setFilters(defaultFilters);
+          setDebouncedFilters({...defaultFilters});
+          setInputFilters({ 
+            name: "", code: "", productType: "", stock: "", moq: "", 
+            leadTime: "", note: "", color: "", size: "", sku: "", 
+            barcode: "", purchaseCost: "", salesPrice: "" 
+          });
+          
+          // Use checkAPI to force a clean fetch without filters
+          console.log('Calling checkAPI after import to refresh data...'); // Debug log
+          await checkAPI();
+          console.log('checkAPI completed, products state:', products); // Debug log
+        } catch (error) {
+          console.error('Error importing products:', error);
+          alert(`Failed to import products: ${error.response?.data?.error || error.message}`);
+        } finally {
+          setImportLoading(false);
+        }
+      };
+
+      reader.readAsText(importFile);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Failed to read the selected file.');
+      setImportLoading(false);
     }
   };
 
@@ -2215,11 +2465,81 @@ export default function ProductListPage() {
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
   const somePageSelected = pageIds.some(id => selectedIds.includes(id)) && !allPageSelected;
 
+  // Debug logs for direct API check
+  const checkAPI = async () => {
+    try {
+      console.log('Direct API check - fetching all products without filters');
+      setLoading(true);
+      
+      const res = await axios.get(`${BASE_URL}/api/products`, {
+        params: {
+          page: 1,
+          limit: 50,
+        },
+        timeout: 15000
+      });
+      
+      console.log('Direct API check - Status:', res.status);
+      console.log('Direct API check - Response:', res.data);
+      
+      if (res.data && res.data.data) {
+        // Set products directly from API response
+        const apiProducts = Array.isArray(res.data.data) ? res.data.data : [];
+        console.log('Direct API check - Products found:', apiProducts.length);
+        
+        setProducts(apiProducts);
+        setTotalItems(res.data.total || 0);
+        setTotalCost(res.data.totalCost || 0);
+      } else {
+        console.error('Direct API check - Invalid response format:', res.data);
+        setProducts([]);
+        alert('Error: API returned invalid data format. Check console for details.');
+      }
+    } catch (err) {
+      console.error("Error in direct API check:", err);
+      setProducts([]);
+      alert('API check failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5">📦 Product Master</Typography>
-        {/* Removed display preferences button from here */}
+        <Box display="flex" gap={2} alignItems="center">
+          {loading && (
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+              <CircularProgress size={16} sx={{ mr: 1 }} />
+              Loading...
+            </Typography>
+          )}
+          <Tooltip title="Refresh Products">
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<Refresh />}
+              onClick={() => {
+                console.log("Manual refresh triggered");
+                // Clear any previous errors
+                setApiError(null);
+                fetchProducts();
+              }}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Tooltip>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            onClick={checkAPI}
+            disabled={loading}
+          >
+            Check API
+          </Button>
+        </Box>
       </Box>
 
       {/* Debug message stays */}
@@ -2414,6 +2734,42 @@ export default function ProductListPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Import dialog */}
+      <Dialog open={importDialogOpen} onClose={() => {
+        setImportDialogOpen(false);
+        setImportFile(null);
+        setImportLoading(false);
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>Import Products</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Import products from a CSV file. Make sure your file follows the correct format.
+          </Typography>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(e) => setImportFile(e.target.files[0])}
+            style={{ marginBottom: '16px' }}
+          />
+          {importFile && (
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Selected file: {importFile.name}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleImport}
+            disabled={!importFile || importLoading}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Import'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Updated summary box to include status, stock, and importance filter dropdowns */}
       <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
         <Grid container spacing={2} alignItems="center" justifyContent="space-between">
@@ -2445,6 +2801,26 @@ export default function ProductListPage() {
       </Box>
 
       <Paper>
+        {apiError && (
+          <Box sx={{ p: 2, mb: 2, bgcolor: '#ffebee', color: '#d32f2f', borderRadius: '4px' }}>
+            <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center' }}>
+              Error: {apiError}
+              <Button 
+                variant="outlined" 
+                color="error" 
+                size="small" 
+                sx={{ ml: 2 }}
+                onClick={() => {
+                  setApiError(null);
+                  checkAPI();
+                }}
+              >
+                Try Again
+              </Button>
+            </Typography>
+          </Box>
+        )}
+        
         <TableContainer sx={{ position: 'relative' }}>
           {/* Optional small corner spinner overlay (does not remount inputs) */}
           {loading && (
@@ -2634,7 +3010,6 @@ export default function ProductListPage() {
                 {visibleColumns.image && <TableCell sx={{fontWeight : "bold", width: 120}}>Image</TableCell>}
                 <TableCell sx={{fontWeight : "bold", width: 120}} align="center">Actions</TableCell>
               </TableRow>
-              {/* NEW: memoized filters row with visibleColumns prop */}
               <FiltersRow
                 inputFilters={inputFilters}
                 setInputFilters={setInputFilters}
@@ -2646,6 +3021,7 @@ export default function ProductListPage() {
                 setPage={setPage}
                 visibleColumns={visibleColumns}
                 handleExport={handleExport} // added prop
+                setImportDialogOpen={setImportDialogOpen}
                 autocompleteOptions={autocompleteOptions}
                 autocompleteLoading={autocompleteLoading}
                 onAutocompleteInputChange={(field, query) => {
@@ -2690,7 +3066,6 @@ export default function ProductListPage() {
                       break;
                   }
                 }}
-                setImportDialogOpen={setImportDialogOpen} // added prop for import dialog
               />
             </TableHead>
             {/* UPDATED: pass visibleColumns into body and onView handler */}
@@ -2737,30 +3112,6 @@ export default function ProductListPage() {
         </Box>
       </Paper>
 
-      {/* Import Dialog */}
-      <Dialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Import Products</DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} p={2}>
-            <Button variant="outlined" color="primary" onClick={handleDownloadTemplate}>
-              Download Excel Template
-            </Button>
-            <Button variant="contained" color="primary" onClick={handleImportFile}>
-              Import File
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".xlsx,.xls"
-              style={{ display: 'none' }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setImportDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
