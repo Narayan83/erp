@@ -105,6 +105,8 @@ func main() {
 	api.Get("/products", handler.GetAllProducts)
 	api.Get("/products/:id", handler.GetProductByID)
 	api.Put("/products/:id", handler.UpdateProduct)
+	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
+	api.Post("/products/import", handler.ImportProducts)
 
 	api.Get("/products/stats", handler.GetProductStats)
 
