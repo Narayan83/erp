@@ -860,12 +860,278 @@ const FiltersRow = memo(function FiltersRow({
         </TableCell>
       )}
       {/* Variant column filters */}
-      {visibleColumns.color && <TableCell sx={{ width: 120 }}><TextField placeholder="Color Code" size="small" fullWidth /></TableCell>}
-      {visibleColumns.size && <TableCell sx={{ width: 120 }}><TextField placeholder="Size" size="small" fullWidth /></TableCell>}
-      {visibleColumns.sku && <TableCell sx={{ width: 120 }}><TextField placeholder="SKU" size="small" fullWidth /></TableCell>}
-      {visibleColumns.barcode && <TableCell sx={{ width: 120 }}><TextField placeholder="Barcode" size="small" fullWidth /></TableCell>}
-      {visibleColumns.purchaseCost && <TableCell sx={{ width: 120 }}><TextField placeholder="Purchase Cost" size="small" fullWidth type="number" /></TableCell>}
-      {visibleColumns.salesPrice && <TableCell sx={{ width: 120 }}><TextField placeholder="Sales Price" size="small" fullWidth type="number" /></TableCell>}
+      {visibleColumns.color && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.colors}
+            loading={autocompleteLoading.colors}
+            inputValue={inputFilters.color}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, color: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('colors', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, colors: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, color: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Color Code"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.colors ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.colors.length > 0 || autocompleteLoading.colors || inputFilters.color.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.size && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.sizes}
+            loading={autocompleteLoading.sizes}
+            inputValue={inputFilters.size}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, size: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('sizes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, sizes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, size: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Size"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.sizes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.sizes.length > 0 || autocompleteLoading.sizes || inputFilters.size.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.sku && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.skus}
+            loading={autocompleteLoading.skus}
+            inputValue={inputFilters.sku}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, sku: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('skus', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, skus: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, sku: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="SKU"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.skus ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.skus.length > 0 || autocompleteLoading.skus || inputFilters.sku.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.barcode && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.barcodes}
+            loading={autocompleteLoading.barcodes}
+            inputValue={inputFilters.barcode}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, barcode: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('barcodes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, barcodes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, barcode: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Barcode"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.barcodes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.barcodes.length > 0 || autocompleteLoading.barcodes || inputFilters.barcode.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.purchaseCost && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.purchaseCosts}
+            loading={autocompleteLoading.purchaseCosts}
+            inputValue={inputFilters.purchaseCost}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, purchaseCost: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('purchaseCosts', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, purchaseCosts: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, purchaseCost: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Purchase Cost"
+                fullWidth
+                size="small"
+                type="number"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.purchaseCosts ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.purchaseCosts.length > 0 || autocompleteLoading.purchaseCosts || inputFilters.purchaseCost.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.salesPrice && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.salesPrices}
+            loading={autocompleteLoading.salesPrices}
+            inputValue={inputFilters.salesPrice}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, salesPrice: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('salesPrices', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, salesPrices: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, salesPrice: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Sales Price"
+                fullWidth
+                size="small"
+                type="number"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.salesPrices ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.salesPrices.length > 0 || autocompleteLoading.salesPrices || inputFilters.salesPrice.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
       {visibleColumns.image && <TableCell sx={{ width: 120 }}><Typography variant="caption" color="textSecondary">Images</Typography></TableCell>}
       <TableCell align="center" sx={{ width: 120 }}>
         <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
@@ -888,7 +1154,7 @@ export default function ProductListPage() {
   const [allSubcategories, setAllSubcategories] = useState([]);
   const [stores, setStores] = useState([]);
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, subcategoryID: null,  storeID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
+  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, subcategoryID: null,  storeID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null, color: "", size: "", sku: "", barcode: "", purchaseCost: "", salesPrice: "" });
   // NEW: local input state to avoid re-fetch on every keystroke
   const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "", color: "", size: "", sku: "", barcode: "", purchaseCost: "", salesPrice: "" });
   const [page, setPage] = useState(0);
@@ -900,6 +1166,8 @@ export default function ProductListPage() {
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
   const [stockSort, setStockSort] = useState(null); // null | 'asc' | 'desc'
   const [leadTimeSort, setLeadTimeSort] = useState(null); // null | 'asc' | 'desc'
+  const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
+  const [salesPriceSort, setSalesPriceSort] = useState(null); // null | 'asc' | 'desc'
   
   // FIXED: Initialize debouncedFilters with same values as filters
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
@@ -1028,7 +1296,13 @@ export default function ProductListPage() {
       stocks: [],
       moqs: [],
       leadTimes: [],
-      notes: []
+      notes: [],
+      colors: [],
+      sizes: [],
+      skus: [],
+      barcodes: [],
+      purchaseCosts: [],
+      salesPrices: []
     });
     setAutocompleteSource({
       names: 'local',
@@ -1036,7 +1310,13 @@ export default function ProductListPage() {
       stocks: 'local',
       moqs: 'local',
       leadTimes: 'local',
-      notes: 'local'
+      notes: 'local',
+      colors: 'local',
+      sizes: 'local',
+      skus: 'local',
+      barcodes: 'local',
+      purchaseCosts: 'local',
+      salesPrices: 'local'
     });
   }, [products]);
 
@@ -1055,7 +1335,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -1069,14 +1349,20 @@ export default function ProductListPage() {
           prev.stock === inputFilters.stock &&
           prev.moq === inputFilters.moq &&
           prev.leadTime === inputFilters.leadTime &&
-          prev.note === inputFilters.note
+          prev.note === inputFilters.note &&
+          prev.color === inputFilters.color &&
+          prev.size === inputFilters.size &&
+          prev.sku === inputFilters.sku &&
+          prev.barcode === inputFilters.barcode &&
+          prev.purchaseCost === inputFilters.purchaseCost &&
+          prev.salesPrice === inputFilters.salesPrice
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -1084,7 +1370,7 @@ export default function ProductListPage() {
     const handler = setTimeout(() => {
       console.log('Updating debounced filters:', filters);
       setDebouncedFilters(filters);
-    }, 200);
+    }, 500);
     return () => clearTimeout(handler);
   }, [filters]);
 
@@ -1100,6 +1386,11 @@ export default function ProductListPage() {
       console.error("Error fetching meta:", err);
     }
   };
+
+  // Fetch categories and stores on component mount
+  useEffect(() => {
+    fetchMeta();
+  }, []);
 
   // Autocomplete fetch functions
   const fetchAutocompleteOptions = async (field, query = '') => {
@@ -1382,6 +1673,18 @@ export default function ProductListPage() {
         note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
         status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
         importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
+        color: debouncedFilters.color !== "" ? debouncedFilters.color : undefined,
+        size: debouncedFilters.size !== "" ? debouncedFilters.size : undefined,
+        sku: debouncedFilters.sku !== "" ? debouncedFilters.sku : undefined,
+        barcode: debouncedFilters.barcode !== "" ? debouncedFilters.barcode : undefined,
+        purchase_cost:
+          debouncedFilters.purchaseCost !== "" && !isNaN(Number(debouncedFilters.purchaseCost))
+            ? Number(debouncedFilters.purchaseCost)
+            : undefined,
+        sales_price:
+          debouncedFilters.salesPrice !== "" && !isNaN(Number(debouncedFilters.salesPrice))
+            ? Number(debouncedFilters.salesPrice)
+            : undefined,
         stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
@@ -1398,6 +1701,10 @@ export default function ProductListPage() {
         sortParams = { sort_by: 'stock', sort_order: stockSort };
       } else if (leadTimeSort) {
         sortParams = { sort_by: 'leadTime', sort_order: leadTimeSort };
+      } else if (purchaseCostSort) {
+        sortParams = { sort_by: 'purchaseCost', sort_order: purchaseCostSort };
+      } else if (salesPriceSort) {
+        sortParams = { sort_by: 'salesPrice', sort_order: salesPriceSort };
       }
       console.log('Product filter params:', { page: page + 1, limit, ...filterParams, ...sortParams });
       const res = await axios.get(`${BASE_URL}/api/products`, {
@@ -1442,12 +1749,30 @@ export default function ProductListPage() {
     setLeadTimeSort(currentSort => currentSort === direction ? null : direction);
     setNameSort(null);
     setStockSort(null);
+    setPurchaseCostSort(null);
+    setSalesPriceSort(null);
+  }, []);
+
+  const handlePurchaseCostSort = useCallback((direction) => {
+    setPurchaseCostSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
+    setLeadTimeSort(null);
+    setSalesPriceSort(null);
+  }, []);
+
+  const handleSalesPriceSort = useCallback((direction) => {
+    setSalesPriceSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
+    setLeadTimeSort(null);
+    setPurchaseCostSort(null);
   }, []);
 
   // Fetch products when filters or pagination change
   useEffect(() => {
     fetchProducts();
-  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
+  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
@@ -1749,8 +2074,8 @@ export default function ProductListPage() {
       // Create template data with proper headers and sample data
       const templateData = [
         {
-          'Product': '',
-          'Name': 'Sample Product 1',
+          'PRODUCT DETAILS': '',
+          'Name': 'Sample Product 1',  // Same product, different variant
           'Code': 'SP001',
           'HSN Code': '1234',
           'Importance': 'Normal',
@@ -1767,51 +2092,60 @@ export default function ProductListPage() {
           'Description': 'A sample product for demonstration.',
           'Internal Notes': 'For internal use only.',
           'Status': 'Active',
-          'Variant': '',
-          'Color & Code': 'red',
-          'Size': 'M',
-          'SKU': 'SP001-RED-M',
-          'Barcode': '1234567890123',
-          'Purchase Cost': 500,
-          'Sales Price': 750,
-          'Stock': 100,
+          
+          'VARIANT DETAILS': '',
+          'Variant Name': 'Blue-Large', 
+          'Color & Code': 'blue',
+          'Size': 'L',
+          'SKU': 'SP001-BLUE-L',
+          'Barcode': '1234567890124',
+          'Purchase Cost': 550,
+          'Sales Price': 800,
+          'Stock': 75,
           'Lead Time': 5,
-          'Images': 'http://example.com/image1.jpg, http://example.com/image2.jpg'
+          'Images': 'http://example.com/image3.jpg, http://example.com/image4.jpg'
         }
       ];
 
       // Create worksheet with proper formatting
       const ws = XLSX.utils.json_to_sheet(templateData);
 
+      // Add cell styles to make section headers stand out
+      const productHeaderIndex = XLSX.utils.encode_cell({r: 0, c: 0}); // A1 cell
+      const variantHeaderIndex = XLSX.utils.encode_cell({r: 0, c: 18}); // S1 cell for first row
+      const productHeaderIndex2 = XLSX.utils.encode_cell({r: 1, c: 0}); // A2 cell for second row
+      const variantHeaderIndex2 = XLSX.utils.encode_cell({r: 1, c: 18}); // S2 cell for second row
+
       // Set column widths for better readability
       ws['!cols'] = [
-        { wch: 20 }, // Product Name
+        { wch: 20 }, // PRODUCT DETAILS header
+        { wch: 20 }, // Name
         { wch: 10 }, // Code
+        { wch: 10 }, // HSN Code
+        { wch: 10 }, // Importance
+        { wch: 15 }, // Product Type
+        { wch: 12 }, // Minimum Stock
         { wch: 15 }, // Category
         { wch: 15 }, // Subcategory
-        { wch: 12 }, // Store
-        { wch: 15 }, // Product Type
-        { wch: 8 },  // Stock
-        { wch: 8 },  // MOQ
-        { wch: 10 }, // Lead Time
-        { wch: 20 }, // Note
-        { wch: 8 },  // Status
-        { wch: 10 }, // Importance
-        { wch: 10 }, // HSN Code
         { wch: 8 },  // Unit
-        { wch: 12 }, // Tax
+        { wch: 12 }, // Product Mode
+        { wch: 8 },  // MOQ
+        { wch: 12 }, // Store
+        { wch: 8 },  // Tax
         { wch: 8 },  // GST %
         { wch: 25 }, // Description
         { wch: 20 }, // Internal Notes
-        { wch: 10 }, // Variant
+        { wch: 8 },  // Status
+        { wch: 20 }, // VARIANT DETAILS header
+        { wch: 15 }, // Variant Name
         { wch: 15 }, // Color & Code
         { wch: 8 },  // Size
         { wch: 15 }, // SKU
         { wch: 15 }, // Barcode
         { wch: 12 }, // Purchase Cost
         { wch: 12 }, // Sales Price
-        { wch: 8 },  // Stock (variant)
-        { wch: 10 }, // Lead Time (variant)
+        { wch: 8 },  // Stock
+        { wch: 10 }, // Lead Time
         { wch: 30 }  // Images
       ];
 
@@ -1840,11 +2174,25 @@ export default function ProductListPage() {
       const workbook = XLSX.read(data);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
+      
+      // Process JSON data based on the new template structure with section headers
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      
+      // Clean up data - remove section headers before sending to server
+      const cleanedData = jsonData.map(row => {
+        const newRow = {...row};
+        // Remove the section header fields
+        delete newRow['PRODUCT DETAILS'];
+        delete newRow['VARIANT DETAILS'];
+        return newRow;
+      });
 
       // Send to backend
       const formData = new FormData();
       formData.append('file', file);
+      
+      // You can also add the processed data as JSON if your backend supports it
+      formData.append('jsonData', JSON.stringify(cleanedData));
 
       const response = await axios.post(`${BASE_URL}/api/products/import`, formData, {
         headers: {
@@ -1965,9 +2313,6 @@ export default function ProductListPage() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Internal Notes" value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''} fullWidth size="small" disabled multiline rows={2} />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12}>
                   {(() => {
@@ -2224,8 +2569,68 @@ export default function ProductListPage() {
                 {visibleColumns.size && <TableCell sx={{fontWeight : "bold"}}>Size</TableCell>}
                 {visibleColumns.sku && <TableCell sx={{fontWeight : "bold"}}>SKU</TableCell>}
                 {visibleColumns.barcode && <TableCell sx={{fontWeight : "bold", width: 120}}>Barcode</TableCell>}
-                {visibleColumns.purchaseCost && <TableCell sx={{fontWeight : "bold", width: 120}}>Purchase Cost</TableCell>}
-                {visibleColumns.salesPrice && <TableCell sx={{fontWeight : "bold", width: 120}}>Sales Price</TableCell>}
+                {visibleColumns.purchaseCost && (
+                  <TableCell sx={{fontWeight : "bold", width: 120}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Purchase Cost
+                      <IconButton
+                        size="small"
+                        onClick={() => handlePurchaseCostSort('asc')}
+                        color={purchaseCostSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort purchase cost ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: purchaseCostSort === 'asc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handlePurchaseCostSort('desc')}
+                        color={purchaseCostSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort purchase cost descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: purchaseCostSort === 'desc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
+                {visibleColumns.salesPrice && (
+                  <TableCell sx={{fontWeight : "bold", width: 120}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Sales Price
+                      <IconButton
+                        size="small"
+                        onClick={() => handleSalesPriceSort('asc')}
+                        color={salesPriceSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort sales price ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: salesPriceSort === 'asc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleSalesPriceSort('desc')}
+                        color={salesPriceSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort sales price descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: salesPriceSort === 'desc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
                 {visibleColumns.image && <TableCell sx={{fontWeight : "bold", width: 120}}>Image</TableCell>}
                 <TableCell sx={{fontWeight : "bold", width: 120}} align="center">Actions</TableCell>
               </TableRow>
