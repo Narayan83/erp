@@ -1,5 +1,4 @@
-// ProductListPage.jsx
-import React, { useEffect, useState, useCallback, memo } from "react";
+import React, { useEffect, useState, useCallback, memo, useRef } from "react";
 import {
   Box,
   Button,
@@ -22,27 +21,243 @@ import {
   FormControlLabel,
   Checkbox,
   Tooltip,
-  Dialog,           // added
-  DialogTitle,      // added
-  DialogContent,    // added
-  DialogActions,    // added
-  Divider,          // added
-  List,             // added
-  ListItem,         // added
-  ListItemText      // added
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+  Autocomplete
 } from "@mui/material";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
-import * as XLSX from 'xlsx'; // added for Excel export
+import debounce from 'lodash/debounce';
 
-// Improve the normalizeID helper to handle more edge cases
+// RAL colors data (complete list from color.csv)
+const ralColors = [
+  { name: 'RAL 1000 - Green beige', value: 'RAL 1000', hex: '#CDBA88' },
+  { name: 'RAL 1001 - Beige', value: 'RAL 1001', hex: '#D0B084' },
+  { name: 'RAL 1002 - Sand yellow', value: 'RAL 1002', hex: '#D2AA6D' },
+  { name: 'RAL 1003 - Signal yellow', value: 'RAL 1003', hex: '#F9A900' },
+  { name: 'RAL 1004 - Golden yellow', value: 'RAL 1004', hex: '#E49E00' },
+  { name: 'RAL 1005 - Honey yellow', value: 'RAL 1005', hex: '#CB8F00' },
+  { name: 'RAL 1006 - Maize yellow', value: 'RAL 1006', hex: '#E19000' },
+  { name: 'RAL 1007 - Daffodil yellow', value: 'RAL 1007', hex: '#E88C00' },
+  { name: 'RAL 1011 - Brown beige', value: 'RAL 1011', hex: '#AF8050' },
+  { name: 'RAL 1012 - Lemon yellow', value: 'RAL 1012', hex: '#DDAF28' },
+  { name: 'RAL 1013 - Oyster white', value: 'RAL 1013', hex: '#E3D9C7' },
+  { name: 'RAL 1014 - Ivory', value: 'RAL 1014', hex: '#DDC49B' },
+  { name: 'RAL 1015 - Light ivory', value: 'RAL 1015', hex: '#E6D2B5' },
+  { name: 'RAL 1016 - Sulfur yellow', value: 'RAL 1016', hex: '#F1DD39' },
+  { name: 'RAL 1017 - Saffron yellow', value: 'RAL 1017', hex: '#F6A951' },
+  { name: 'RAL 1018 - Zinc yellow', value: 'RAL 1018', hex: '#FACA31' },
+  { name: 'RAL 1019 - Grey beige', value: 'RAL 1019', hex: '#A48F7A' },
+  { name: 'RAL 1020 - Olive yellow', value: 'RAL 1020', hex: '#A08F65' },
+  { name: 'RAL 1021 - Colza yellow', value: 'RAL 1021', hex: '#F6B600' },
+  { name: 'RAL 1023 - Traffic yellow', value: 'RAL 1023', hex: '#F7B500' },
+  { name: 'RAL 1024 - Ochre yellow', value: 'RAL 1024', hex: '#BA8F4C' },
+  { name: 'RAL 1026 - Luminous yellow', value: 'RAL 1026', hex: '#FFFF00' },
+  { name: 'RAL 1027 - Curry', value: 'RAL 1027', hex: '#A77F0F' },
+  { name: 'RAL 1028 - Melon yellow', value: 'RAL 1028', hex: '#FF9C00' },
+  { name: 'RAL 1032 - Broom yellow', value: 'RAL 1032', hex: '#E2A300' },
+  { name: 'RAL 1033 - Dahlia yellow', value: 'RAL 1033', hex: '#F99A1D' },
+  { name: 'RAL 1034 - Pastel yellow', value: 'RAL 1034', hex: '#EB9C52' },
+  { name: 'RAL 1035 - Pearl beige', value: 'RAL 1035', hex: '#8F8370' },
+  { name: 'RAL 1036 - Pearl gold', value: 'RAL 1036', hex: '#806440' },
+  { name: 'RAL 1037 - Sun yellow', value: 'RAL 1037', hex: '#F09200' },
+  { name: 'RAL 2000 - Yellow orange', value: 'RAL 2000', hex: '#DA6E00' },
+  { name: 'RAL 2001 - Red orange', value: 'RAL 2001', hex: '#BA481C' },
+  { name: 'RAL 2002 - Vermilion', value: 'RAL 2002', hex: '#BF3922' },
+  { name: 'RAL 2003 - Pastel orange', value: 'RAL 2003', hex: '#F67829' },
+  { name: 'RAL 2004 - Pure orange', value: 'RAL 2004', hex: '#E25304' },
+  { name: 'RAL 2005 - Luminous orange', value: 'RAL 2005', hex: '#FF4D08' },
+  { name: 'RAL 2007 - Luminous bright orange', value: 'RAL 2007', hex: '#FFB200' },
+  { name: 'RAL 2008 - Bright red orange', value: 'RAL 2008', hex: '#EC6B22' },
+  { name: 'RAL 2009 - Traffic orange', value: 'RAL 2009', hex: '#DE5308' },
+  { name: 'RAL 2010 - Signal orange', value: 'RAL 2010', hex: '#D05D29' },
+  { name: 'RAL 2011 - Deep orange', value: 'RAL 2011', hex: '#E26E0F' },
+  { name: 'RAL 2012 - Salmon orange', value: 'RAL 2012', hex: '#D5654E' },
+  { name: 'RAL 2013 - Pearl orange', value: 'RAL 2013', hex: '#923E25' },
+  { name: 'RAL 2017 - RAL orange', value: 'RAL 2017', hex: '#FC5500' },
+  { name: 'RAL 3000 - Flame red', value: 'RAL 3000', hex: '#A72920' },
+  { name: 'RAL 3001 - Signal red', value: 'RAL 3001', hex: '#9B2423' },
+  { name: 'RAL 3002 - Carmine red', value: 'RAL 3002', hex: '#9B2321' },
+  { name: 'RAL 3003 - Ruby red', value: 'RAL 3003', hex: '#861A22' },
+  { name: 'RAL 3004 - Purple red', value: 'RAL 3004', hex: '#6B1C23' },
+  { name: 'RAL 3005 - Wine red', value: 'RAL 3005', hex: '#59191F' },
+  { name: 'RAL 3007 - Black red', value: 'RAL 3007', hex: '#3E2022' },
+  { name: 'RAL 3009 - Oxide red', value: 'RAL 3009', hex: '#6D342D' },
+  { name: 'RAL 3011 - Brown red', value: 'RAL 3011', hex: '#782423' },
+  { name: 'RAL 3012 - Beige red', value: 'RAL 3012', hex: '#C5856D' },
+  { name: 'RAL 3013 - Tomato red', value: 'RAL 3013', hex: '#972E25' },
+  { name: 'RAL 3014 - Antique pink', value: 'RAL 3014', hex: '#CB7375' },
+  { name: 'RAL 3015 - Light pink', value: 'RAL 3015', hex: '#D8A0A6' },
+  { name: 'RAL 3016 - Coral red', value: 'RAL 3016', hex: '#A63D30' },
+  { name: 'RAL 3017 - Rose', value: 'RAL 3017', hex: '#CA555D' },
+  { name: 'RAL 3018 - Strawberry red', value: 'RAL 3018', hex: '#C63F4A' },
+  { name: 'RAL 3020 - Traffic red', value: 'RAL 3020', hex: '#BB1F11' },
+  { name: 'RAL 3022 - Salmon pink', value: 'RAL 3022', hex: '#CF6955' },
+  { name: 'RAL 3024 - Luminous red', value: 'RAL 3024', hex: '#FF2D21' },
+  { name: 'RAL 3026 - Luminous bright red', value: 'RAL 3026', hex: '#FF2A1C' },
+  { name: 'RAL 3027 - Raspberry red', value: 'RAL 3027', hex: '#AB273C' },
+  { name: 'RAL 3028 - Pure red', value: 'RAL 3028', hex: '#CC2C24' },
+  { name: 'RAL 3031 - Orient red', value: 'RAL 3031', hex: '#A63437' },
+  { name: 'RAL 3032 - Pearl ruby red', value: 'RAL 3032', hex: '#701D24' },
+  { name: 'RAL 3033 - Pearl pink', value: 'RAL 3033', hex: '#A53A2E' },
+  { name: 'RAL 4001 - Red lilac', value: 'RAL 4001', hex: '#816183' },
+  { name: 'RAL 4002 - Red violet', value: 'RAL 4002', hex: '#8D3C4B' },
+  { name: 'RAL 4003 - Heather violet', value: 'RAL 4003', hex: '#C4618C' },
+  { name: 'RAL 4004 - Claret violet', value: 'RAL 4004', hex: '#651E38' },
+  { name: 'RAL 4005 - Blue lilac', value: 'RAL 4005', hex: '#76689A' },
+  { name: 'RAL 4006 - Traffic purple', value: 'RAL 4006', hex: '#903373' },
+  { name: 'RAL 4007 - Purple violet', value: 'RAL 4007', hex: '#47243C' },
+  { name: 'RAL 4008 - Signal violet', value: 'RAL 4008', hex: '#844C82' },
+  { name: 'RAL 4009 - Pastel violet', value: 'RAL 4009', hex: '#9D8692' },
+  { name: 'RAL 4010 - Telemagenta', value: 'RAL 4010', hex: '#BB4077' },
+  { name: 'RAL 4011 - Pearl violet', value: 'RAL 4011', hex: '#6E6387' },
+  { name: 'RAL 4012 - Pearl blackberry', value: 'RAL 4012', hex: '#6A6B7F' },
+  { name: 'RAL 5000 - Violet blue', value: 'RAL 5000', hex: '#304F6E' },
+  { name: 'RAL 5001 - Green blue', value: 'RAL 5001', hex: '#0E4C64' },
+  { name: 'RAL 5002 - Ultramarine blue', value: 'RAL 5002', hex: '#00387A' },
+  { name: 'RAL 5003 - Sapphire blue', value: 'RAL 5003', hex: '#1F3855' },
+  { name: 'RAL 5004 - Black blue', value: 'RAL 5004', hex: '#191E28' },
+  { name: 'RAL 5005 - Signal blue', value: 'RAL 5005', hex: '#005387' },
+  { name: 'RAL 5007 - Brillant blue', value: 'RAL 5007', hex: '#376B8C' },
+  { name: 'RAL 5008 - Grey blue', value: 'RAL 5008', hex: '#2B3A44' },
+  { name: 'RAL 5009 - Azure blue', value: 'RAL 5009', hex: '#215F78' },
+  { name: 'RAL 5010 - Gentian blue', value: 'RAL 5010', hex: '#004F7C' },
+  { name: 'RAL 5011 - Steel blue', value: 'RAL 5011', hex: '#1A2B3C' },
+  { name: 'RAL 5012 - Light blue', value: 'RAL 5012', hex: '#0089B6' },
+  { name: 'RAL 5013 - Cobalt blue', value: 'RAL 5013', hex: '#193153' },
+  { name: 'RAL 5014 - Pigeon blue', value: 'RAL 5014', hex: '#637D96' },
+  { name: 'RAL 5015 - Sky blue', value: 'RAL 5015', hex: '#007CAF' },
+  { name: 'RAL 5017 - Traffic blue', value: 'RAL 5017', hex: '#005B8C' },
+  { name: 'RAL 5018 - Turquoise blue', value: 'RAL 5018', hex: '#048B8C' },
+  { name: 'RAL 5019 - Capri blue', value: 'RAL 5019', hex: '#005E83' },
+  { name: 'RAL 5020 - Ocean blue', value: 'RAL 5020', hex: '#00414B' },
+  { name: 'RAL 5021 - Water blue', value: 'RAL 5021', hex: '#007577' },
+  { name: 'RAL 5022 - Night blue', value: 'RAL 5022', hex: '#222D5A' },
+  { name: 'RAL 5023 - Distant blue', value: 'RAL 5023', hex: '#41698C' },
+  { name: 'RAL 5024 - Pastel blue', value: 'RAL 5024', hex: '#6093AC' },
+  { name: 'RAL 5025 - Pearl gentian blue', value: 'RAL 5025', hex: '#20697C' },
+  { name: 'RAL 5026 - Pearl night blue', value: 'RAL 5026', hex: '#0F3052' },
+  { name: 'RAL 6000 - Patina green', value: 'RAL 6000', hex: '#3C7460' },
+  { name: 'RAL 6001 - Emerald green', value: 'RAL 6001', hex: '#366735' },
+  { name: 'RAL 6002 - Leaf green', value: 'RAL 6002', hex: '#325928' },
+  { name: 'RAL 6003 - Olive green', value: 'RAL 6003', hex: '#50533C' },
+  { name: 'RAL 6004 - Blue green', value: 'RAL 6004', hex: '#024442' },
+  { name: 'RAL 6005 - Moss green', value: 'RAL 6005', hex: '#114232' },
+  { name: 'RAL 6006 - Grey olive', value: 'RAL 6006', hex: '#3C392E' },
+  { name: 'RAL 6007 - Bottle green', value: 'RAL 6007', hex: '#2C3222' },
+  { name: 'RAL 6008 - Brown green', value: 'RAL 6008', hex: '#36342A' },
+  { name: 'RAL 6009 - Fir green', value: 'RAL 6009', hex: '#27352A' },
+  { name: 'RAL 6010 - Grass green', value: 'RAL 6010', hex: '#4D6F39' },
+  { name: 'RAL 6011 - Reseda green', value: 'RAL 6011', hex: '#6B7C59' },
+  { name: 'RAL 6012 - Black green', value: 'RAL 6012', hex: '#2F3D3A' },
+  { name: 'RAL 6013 - Reed green', value: 'RAL 6013', hex: '#7C765A' },
+  { name: 'RAL 6014 - Yellow olive', value: 'RAL 6014', hex: '#474135' },
+  { name: 'RAL 6015 - Black olive', value: 'RAL 6015', hex: '#3D3D36' },
+  { name: 'RAL 6016 - Turquoise green', value: 'RAL 6016', hex: '#00694C' },
+  { name: 'RAL 6017 - May green', value: 'RAL 6017', hex: '#587F40' },
+  { name: 'RAL 6018 - Yellow green', value: 'RAL 6018', hex: '#60993B' },
+  { name: 'RAL 6019 - Pastel green', value: 'RAL 6019', hex: '#B9CEAC' },
+  { name: 'RAL 6020 - Chrome green', value: 'RAL 6020', hex: '#37422F' },
+  { name: 'RAL 6021 - Pale green', value: 'RAL 6021', hex: '#8A9977' },
+  { name: 'RAL 6022 - Olive drab', value: 'RAL 6022', hex: '#3A3327' },
+  { name: 'RAL 6024 - Traffic green', value: 'RAL 6024', hex: '#008351' },
+  { name: 'RAL 6025 - Fern green', value: 'RAL 6025', hex: '#5E6E3B' },
+  { name: 'RAL 6026 - Opal green', value: 'RAL 6026', hex: '#005F4E' },
+  { name: 'RAL 6027 - Light green', value: 'RAL 6027', hex: '#7EBAB5' },
+  { name: 'RAL 6028 - Pine green', value: 'RAL 6028', hex: '#315442' },
+  { name: 'RAL 6029 - Mint green', value: 'RAL 6029', hex: '#006F3D' },
+  { name: 'RAL 6032 - Signal green', value: 'RAL 6032', hex: '#237F52' },
+  { name: 'RAL 6033 - Mint turquoise', value: 'RAL 6033', hex: '#45877F' },
+  { name: 'RAL 6034 - Pastel turquoise', value: 'RAL 6034', hex: '#7AADAC' },
+  { name: 'RAL 6035 - Pearl green', value: 'RAL 6035', hex: '#194D25' },
+  { name: 'RAL 6036 - Pearl opal green', value: 'RAL 6036', hex: '#04574B' },
+  { name: 'RAL 6037 - Pure green', value: 'RAL 6037', hex: '#008B29' },
+  { name: 'RAL 6038 - Luminous green', value: 'RAL 6038', hex: '#00B51B' },
+  { name: 'RAL 6039 - Fibrous green', value: 'RAL 6039', hex: '#B3C43E' },
+  { name: 'RAL 7000 - Squirrel grey', value: 'RAL 7000', hex: '#7A888E' },
+  { name: 'RAL 7001 - Silver grey', value: 'RAL 7001', hex: '#8C979C' },
+  { name: 'RAL 7002 - Olive grey', value: 'RAL 7002', hex: '#817863' },
+  { name: 'RAL 7003 - Moss grey', value: 'RAL 7003', hex: '#797669' },
+  { name: 'RAL 7004 - Signal grey', value: 'RAL 7004', hex: '#9A9B9B' },
+  { name: 'RAL 7005 - Mouse grey', value: 'RAL 7005', hex: '#6B6E6B' },
+  { name: 'RAL 7006 - Beige grey', value: 'RAL 7006', hex: '#766A5E' },
+  { name: 'RAL 7008 - Khaki grey', value: 'RAL 7008', hex: '#745F3D' },
+  { name: 'RAL 7009 - Green grey', value: 'RAL 7009', hex: '#5D6058' },
+  { name: 'RAL 7010 - Tarpaulin grey', value: 'RAL 7010', hex: '#585C56' },
+  { name: 'RAL 7011 - Iron grey', value: 'RAL 7011', hex: '#52595D' },
+  { name: 'RAL 7012 - Basalt grey', value: 'RAL 7012', hex: '#575D5E' },
+  { name: 'RAL 7013 - Brown grey', value: 'RAL 7013', hex: '#575044' },
+  { name: 'RAL 7015 - Slate grey', value: 'RAL 7015', hex: '#4F5358' },
+  { name: 'RAL 7016 - Anthracite grey', value: 'RAL 7016', hex: '#383E42' },
+  { name: 'RAL 7021 - Black grey', value: 'RAL 7021', hex: '#2F3234' },
+  { name: 'RAL 7022 - Umbra grey', value: 'RAL 7022', hex: '#4C4A44' },
+  { name: 'RAL 7023 - Concrete grey', value: 'RAL 7023', hex: '#808076' },
+  { name: 'RAL 7024 - Graphite grey', value: 'RAL 7024', hex: '#45494E' },
+  { name: 'RAL 7026 - Granite grey', value: 'RAL 7026', hex: '#374345' },
+  { name: 'RAL 7030 - Stone grey', value: 'RAL 7030', hex: '#928E85' },
+  { name: 'RAL 7031 - Blue grey', value: 'RAL 7031', hex: '#5B686D' },
+  { name: 'RAL 7032 - Pebble grey', value: 'RAL 7032', hex: '#B5B0A1' },
+  { name: 'RAL 7033 - Cement grey', value: 'RAL 7033', hex: '#7F8274' },
+  { name: 'RAL 7034 - Yellow grey', value: 'RAL 7034', hex: '#92886F' },
+  { name: 'RAL 7035 - Light grey', value: 'RAL 7035', hex: '#C5C7C4' },
+  { name: 'RAL 7036 - Platinum grey', value: 'RAL 7036', hex: '#979392' },
+  { name: 'RAL 7037 - Dusty grey', value: 'RAL 7037', hex: '#7A7B7A' },
+  { name: 'RAL 7038 - Agate grey', value: 'RAL 7038', hex: '#B0B0A9' },
+  { name: 'RAL 7039 - Quartz grey', value: 'RAL 7039', hex: '#6B665E' },
+  { name: 'RAL 7040 - Window grey', value: 'RAL 7040', hex: '#989EA1' },
+  { name: 'RAL 7042 - Traffic grey A', value: 'RAL 7042', hex: '#8E9291' },
+  { name: 'RAL 7043 - Traffic grey B', value: 'RAL 7043', hex: '#4F5250' },
+  { name: 'RAL 7044 - Silk grey', value: 'RAL 7044', hex: '#B7B3A8' },
+  { name: 'RAL 7045 - Telegrey 1', value: 'RAL 7045', hex: '#8D9295' },
+  { name: 'RAL 7046 - Telegrey 2', value: 'RAL 7046', hex: '#7E868A' },
+  { name: 'RAL 7047 - Telegrey 4', value: 'RAL 7047', hex: '#C8C8C7' },
+  { name: 'RAL 7048 - Pearl mouse grey', value: 'RAL 7048', hex: '#817B73' },
+  { name: 'RAL 8000 - Green brown', value: 'RAL 8000', hex: '#89693F' },
+  { name: 'RAL 8001 - Ochre brown', value: 'RAL 8001', hex: '#9D622B' },
+  { name: 'RAL 8002 - Signal brown', value: 'RAL 8002', hex: '#794D3E' },
+  { name: 'RAL 8003 - Clay brown', value: 'RAL 8003', hex: '#7E4B27' },
+  { name: 'RAL 8004 - Copper brown', value: 'RAL 8004', hex: '#8D4931' },
+  { name: 'RAL 8007 - Fawn brown', value: 'RAL 8007', hex: '#70462B' },
+  { name: 'RAL 8008 - Olive brown', value: 'RAL 8008', hex: '#724A25' },
+  { name: 'RAL 8011 - Nut brown', value: 'RAL 8011', hex: '#5A3827' },
+  { name: 'RAL 8012 - Red brown', value: 'RAL 8012', hex: '#66332B' },
+  { name: 'RAL 8014 - Sepia brown', value: 'RAL 8014', hex: '#4A3526' },
+  { name: 'RAL 8015 - Chestnut brown', value: 'RAL 8015', hex: '#5E2F26' },
+  { name: 'RAL 8016 - Mahogany brown', value: 'RAL 8016', hex: '#4C2B20' },
+  { name: 'RAL 8017 - Chocolate brown', value: 'RAL 8017', hex: '#442F29' },
+  { name: 'RAL 8019 - Grey brown', value: 'RAL 8019', hex: '#3D3635' },
+  { name: 'RAL 8022 - Black brown', value: 'RAL 8022', hex: '#1A1719' },
+  { name: 'RAL 8023 - Orange brown', value: 'RAL 8023', hex: '#A45729' },
+  { name: 'RAL 8024 - Beige brown', value: 'RAL 8024', hex: '#795038' },
+  { name: 'RAL 8025 - Pale brown', value: 'RAL 8025', hex: '#755847' },
+  { name: 'RAL 8028 - Terra brown', value: 'RAL 8028', hex: '#513A2A' },
+  { name: 'RAL 8029 - Pearl copper', value: 'RAL 8029', hex: '#7F4031' },
+  { name: 'RAL 9001 - Cream', value: 'RAL 9001', hex: '#E9E0D2' },
+  { name: 'RAL 9002 - Grey white', value: 'RAL 9002', hex: '#D6D5CB' },
+  { name: 'RAL 9003 - Signal white', value: 'RAL 9003', hex: '#ECECE7' },
+  { name: 'RAL 9004 - Signal black', value: 'RAL 9004', hex: '#2B2B2C' },
+  { name: 'RAL 9005 - Jet black', value: 'RAL 9005', hex: '#0E0E10' },
+  { name: 'RAL 9006 - White aluminium', value: 'RAL 9006', hex: '#A1A1A0' },
+  { name: 'RAL 9007 - Grey aluminium', value: 'RAL 9007', hex: '#868581' },
+  { name: 'RAL 9010 - Pure white', value: 'RAL 9010', hex: '#F1EDE1' },
+  { name: 'RAL 9011 - Graphite black', value: 'RAL 9011', hex: '#27292B' },
+  { name: 'RAL 9012 - Cleanroom white', value: 'RAL 9012', hex: '#F8F2E1' },
+  { name: 'RAL 9016 - Traffic white', value: 'RAL 9016', hex: '#F1F1EA' },
+  { name: 'RAL 9017 - Traffic black', value: 'RAL 9017', hex: '#29292A' },
+  { name: 'RAL 9018 - Papyrus white', value: 'RAL 9018', hex: '#C8CBC4' },
+  { name: 'RAL 9022 - Pearl light grey', value: 'RAL 9022', hex: '#858583' },
+  { name: 'RAL 9023 - Pearl dark grey', value: 'RAL 9023', hex: '#787B7A' },
+];
+
 const normalizeID = (val) => {
   if (val === "" || val === null || val === undefined) return null;
-  // Try to convert to number, fallback to original value if it fails
   const n = Number(val);
-  return Number.isNaN(n) ? val : n; // Return original value if can't convert to number
+  return Number.isNaN(n) ? val : n;
 };
 
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
@@ -127,12 +342,12 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Category"
           />
           <FormControlLabel
-            control={<Checkbox checked={columns.store} onChange={handleColumnToggle('store')} />}
-            label="Store"
-          />
-          <FormControlLabel
             control={<Checkbox checked={columns.subcategory} onChange={handleColumnToggle('subcategory')} />}
             label="Subcategory"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.store} onChange={handleColumnToggle('store')} />}
+            label="Store"
           />
           <FormControlLabel
             control={<Checkbox checked={columns.productType} onChange={handleColumnToggle('productType')} />}
@@ -161,6 +376,36 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
           <FormControlLabel
             control={<Checkbox checked={columns.importance} onChange={handleColumnToggle('importance')} />}
             label="Importance"
+          />
+          {/* Variant columns */}
+          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Variant Columns</Typography>
+          <FormControlLabel
+            control={<Checkbox checked={columns.color} onChange={handleColumnToggle('color')} />}
+            label="Color Code"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.size} onChange={handleColumnToggle('size')} />}
+            label="Size"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.sku} onChange={handleColumnToggle('sku')} />}
+            label="SKU"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.barcode} onChange={handleColumnToggle('barcode')} />}
+            label="Barcode"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.purchaseCost} onChange={handleColumnToggle('purchaseCost')} />}
+            label="Purchase Cost"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.salesPrice} onChange={handleColumnToggle('salesPrice')} />}
+            label="Sales Price"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.image} onChange={handleColumnToggle('image')} />}
+            label="Image"
           />
         </FormGroup>
       </Box>
@@ -206,45 +451,164 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
               }
             />
           </TableCell>
-          <TableCell sx={{ py: 0.5 }}>{page * limit + idx + 1}</TableCell>
-          {visibleColumns.name && <TableCell sx={{ py: 0.5 }}>{p.Name}</TableCell>}
-          {visibleColumns.code && <TableCell sx={{ py: 0.5 }}>{p.Code}</TableCell>}
-          {visibleColumns.category && <TableCell sx={{ py: 0.5 }}>{p.Category?.Name}</TableCell>}
-          {visibleColumns.store && <TableCell sx={{ py: 0.5 }}>{p.Store?.Name}</TableCell>}
-          {visibleColumns.subcategory && <TableCell sx={{ py: 0.5 }}>{p.Subcategory?.Name || ''}</TableCell>}
-          {visibleColumns.productType && <TableCell sx={{ py: 0.5 }}>{p.ProductType || ''}</TableCell>}
+          <TableCell sx={{ py: 0.5, width: 60 }}>{page * limit + idx + 1}</TableCell>
+          {visibleColumns.name && <TableCell sx={{ py: 0.5, width: 150 }}>{p.Name}</TableCell>}
+          {visibleColumns.code && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Code}</TableCell>}
+          {visibleColumns.category && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Category?.Name}</TableCell>}
+          {visibleColumns.subcategory && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Subcategory?.Name || ''}</TableCell>}
+          {visibleColumns.store && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Store?.Name}</TableCell>}
+          {visibleColumns.productType && <TableCell sx={{ py: 0.5, width: 120 }}>{p.ProductType || ''}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 100 }}>
               {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
             </TableCell>
           )}
           {visibleColumns.moq && (
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 100 }}>
               {p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? ''}
             </TableCell>
           )}
           {visibleColumns.leadTime && (
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 120 }}>
               {p.LeadTime ?? p.lead_time ?? p.leadtime ?? ''}
             </TableCell>
           )}
           {visibleColumns.note && (
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 150 }}>
               {p.Note ?? p.note ?? p.Notes ?? p.notes ?? ''}
             </TableCell>
           )}
           {visibleColumns.status && (
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 100 }}>
               {p.IsActive ? 'Active' : 'Inactive'}
             </TableCell>
           )}
           {visibleColumns.importance && (
-            <TableCell sx={{ py: 0.5 }}>
+            <TableCell sx={{ py: 0.5, width: 100 }}>
               {p.Importance ?? 'Normal'}
             </TableCell>
           )}
-          <TableCell align="center">
+          {/* Variant columns */}
+          {visibleColumns.color && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 ? (
+                <Box display="flex" flexWrap="wrap" gap={0.5} alignItems="center">
+                  {p.Variants.map((v, idx) => {
+                    // Find color data by hex or RAL code
+                    let colorData = ralColors.find(c => c.hex.toLowerCase() === (v.Color || '').toLowerCase());
+                    if (!colorData) {
+                      // Try to find by RAL code
+                      colorData = ralColors.find(c => c.value.toLowerCase() === (v.Color || '').toLowerCase());
+                    }
+                    return (
+                      <Box key={idx} display="flex" alignItems="center" gap={0.5}>
+                        {/* Color visual indicator */}
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 1,
+                            border: '1px solid #ccc',
+                            backgroundColor: colorData ? colorData.hex : (v.Color || '#ffffff'),
+                            flexShrink: 0
+                          }}
+                        />
+                        {/* Color code and name */}
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                          {colorData ? `${colorData.value} - ${colorData.name.split(' - ')[1]}` : (v.Color || 'N/A')}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ) : (
+                <Typography variant="caption" color="textSecondary">No colors</Typography>
+              )}
+            </TableCell>
+          )}
+          {visibleColumns.size && (
+            <TableCell sx={{ py: 0.5, width: 100 }}>
+              {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Size?.Name || v.Size).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.sku && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.SKU).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.barcode && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Barcode).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.purchaseCost && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => `₹${v.PurchaseCost || 0}`).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.salesPrice && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => `₹${v.StdSalesPrice || 0}`).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.image && (
+            <TableCell sx={{ py: 0.5, width: 120 }}>
+              {p.Variants && p.Variants.length > 0 && p.Variants.some(v => v.Images && v.Images.length > 0) ? (
+                <Box display="flex" gap={0.5} flexWrap="wrap">
+                  {p.Variants.flatMap(v => v.Images || []).slice(0, 3).map((img, idx) => {
+                    // If img is an absolute URL, use as is; else construct relative path
+                    let imgSrc = '';
+                    if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:'))) {
+                      imgSrc = img;
+                    } else if (typeof img === 'string' && img.trim() !== '') {
+                      // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
+                      // Also replace backslashes with forward slashes for URL safety
+                      const normalizedImg = img.replace(/\\/g, '/');
+                      if (normalizedImg.startsWith('uploads/')) {
+                        imgSrc = `${BASE_URL}/${normalizedImg}`;
+                      } else {
+                        imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
+                      }
+                    } else {
+                      imgSrc = 'https://via.placeholder.com/30?text=No+Image';
+                    }
+                    return (
+                      <img
+                        key={idx}
+                        src={imgSrc}
+                        alt={`variant-${idx}`}
+                        style={{
+                          width: 30,
+                          height: 30,
+                          objectFit: 'cover',
+                          borderRadius: 4,
+                          border: '1px solid #ccc'
+                        }}
+                        onError={(e) => {
+                          console.error(`Failed to load variant image:`, {
+                            src: e.target.src,
+                            original: img,
+                            variantIndex: idx,
+                            productId: p.ID
+                          });
+                          e.target.src = 'https://via.placeholder.com/30?text=No+Image';
+                        }}
+                      />
+                    );
+                  })}
+                  {p.Variants.flatMap(v => v.Images || []).length > 3 && (
+                    <Typography variant="caption" color="textSecondary">
+                      +{p.Variants.flatMap(v => v.Images || []).length - 3}
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="caption" color="textSecondary">No images</Typography>
+              )}
+            </TableCell>
+          )}
+          <TableCell align="center" sx={{ width: 120 }}>
             <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
               {/* View now uses onView callback to open read-only dialog */}
               <IconButton onClick={() => onView && onView(p.ID)}><Visibility /></IconButton>
@@ -269,226 +633,724 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
   );
 });
 
-// Memoized filters row so product list updates do not re-render inputs
 const FiltersRow = memo(function FiltersRow({
   inputFilters,
   setInputFilters,
   filters,
   setFilters,
   categories,
-  stores,
   allSubcategories,
+  stores,
   setPage,
   visibleColumns,
-  handleExport // added prop for export handler
+  handleExport,
+  setImportDialogOpen,
+  autocompleteOptions,
+  autocompleteLoading,
+  onAutocompleteInputChange
 }) {
-  // Log for debugging
-  console.log('Categories:', categories.map(c => ({ id: c.ID, name: c.Name })));
-  
   return (
     <TableRow>
-      <TableCell />
-      <TableCell />
+      <TableCell sx={{ width: 60 }} />
+      <TableCell sx={{ width: 60 }} />
       {visibleColumns.name && (
-        <TableCell>
-          <TextField
-            placeholder="Search Name"
-            fullWidth
-            size="small"
-            value={inputFilters.name}
-            onChange={(e) => setInputFilters(f => ({ ...f, name: e.target.value }))}
+        <TableCell sx={{ width: 150 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.names}
+            loading={autocompleteLoading.names}
+            inputValue={inputFilters.name}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, name: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('names', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                // Clear options when input is cleared
+                setAutocompleteOptions(prev => ({ ...prev, names: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, name: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search Name"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.names ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.names.length > 0 || autocompleteLoading.names || inputFilters.name.length > 0}
+            filterOptions={(x) => x} // Disable built-in filtering
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.code && (
-        <TableCell>
-          <TextField
-            placeholder="Code"
-            fullWidth
-            size="small"
-            value={inputFilters.code}
-            onChange={(e) => setInputFilters(f => ({ ...f, code: e.target.value }))}
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.codes}
+            loading={autocompleteLoading.codes}
+            inputValue={inputFilters.code}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, code: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('codes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, codes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, code: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Code"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.codes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.codes.length > 0 || autocompleteLoading.codes || inputFilters.code.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.category && (
-        <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.categoryID != null ? filters.categoryID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
-              console.log(`Selected category: ${val}`);
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            options={categories}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={categories.find(c => c.ID === filters.categoryID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
               setFilters({ ...filters, categoryID: val, subcategoryID: null });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            {categories.map(c => (
-              <MenuItem key={c.ID} value={c.ID}>{c.Name}</MenuItem>
-            ))}
-          </TextField>
-        </TableCell>
-      )}
-      {visibleColumns.store && (
-        <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.storeID != null ? filters.storeID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : Number(e.target.value);
-              setFilters({ ...filters, storeID: val });
-              setPage(0);
-            }}
-          >
-            <MenuItem value="">All</MenuItem>
-            {stores.map(s => <MenuItem key={s.ID} value={s.ID}>{s.Name}</MenuItem>)}
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Category"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.subcategory && (
-        <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.subcategoryID != null ? filters.subcategoryID : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
-              console.log(`Selected subcategory: ${val}`);
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            options={allSubcategories.filter(sub => {
+              if (!filters.categoryID) return false;
+              const catID = filters.categoryID.toString();
+              const subCatID = sub.CategoryID?.toString();
+              return catID === subCatID;
+            })}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={allSubcategories.find(sub => sub.ID === filters.subcategoryID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
               setFilters({ ...filters, subcategoryID: val });
               setPage(0);
             }}
             disabled={filters.categoryID == null}
-          >
-            <MenuItem value="">All</MenuItem>
-            {/* Safely filter subcategories */}
-            {allSubcategories
-              .filter(sub => {
-                // More lenient comparison that handles both string and number IDs
-                if (!filters.categoryID) return false;
-                const catID = filters.categoryID.toString();
-                const subCatID = sub.CategoryID?.toString();
-                return catID === subCatID;
-              })
-              .map(sub => (
-                <MenuItem key={sub.ID} value={sub.ID}>{sub.Name}</MenuItem>
-              ))
-            }
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Subcategory"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
+        </TableCell>
+      )}
+       {visibleColumns.store && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            options={stores}
+            getOptionLabel={(option) => option?.Name || ''}
+            value={stores.find(s => s.ID === filters.storeID) || null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.ID : null;
+              setFilters({ ...filters, storeID: val });
+              setPage(0);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Store"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.productType && (
-        <TableCell>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.productType != null ? filters.productType : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? "" : e.target.value;
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            options={[
+              { value: 'Finished Goods', label: 'Finished Goods' },
+              { value: 'Semi-Finished Goods', label: 'Semi-Finished Goods' },
+              { value: 'Raw Materials', label: 'Raw Materials' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.productType ? { value: filters.productType, label: filters.productType } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : "";
               setFilters({ ...filters, productType: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="Finished Goods">Finished Goods</MenuItem>
-            <MenuItem value="Semi-Finished Goods">Semi-Finished Goods</MenuItem>
-            <MenuItem value="Raw Materials">Raw Materials</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Product Type"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.stock && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Stock"
-            fullWidth
-            size="small"
-            value={inputFilters.stock}
-            onChange={(e) => setInputFilters(f => ({ ...f, stock: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.stocks}
+            loading={autocompleteLoading.stocks}
+            inputValue={inputFilters.stock}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, stock: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('stocks', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, stocks: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, stock: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Stock"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.stocks ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.stocks.length > 0 || autocompleteLoading.stocks || inputFilters.stock.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.moq && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="MOQ"
-            fullWidth
-            size="small"
-            value={inputFilters.moq}
-            onChange={(e) => setInputFilters(f => ({ ...f, moq: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.moqs}
+            loading={autocompleteLoading.moqs}
+            inputValue={inputFilters.moq}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, moq: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('moqs', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, moqs: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, moq: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="MOQ"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.moqs ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.moqs.length > 0 || autocompleteLoading.moqs || inputFilters.moq.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.leadTime && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Lead Time"
-            fullWidth
-            size="small"
-            value={inputFilters.leadTime}
-            onChange={(e) => setInputFilters(f => ({ ...f, leadTime: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.leadTimes}
+            loading={autocompleteLoading.leadTimes}
+            inputValue={inputFilters.leadTime}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, leadTime: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('leadTimes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, leadTimes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, leadTime: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Lead Time"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.leadTimes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.leadTimes.length > 0 || autocompleteLoading.leadTimes || inputFilters.leadTime.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.note && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            placeholder="Note"
-            fullWidth
-            size="small"
-            value={inputFilters.note}
-            onChange={(e) => setInputFilters(f => ({ ...f, note: e.target.value }))}
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.notes}
+            loading={autocompleteLoading.notes}
+            inputValue={inputFilters.note}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, note: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('notes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, notes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, note: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Note"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.notes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.notes.length > 0 || autocompleteLoading.notes || inputFilters.note.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
       {visibleColumns.status && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.status != null ? filters.status : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={[
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.status ? { value: filters.status, label: filters.status === 'true' ? 'Active' : 'Inactive' } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : null;
               setFilters({ ...filters, status: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="true">Active</MenuItem>
-            <MenuItem value="false">Inactive</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Status"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
       {visibleColumns.importance && (
         <TableCell sx={{ width: 120 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={filters.importance != null ? filters.importance : ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : e.target.value;
+          <Autocomplete
+            options={[
+              { value: 'Normal', label: 'Normal' },
+              { value: 'High', label: 'High' },
+              { value: 'Critical', label: 'Critical' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.importance ? { value: filters.importance, label: filters.importance } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : null;
               setFilters({ ...filters, importance: val });
               setPage(0);
             }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="Normal">Normal</MenuItem>
-            <MenuItem value="High">High</MenuItem>
-            <MenuItem value="Critical">Critical</MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Importance"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
         </TableCell>
       )}
-      <TableCell align="center">
+      {/* Variant column filters */}
+      {visibleColumns.color && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.colors}
+            loading={autocompleteLoading.colors}
+            inputValue={inputFilters.color}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, color: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('colors', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, colors: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, color: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Color Code"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.colors ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.colors.length > 0 || autocompleteLoading.colors || inputFilters.color.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.size && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.sizes}
+            loading={autocompleteLoading.sizes}
+            inputValue={inputFilters.size}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, size: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('sizes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, sizes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, size: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Size"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.sizes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.sizes.length > 0 || autocompleteLoading.sizes || inputFilters.size.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.sku && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.skus}
+            loading={autocompleteLoading.skus}
+            inputValue={inputFilters.sku}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, sku: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('skus', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, skus: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, sku: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="SKU"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.skus ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.skus.length > 0 || autocompleteLoading.skus || inputFilters.sku.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.barcode && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.barcodes}
+            loading={autocompleteLoading.barcodes}
+            inputValue={inputFilters.barcode}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, barcode: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('barcodes', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, barcodes: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, barcode: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Barcode"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.barcodes ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.barcodes.length > 0 || autocompleteLoading.barcodes || inputFilters.barcode.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.purchaseCost && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.purchaseCosts}
+            loading={autocompleteLoading.purchaseCosts}
+            inputValue={inputFilters.purchaseCost}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, purchaseCost: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('purchaseCosts', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, purchaseCosts: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, purchaseCost: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Purchase Cost"
+                fullWidth
+                size="small"
+                type="number"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.purchaseCosts ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.purchaseCosts.length > 0 || autocompleteLoading.purchaseCosts || inputFilters.purchaseCost.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.salesPrice && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.salesPrices}
+            loading={autocompleteLoading.salesPrices}
+            inputValue={inputFilters.salesPrice}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, salesPrice: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('salesPrices', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, salesPrices: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, salesPrice: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Sales Price"
+                fullWidth
+                size="small"
+                type="number"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.salesPrices ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={autocompleteOptions.salesPrices.length > 0 || autocompleteLoading.salesPrices || inputFilters.salesPrice.length > 0}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.image && <TableCell sx={{ width: 120 }}><Typography variant="caption" color="textSecondary">Images</Typography></TableCell>}
+      <TableCell align="center" sx={{ width: 120 }}>
         <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
           <Tooltip title="Import">
-            <IconButton onClick={() => console.log('Import')}><GetApp /></IconButton>
+            <IconButton onClick={() => setImportDialogOpen(true)}><GetApp /></IconButton>
           </Tooltip>
           <Tooltip title="Export">
             <IconButton onClick={handleExport}><Publish /></IconButton> 
@@ -503,23 +1365,44 @@ export default function ProductListPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [stores, setStores] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
+  const [stores, setStores] = useState([]);
+  
+  // Define default filters
+  const defaultFilters = { 
+    name: "", code: "", categoryID: null, subcategoryID: null, storeID: null, 
+    productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, 
+    importance: null, color: "", size: "", sku: "", barcode: "", 
+    purchaseCost: "", salesPrice: "" 
+  };
+  
   // Replace initial filters (use null for IDs)
-  const [filters, setFilters] = useState({ name: "", code: "", categoryID: null, storeID: null, subcategoryID: null, productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, importance: null });
+  const [filters, setFilters] = useState(defaultFilters);
+  
   // NEW: local input state to avoid re-fetch on every keystroke
-  const [inputFilters, setInputFilters] = useState({ name: "", code: "", productType: "", stock: "", moq: "", leadTime: "", note: "" });
+  const [inputFilters, setInputFilters] = useState({ 
+    name: "", code: "", productType: "", stock: "", moq: "", 
+    leadTime: "", note: "", color: "", size: "", sku: "", 
+    barcode: "", purchaseCost: "", salesPrice: "" 
+  });
   const [page, setPage] = useState(0);
   const [limit, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState(null);
   // Sorting state for Name and Stock columns
   const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
   const [stockSort, setStockSort] = useState(null); // null | 'asc' | 'desc'
+  const [leadTimeSort, setLeadTimeSort] = useState(null); // null | 'asc' | 'desc'
+  const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
+  const [salesPriceSort, setSalesPriceSort] = useState(null); // null | 'asc' | 'desc'
   
-  // FIXED: Initialize debouncedFilters with same values as filters
-  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  // Force refresh flag
+  const [forceRefresh, setForceRefresh] = useState(0);
+  
+  // FIXED: Initialize debouncedFilters directly with defaultFilters instead of filters reference
+  const [debouncedFilters, setDebouncedFilters] = useState({...defaultFilters});
 
   // New state for display preferences
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -537,15 +1420,23 @@ export default function ProductListPage() {
       name: true,
       code: true,
       category: true,
-      store: true,
       subcategory: true,
+      store: true,
       productType: true,
       stock: true,
       moq: true,
       leadTime: true,
       note: true,
       status: true,
-      importance: true
+      importance: true,
+      // Variant columns
+      color: true,
+      size: true,
+      sku: true,
+      barcode: true,
+      purchaseCost: true,
+      salesPrice: true,
+      image: true
     };
   });
   
@@ -562,6 +1453,44 @@ export default function ProductListPage() {
 
   // Add state for stock filter dropdown
   const [stockFilter, setStockFilter] = useState('all');
+
+  // Autocomplete state
+  const [autocompleteOptions, setAutocompleteOptions] = useState({
+    names: [],
+    codes: [],
+    stocks: [],
+    moqs: [],
+    leadTimes: [],
+    notes: [],
+    colors: [],
+    sizes: [],
+    skus: [],
+    barcodes: [],
+    purchaseCosts: [],
+    salesPrices: []
+  });
+  const [autocompleteLoading, setAutocompleteLoading] = useState({
+    names: false,
+    codes: false,
+    stocks: false,
+    moqs: false,
+    leadTimes: false,
+    notes: false,
+    colors: false,
+    sizes: false,
+    skus: false,
+    barcodes: false,
+    purchaseCosts: false,
+    salesPrices: false
+  });
+  const [autocompleteSource, setAutocompleteSource] = useState({
+    names: 'local', // 'local' or 'api'
+    codes: 'local',
+    stocks: 'local',
+    moqs: 'local',
+    leadTimes: 'local',
+    notes: 'local'
+  });
 
   const toggleSelectOne = (id) => {
     setSelectedIds(prev => {
@@ -584,9 +1513,38 @@ export default function ProductListPage() {
     }
   };
 
+  // Update autocomplete options when products data changes
   useEffect(() => {
-    fetchMeta();
-  }, []);
+    // Clear existing autocomplete options when products change
+    setAutocompleteOptions({
+      names: [],
+      codes: [],
+      stocks: [],
+      moqs: [],
+      leadTimes: [],
+      notes: [],
+      colors: [],
+      sizes: [],
+      skus: [],
+      barcodes: [],
+      purchaseCosts: [],
+      salesPrices: []
+    });
+    setAutocompleteSource({
+      names: 'local',
+      codes: 'local',
+      stocks: 'local',
+      moqs: 'local',
+      leadTimes: 'local',
+      notes: 'local',
+      colors: 'local',
+      sizes: 'local',
+      skus: 'local',
+      barcodes: 'local',
+      purchaseCosts: 'local',
+      salesPrices: 'local'
+    });
+  }, [products]);
 
   // Fetch subcategories on mount
   useEffect(() => {
@@ -603,7 +1561,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -617,22 +1575,27 @@ export default function ProductListPage() {
           prev.stock === inputFilters.stock &&
           prev.moq === inputFilters.moq &&
           prev.leadTime === inputFilters.leadTime &&
-          prev.note === inputFilters.note
+          prev.note === inputFilters.note &&
+          prev.color === inputFilters.color &&
+          prev.size === inputFilters.size &&
+          prev.sku === inputFilters.sku &&
+          prev.barcode === inputFilters.barcode &&
+          prev.purchaseCost === inputFilters.purchaseCost &&
+          prev.salesPrice === inputFilters.salesPrice
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
     // Update debouncedFilters with current filters
     const handler = setTimeout(() => {
-      console.log('Updating debounced filters:', filters);
       setDebouncedFilters(filters);
-    }, 200);
+    }, 500);
     return () => clearTimeout(handler);
   }, [filters]);
 
@@ -649,26 +1612,276 @@ export default function ProductListPage() {
     }
   };
 
+  // Fetch categories and stores on component mount
+  useEffect(() => {
+    fetchMeta();
+  }, []);
+
+  // Autocomplete fetch functions
+  const fetchAutocompleteOptions = async (field, query = '') => {
+    if (!query.trim()) return;
+
+    setAutocompleteLoading(prev => ({ ...prev, [field]: true }));
+
+    try {
+      // First try to get suggestions from current table data
+      const localSuggestions = getLocalSuggestions(field, query);
+
+      if (localSuggestions.length > 0) {
+        setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
+        setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
+        setAutocompleteLoading(prev => ({ ...prev, [field]: false }));
+        return;
+      }
+
+      // If no local suggestions, fall back to API
+      const response = await axios.get(`${BASE_URL}/api/products/autocomplete`, {
+        params: { field, query, limit: 10 }
+      });
+      setAutocompleteOptions(prev => ({ ...prev, [field]: response.data.data || [] }));
+      setAutocompleteSource(prev => ({ ...prev, [field]: 'api' }));
+    } catch (error) {
+      console.error(`Error fetching ${field} autocomplete:`, error);
+      // Even on error, try to use local suggestions as fallback
+      const localSuggestions = getLocalSuggestions(field, query);
+      setAutocompleteOptions(prev => ({ ...prev, [field]: localSuggestions }));
+      setAutocompleteSource(prev => ({ ...prev, [field]: 'local' }));
+    } finally {
+      setAutocompleteLoading(prev => ({ ...prev, [field]: false }));
+    }
+  };
+
+  // Get suggestions from current table data
+  const getLocalSuggestions = (field, query) => {
+    if (!products || products.length === 0) return [];
+
+    const queryLower = query.toLowerCase();
+    const suggestions = new Set();
+
+    switch (field) {
+      case 'names':
+        products.forEach(product => {
+          if (product.Name && product.Name.toLowerCase().includes(queryLower)) {
+            suggestions.add(product.Name);
+          }
+        });
+        break;
+
+      case 'codes':
+        products.forEach(product => {
+          if (product.Code && product.Code.toLowerCase().includes(queryLower)) {
+            suggestions.add(product.Code);
+          }
+        });
+        break;
+
+      case 'stocks':
+        products.forEach(product => {
+          // Get stock from product or variants
+          let stock = null;
+          if (product.Stock !== undefined && product.Stock !== null) {
+            stock = product.Stock;
+          } else if (product.Variants && product.Variants.length > 0) {
+            stock = product.Variants.reduce((sum, variant) => sum + (variant.Stock || 0), 0);
+          }
+
+          if (stock !== null && stock !== undefined && stock.toString().includes(query)) {
+            suggestions.add(stock.toString());
+          }
+        });
+        break;
+
+      case 'moqs':
+        products.forEach(product => {
+          if (product.MOQ !== undefined && product.MOQ !== null && product.MOQ.toString().includes(query)) {
+            suggestions.add(product.MOQ.toString());
+          }
+        });
+        break;
+
+      case 'leadTimes':
+        products.forEach(product => {
+          let leadTime = null;
+          if (product.LeadTime !== undefined && product.LeadTime !== null) {
+            leadTime = product.LeadTime;
+          } else if (product.Variants && product.Variants.length > 0 && product.Variants[0].LeadTime) {
+            leadTime = product.Variants[0].LeadTime;
+          }
+
+          if (leadTime !== null && leadTime !== undefined && leadTime.toString().includes(query)) {
+            suggestions.add(leadTime.toString());
+          }
+        });
+        break;
+
+      case 'notes':
+        products.forEach(product => {
+          const note = product.Note || product.InternalNotes || product.internal_notes || '';
+          if (note && note.toLowerCase().includes(queryLower)) {
+            suggestions.add(note);
+          }
+        });
+        break;
+
+      case 'colors':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              if (variant.Color && variant.Color.toLowerCase().includes(queryLower)) {
+                suggestions.add(variant.Color);
+              }
+            });
+          }
+        });
+        break;
+
+      case 'sizes':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              const size = variant.Size?.Name || variant.Size;
+              if (size && size.toLowerCase().includes(queryLower)) {
+                suggestions.add(size);
+              }
+            });
+          }
+        });
+        break;
+
+      case 'skus':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              if (variant.SKU && variant.SKU.toLowerCase().includes(queryLower)) {
+                suggestions.add(variant.SKU);
+              }
+            });
+          }
+        });
+        break;
+
+      case 'barcodes':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              if (variant.Barcode && variant.Barcode.toLowerCase().includes(queryLower)) {
+                suggestions.add(variant.Barcode);
+              }
+            });
+          }
+        });
+        break;
+
+      case 'purchaseCosts':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              if (variant.PurchaseCost !== undefined && variant.PurchaseCost !== null && variant.PurchaseCost.toString().includes(query)) {
+                suggestions.add(variant.PurchaseCost.toString());
+              }
+            });
+          }
+        });
+        break;
+
+      case 'salesPrices':
+        products.forEach(product => {
+          if (product.Variants && product.Variants.length > 0) {
+            product.Variants.forEach(variant => {
+              if (variant.StdSalesPrice !== undefined && variant.StdSalesPrice !== null && variant.StdSalesPrice.toString().includes(query)) {
+                suggestions.add(variant.StdSalesPrice.toString());
+              }
+            });
+          }
+        });
+        break;
+
+      default:
+        return [];
+    }
+
+    // Convert Set to Array and limit to 10 suggestions
+    return Array.from(suggestions).slice(0, 10);
+  };
+
+  // Debounced autocomplete functions (reduced delay for instant local suggestions)
+  const debouncedFetchNames = useCallback(
+    debounce((query) => fetchAutocompleteOptions('names', query), 100),
+    [products]
+  );
+  const debouncedFetchCodes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('codes', query), 100),
+    [products]
+  );
+  const debouncedFetchStocks = useCallback(
+    debounce((query) => fetchAutocompleteOptions('stocks', query), 100),
+    [products]
+  );
+  const debouncedFetchMoqs = useCallback(
+    debounce((query) => fetchAutocompleteOptions('moqs', query), 100),
+    [products]
+  );
+  const debouncedFetchLeadTimes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('leadTimes', query), 100),
+    [products]
+  );
+  const debouncedFetchNotes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('notes', query), 100),
+    [products]
+  );
+
+  // Variant field autocomplete functions
+  const debouncedFetchColors = useCallback(
+    debounce((query) => fetchAutocompleteOptions('colors', query), 100),
+    [products]
+  );
+
+  const debouncedFetchSizes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('sizes', query), 100),
+    [products]
+  );
+
+  const debouncedFetchSkus = useCallback(
+    debounce((query) => fetchAutocompleteOptions('skus', query), 100),
+    [products]
+  );
+
+  const debouncedFetchBarcodes = useCallback(
+    debounce((query) => fetchAutocompleteOptions('barcodes', query), 100),
+    [products]
+  );
+
+  const debouncedFetchPurchaseCosts = useCallback(
+    debounce((query) => fetchAutocompleteOptions('purchaseCosts', query), 100),
+    [products]
+  );
+
+  const debouncedFetchSalesPrices = useCallback(
+    debounce((query) => fetchAutocompleteOptions('salesPrices', query), 100),
+    [products]
+  );
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
       // FIXED: Added check to ensure debouncedFilters is defined before using it
       if (!debouncedFilters) {
         console.error('debouncedFilters is undefined');
+        setLoading(false);
         return;
       }
       
-      // Log categories and selected category for debugging
-      console.log(`Current category: ${debouncedFilters.categoryID}, type: ${typeof debouncedFilters.categoryID}`);
+      console.log('fetchProducts called with filters:', debouncedFilters); // Debug log
+      console.log('Current page:', page, 'limit:', limit); // Debug log
       
       // Always send category_id/subcategory_id/store_id as they are (don't force conversion)
       const filterParams = Object.entries({
-        name: debouncedFilters.name,
-        code: debouncedFilters.code,
+        name: debouncedFilters.name || "",
+        code: debouncedFilters.code || "",
         product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
-        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+        store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
         stock:
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
@@ -681,6 +1894,18 @@ export default function ProductListPage() {
         note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
         status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
         importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
+        color: debouncedFilters.color !== "" ? debouncedFilters.color : undefined,
+        size: debouncedFilters.size !== "" ? debouncedFilters.size : undefined,
+        sku: debouncedFilters.sku !== "" ? debouncedFilters.sku : undefined,
+        barcode: debouncedFilters.barcode !== "" ? debouncedFilters.barcode : undefined,
+        purchase_cost:
+          debouncedFilters.purchaseCost !== "" && !isNaN(Number(debouncedFilters.purchaseCost))
+            ? Number(debouncedFilters.purchaseCost)
+            : undefined,
+        sales_price:
+          debouncedFilters.salesPrice !== "" && !isNaN(Number(debouncedFilters.salesPrice))
+            ? Number(debouncedFilters.salesPrice)
+            : undefined,
         stock_filter: stockFilter !== 'all' ? stockFilter : undefined,
       }).reduce((acc, [key, value]) => {
         if (value !== "" && value !== undefined && value !== null) {
@@ -695,27 +1920,62 @@ export default function ProductListPage() {
         sortParams = { sort_by: 'name', sort_order: nameSort };
       } else if (stockSort) {
         sortParams = { sort_by: 'stock', sort_order: stockSort };
+      } else if (leadTimeSort) {
+        sortParams = { sort_by: 'leadTime', sort_order: leadTimeSort };
+      } else if (purchaseCostSort) {
+        sortParams = { sort_by: 'purchaseCost', sort_order: purchaseCostSort };
+      } else if (salesPriceSort) {
+        sortParams = { sort_by: 'salesPrice', sort_order: salesPriceSort };
       }
-      console.log('Product filter params:', { page: page + 1, limit, ...filterParams, ...sortParams });
-      const res = await axios.get(`${BASE_URL}/api/products`, {
-        params: {
-          page: page + 1,
-          limit,
-          ...filterParams,
-          ...sortParams,
-        },
+      
+      console.log('Fetching products with params:', {
+        page: page + 1,
+        limit,
+        ...filterParams,
+        ...sortParams,
       });
       
-      // Ensure products is always an array
-      setProducts(res.data.data || []);
-      setTotalItems(res.data.total || 0);
-      setTotalCost(res.data.totalCost || 0);
+      try {
+        const res = await axios.get(`${BASE_URL}/api/products`, {
+          params: {
+            page: page + 1,
+            limit,
+            ...filterParams,
+            ...sortParams,
+          },
+          // Add timeout to prevent hanging requests
+          timeout: 15000
+        });
+        
+        console.log('fetchProducts API response status:', res.status);
+        console.log('fetchProducts API response data:', res.data);
+        
+        // Ensure products is always an array
+        if (res.data && res.data.data) {
+          const newProducts = Array.isArray(res.data.data) ? res.data.data : [];
+          console.log('Setting products to:', newProducts.length, 'items');
+          setProducts(newProducts);
+          setTotalItems(res.data.total || 0);
+          setTotalCost(res.data.totalCost || 0);
+        } else {
+          console.error('Invalid API response format:', res.data);
+          setProducts([]);
+          setTotalItems(0);
+          setTotalCost(0);
+        }
+      } catch (apiError) {
+        console.error('API request failed:', apiError);
+        setProducts([]);
+        setTotalItems(0);
+        setTotalCost(0);
+      }
     } catch (err) {
       console.error("Error fetching products:", err);
       // Initialize with empty array instead of null
       setProducts([]);
       setTotalItems(0);
       setTotalCost(0);
+      setApiError(err.message || "Failed to load products. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -726,32 +1986,101 @@ export default function ProductListPage() {
   const handleNameSort = useCallback((direction) => {
     setNameSort(currentSort => currentSort === direction ? null : direction);
     setStockSort(null);
+    setLeadTimeSort(null);
   }, []);
 
   const handleStockSort = useCallback((direction) => {
     setStockSort(currentSort => currentSort === direction ? null : direction);
     setNameSort(null);
+    setLeadTimeSort(null);
   }, []);
 
-  // Fetch products when filters or pagination change
+  const handleLeadTimeSort = useCallback((direction) => {
+    setLeadTimeSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
+    setPurchaseCostSort(null);
+    setSalesPriceSort(null);
+  }, []);
+
+  const handlePurchaseCostSort = useCallback((direction) => {
+    setPurchaseCostSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
+    setLeadTimeSort(null);
+    setSalesPriceSort(null);
+  }, []);
+
+  const handleSalesPriceSort = useCallback((direction) => {
+    setSalesPriceSort(currentSort => currentSort === direction ? null : direction);
+    setNameSort(null);
+    setStockSort(null);
+    setLeadTimeSort(null);
+    setPurchaseCostSort(null);
+  }, []);
+
   useEffect(() => {
-    fetchProducts();
-  }, [debouncedFilters, page, limit, nameSort, stockSort, stockFilter]); // Removed statusFilter, stockFilter, importanceFilter
+    console.log('Effect triggered - fetchProducts will be called');
+    console.log('Current filters state:', { 
+      debouncedFilters, 
+      page, 
+      limit, 
+      sorts: { nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort }, 
+      stockFilter 
+    });
+    
+    // Safeguard against undefined debouncedFilters
+    if (debouncedFilters) {
+      fetchProducts();
+    } else {
+      console.error('debouncedFilters is undefined in useEffect - cannot fetch products');
+    }
+  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter]);
+
+  // Debug: Monitor products state changes
+  useEffect(() => {
+    console.log('Products state changed:', products?.length || 0, 'items');
+  }, [products]);
+
+  // Force cleanup and fetch on component mount
+  useEffect(() => {
+    // Reset key states on mount
+    setLoading(true);
+    setApiError(null);
+    setProducts([]);
+    
+    // Check if BASE_URL is configured correctly
+    if (!BASE_URL) {
+      setApiError('BASE_URL is not configured. Please check Config.jsx');
+      setLoading(false);
+      return;
+    }
+    
+    // Start with a direct API check instead of using filters
+    // This ensures we at least get data even if there's an issue with filters
+    checkAPI();
+    
+    return () => {
+      // Cleanup function
+      console.log('Component unmounting - cleaning up');
+    };
+  }, []);
 
   // Display preferences handlers
   const handleOpenDisplayPrefs = (event) => {
-    console.log('Opening display preferences');
     setDisplayPrefsAnchor(event.currentTarget);
   };
 
   const handleCloseDisplayPrefs = () => {
-    console.log('Closing display preferences');
     setDisplayPrefsAnchor(null);
   };
 
   const [selectedProduct, setSelectedProduct] = useState(null); // product details for view
   const [viewOpen, setViewOpen] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
 
   const handleOpenView = async (id) => {
     try {
@@ -760,9 +2089,7 @@ export default function ProductListPage() {
       const res = await axios.get(`${BASE_URL}/api/products/${id}`);
       let product = res?.data?.data ?? res?.data ?? null;
 
-      console.log("Raw product data from API:", product);
-      console.log("IsActive field:", product?.IsActive);
-      console.log("isActive field:", product?.isActive);
+
 
       // Helper to extract numeric stock from an object/field
       const extractStock = (obj) => {
@@ -811,11 +2138,12 @@ export default function ProductListPage() {
 
       // Normalize variants if present on product or fetch separately
       let variants = product?.Variants ?? product?.variants ?? product?.product_variants ?? null;
-      if (!Array.isArray(variants)) {
+      if (!Array.isArray(variants) || variants.length === 0) {
         try {
           const vr = await axios.get(`${BASE_URL}/api/products/${id}/variants`);
           variants = vr?.data?.data ?? vr?.data ?? [];
         } catch (e) {
+          console.error("Error fetching variants separately:", e);
           variants = [];
         }
       }
@@ -825,7 +2153,7 @@ export default function ProductListPage() {
         const sku = v.SKU ?? v.Code ?? v.code ?? v.sku ?? v.id ?? v.ID ?? `#${idx + 1}`;
         const barcode = v.Barcode ?? v.barcode ?? v.EAN ?? v.ean ?? v.UPC ?? v.upc ?? '';
         const purchaseCost = v.PurchaseCost ?? v.purchase_cost ?? v.Cost ?? v.cost_price ?? v.CostPrice ?? v.cost ?? null;
-        const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? null;
+        const salesPrice = v.Price ?? v.UnitPrice ?? v.price ?? v.unit_price ?? v.SalesPrice ?? v.sales_price ?? v.StdSalesPrice ?? v.std_sales_price ?? null;
         const stockVal = extractStock(v);
         const leadTime = v.LeadTime ?? v.lead_time ?? v.leadtime ?? v.delivery_days ?? v.lead ?? null;
 
@@ -863,8 +2191,8 @@ export default function ProductListPage() {
       }
 
       // NEW: Normalize MOQ and Unit with fallbacks
-      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? null;
-      const productUnit = product?.Unit ?? product?.unit ?? null;
+      const productMOQ = product?.MOQ ?? product?.MinimumOrderQuantity ?? product?.moq ?? product?.Moq ?? null;
+      let productUnit = product?.Unit ?? product?.unit ?? null;
 
       // Attach normalized fields to product
       const normalizedProduct = {
@@ -874,10 +2202,6 @@ export default function ProductListPage() {
         MOQ: productMOQ,
         Unit: productUnit,
       };
-
-      console.log("Normalized product:", normalizedProduct);
-      console.log("Normalized IsActive:", normalizedProduct.IsActive);
-      console.log("Normalized isActive:", normalizedProduct.isActive);
 
       setSelectedProduct(normalizedProduct);
       setViewOpen(true);
@@ -895,6 +2219,27 @@ export default function ProductListPage() {
     setSelectedProduct(null);
   };
 
+  // CSV download function
+  const downloadCSV = (data, filename = "products.csv") => {
+    const headers = Object.keys(data[0] || {}).map(h => `"${h}"`).join(",");
+    const rows = data.map(row =>
+      Object.values(row).map(cell => {
+        const cellStr = (cell ?? "").toString().replace(/"/g, '""');
+        return `"${cellStr}"`;
+      }).join(",")
+    );
+    const csv = [headers, ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleExport = async () => {
     try {
       let productsToExport = [];
@@ -910,8 +2255,8 @@ export default function ProductListPage() {
           name: debouncedFilters.name,
           code: debouncedFilters.code,
           category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
-          store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
+          store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
           stock: debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock)) ? Number(debouncedFilters.stock) : undefined,
           status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
           importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
@@ -928,6 +2273,8 @@ export default function ProductListPage() {
           sortParams = { sort_by: 'name', sort_order: nameSort };
         } else if (stockSort) {
           sortParams = { sort_by: 'stock', sort_order: stockSort };
+        } else if (leadTimeSort) {
+          sortParams = { sort_by: 'leadTime', sort_order: leadTimeSort };
         }
         
         const res = await axios.get(`${BASE_URL}/api/products`, {
@@ -941,33 +2288,304 @@ export default function ProductListPage() {
         productsToExport = res.data.data || [];
       }
       
-      // Flatten data for Excel based on visible columns
+      // Flatten data for CSV based on import template format
       const exportData = productsToExport.map(p => {
         const row = {};
-        if (visibleColumns.name) row.Name = p.Name;
-        if (visibleColumns.code) row.Code = p.Code;
-        if (visibleColumns.category) row.Category = p.Category?.Name;
-        if (visibleColumns.store) row.Store = p.Store?.Name;
-        if (visibleColumns.subcategory) row.Subcategory = p.Subcategory?.Name;
-        if (visibleColumns.stock) row.Stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
-        if (visibleColumns.moq) row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
-        if (visibleColumns.leadTime) row.LeadTime = p.LeadTime ?? p.lead_time ?? p.leadtime ?? '';
-        if (visibleColumns.note) row.Note = p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
-        if (visibleColumns.status) row.Status = p.IsActive ? 'Active' : 'Inactive';
-        if (visibleColumns.importance) row.Importance = p.Importance ?? 'Normal';
+        
+        // Product details - match import template exactly
+        row.Name = p.Name;
+        row.Code = p.Code;
+        row['HSN Code'] = p.HsnSacCode ?? p.HSN ?? p.hsn ?? '';
+        row.Importance = p.Importance ?? 'Normal';
+        row['Product Type'] = p.ProductType ?? p.productType ?? 'Single';
+        row['Minimum Stock'] = p.MinimumStock ?? p.minimumStock ?? '';
+        row.Category = p.Category?.Name;
+        row.Subcategory = p.Subcategory?.Name;
+        row.Unit = p.Unit?.Name || p.Unit?.name || p.unit_name || '';
+        row['Product Mode'] = p.ProductMode ?? p.product_mode ?? 'Physical';
+        row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
+        row.Store = p.Store?.Name;
+        row.Tax = p.Tax?.Name ?? '';
+        row['GST %'] = p.GstPercent ?? p.gstPercent ?? p.Tax?.Percentage ?? '';
+        row.Description = p.Description ?? p.description ?? '';
+        row['Internal Notes'] = p.InternalNotes ?? p.internalNotes ?? p.Note ?? p.note ?? p.Notes ?? p.notes ?? '';
+        row.Status = p.IsActive ? 'Active' : 'Inactive';
+        
+        // Variant details - handle multiple variants by joining with semicolons
+        if (p.Variants && p.Variants.length > 0) {
+          row['Color Code'] = p.Variants.map(v => v.Color ?? v.ColorCaption ?? 'N/A').join('; ');
+          row.Size = p.Variants.map(v => v.Size?.Name || v.Size || 'N/A').join('; ');
+          row.SKU = p.Variants.map(v => v.SKU ?? 'N/A').join('; ');
+          row.Barcode = p.Variants.map(v => v.Barcode ?? 'N/A').join('; ');
+          row['Purchase Cost'] = p.Variants.map(v => v.PurchaseCost ?? 0).join('; ');
+          row['Sales Price'] = p.Variants.map(v => v.StdSalesPrice ?? v.SalesPrice ?? 0).join('; ');
+          row.Stock = p.Variants.map(v => v.Stock ?? v.stock ?? v.quantity ?? v.qty ?? 0).join('; ');
+          row['Lead Time'] = p.Variants.map(v => v.LeadTime ?? v.lead_time ?? v.leadtime ?? 0).join('; ');
+          
+          // Handle images
+          const allImages = p.Variants.flatMap(v => v.Images || []);
+          const imageUrls = allImages.map(img => {
+            if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:'))) {
+              return img;
+            } else if (typeof img === 'string' && img.trim() !== '') {
+              const normalizedImg = img.replace(/\\/g, '/');
+              if (normalizedImg.startsWith('uploads/')) {
+                return `${BASE_URL}/${normalizedImg}`;
+              } else {
+                return `${BASE_URL}/uploads/${normalizedImg}`;
+              }
+            }
+            return '';
+          }).filter(url => url !== '');
+          row.Images = imageUrls.join('; ');
+        } else {
+          // No variants - empty fields
+          row['Color Code'] = '';
+          row.Size = '';
+          row.SKU = '';
+          row.Barcode = '';
+          row['Purchase Cost'] = '';
+          row['Sales Price'] = '';
+          row.Stock = '';
+          row['Lead Time'] = '';
+          row.Images = '';
+        }
+        
         return row;
       });
       
-      // Create worksheet
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Products');
-      
-      // Download file
-      XLSX.writeFile(wb, 'products_export.xlsx');
+      // Download CSV file
+      downloadCSV(exportData, 'products_export.csv');
     } catch (err) {
       console.error('Error exporting products:', err);
       alert('Failed to export products. Please try again.');
+    }
+  };
+
+  const downloadTemplateCSV = () => {
+    // Create template CSV headers
+    const headers = [
+      'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
+      'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
+      'GST %', 'Description', 'Internal Notes', 'Status', 'Color Code', 'Size',
+      'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time', 'Images'
+    ].join(',');
+    
+    // Create template data row with example values
+    const exampleRow = [
+      'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
+      'Electronics', 'Mobiles', 'Piece', 'Physical', '5', 'Main Store', 'GST',
+      '18', 'Product description', 'Internal notes', 'Active', 'Red', 'Large',
+      'SKU001', 'BAR001', '100', '150', '20', '3', 'image1.jpg;image2.jpg'
+    ].join(',');
+    
+    // Combine headers and example row
+    const csvContent = `${headers}\n${exampleRow}`;
+    
+    // Create blob and download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'product_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      alert('Please select a file to import.');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      // Read the CSV file
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target.result;
+          console.log('Raw CSV data:', csvText); // Debug log
+
+          if (!csvText.trim()) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Parse CSV
+          let lines = csvText.split('\n').filter(line => line.trim());
+          if (lines.length === 0) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Handle different line endings (CR, LF, CRLF)
+          if (lines.length === 1 && lines[0].includes('\r')) {
+            lines = csvText.split('\r').filter(line => line.trim());
+          }
+
+          // Parse headers - handle CSV that might be exported from Excel 
+          // which can use semicolons instead of commas in some regions
+          const delimiter = lines[0].includes(';') ? ';' : ',';
+          const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const dataRows = lines.slice(1);
+
+          console.log('Headers:', headers); // Debug log
+          console.log('Data rows:', dataRows.length); // Debug log
+          
+          // Validate required headers
+          const requiredHeaders = ['Name', 'Code'];
+          const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+          
+          if (missingHeaders.length > 0) {
+            alert(`Missing required headers: ${missingHeaders.join(', ')}. Please check your CSV file format.`);
+            setImportLoading(false);
+            return;
+          }
+
+          const objectData = dataRows.map(row => {
+            // Handle quoted CSV values that might contain commas within quotes
+            let values = [];
+            let inQuote = false;
+            let currentValue = '';
+            
+            if (delimiter === ';') {
+              values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            } else {
+              // More complex parsing for comma-delimited CSV with potential quoted values
+              for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                
+                if (char === '"' && (i === 0 || row[i-1] !== '\\')) {
+                  inQuote = !inQuote;
+                } else if (char === delimiter && !inQuote) {
+                  values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                  currentValue = '';
+                } else {
+                  currentValue += char;
+                }
+              }
+              
+              // Add the last value
+              values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            }
+            
+            // Create object from headers and values
+            const obj = {};
+            headers.forEach((header, index) => {
+              obj[header] = values[index] || '';
+            });
+            return obj;
+          });
+
+          console.log('Converted object data:', objectData); // Debug log
+
+          if (objectData.length === 0) {
+            alert('The CSV file has headers but no data rows.');
+            setImportLoading(false);
+            return;
+          }
+          
+          // Basic validation of required fields
+          const invalidRows = [];
+          objectData.forEach((row, index) => {
+            if (!row.Name || !row.Code) {
+              invalidRows.push(`Row ${index + 2}: Missing Name or Code`);
+            }
+            
+            // Validate numeric fields
+            if (row['Minimum Stock'] && isNaN(Number(row['Minimum Stock']))) {
+              invalidRows.push(`Row ${index + 2}: Minimum Stock must be a number`);
+            }
+            if (row['MOQ'] && isNaN(Number(row['MOQ']))) {
+              invalidRows.push(`Row ${index + 2}: MOQ must be a number`);
+            }
+            if (row['GST %'] && isNaN(Number(row['GST %']))) {
+              invalidRows.push(`Row ${index + 2}: GST % must be a number`);
+            }
+            if (row['Purchase Cost'] && isNaN(Number(row['Purchase Cost']))) {
+              invalidRows.push(`Row ${index + 2}: Purchase Cost must be a number`);
+            }
+            if (row['Sales Price'] && isNaN(Number(row['Sales Price']))) {
+              invalidRows.push(`Row ${index + 2}: Sales Price must be a number`);
+            }
+            if (row['Stock'] && isNaN(Number(row['Stock']))) {
+              invalidRows.push(`Row ${index + 2}: Stock must be a number`);
+            }
+            if (row['Lead Time'] && isNaN(Number(row['Lead Time']))) {
+              invalidRows.push(`Row ${index + 2}: Lead Time must be a number`);
+            }
+            
+            // Validate Status field if present
+            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+              invalidRows.push(`Row ${index + 2}: Status must be 'Active' or 'Inactive'`);
+            }
+          });
+          
+          if (invalidRows.length > 0) {
+            const errorMessage = `Found ${invalidRows.length} validation error(s):\n\n${invalidRows.slice(0, 5).join('\n')}${
+              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more errors.` : ''
+            }`;
+            alert(errorMessage);
+            setImportLoading(false);
+            return;
+          }
+
+          // Send data to backend as JSON
+          console.log('Sending import data:', objectData); // Debug log
+
+          const response = await axios.post(`${BASE_URL}/api/products/import`, objectData, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('Import response:', response.data); // Debug log
+          
+          // Show success message or error details
+          if (response.data.errors && response.data.errors.length > 0) {
+            const errorMessage = `Imported ${response.data.imported} product(s) with ${response.data.errors.length} error(s):\n\n${response.data.errors.slice(0, 5).join('\n')}${
+              response.data.errors.length > 5 ? `\n\n...and ${response.data.errors.length - 5} more errors.` : ''
+            }`;
+            alert(errorMessage);
+          } else {
+            alert(`Successfully imported ${response.data.imported || objectData.length} products!`);
+          }
+          
+          setImportDialogOpen(false);
+          setImportFile(null);
+          
+          // Reset filters and pagination to show newly imported products
+          setPage(0);
+          setFilters(defaultFilters);
+          setDebouncedFilters({...defaultFilters});
+          setInputFilters({ 
+            name: "", code: "", productType: "", stock: "", moq: "", 
+            leadTime: "", note: "", color: "", size: "", sku: "", 
+            barcode: "", purchaseCost: "", salesPrice: "" 
+          });
+          
+          // Use checkAPI to force a clean fetch without filters
+          console.log('Calling checkAPI after import to refresh data...'); // Debug log
+          await checkAPI();
+          console.log('checkAPI completed, products state:', products); // Debug log
+        } catch (error) {
+          console.error('Error importing products:', error);
+          alert(`Failed to import products: ${error.response?.data?.error || error.message}`);
+        } finally {
+          setImportLoading(false);
+        }
+      };
+
+      reader.readAsText(importFile);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Failed to read the selected file.');
+      setImportLoading(false);
     }
   };
 
@@ -976,11 +2594,81 @@ export default function ProductListPage() {
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
   const somePageSelected = pageIds.some(id => selectedIds.includes(id)) && !allPageSelected;
 
+  // Debug logs for direct API check
+  const checkAPI = async () => {
+    try {
+      console.log('Direct API check - fetching all products without filters');
+      setLoading(true);
+      
+      const res = await axios.get(`${BASE_URL}/api/products`, {
+        params: {
+          page: 1,
+          limit: 50,
+        },
+        timeout: 15000
+      });
+      
+      console.log('Direct API check - Status:', res.status);
+      console.log('Direct API check - Response:', res.data);
+      
+      if (res.data && res.data.data) {
+        // Set products directly from API response
+        const apiProducts = Array.isArray(res.data.data) ? res.data.data : [];
+        console.log('Direct API check - Products found:', apiProducts.length);
+        
+        setProducts(apiProducts);
+        setTotalItems(res.data.total || 0);
+        setTotalCost(res.data.totalCost || 0);
+      } else {
+        console.error('Direct API check - Invalid response format:', res.data);
+        setProducts([]);
+        alert('Error: API returned invalid data format. Check console for details.');
+      }
+    } catch (err) {
+      console.error("Error in direct API check:", err);
+      setProducts([]);
+      alert('API check failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5">📦 Product Master</Typography>
-        {/* Removed display preferences button from here */}
+        <Box display="flex" gap={2} alignItems="center">
+          {loading && (
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+              <CircularProgress size={16} sx={{ mr: 1 }} />
+              Loading...
+            </Typography>
+          )}
+          <Tooltip title="Refresh Products">
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<Refresh />}
+              onClick={() => {
+                console.log("Manual refresh triggered");
+                // Clear any previous errors
+                setApiError(null);
+                fetchProducts();
+              }}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Tooltip>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            onClick={checkAPI}
+            disabled={loading}
+          >
+            Check API
+          </Button>
+        </Box>
       </Box>
 
       {/* Debug message stays */}
@@ -1037,7 +2725,13 @@ export default function ProductListPage() {
                   <TextField label="Subcategory" value={selectedProduct.Subcategory?.Name ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Unit" value={selectedProduct.Unit?.Name ?? ''} fullWidth size="small" disabled />
+                  <TextField 
+                    label="Unit" 
+                    value={selectedProduct.Unit?.Name || selectedProduct.Unit?.name || selectedProduct.unit_name || ''} 
+                    fullWidth 
+                    size="small" 
+                    disabled 
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Product Mode" value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''} fullWidth size="small" disabled />
@@ -1046,7 +2740,13 @@ export default function ProductListPage() {
                   <TextField label="Product Type" value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="MOQ" value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? ''} fullWidth size="small" disabled />
+                  <TextField 
+                    label="MOQ" 
+                    value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? selectedProduct.Moq ?? ''} 
+                    fullWidth 
+                    size="small" 
+                    disabled 
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
@@ -1062,9 +2762,6 @@ export default function ProductListPage() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Internal Notes" value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''} fullWidth size="small" disabled multiline rows={2} />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Stock" value={selectedProduct.Stock ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12}>
                   {(() => {
@@ -1166,6 +2863,93 @@ export default function ProductListPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Import dialog */}
+      <Dialog open={importDialogOpen} onClose={() => {
+        setImportDialogOpen(false);
+        setImportFile(null);
+        setImportLoading(false);
+      }} maxWidth="md" fullWidth>
+        <DialogTitle>Import Products</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Import products from a CSV file. Make sure your file follows the correct format with the following headers:
+          </Typography>
+          
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Required CSV Headers:
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Name</Typography>
+                <Typography variant="body2" color="textSecondary">• Code</Typography>
+                <Typography variant="body2" color="textSecondary">• HSN Code</Typography>
+                <Typography variant="body2" color="textSecondary">• Importance</Typography>
+                <Typography variant="body2" color="textSecondary">• Product Type</Typography>
+                <Typography variant="body2" color="textSecondary">• Minimum Stock</Typography>
+                <Typography variant="body2" color="textSecondary">• Category</Typography>
+                <Typography variant="body2" color="textSecondary">• Subcategory</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Unit</Typography>
+                <Typography variant="body2" color="textSecondary">• Product Mode</Typography>
+                <Typography variant="body2" color="textSecondary">• MOQ</Typography>
+                <Typography variant="body2" color="textSecondary">• Store</Typography>
+                <Typography variant="body2" color="textSecondary">• Tax</Typography>
+                <Typography variant="body2" color="textSecondary">• GST %</Typography>
+                <Typography variant="body2" color="textSecondary">• Description</Typography>
+                <Typography variant="body2" color="textSecondary">• Internal Notes</Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" color="textSecondary">• Status</Typography>
+                <Typography variant="body2" color="textSecondary">• Color Code</Typography>
+                <Typography variant="body2" color="textSecondary">• Size</Typography>
+                <Typography variant="body2" color="textSecondary">• SKU</Typography>
+                <Typography variant="body2" color="textSecondary">• Barcode</Typography>
+                <Typography variant="body2" color="textSecondary">• Purchase Cost</Typography>
+                <Typography variant="body2" color="textSecondary">• Sales Price</Typography>
+                <Typography variant="body2" color="textSecondary">• Stock</Typography>
+                <Typography variant="body2" color="textSecondary">• Lead Time</Typography>
+                <Typography variant="body2" color="textSecondary">• Images</Typography>
+              </Grid>
+            </Grid>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+              Note: Name and Code are required. Category, Unit, Store, and Tax must match existing entries in the system.
+            </Typography>
+          </Box>
+          
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(e) => setImportFile(e.target.files[0])}
+            style={{ marginBottom: '16px' }}
+          />
+          {importFile && (
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Selected file: {importFile.name}
+            </Typography>
+          )}
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} 
+              onClick={() => downloadTemplateCSV()}>
+              ↓ Download template CSV file
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleImport}
+            disabled={!importFile || importLoading}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Import'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Updated summary box to include status, stock, and importance filter dropdowns */}
       <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
         <Grid container spacing={2} alignItems="center" justifyContent="space-between">
@@ -1197,6 +2981,26 @@ export default function ProductListPage() {
       </Box>
 
       <Paper>
+        {apiError && (
+          <Box sx={{ p: 2, mb: 2, bgcolor: '#ffebee', color: '#d32f2f', borderRadius: '4px' }}>
+            <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center' }}>
+              Error: {apiError}
+              <Button 
+                variant="outlined" 
+                color="error" 
+                size="small" 
+                sx={{ ml: 2 }}
+                onClick={() => {
+                  setApiError(null);
+                  checkAPI();
+                }}
+              >
+                Try Again
+              </Button>
+            </Typography>
+          </Box>
+        )}
+        
         <TableContainer sx={{ position: 'relative' }}>
           {/* Optional small corner spinner overlay (does not remount inputs) */}
           {loading && (
@@ -1207,7 +3011,7 @@ export default function ProductListPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>
+                <TableCell sx={{ width: 60 }}>
                   <Checkbox
                     size="small"
                     checked={allPageSelected}
@@ -1215,9 +3019,9 @@ export default function ProductListPage() {
                     onChange={toggleSelectAllOnPage}
                   />
                 </TableCell>
-                <TableCell sx={{fontWeight : "bold"}}>SL</TableCell>
+                <TableCell sx={{fontWeight : "bold", width: 60}}>SL</TableCell>
                 {visibleColumns.name && (
-                  <TableCell sx={{fontWeight : "bold"}}>
+                  <TableCell sx={{fontWeight : "bold", width: 150}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
                       Name
                       <IconButton
@@ -1245,13 +3049,13 @@ export default function ProductListPage() {
                     </Box>
                   </TableCell>
                 )}
-                {visibleColumns.code && <TableCell sx={{fontWeight : "bold"}}>Code</TableCell>}
-                {visibleColumns.category && <TableCell sx={{fontWeight : "bold"}}>Category</TableCell>}
-                {visibleColumns.store && <TableCell sx={{fontWeight : "bold"}}>Store</TableCell>}
-                {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold"}}>Subcategory</TableCell>}
-                {visibleColumns.productType && <TableCell sx={{fontWeight : "bold"}}>Product Type</TableCell>}
+                {visibleColumns.code && <TableCell sx={{fontWeight : "bold", width: 120}}>Code</TableCell>}
+                {visibleColumns.category && <TableCell sx={{fontWeight : "bold", width: 120}}>Category</TableCell>}
+                {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold", width: 120}}>Subcategory</TableCell>}
+                {visibleColumns.store && <TableCell sx={{fontWeight : "bold", width: 120}}>Store</TableCell>}
+                {visibleColumns.productType && <TableCell sx={{fontWeight : "bold", width: 120}}>Product Type</TableCell>}
                 {visibleColumns.stock && (
-                  <TableCell sx={{fontWeight : "bold"}}>
+                  <TableCell sx={{fontWeight : "bold", width: 100}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
                       Stock
                       <IconButton
@@ -1281,25 +3085,167 @@ export default function ProductListPage() {
                     </Box>
                   </TableCell>
                 )}
-                {visibleColumns.moq && <TableCell sx={{fontWeight : "bold"}}>MOQ</TableCell>}
-                {visibleColumns.leadTime && <TableCell sx={{fontWeight : "bold"}}>Lead Time</TableCell>}
-                {visibleColumns.note && <TableCell sx={{fontWeight : "bold"}}>Note</TableCell>}
-                {visibleColumns.status && <TableCell sx={{fontWeight : "bold"}}>Status</TableCell>}
-                {visibleColumns.importance && <TableCell sx={{fontWeight : "bold"}}>Importance</TableCell>}
-                <TableCell sx={{fontWeight : "bold"}} align="center">Actions</TableCell>
+                {visibleColumns.moq && <TableCell sx={{fontWeight : "bold", width: 100}}>MOQ</TableCell>}
+                {visibleColumns.leadTime && (
+                  <TableCell sx={{fontWeight : "bold", width: 120}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Lead Time
+                      <IconButton
+                        size="small"
+                        onClick={() => handleLeadTimeSort('asc')}
+                        color={leadTimeSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort lead time ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: leadTimeSort === 'asc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleLeadTimeSort('desc')}
+                        color={leadTimeSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort lead time descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: leadTimeSort === 'desc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
+                {visibleColumns.note && <TableCell sx={{fontWeight : "bold", width: 150}}>Note</TableCell>}
+                {visibleColumns.status && <TableCell sx={{fontWeight : "bold", width: 100}}>Status</TableCell>}
+                {visibleColumns.importance && <TableCell sx={{fontWeight : "bold", width: 100}}>Importance</TableCell>}
+                {/* Variant columns */}
+                {visibleColumns.color && <TableCell sx={{fontWeight : "bold", width: 120}}>Color Code</TableCell>}
+                {visibleColumns.size && <TableCell sx={{fontWeight : "bold"}}>Size</TableCell>}
+                {visibleColumns.sku && <TableCell sx={{fontWeight : "bold"}}>SKU</TableCell>}
+                {visibleColumns.barcode && <TableCell sx={{fontWeight : "bold", width: 120}}>Barcode</TableCell>}
+                {visibleColumns.purchaseCost && (
+                  <TableCell sx={{fontWeight : "bold", width: 120}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Purchase Cost
+                      <IconButton
+                        size="small"
+                        onClick={() => handlePurchaseCostSort('asc')}
+                        color={purchaseCostSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort purchase cost ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: purchaseCostSort === 'asc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handlePurchaseCostSort('desc')}
+                        color={purchaseCostSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort purchase cost descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: purchaseCostSort === 'desc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
+                {visibleColumns.salesPrice && (
+                  <TableCell sx={{fontWeight : "bold", width: 120}}>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      Sales Price
+                      <IconButton
+                        size="small"
+                        onClick={() => handleSalesPriceSort('asc')}
+                        color={salesPriceSort === 'asc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort sales price ascending"
+                      >
+                        <ArrowUpward
+                          fontSize="inherit"
+                          sx={{ color: salesPriceSort === 'asc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'asc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleSalesPriceSort('desc')}
+                        color={salesPriceSort === 'desc' ? 'primary' : 'default'}
+                        sx={{ p: 0.25 }}
+                        aria-label="Sort sales price descending"
+                      >
+                        <ArrowDownward
+                          fontSize="inherit"
+                          sx={{ color: salesPriceSort === 'desc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'desc' ? 1 : 0.5 }}
+                        />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                )}
+                {visibleColumns.image && <TableCell sx={{fontWeight : "bold", width: 120}}>Image</TableCell>}
+                <TableCell sx={{fontWeight : "bold", width: 120}} align="center">Actions</TableCell>
               </TableRow>
-              {/* NEW: memoized filters row with visibleColumns prop */}
               <FiltersRow
                 inputFilters={inputFilters}
                 setInputFilters={setInputFilters}
                 filters={filters}
                 setFilters={setFilters}
                 categories={categories}
-                stores={stores}
                 allSubcategories={allSubcategories}
+                stores={stores}
                 setPage={setPage}
                 visibleColumns={visibleColumns}
                 handleExport={handleExport} // added prop
+                setImportDialogOpen={setImportDialogOpen}
+                autocompleteOptions={autocompleteOptions}
+                autocompleteLoading={autocompleteLoading}
+                onAutocompleteInputChange={(field, query) => {
+                  switch(field) {
+                    case 'names':
+                      debouncedFetchNames(query);
+                      break;
+                    case 'codes':
+                      debouncedFetchCodes(query);
+                      break;
+                    case 'stocks':
+                      debouncedFetchStocks(query);
+                      break;
+                    case 'moqs':
+                      debouncedFetchMoqs(query);
+                      break;
+                    case 'leadTimes':
+                      debouncedFetchLeadTimes(query);
+                      break;
+                    case 'notes':
+                      debouncedFetchNotes(query);
+                      break;
+                    case 'colors':
+                      debouncedFetchColors(query);
+                      break;
+                    case 'sizes':
+                      debouncedFetchSizes(query);
+                      break;
+                    case 'skus':
+                      debouncedFetchSkus(query);
+                      break;
+                    case 'barcodes':
+                      debouncedFetchBarcodes(query);
+                      break;
+                    case 'purchaseCosts':
+                      debouncedFetchPurchaseCosts(query);
+                      break;
+                    case 'salesPrices':
+                      debouncedFetchSalesPrices(query);
+                      break;
+                    default:
+                      break;
+                  }
+                }}
               />
             </TableHead>
             {/* UPDATED: pass visibleColumns into body and onView handler */}
@@ -1345,6 +3291,7 @@ export default function ProductListPage() {
           />
         </Box>
       </Paper>
+
     </Box>
   );
 }

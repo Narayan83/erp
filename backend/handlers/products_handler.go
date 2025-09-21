@@ -102,6 +102,9 @@ func GetAllProducts(c *fiber.Ctx) error {
 		Preload("Category").Preload("Subcategory").Preload("Unit").Preload("Store").
 		Preload("Tax").Preload("Tags").Preload("Variants")
 
+	fmt.Printf("GetAllProducts called with filters: name=%s, category_id=%s, subcategory_id=%s, store_id=%s, code=%s\n",
+		c.Query("name"), c.Query("category_id"), c.Query("subcategory_id"), c.Query("store_id"), c.Query("code"))
+
 	if name := c.Query("name"); name != "" {
 		query = query.Where("name ILIKE ?", "%"+name+"%")
 	}
@@ -141,7 +144,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 	sortBy := c.Query("sort_by", "")
 	sortOrder := c.Query("sort_order", "asc")
 	// Only apply DB sorting for non-in-memory fields
-	if sortBy != "" && sortBy != "stock" && sortBy != "leadTime" && sortBy != "note" {
+	if sortBy != "" && sortBy != "stock" && sortBy != "leadTime" && sortBy != "note" && sortBy != "purchaseCost" && sortBy != "salesPrice" {
 		orderStr := sortBy
 		if sortOrder == "desc" {
 			orderStr += " desc"
@@ -156,6 +159,8 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if err := query.Find(&allProducts).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	fmt.Printf("GetAllProducts: Found %d products in database\n", len(allProducts))
 
 	// Calculate total cost from all variants
 	totalCost := 0.0
@@ -257,6 +262,115 @@ func GetAllProducts(c *fiber.Ctx) error {
 		productsWithStock = filtered
 	}
 
+	// In-memory filtering for variant fields
+	if colorQuery := c.Query("color"); colorQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			hasMatch := false
+			for _, v := range p.Variants {
+				if strings.Contains(strings.ToLower(v.Color), strings.ToLower(colorQuery)) {
+					hasMatch = true
+					break
+				}
+			}
+			if hasMatch {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
+	if sizeQuery := c.Query("size"); sizeQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			hasMatch := false
+			for _, v := range p.Variants {
+				if strings.Contains(strings.ToLower(v.Size), strings.ToLower(sizeQuery)) {
+					hasMatch = true
+					break
+				}
+			}
+			if hasMatch {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
+	if skuQuery := c.Query("sku"); skuQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			hasMatch := false
+			for _, v := range p.Variants {
+				if strings.Contains(strings.ToLower(v.SKU), strings.ToLower(skuQuery)) {
+					hasMatch = true
+					break
+				}
+			}
+			if hasMatch {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
+	if barcodeQuery := c.Query("barcode"); barcodeQuery != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			hasMatch := false
+			for _, v := range p.Variants {
+				if strings.Contains(strings.ToLower(v.Barcode), strings.ToLower(barcodeQuery)) {
+					hasMatch = true
+					break
+				}
+			}
+			if hasMatch {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
+	if purchaseCostQuery := c.Query("purchase_cost"); purchaseCostQuery != "" {
+		purchaseCostFilterVal, err := strconv.ParseFloat(purchaseCostQuery, 64)
+		if err == nil {
+			filtered := make([]ProductWithStock, 0)
+			for _, p := range productsWithStock {
+				hasMatch := false
+				for _, v := range p.Variants {
+					if v.PurchaseCost == purchaseCostFilterVal {
+						hasMatch = true
+						break
+					}
+				}
+				if hasMatch {
+					filtered = append(filtered, p)
+				}
+			}
+			productsWithStock = filtered
+		}
+	}
+
+	if salesPriceQuery := c.Query("sales_price"); salesPriceQuery != "" {
+		salesPriceFilterVal, err := strconv.ParseFloat(salesPriceQuery, 64)
+		if err == nil {
+			filtered := make([]ProductWithStock, 0)
+			for _, p := range productsWithStock {
+				hasMatch := false
+				for _, v := range p.Variants {
+					if v.StdSalesPrice == salesPriceFilterVal {
+						hasMatch = true
+						break
+					}
+				}
+				if hasMatch {
+					filtered = append(filtered, p)
+				}
+			}
+			productsWithStock = filtered
+		}
+	}
+
 	// In-memory sort for Stock
 	if sortBy == "stock" {
 		sort.Slice(productsWithStock, func(i, j int) bool {
@@ -296,6 +410,70 @@ func GetAllProducts(c *fiber.Ctx) error {
 		})
 	}
 
+	// In-memory sort for PurchaseCost (use minimum purchase cost from variants)
+	if sortBy == "purchaseCost" {
+		sort.Slice(productsWithStock, func(i, j int) bool {
+			// Get minimum purchase cost from variants for product i
+			minCostI := 0.0
+			if len(productsWithStock[i].Variants) > 0 {
+				minCostI = productsWithStock[i].Variants[0].PurchaseCost
+				for _, v := range productsWithStock[i].Variants {
+					if v.PurchaseCost < minCostI {
+						minCostI = v.PurchaseCost
+					}
+				}
+			}
+
+			// Get minimum purchase cost from variants for product j
+			minCostJ := 0.0
+			if len(productsWithStock[j].Variants) > 0 {
+				minCostJ = productsWithStock[j].Variants[0].PurchaseCost
+				for _, v := range productsWithStock[j].Variants {
+					if v.PurchaseCost < minCostJ {
+						minCostJ = v.PurchaseCost
+					}
+				}
+			}
+
+			if sortOrder == "desc" {
+				return minCostI > minCostJ
+			}
+			return minCostI < minCostJ
+		})
+	}
+
+	// In-memory sort for SalesPrice (use minimum sales price from variants)
+	if sortBy == "salesPrice" {
+		sort.Slice(productsWithStock, func(i, j int) bool {
+			// Get minimum sales price from variants for product i
+			minPriceI := 0.0
+			if len(productsWithStock[i].Variants) > 0 {
+				minPriceI = productsWithStock[i].Variants[0].StdSalesPrice
+				for _, v := range productsWithStock[i].Variants {
+					if v.StdSalesPrice < minPriceI {
+						minPriceI = v.StdSalesPrice
+					}
+				}
+			}
+
+			// Get minimum sales price from variants for product j
+			minPriceJ := 0.0
+			if len(productsWithStock[j].Variants) > 0 {
+				minPriceJ = productsWithStock[j].Variants[0].StdSalesPrice
+				for _, v := range productsWithStock[j].Variants {
+					if v.StdSalesPrice < minPriceJ {
+						minPriceJ = v.StdSalesPrice
+					}
+				}
+			}
+
+			if sortOrder == "desc" {
+				return minPriceI > minPriceJ
+			}
+			return minPriceI < minPriceJ
+		})
+	}
+
 	// Now apply pagination
 	total := int64(len(productsWithStock))
 	end := offset + limit
@@ -318,6 +496,112 @@ func GetAllProducts(c *fiber.Ctx) error {
 	})
 }
 
+// Handler: Get autocomplete suggestions for product fields
+func GetProductAutocomplete(c *fiber.Ctx) error {
+	field := c.Query("field")
+	query := c.Query("query")
+	limit := c.QueryInt("limit", 10)
+
+	if field == "" || query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "field and query parameters are required"})
+	}
+
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	var results []string
+
+	switch field {
+	case "names":
+		var products []models.Product
+		if err := productsDB.Select("DISTINCT name").
+			Where("name ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Find(&products).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, p := range products {
+			if p.Name != "" {
+				results = append(results, p.Name)
+			}
+		}
+
+	case "codes":
+		var products []models.Product
+		if err := productsDB.Select("DISTINCT code").
+			Where("code ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Find(&products).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, p := range products {
+			if p.Code != "" {
+				results = append(results, p.Code)
+			}
+		}
+
+	case "stocks":
+		var distinctStocks []int
+		if err := productsDB.Table("product_variants").
+			Select("DISTINCT stock").
+			Where("stock::text ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Pluck("stock", &distinctStocks).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, stock := range distinctStocks {
+			results = append(results, strconv.Itoa(stock))
+		}
+
+	case "moqs":
+		var distinctMoqs []int
+		if err := productsDB.Select("DISTINCT moq").
+			Where("moq::text ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Pluck("moq", &distinctMoqs).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, moq := range distinctMoqs {
+			results = append(results, strconv.Itoa(moq))
+		}
+
+	case "leadTimes":
+		var distinctLeadTimes []int
+		if err := productsDB.Table("product_variants").
+			Select("DISTINCT lead_time").
+			Where("lead_time::text ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Pluck("lead_time", &distinctLeadTimes).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, leadTime := range distinctLeadTimes {
+			results = append(results, strconv.Itoa(leadTime))
+		}
+
+	case "notes":
+		var products []models.Product
+		if err := productsDB.Select("DISTINCT internal_notes").
+			Where("internal_notes ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Find(&products).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, p := range products {
+			if p.InternalNotes != "" {
+				results = append(results, p.InternalNotes)
+			}
+		}
+
+	default:
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid field parameter"})
+	}
+
+	return c.JSON(fiber.Map{
+		"data": results,
+	})
+}
+
 // Get One
 func GetProductByID(c *fiber.Ctx) error {
 	id := c.Params("id")
@@ -327,9 +611,6 @@ func GetProductByID(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Not found"})
 	}
-
-	// Debug logging
-	fmt.Printf("Product ID: %d, IsActive from DB: %v\n", product.ID, product.IsActive)
 
 	return c.JSON(product)
 }
@@ -364,14 +645,6 @@ func UpdateProduct(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
-
-	// Debug logging
-	fmt.Printf("Received update request: %+v\n", req)
-	fmt.Printf("IsActive value: %v\n", req.IsActive)
-
-	// Debug logging
-	fmt.Printf("Received update request: %+v\n", req)
-	fmt.Printf("IsActive value: %v\n", req.IsActive)
 
 	var product models.Product
 	if err := productsDB.Preload("Variants").Preload("Tags").First(&product, id).Error; err != nil {
@@ -436,4 +709,328 @@ func GetProductStats(c *fiber.Ctx) error {
 		"total_products": totalProducts,
 		"total_cost":     totalCost,
 	})
+}
+
+// Handler: Import Products from Excel
+func ImportProducts(c *fiber.Ctx) error {
+	body := c.Body()
+	fmt.Println("Raw request body:", string(body)) // Debug log
+
+	var importData []map[string]interface{}
+
+	// Try to parse as JSON first (from request body)
+	if err := c.BodyParser(&importData); err != nil {
+		fmt.Println("BodyParser error:", err) // Debug log
+		// If that fails, try form data (legacy support)
+		jsonDataStr := c.FormValue("jsonData")
+		fmt.Println("Received jsonDataStr:", jsonDataStr) // Debug log
+
+		if jsonDataStr == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "No JSON data provided"})
+		}
+
+		if err := json.Unmarshal([]byte(jsonDataStr), &importData); err != nil {
+			fmt.Println("JSON unmarshal error:", err) // Debug log
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid JSON data: " + err.Error()})
+		}
+	} else {
+		fmt.Println("Successfully parsed JSON from body") // Debug log
+	}
+
+	fmt.Println("Parsed import data length:", len(importData)) // Debug log
+	if len(importData) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "No data to import"})
+	}
+
+	fmt.Println("First row sample:", importData[0]) // Debug log
+
+	var importedCount int
+	var errors []string
+
+	// Process each row with individual transactions
+	for i, row := range importData {
+		rowNum := i + 1
+
+		// Skip empty rows
+		if row["Name"] == nil || row["Name"] == "" {
+			continue
+		}
+
+		fmt.Printf("Processing row %d: Name=%s, Code=%s\n", rowNum, getStringValue(row["Name"]), getStringValue(row["Code"]))
+
+		// Start a transaction for this row
+		tx := productsDB.Begin()
+
+		// Get basic product data
+		name := getStringValue(row["Name"])
+		code := getStringValue(row["Code"])
+		hsnCode := getStringValue(row["HSN Code"])
+		importance := getStringValue(row["Importance"])
+		productType := getStringValue(row["Product Type"])
+		minStock := getIntValue(row["Minimum Stock"])
+		categoryName := getStringValue(row["Category"])
+		subcategoryName := getStringValue(row["Subcategory"])
+		unitName := getStringValue(row["Unit"])
+		productMode := getStringValue(row["Product Mode"])
+		moq := getIntValue(row["MOQ"])
+		storeName := getStringValue(row["Store"])
+		taxName := getStringValue(row["Tax"])
+		gstPercent := getFloatValue(row["GST %"])
+		description := getStringValue(row["Description"])
+		internalNotes := getStringValue(row["Internal Notes"])
+		status := getStringValue(row["Status"])
+
+		// Get variant-specific data
+		colorCode := getStringValue(row["Color Code"])
+		size := getStringValue(row["Size"])
+		sku := getStringValue(row["SKU"])
+		barcode := getStringValue(row["Barcode"])
+		purchaseCost := getFloatValue(row["Purchase Cost"])
+		salesPrice := getFloatValue(row["Sales Price"])
+		stock := getIntValue(row["Stock"])
+		leadTime := getIntValue(row["Lead Time"])
+		imagesStr := getStringValue(row["Images"])
+
+		// Validate required fields
+		if name == "" || code == "" {
+			errors = append(errors, fmt.Sprintf("Row %d: Name and Code are required", rowNum))
+			tx.Rollback() // Rollback this row's transaction
+			continue
+		}
+
+		// Check if product with same code already exists
+		var productExists models.Product
+		if result := tx.Where("code = ?", code).First(&productExists); result.RowsAffected > 0 {
+			errors = append(errors, fmt.Sprintf("Row %d: Product with code %s already exists", rowNum, code))
+			tx.Rollback() // Rollback this row's transaction
+			continue
+		}
+
+		// Create product with default values
+		product := models.Product{
+			Name:          name,
+			Code:          code,
+			HsnSacCode:    hsnCode,
+			Importance:    importance,
+			ProductType:   productType,
+			MinimumStock:  minStock,
+			ProductMode:   productMode,
+			Moq:           moq,
+			GstPercent:    gstPercent,
+			Description:   description,
+			InternalNotes: internalNotes,
+			IsActive:      strings.ToLower(status) == "active" || status == "",
+		}
+
+		// Set default values
+		if product.Importance == "" {
+			product.Importance = "Normal"
+		}
+		if product.ProductType == "" {
+			product.ProductType = "Single"
+		}
+		if product.ProductMode == "" {
+			product.ProductMode = "Physical"
+		}
+
+		// Handle category
+		if categoryName != "" {
+			var category models.Category
+			if err := tx.Where("name = ?", categoryName).First(&category).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					errors = append(errors, fmt.Sprintf("Row %d: Category '%s' not found", rowNum, categoryName))
+					tx.Rollback()
+					continue
+				} else {
+					errors = append(errors, fmt.Sprintf("Row %d: Error finding category %s: %v", rowNum, categoryName, err))
+					tx.Rollback()
+					continue
+				}
+			}
+			product.CategoryID = &category.ID
+
+			// Handle subcategory if category exists
+			if subcategoryName != "" {
+				var subcategory models.Subcategory
+				if err := tx.Where("name = ? AND category_id = ?", subcategoryName, category.ID).First(&subcategory).Error; err != nil {
+					if err == gorm.ErrRecordNotFound {
+						errors = append(errors, fmt.Sprintf("Row %d: Subcategory '%s' not found in category '%s'", rowNum, subcategoryName, categoryName))
+						tx.Rollback()
+						continue
+					} else {
+						errors = append(errors, fmt.Sprintf("Row %d: Error finding subcategory %s: %v", rowNum, subcategoryName, err))
+						tx.Rollback()
+						continue
+					}
+				}
+				product.SubcategoryID = &subcategory.ID
+			}
+		}
+
+		// Handle unit
+		if unitName != "" {
+			var unit models.Unit
+			if err := tx.Where("name = ?", unitName).First(&unit).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					errors = append(errors, fmt.Sprintf("Row %d: Unit '%s' not found", rowNum, unitName))
+					tx.Rollback()
+					continue
+				} else {
+					errors = append(errors, fmt.Sprintf("Row %d: Error finding unit %s: %v", rowNum, unitName, err))
+					tx.Rollback()
+					continue
+				}
+			}
+			product.UnitID = &unit.ID
+		}
+
+		// Handle store
+		if storeName != "" {
+			var store models.Store
+			if err := tx.Where("name = ?", storeName).First(&store).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					errors = append(errors, fmt.Sprintf("Row %d: Store '%s' not found", rowNum, storeName))
+					tx.Rollback()
+					continue
+				} else {
+					errors = append(errors, fmt.Sprintf("Row %d: Error finding store %s: %v", rowNum, storeName, err))
+					tx.Rollback()
+					continue
+				}
+			}
+			product.StoreID = &store.ID
+		}
+
+		// Handle tax
+		if taxName != "" {
+			var tax models.Tax
+			if err := tx.Where("name = ?", taxName).First(&tax).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					errors = append(errors, fmt.Sprintf("Row %d: Tax '%s' not found", rowNum, taxName))
+					tx.Rollback()
+					continue
+				} else {
+					errors = append(errors, fmt.Sprintf("Row %d: Error finding tax %s: %v", rowNum, taxName, err))
+					tx.Rollback()
+					continue
+				}
+			}
+			product.TaxID = &tax.ID
+		}
+
+		// Create the product
+		if err := tx.Create(&product).Error; err != nil {
+			errors = append(errors, fmt.Sprintf("Row %d: Failed to create product: %v", rowNum, err))
+			tx.Rollback()
+			continue
+		}
+
+		// Parse images if provided
+		var images models.StringArray
+		if imagesStr != "" {
+			for _, img := range strings.Split(imagesStr, ";") {
+				if img = strings.TrimSpace(img); img != "" {
+					images = append(images, img)
+				}
+			}
+		}
+
+		// Create product variant
+		variant := models.ProductVariant{
+			ProductID:     product.ID,
+			Color:         colorCode,
+			Size:          size,
+			SKU:           sku,
+			Barcode:       barcode,
+			PurchaseCost:  purchaseCost,
+			StdSalesPrice: salesPrice,
+			Stock:         stock,
+			LeadTime:      leadTime,
+			Images:        images,
+			IsActive:      product.IsActive,
+		}
+
+		// Create the variant
+		if err := tx.Create(&variant).Error; err != nil {
+			errors = append(errors, fmt.Sprintf("Row %d: Failed to create product variant: %v", rowNum, err))
+			tx.Rollback()
+			continue
+		}
+
+		// Commit this row's transaction
+		if err := tx.Commit().Error; err != nil {
+			errors = append(errors, fmt.Sprintf("Row %d: Failed to commit transaction: %v", rowNum, err))
+			continue
+		}
+
+		importedCount++
+	}
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "Products imported successfully",
+		"imported": importedCount,
+		"errors":   errors,
+	})
+}
+
+func getStringValue(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+	if str, ok := val.(string); ok {
+		return str
+	}
+	return ""
+}
+
+func getIntValue(val interface{}) int {
+	if val == nil {
+		return 0
+	}
+	if num, ok := val.(int); ok {
+		return num
+	}
+	if num, ok := val.(float64); ok {
+		return int(num)
+	}
+	if str, ok := val.(string); ok {
+		if str == "" {
+			return 0
+		}
+		if num, err := strconv.Atoi(str); err == nil {
+			return num
+		}
+	}
+	return 0
+}
+
+func getFloatValue(val interface{}) float64 {
+	if val == nil {
+		return 0.0
+	}
+	if num, ok := val.(float64); ok {
+		return num
+	}
+	if str, ok := val.(string); ok {
+		if str == "" {
+			return 0.0
+		}
+		if num, err := strconv.ParseFloat(str, 64); err == nil {
+			return num
+		}
+	}
+	return 0.0
+}
+
+func getBoolValue(val interface{}) bool {
+	if val == nil {
+		return true
+	}
+	if b, ok := val.(bool); ok {
+		return b
+	}
+	if str, ok := val.(string); ok {
+		return strings.ToLower(str) == "active"
+	}
+	return true
 }
