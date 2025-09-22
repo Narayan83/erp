@@ -121,31 +121,12 @@ func DeleteUnit(c *fiber.Ctx) error {
 			return c.Status(404).JSON(fiber.Map{"error": "Unit not found"})
 		}
 
-		// Find products using this unit
-		var products []models.Product
-		if err := unitsDB.Where("unit_id = ?", id).Find(&products).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to find products for unit: " + err.Error()})
+		// Find products using this unit and set their unit_id to NULL
+		if err := unitsDB.Model(&models.Product{}).Where("unit_id = ?", id).Update("unit_id", nil).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update products: " + err.Error()})
 		}
 
-		// If there are products, find and delete their variants, then the products themselves
-		if len(products) > 0 {
-			var productIDs []uint
-			for _, p := range products {
-				productIDs = append(productIDs, p.ID)
-			}
-
-			// Delete product variants associated with these products
-			if err := unitsDB.Where("product_id IN ?", productIDs).Delete(&models.ProductVariant{}).Error; err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to delete product variants: " + err.Error()})
-			}
-
-			// Delete the products
-			if err := unitsDB.Where("id IN ?", productIDs).Delete(&models.Product{}).Error; err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to delete products: " + err.Error()})
-			}
-		}
-
-		// Now, it's safe to delete the unit
+		// Now, delete the unit
 		if err := unitsDB.Delete(&unit).Error; err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete unit: " + err.Error()})
 		}
