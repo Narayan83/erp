@@ -28,6 +28,8 @@ import {
   Divider,
   Autocomplete
 } from "@mui/material";
+
+import EnhancedEditableCell from "../Components/EnhancedEditableCell";
 import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -641,6 +643,9 @@ const FiltersRow = memo(function FiltersRow({
   categories,
   allSubcategories,
   stores,
+  hsnCodes,
+  units,
+  sizes,
   setPage,
   visibleColumns,
   handleExport,
@@ -1367,6 +1372,9 @@ export default function ProductListPage() {
   const [categories, setCategories] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
   const [stores, setStores] = useState([]);
+  const [hsnCodes, setHsnCodes] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [sizes, setSizes] = useState([]);
   
   // Define default filters
   const defaultFilters = { 
@@ -1546,19 +1554,6 @@ export default function ProductListPage() {
     });
   }, [products]);
 
-  // Fetch subcategories on mount
-  useEffect(() => {
-    const fetchSubcategories = async () => {
-      try {
-        const res = await axios.get(`${BASE_URL}/api/subcategories`);
-        setAllSubcategories(res.data.data);
-      } catch (err) {
-        setAllSubcategories([]);
-      }
-    };
-    fetchSubcategories();
-  }, []);
-
   // Sync initial values (runs once)
   useEffect(() => {
     setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
@@ -1601,14 +1596,109 @@ export default function ProductListPage() {
 
   const fetchMeta = async () => {
     try {
-      const [catRes, storeRes] = await Promise.all([
-        axios.get(`${BASE_URL}/api/categories`),
-        axios.get(`${BASE_URL}/api/stores`),
+      console.log("Fetching dropdown data from backend...");
+      
+      // Fetch all metadata in parallel
+      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes] = await Promise.all([
+        axios.get(`${BASE_URL}/api/categories`).catch(err => {
+          console.error("Error fetching categories:", err);
+          return { data: [] };
+        }),
+        axios.get(`${BASE_URL}/api/subcategories`).catch(err => {
+          console.error("Error fetching subcategories:", err);
+          return { data: [] };
+        }),
+        axios.get(`${BASE_URL}/api/stores`).catch(err => {
+          console.error("Error fetching stores:", err);
+          return { data: [] };
+        }),
+        axios.get(`${BASE_URL}/api/hsncodes`).catch(err => {
+          console.error("Error fetching hsncodes:", err);
+          return { data: [] };
+        }),
+        axios.get(`${BASE_URL}/api/units`).catch(err => {
+          console.error("Error fetching units:", err);
+          return { data: [] };
+        }),
+        axios.get(`${BASE_URL}/api/sizes`).catch(err => {
+          console.error("Error fetching sizes:", err);
+          return { data: [] };
+        }),
       ]);
-      setCategories(catRes.data.data);
-      setStores(storeRes.data.data);
+      
+      // Handle different response structures and ensure we have arrays
+      const processData = (response) => {
+        if (!response || !response.data) return [];
+        const data = response.data.data || response.data;
+        return Array.isArray(data) ? data : [];
+      };
+      
+      const categoriesData = processData(catRes);
+      const subcategoriesData = processData(subRes);
+      const storesData = processData(storeRes);
+      const hsnCodesData = processData(hsnRes);
+      const unitsData = processData(unitRes);
+      const sizesData = processData(sizeRes);
+      
+      // Log the first item of each type to check data structure
+      console.log("Dropdown data samples:");
+      if (categoriesData.length > 0) console.log("Category sample:", categoriesData[0]);
+      if (subcategoriesData.length > 0) console.log("Subcategory sample:", subcategoriesData[0]);
+      if (storesData.length > 0) console.log("Store sample:", storesData[0]);
+      if (hsnCodesData.length > 0) console.log("HSN Code sample:", hsnCodesData[0]);
+      if (unitsData.length > 0) console.log("Unit sample:", unitsData[0]);
+      if (sizesData.length > 0) console.log("Size sample:", sizesData[0]);
+      
+      // Log the counts
+      console.log("Dropdown data counts:");
+      console.log("Categories:", categoriesData.length);
+      console.log("Subcategories:", subcategoriesData.length);
+      console.log("Stores:", storesData.length);
+      console.log("HSN Codes:", hsnCodesData.length);
+      console.log("Units:", unitsData.length);
+      console.log("Sizes:", sizesData.length);
+      
+      // Detailed logging of raw HSN codes data
+      console.log("Raw HSN codes data (first item):", hsnCodesData.length > 0 ? hsnCodesData[0] : "No HSN data");
+      
+      // Standardize HSN codes format if needed
+      const standardizedHsnCodes = hsnCodesData.map(hsn => {
+        // Based on the backend model, we know the structure should be:
+        // { id: number, code: string, tax_id: number, Tax: { ... } }
+        
+        // Create a standardized HSN object
+        return {
+          id: hsn.id || hsn.ID,
+          code: String(hsn.code || hsn.Code || ''),
+          tax_id: hsn.tax_id || hsn.taxId || hsn.TaxID,
+          Tax: hsn.Tax || hsn.tax || {},
+          // Add extra fields for compatibility with dropdown component
+          tax: hsn.Tax || hsn.tax || {}
+        };
+      });
+      
+      // Log the standardized HSN codes
+      console.log("Standardized HSN codes (first item):", standardizedHsnCodes.length > 0 ? standardizedHsnCodes[0] : "No HSN data");
+      
+      // Update state with the processed data
+      setCategories(categoriesData);
+      setAllSubcategories(subcategoriesData);
+      setStores(storesData);
+      setHsnCodes(standardizedHsnCodes);
+      setUnits(unitsData);
+      setSizes(sizesData);
+      
+      return {
+        categories: categoriesData,
+        subcategories: subcategoriesData,
+        stores: storesData,
+        hsnCodes: standardizedHsnCodes,
+        units: unitsData,
+        sizes: sizesData
+      };
     } catch (err) {
-      console.error("Error fetching meta:", err);
+      console.error("Error fetching dropdown data:", err);
+      return null;
     }
   };
 
@@ -2081,6 +2171,8 @@ export default function ProductListPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [importedData, setImportedData] = useState([]);
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
 
   const handleOpenView = async (id) => {
     try {
@@ -2367,16 +2459,16 @@ export default function ProductListPage() {
     const headers = [
       'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
       'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
-      'GST %', 'Description', 'Internal Notes', 'Status', 'Color Code', 'Size',
-      'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time', 'Images'
+      'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
+      'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
     ].join(',');
     
     // Create template data row with example values
     const exampleRow = [
       'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
       'Electronics', 'Mobiles', 'Piece', 'Physical', '5', 'Main Store', 'GST',
-      '18', 'Product description', 'Internal notes', 'Active', 'Red', 'Large',
-      'SKU001', 'BAR001', '100', '150', '20', '3', 'image1.jpg;image2.jpg'
+      '18', 'Product description', 'Internal notes', 'Active', 'Large',
+      'SKU001', 'BAR001', '100', '150', '20', '3'
     ].join(',');
     
     // Combine headers and example row
@@ -2535,48 +2627,34 @@ export default function ProductListPage() {
             return;
           }
 
-          // Send data to backend as JSON
-          console.log('Sending import data:', objectData); // Debug log
-
-          const response = await axios.post(`${BASE_URL}/api/products/import`, objectData, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-
-          console.log('Import response:', response.data); // Debug log
+          // Refresh metadata from backend before showing preview
+          console.log("Refreshing metadata before opening preview dialog...");
           
-          // Show success message or error details
-          if (response.data.errors && response.data.errors.length > 0) {
-            const errorMessage = `Imported ${response.data.imported} product(s) with ${response.data.errors.length} error(s):\n\n${response.data.errors.slice(0, 5).join('\n')}${
-              response.data.errors.length > 5 ? `\n\n...and ${response.data.errors.length - 5} more errors.` : ''
-            }`;
-            alert(errorMessage);
-          } else {
-            alert(`Successfully imported ${response.data.imported || objectData.length} products!`);
+          try {
+            // Explicitly fetch dropdown data to ensure it's available
+            const metaData = await fetchMeta();
+            
+            if (!metaData) {
+              console.error("Failed to fetch dropdown data for import preview");
+              alert("Failed to load dropdown data for import preview. Some dropdown options may not work correctly.");
+            } else {
+              console.log("Successfully fetched dropdown data for import preview");
+            }
+            
+            // Store the parsed data and open the preview dialog
+            setImportedData(objectData);
+            setImportDialogOpen(false);
+            setImportPreviewOpen(true);
+            setImportLoading(false);
+          } catch (err) {
+            console.error("Error preparing import preview:", err);
+            alert("Error preparing import preview: " + (err.message || "Unknown error"));
+            setImportLoading(false);
           }
           
-          setImportDialogOpen(false);
-          setImportFile(null);
-          
-          // Reset filters and pagination to show newly imported products
-          setPage(0);
-          setFilters(defaultFilters);
-          setDebouncedFilters({...defaultFilters});
-          setInputFilters({ 
-            name: "", code: "", productType: "", stock: "", moq: "", 
-            leadTime: "", note: "", color: "", size: "", sku: "", 
-            barcode: "", purchaseCost: "", salesPrice: "" 
-          });
-          
-          // Use checkAPI to force a clean fetch without filters
-          console.log('Calling checkAPI after import to refresh data...'); // Debug log
-          await checkAPI();
-          console.log('checkAPI completed, products state:', products); // Debug log
         } catch (error) {
           console.error('Error importing products:', error);
-          alert(`Failed to import products: ${error.response?.data?.error || error.message}`);
-        } finally {
+          alert(`Failed to import products: ${error.message}`);
           setImportLoading(false);
         }
       };
@@ -2593,6 +2671,57 @@ export default function ProductListPage() {
   const pageIds = products.map(p => p.ID);
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
   const somePageSelected = pageIds.some(id => selectedIds.includes(id)) && !allPageSelected;
+
+  // Handle final import after preview/edit
+  const handleFinalImport = async () => {
+    setImportLoading(true);
+    try {
+      // Send data to backend as JSON
+      console.log('Sending import data:', importedData); // Debug log
+
+      const response = await axios.post(`${BASE_URL}/api/products/import`, importedData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Import response:', response.data); // Debug log
+      
+      // Show success message or error details
+      if (response.data.errors && response.data.errors.length > 0) {
+        const errorMessage = `Imported ${response.data.imported} product(s) with ${response.data.errors.length} error(s):\n\n${response.data.errors.slice(0, 5).join('\n')}${
+          response.data.errors.length > 5 ? `\n\n...and ${response.data.errors.length - 5} more errors.` : ''
+        }`;
+        alert(errorMessage);
+      } else {
+        alert(`Successfully imported ${response.data.imported || importedData.length} products!`);
+      }
+      
+      setImportPreviewOpen(false);
+      setImportFile(null);
+      setImportedData([]);
+      
+      // Reset filters and pagination to show newly imported products
+      setPage(0);
+      setFilters(defaultFilters);
+      setDebouncedFilters({...defaultFilters});
+      setInputFilters({ 
+        name: "", code: "", productType: "", stock: "", moq: "", 
+        leadTime: "", note: "", color: "", size: "", sku: "", 
+        barcode: "", purchaseCost: "", salesPrice: "" 
+      });
+      
+      // Use checkAPI to force a clean fetch without filters
+      console.log('Calling checkAPI after import to refresh data...'); // Debug log
+      await checkAPI();
+      console.log('checkAPI completed, products state:', products); // Debug log
+    } catch (error) {
+      console.error('Error importing products:', error);
+      alert(`Failed to import products: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   // Debug logs for direct API check
   const checkAPI = async () => {
@@ -2902,7 +3031,6 @@ export default function ProductListPage() {
               </Grid>
               <Grid item xs={4}>
                 <Typography variant="body2" color="textSecondary">• Status</Typography>
-                <Typography variant="body2" color="textSecondary">• Color Code</Typography>
                 <Typography variant="body2" color="textSecondary">• Size</Typography>
                 <Typography variant="body2" color="textSecondary">• SKU</Typography>
                 <Typography variant="body2" color="textSecondary">• Barcode</Typography>
@@ -2910,7 +3038,6 @@ export default function ProductListPage() {
                 <Typography variant="body2" color="textSecondary">• Sales Price</Typography>
                 <Typography variant="body2" color="textSecondary">• Stock</Typography>
                 <Typography variant="body2" color="textSecondary">• Lead Time</Typography>
-                <Typography variant="body2" color="textSecondary">• Images</Typography>
               </Grid>
             </Grid>
             <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
@@ -3291,6 +3418,209 @@ export default function ProductListPage() {
           />
         </Box>
       </Paper>
+
+      {/* Import Preview Dialog */}
+      <Dialog 
+        open={importPreviewOpen} 
+        onClose={() => setImportPreviewOpen(false)} 
+        maxWidth="xl" 
+        fullWidth
+        onEnter={async () => {
+          console.log("Import Preview Dialog opened");
+          
+          // Check if we have dropdown data
+          const hasAllDropdownData = 
+            categories?.length > 0 && 
+            allSubcategories?.length > 0 && 
+            stores?.length > 0 && 
+            hsnCodes?.length > 0 && 
+            units?.length > 0 && 
+            sizes?.length > 0;
+          
+          console.log("Current dropdown data status:");
+          console.log("- Categories:", categories?.length || 0);
+          console.log("- Subcategories:", allSubcategories?.length || 0);
+          console.log("- Stores:", stores?.length || 0);
+          console.log("- HSN Codes:", hsnCodes?.length || 0);
+          console.log("- Units:", units?.length || 0);
+          console.log("- Sizes:", sizes?.length || 0);
+          
+          // Log column keys to help identify field name mismatches
+          if (importedData.length > 0) {
+            console.log("CSV Column Keys:", Object.keys(importedData[0]));
+          }
+          
+          // If any data is missing, fetch it all
+          if (!hasAllDropdownData) {
+            console.log("Some dropdown data is missing, fetching from backend...");
+            try {
+              // Force a direct fetch of HSN codes
+              if (!hsnCodes?.length) {
+                console.log("Directly fetching HSN codes...");
+                const hsnResponse = await axios.get(`${BASE_URL}/api/hsncodes`);
+                const hsnData = hsnResponse.data?.data || [];
+                
+                if (Array.isArray(hsnData) && hsnData.length > 0) {
+                  console.log("Successfully fetched HSN codes:", hsnData.length);
+                  console.log("Sample HSN code:", hsnData[0]);
+                  
+                  // Process and set HSN codes
+                  const standardizedHsnCodes = hsnData.map(hsn => ({
+                    id: hsn.id,
+                    code: String(hsn.code || ''),
+                    tax_id: hsn.tax_id,
+                    Tax: hsn.Tax || {},
+                    tax: hsn.Tax || {}
+                  }));
+                  
+                  setHsnCodes(standardizedHsnCodes);
+                }
+              }
+              
+              // Fetch all other metadata
+              const metaData = await fetchMeta();
+              if (metaData) {
+                console.log("Successfully fetched dropdown data in dialog open");
+                console.log("Updated dropdown data counts:");
+                console.log("- Categories:", metaData.categories?.length || 0);
+                console.log("- Subcategories:", metaData.subcategories?.length || 0);
+                console.log("- Stores:", metaData.stores?.length || 0);
+                console.log("- HSN Codes:", metaData.hsnCodes?.length || 0);
+                console.log("- Units:", metaData.units?.length || 0);
+                console.log("- Sizes:", metaData.sizes?.length || 0);
+              } else {
+                console.error("Failed to fetch dropdown data in dialog open");
+              }
+            } catch (err) {
+              console.error("Error fetching dropdown data in dialog:", err);
+            }
+          }
+        }}
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Preview and Edit Import Data</Typography>
+            <Typography variant="subtitle2" color="textSecondary">
+              {importedData.length} records to import
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Review and edit the data before finalizing the import. Click on any cell to edit directly in the table.
+          </Typography>
+          
+          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
+                  {importedData.length > 0 && Object.keys(importedData[0]).map((header) => (
+                    <TableCell key={header} sx={{ fontWeight: 'bold' }}>{header}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {importedData.map((row, rowIndex) => (
+                  <TableRow key={rowIndex} hover>
+                    <TableCell>{rowIndex + 1}</TableCell>
+                    {Object.keys(row).map((key, cellIndex) => {
+                      // Enhanced column key debugging
+                      const columnKeyLower = key.toLowerCase();
+                      const normalizedKey = columnKeyLower
+                        .replace(/\s+/g, '')  // Remove spaces
+                        .replace(/^hsn(code)?$/, 'hsn') // Normalize HSN/HSN Code to hsn
+                        .replace(/^hsnnum(ber)?$/, 'hsn') // Also catch HSN Number variations
+                        .replace(/^categoryname$/, 'category') // Normalize CategoryName
+                        .replace(/^subcategoryname$/, 'subcategory') // Normalize SubcategoryName
+                        .replace(/^storename$/, 'store') // Normalize StoreName
+                        .replace(/^unitname$/, 'unit') // Normalize UnitName
+                        .replace(/^sizename$/, 'size'); // Normalize SizeName
+                      
+                      const isDropdownColumn = ['category', 'subcategory', 'store', 'producttype', 
+                        'status', 'importance', 'hsn', 'unit', 'productmode', 'size'].includes(normalizedKey);
+                      
+                      // Detailed debugging for first row cells
+                      if (rowIndex === 0) {
+                        console.log(`Column "${key}": normalized="${normalizedKey}", isDropdown=${isDropdownColumn}`);
+                        
+                        // Special debugging for dropdown columns
+                        if (isDropdownColumn) {
+                          // Check dropdown data availability
+                          let availableOptions = [];
+                          let dataSource = [];
+                          
+                          if (normalizedKey === 'category' && Array.isArray(categories)) {
+                            dataSource = categories;
+                            availableOptions = categories.map(c => c.Name || c.name).filter(Boolean);
+                          } else if (normalizedKey === 'subcategory' && Array.isArray(allSubcategories)) {
+                            dataSource = allSubcategories;
+                            availableOptions = allSubcategories.map(s => s.Name || s.name).filter(Boolean);
+                          } else if (normalizedKey === 'store' && Array.isArray(stores)) {
+                            dataSource = stores;
+                            availableOptions = stores.map(s => s.Name || s.name).filter(Boolean);
+                          } else if (normalizedKey === 'hsn' && Array.isArray(hsnCodes)) {
+                            dataSource = hsnCodes;
+                            availableOptions = hsnCodes.map(h => h.code || h.Code || '').filter(Boolean);
+                          } else if (normalizedKey === 'unit' && Array.isArray(units)) {
+                            dataSource = units;
+                            availableOptions = units.map(u => u.Name || u.name).filter(Boolean);
+                          } else if (normalizedKey === 'size' && Array.isArray(sizes)) {
+                            dataSource = sizes;
+                            availableOptions = sizes.map(s => s.Name || s.name).filter(Boolean);
+                          }
+                          
+                          console.log(`  - ${key}: ${dataSource.length} items available, sample options:`, 
+                            availableOptions.slice(0, 3));
+                        }
+                      }
+                      
+                      return (
+                        <EnhancedEditableCell
+                          key={`${rowIndex}-${cellIndex}`}
+                          value={row[key]}
+                          rowIndex={rowIndex}
+                          columnKey={key}
+                          row={row}
+                          onUpdate={(rowIdx, colKey, newValue) => {
+                            const updatedData = [...importedData];
+                            updatedData[rowIdx] = { ...updatedData[rowIdx], [colKey]: newValue };
+                            setImportedData(updatedData);
+                          }}
+                          categories={categories}
+                          allSubcategories={allSubcategories}
+                          stores={stores}
+                          hsnCodes={hsnCodes}
+                          units={units}
+                          sizes={sizes}
+                        />
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setImportPreviewOpen(false);
+              setImportedData([]);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleFinalImport}
+            disabled={importLoading}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Finalize Import'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );
