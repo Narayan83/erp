@@ -354,6 +354,10 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Product Type"
           />
           <FormControlLabel
+            control={<Checkbox checked={columns.productMode} onChange={handleColumnToggle('productMode')} />}
+            label="Product Mode"
+          />
+          <FormControlLabel
             control={<Checkbox checked={columns.stock} onChange={handleColumnToggle('stock')} />}
             label="Stock"
           />
@@ -458,6 +462,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           {visibleColumns.subcategory && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Subcategory?.Name || ''}</TableCell>}
           {visibleColumns.store && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Store?.Name}</TableCell>}
           {visibleColumns.productType && <TableCell sx={{ py: 0.5, width: 120 }}>{p.ProductType || ''}</TableCell>}
+          {visibleColumns.productMode && <TableCell sx={{ py: 0.5, width: 120 }}>{p.ProductMode || p.product_mode || 'Physical'}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
             <TableCell sx={{ py: 0.5, width: 100 }}>
@@ -835,6 +840,31 @@ const FiltersRow = memo(function FiltersRow({
               <TextField
                 {...params}
                 placeholder="Select Product Type"
+                fullWidth
+                size="small"
+              />
+            )}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.productMode && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            options={[
+              { value: 'Purchase', label: 'Purchase' },
+              { value: 'Internal Manufacturing', label: 'Internal Manufacturing' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={filters.productMode ? { value: filters.productMode, label: filters.productMode } : null}
+            onChange={(event, newValue) => {
+              const val = newValue ? newValue.value : "";
+              setFilters({ ...filters, productMode: val });
+              setPage(0);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Select Product Mode"
                 fullWidth
                 size="small"
               />
@@ -1371,7 +1401,7 @@ export default function ProductListPage() {
   // Define default filters
   const defaultFilters = { 
     name: "", code: "", categoryID: null, subcategoryID: null, storeID: null, 
-    productType: "", stock: "", moq: "", leadTime: "", note: "", status: null, 
+    productType: "", productMode: "", stock: "", moq: "", leadTime: "", note: "", status: null, 
     importance: null, color: "", size: "", sku: "", barcode: "", 
     purchaseCost: "", salesPrice: "" 
   };
@@ -1423,6 +1453,7 @@ export default function ProductListPage() {
       subcategory: true,
       store: true,
       productType: true,
+      productMode: true,
       stock: true,
       moq: true,
       leadTime: true,
@@ -1513,6 +1544,8 @@ export default function ProductListPage() {
     }
   };
 
+
+
   // Update autocomplete options when products data changes
   useEffect(() => {
     // Clear existing autocomplete options when products change
@@ -1561,7 +1594,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, productMode: filters.productMode, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -1572,6 +1605,7 @@ export default function ProductListPage() {
           prev.name === inputFilters.name &&
           prev.code === inputFilters.code &&
           prev.productType === inputFilters.productType &&
+          prev.productMode === inputFilters.productMode &&
           prev.stock === inputFilters.stock &&
           prev.moq === inputFilters.moq &&
           prev.leadTime === inputFilters.leadTime &&
@@ -1583,12 +1617,12 @@ export default function ProductListPage() {
           prev.purchaseCost === inputFilters.purchaseCost &&
           prev.salesPrice === inputFilters.salesPrice
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, productMode: inputFilters.productMode, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.productMode, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -1674,6 +1708,8 @@ export default function ProductListPage() {
           }
         });
         break;
+
+
 
       case 'stocks':
         products.forEach(product => {
@@ -1813,6 +1849,7 @@ export default function ProductListPage() {
     debounce((query) => fetchAutocompleteOptions('codes', query), 100),
     [products]
   );
+
   const debouncedFetchStocks = useCallback(
     debounce((query) => fetchAutocompleteOptions('stocks', query), 100),
     [products]
@@ -1879,6 +1916,7 @@ export default function ProductListPage() {
         name: debouncedFilters.name || "",
         code: debouncedFilters.code || "",
         product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
+        product_mode: debouncedFilters.productMode !== "" ? debouncedFilters.productMode : undefined,
         category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
         subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
         store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
@@ -2254,6 +2292,8 @@ export default function ProductListPage() {
         const filterParams = Object.entries({
           name: debouncedFilters.name,
           code: debouncedFilters.code,
+          product_type: debouncedFilters.productType !== "" ? debouncedFilters.productType : undefined,
+          product_mode: debouncedFilters.productMode !== "" ? debouncedFilters.productMode : undefined,
           category_id: debouncedFilters.categoryID != null ? debouncedFilters.categoryID : undefined,
           subcategory_id: debouncedFilters.subcategoryID != null ? debouncedFilters.subcategoryID : undefined,
           store_id: debouncedFilters.storeID != null ? debouncedFilters.storeID : undefined,
@@ -2564,7 +2604,7 @@ export default function ProductListPage() {
           setFilters(defaultFilters);
           setDebouncedFilters({...defaultFilters});
           setInputFilters({ 
-            name: "", code: "", productType: "", stock: "", moq: "", 
+            name: "", code: "", productType: "", productMode: "", stock: "", moq: "", 
             leadTime: "", note: "", color: "", size: "", sku: "", 
             barcode: "", purchaseCost: "", salesPrice: "" 
           });
@@ -3054,6 +3094,7 @@ export default function ProductListPage() {
                 {visibleColumns.subcategory && <TableCell sx={{fontWeight : "bold", width: 120}}>Subcategory</TableCell>}
                 {visibleColumns.store && <TableCell sx={{fontWeight : "bold", width: 120}}>Store</TableCell>}
                 {visibleColumns.productType && <TableCell sx={{fontWeight : "bold", width: 120}}>Product Type</TableCell>}
+                {visibleColumns.productMode && <TableCell sx={{fontWeight : "bold", width: 120}}>Product Mode</TableCell>}
                 {visibleColumns.stock && (
                   <TableCell sx={{fontWeight : "bold", width: 100}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
@@ -3212,6 +3253,7 @@ export default function ProductListPage() {
                     case 'codes':
                       debouncedFetchCodes(query);
                       break;
+
                     case 'stocks':
                       debouncedFetchStocks(query);
                       break;
