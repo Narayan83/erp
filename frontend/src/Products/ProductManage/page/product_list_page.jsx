@@ -830,6 +830,7 @@ const FiltersRow = memo(function FiltersRow({
         <TableCell sx={{ width: 120 }}>
           <Autocomplete
             options={[
+              { value: 'All', label: 'All' },
               { value: 'Finished Goods', label: 'Finished Goods' },
               { value: 'Semi-Finished Goods', label: 'Semi-Finished Goods' },
               { value: 'Raw Materials', label: 'Raw Materials' }
@@ -2206,6 +2207,9 @@ export default function ProductListPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [importedData, setImportedData] = useState([]);
   const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+  const [importSelectedRows, setImportSelectedRows] = useState(new Set());
+  const [importReportOpen, setImportReportOpen] = useState(false);
+  const [importReport, setImportReport] = useState(null);
 
   const handleOpenView = async (id) => {
     try {
@@ -2422,12 +2426,12 @@ export default function ProductListPage() {
         row.Code = p.Code;
         row['HSN Code'] = p.HsnSacCode ?? p.HSN ?? p.hsn ?? '';
         row.Importance = p.Importance ?? 'Normal';
-        row['Product Type'] = p.ProductType ?? p.productType ?? 'Single';
+        row['Product Type'] = p.ProductType ?? p.productType ?? 'Finished Goods';
         row['Minimum Stock'] = p.MinimumStock ?? p.minimumStock ?? '';
         row.Category = p.Category?.Name;
         row.Subcategory = p.Subcategory?.Name;
         row.Unit = p.Unit?.Name || p.Unit?.name || p.unit_name || '';
-        row['Product Mode'] = p.ProductMode ?? p.product_mode ?? 'Physical';
+        row['Product Mode'] = p.ProductMode ?? p.product_mode ?? 'Purchase';
         row.MOQ = p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? '';
         row.Store = p.Store?.Name;
         row.Tax = p.Tax?.Name ?? '';
@@ -2488,18 +2492,22 @@ export default function ProductListPage() {
   };
 
   const downloadTemplateCSV = () => {
-    // Create template CSV headers
-    const headers = [
+    // Create template CSV headers and mark required fields with an asterisk
+    const req = new Set(['name','code','hsn code','minimum stock','category','unit','store','tax','gst %','status']);
+    const headersArr = [
       'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
       'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
       'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
-    ].join(',');
+    ].map(h => {
+      return req.has(h.toLowerCase()) ? `${h} *` : h;
+    });
+    const headers = headersArr.join(',');
     
     // Create template data row with example values
     const exampleRow = [
       'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
-      'Electronics', 'Mobiles', 'Piece', 'Physical', '5', 'Main Store', 'GST',
+      'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'GST',
       '18', 'Product description', 'Internal notes', 'Active', 'Large',
       'SKU001', 'BAR001', '100', '150', '20', '3'
     ].join(',');
@@ -2562,12 +2570,15 @@ export default function ProductListPage() {
           console.log('Headers:', headers); // Debug log
           console.log('Data rows:', dataRows.length); // Debug log
           
-          // Validate required headers
-          const requiredHeaders = ['Name', 'Code'];
-          const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-          
-          if (missingHeaders.length > 0) {
-            alert(`Missing required headers: ${missingHeaders.join(', ')}. Please check your CSV file format.`);
+          // Validate required headers (allow visual marks like '*' or parentheses)
+          const headersNormalized = headers.map(h => String(h).toLowerCase().replace(/[^a-z0-9]/g, ''));
+          const requiredNormalized = ['name', 'code'];
+          const missingNormalized = requiredNormalized.filter(r => !headersNormalized.includes(r));
+
+          if (missingNormalized.length > 0) {
+            // Map back to human-readable names for the alert
+            const missingHuman = missingNormalized.map(m => m.charAt(0).toUpperCase() + m.slice(1));
+            alert(`Missing required headers: ${missingHuman.join(', ')}. Please check your CSV file format.`);
             setImportLoading(false);
             return;
           }
@@ -2674,8 +2685,10 @@ export default function ProductListPage() {
               console.log("Successfully fetched dropdown data for import preview");
             }
             
-            // Store the parsed data and open the preview dialog
+            // Store the parsed data, select all rows by default, and open the preview dialog
             setImportedData(objectData);
+            const allIdx = new Set(objectData.map((_, i) => i));
+            setImportSelectedRows(allIdx);
             setImportDialogOpen(false);
             setImportPreviewOpen(true);
             setImportLoading(false);
@@ -2705,14 +2718,98 @@ export default function ProductListPage() {
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
   const somePageSelected = pageIds.some(id => selectedIds.includes(id)) && !allPageSelected;
 
+  // Validate import data before sending
+  const validateImportData = (data) => {
+    const errors = [];
+    // All required fields based on importRequiredHeaders
+    const requiredFields = [
+      'Name', 'Code', 'HSN Code', 'Minimum Stock', 'Category', 
+      'Unit', 'Store', 'Tax', 'GST %', 'Status'
+    ];
+    
+    data.forEach((row, index) => {
+      const rowErrors = [];
+      
+      // Check required fields - all must be filled
+      requiredFields.forEach(field => {
+        const value = row[field];
+        if (!value || value.toString().trim() === '') {
+          rowErrors.push(`${field} is mandatory and cannot be empty`);
+        }
+      });
+      
+      // Validate numeric fields
+      const numericFields = ['Minimum Stock', 'MOQ', 'GST %', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'];
+      numericFields.forEach(field => {
+        if (row[field] && row[field].toString().trim() !== '' && isNaN(Number(row[field]))) {
+          rowErrors.push(`${field} must be a valid number`);
+        }
+      });
+      
+      // Validate Status field
+      if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+        rowErrors.push('Status must be "Active" or "Inactive"');
+      }
+      
+      // Validate Importance field
+      if (row['Importance'] && !['Low', 'Normal', 'High', 'Critical'].includes(row['Importance'])) {
+        rowErrors.push('Importance must be "Low", "Normal", "High", or "Critical"');
+      }
+      
+      // Validate Product Type
+      if (row['Product Type'] && ![ 'All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'].includes(row['Product Type'])) {
+        rowErrors.push('Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"');
+      }
+      
+      // Validate Product Mode
+      if (row['Product Mode'] && !['Purchase', 'Internal Manufacturing'].includes(row['Product Mode'])) {
+        rowErrors.push('Product Mode must be "Purchase", or "Internal Manufacturing"');
+      }
+      
+      if (rowErrors.length > 0) {
+        errors.push({
+          row: index + 1,
+          data: row,
+          errors: rowErrors
+        });
+      }
+    });
+    
+    return errors;
+  };
+
   // Handle final import after preview/edit
   const handleFinalImport = async () => {
     setImportLoading(true);
     try {
-      // Send data to backend as JSON
-      console.log('Sending import data:', importedData); // Debug log
+      // Send only selected rows to backend as JSON
+      const selectedArray = importedData.filter((_, idx) => importSelectedRows.has(idx));
+      if (selectedArray.length === 0) {
+        alert('No rows selected for import. Please select at least one row.');
+        setImportLoading(false);
+        return;
+      }
 
-      const response = await axios.post(`${BASE_URL}/api/products/import`, importedData, {
+      // Validate data before sending
+      const validationErrors = validateImportData(selectedArray);
+      if (validationErrors.length > 0) {
+        // Show validation errors in report dialog
+        setImportReport({
+          type: 'validation_error',
+          totalRows: selectedArray.length,
+          successCount: 0,
+          errorCount: validationErrors.length,
+          errors: validationErrors,
+          successes: []
+        });
+        setImportReportOpen(true);
+        setImportLoading(false);
+        return;
+      }
+
+      console.log('Sending import data (selected rows):', selectedArray); // Debug log
+
+      const response = await axios.post(`${BASE_URL}/api/products/import`, selectedArray, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -2720,19 +2817,25 @@ export default function ProductListPage() {
 
       console.log('Import response:', response.data); // Debug log
       
-      // Show success message or error details
-      if (response.data.errors && response.data.errors.length > 0) {
-        const errorMessage = `Imported ${response.data.imported} product(s) with ${response.data.errors.length} error(s):\n\n${response.data.errors.slice(0, 5).join('\n')}${
-          response.data.errors.length > 5 ? `\n\n...and ${response.data.errors.length - 5} more errors.` : ''
-        }`;
-        alert(errorMessage);
-      } else {
-        alert(`Successfully imported ${response.data.imported || importedData.length} products!`);
-      }
+      // Prepare import report
+      const report = {
+        type: 'import_complete',
+        totalRows: selectedArray.length,
+        successCount: response.data.imported || 0,
+        errorCount: (response.data.errors && response.data.errors.length) || 0,
+        errors: response.data.errors || [],
+        successes: response.data.successes || [],
+        skipped: response.data.skipped || 0
+      };
       
+      setImportReport(report);
+      setImportReportOpen(true);
+      
+      // Close preview dialog
       setImportPreviewOpen(false);
       setImportFile(null);
       setImportedData([]);
+      setImportSelectedRows(new Set());
       
       // Reset filters and pagination to show newly imported products
       setPage(0);
@@ -2750,7 +2853,20 @@ export default function ProductListPage() {
       console.log('checkAPI completed, products state:', products); // Debug log
     } catch (error) {
       console.error('Error importing products:', error);
-      alert(`Failed to import products: ${error.response?.data?.error || error.message}`);
+      
+      // Show error in report dialog
+      setImportReport({
+        type: 'import_failed',
+        totalRows: importedData.filter((_, idx) => importSelectedRows.has(idx)).length,
+        successCount: 0,
+        errorCount: 1,
+        errors: [{ 
+          row: 'Server Error', 
+          errors: [error.response?.data?.error || error.message || 'Unknown server error'] 
+        }],
+        successes: []
+      });
+      setImportReportOpen(true);
     } finally {
       setImportLoading(false);
     }
@@ -2794,6 +2910,32 @@ export default function ProductListPage() {
       setLoading(false);
     }
   };
+  // Required headers (normalized) for import preview marking
+  const importRequiredHeaders = new Set([
+    'name',
+    'code',
+    'hsn',
+    'minimumstock',
+    'category',
+    'unit',
+    'store',
+    'tax',
+    'gst',
+    'status'
+  ]);
+
+  const normalizeHeaderKey = (h) => {
+    if (!h && h !== 0) return '';
+    return String(h).toLowerCase().replace(/[^a-z0-9]/g, '');
+  };
+
+  // Full template headers for display in Import dialog
+  const importTemplateHeaders = [
+    'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
+    'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
+    'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
+    'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
+  ];
 
   return (
     <Box p={3}>
@@ -3039,42 +3181,31 @@ export default function ProductListPage() {
           
           <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Required CSV Headers:
+              CSV Template Headers (required fields are marked with a red *)
             </Typography>
             <Grid container spacing={1}>
-              <Grid item xs={4}>
-                <Typography variant="body2" color="textSecondary">• Name</Typography>
-                <Typography variant="body2" color="textSecondary">• Code</Typography>
-                <Typography variant="body2" color="textSecondary">• HSN Code</Typography>
-                <Typography variant="body2" color="textSecondary">• Importance</Typography>
-                <Typography variant="body2" color="textSecondary">• Product Type</Typography>
-                <Typography variant="body2" color="textSecondary">• Minimum Stock</Typography>
-                <Typography variant="body2" color="textSecondary">• Category</Typography>
-                <Typography variant="body2" color="textSecondary">• Subcategory</Typography>
-              </Grid>
-              <Grid item xs={4}>
-                <Typography variant="body2" color="textSecondary">• Unit</Typography>
-                <Typography variant="body2" color="textSecondary">• Product Mode</Typography>
-                <Typography variant="body2" color="textSecondary">• MOQ</Typography>
-                <Typography variant="body2" color="textSecondary">• Store</Typography>
-                <Typography variant="body2" color="textSecondary">• Tax</Typography>
-                <Typography variant="body2" color="textSecondary">• GST %</Typography>
-                <Typography variant="body2" color="textSecondary">• Description</Typography>
-                <Typography variant="body2" color="textSecondary">• Internal Notes</Typography>
-              </Grid>
-              <Grid item xs={4}>
-                <Typography variant="body2" color="textSecondary">• Status</Typography>
-                <Typography variant="body2" color="textSecondary">• Size</Typography>
-                <Typography variant="body2" color="textSecondary">• SKU</Typography>
-                <Typography variant="body2" color="textSecondary">• Barcode</Typography>
-                <Typography variant="body2" color="textSecondary">• Purchase Cost</Typography>
-                <Typography variant="body2" color="textSecondary">• Sales Price</Typography>
-                <Typography variant="body2" color="textSecondary">• Stock</Typography>
-                <Typography variant="body2" color="textSecondary">• Lead Time</Typography>
-              </Grid>
+              {(() => {
+                const cols = [[], [], []];
+                importTemplateHeaders.forEach((h, i) => cols[i % 3].push(h));
+                return cols.map((col, idx) => (
+                  <Grid item xs={4} key={idx}>
+                    {col.map((h) => {
+                      const normalized = normalizeHeaderKey(h);
+                      const isReq = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
+                      return (
+                        <Typography variant="body2" color="textSecondary" key={h} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <span>•</span>
+                          <span>{h}</span>
+                          {isReq && <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-hidden>*</span>}
+                        </Typography>
+                      );
+                    })}
+                  </Grid>
+                ));
+              })()}
             </Grid>
             <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
-              Note: Name and Code are required. Category, Unit, Store, and Tax must match existing entries in the system.
+              Note: Fields marked with * are required. Category, Unit, Store, and Tax must match existing entries in the system.
             </Typography>
           </Box>
           
@@ -3548,15 +3679,53 @@ export default function ProductListPage() {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ width: 60 }}>
+                    <Checkbox
+                      size="small"
+                      checked={importedData.length > 0 && importSelectedRows.size === importedData.length}
+                      indeterminate={importSelectedRows.size > 0 && importSelectedRows.size < importedData.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setImportSelectedRows(new Set(importedData.map((_, i) => i)));
+                        } else {
+                          setImportSelectedRows(new Set());
+                        }
+                      }}
+                    />
+                  </TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
-                  {importedData.length > 0 && Object.keys(importedData[0]).map((header) => (
-                    <TableCell key={header} sx={{ fontWeight: 'bold' }}>{header}</TableCell>
-                  ))}
+                  {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
+                    const normalized = normalizeHeaderKey(header);
+                    const isRequired = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
+                    return (
+                      <TableCell key={header} sx={{ fontWeight: 'bold' }}>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <span>{header}</span>
+                          {isRequired && (
+                            <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-label="required">*</span>
+                          )}
+                        </Box>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {importedData.map((row, rowIndex) => (
                   <TableRow key={rowIndex} hover>
+                    <TableCell>
+                      <Checkbox
+                        size="small"
+                        checked={importSelectedRows.has(rowIndex)}
+                        onChange={(e) => {
+                          setImportSelectedRows(prev => {
+                            const s = new Set(prev);
+                            if (e.target.checked) s.add(rowIndex); else s.delete(rowIndex);
+                            return s;
+                          });
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>{rowIndex + 1}</TableCell>
                     {Object.keys(row).map((key, cellIndex) => {
                       // Enhanced column key debugging
@@ -3653,6 +3822,215 @@ export default function ProductListPage() {
           >
             {importLoading ? <CircularProgress size={20} /> : 'Finalize Import'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Report Dialog */}
+      <Dialog 
+        open={importReportOpen} 
+        onClose={() => setImportReportOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">
+              {importReport?.type === 'validation_error' ? 'Validation Errors' : 
+               importReport?.type === 'import_failed' ? 'Import Failed' : 'Import Report'}
+            </Typography>
+            <Box display="flex" gap={2}>
+              {importReport?.type === 'import_complete' && (
+                <>
+                  <Typography variant="body2" color="success.main">
+                    ✓ {importReport.successCount} Imported
+                  </Typography>
+                  {importReport.errorCount > 0 && (
+                    <Typography variant="body2" color="error.main">
+                      ✗ {importReport.errorCount} Errors
+                    </Typography>
+                  )}
+                  {importReport.skipped > 0 && (
+                    <Typography variant="body2" color="warning.main">
+                      ⚠ {importReport.skipped} Skipped
+                    </Typography>
+                  )}
+                </>
+              )}
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {importReport && (
+            <Box>
+              {/* Summary */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle2" gutterBottom>Summary</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="textSecondary">Total Rows:</Typography>
+                    <Typography variant="h6">{importReport.totalRows}</Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="success.main">Successful:</Typography>
+                    <Typography variant="h6" color="success.main">{importReport.successCount}</Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="error.main">Errors:</Typography>
+                    <Typography variant="h6" color="error.main">{importReport.errorCount}</Typography>
+                  </Grid>
+                  {importReport.skipped > 0 && (
+                    <Grid item xs={3}>
+                      <Typography variant="body2" color="warning.main">Skipped:</Typography>
+                      <Typography variant="h6" color="warning.main">{importReport.skipped}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
+              {/* Errors Section */}
+              {importReport.errors && importReport.errors.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="error.main" gutterBottom>
+                    Errors ({importReport.errors.length})
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Row</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Code</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Error Details</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {importReport.errors.map((error, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{error.row}</TableCell>
+                            <TableCell>{error.data?.Name || 'N/A'}</TableCell>
+                            <TableCell>{error.data?.Code || 'N/A'}</TableCell>
+                            <TableCell>
+                              <Box>
+                                {Array.isArray(error.errors) ? error.errors.map((err, i) => {
+                                  const isMandatoryError = err.includes('mandatory') || err.includes('required');
+                                  return (
+                                    <Typography 
+                                      key={i} 
+                                      variant="body2" 
+                                      color="error.main" 
+                                      sx={{ 
+                                        mb: 0.5,
+                                        fontWeight: isMandatoryError ? 600 : 400,
+                                        bgcolor: isMandatoryError ? 'error.lighter' : 'transparent',
+                                        px: isMandatoryError ? 1 : 0,
+                                        py: isMandatoryError ? 0.5 : 0,
+                                        borderRadius: isMandatoryError ? 1 : 0
+                                      }}
+                                    >
+                                      {isMandatoryError ? '⚠ ' : '• '}{err}
+                                    </Typography>
+                                  );
+                                }) : (
+                                  <Typography variant="body2" color="error.main">
+                                    {error.errors || error.message || 'Unknown error'}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {/* Success Section */}
+              {importReport.successes && importReport.successes.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="success.main" gutterBottom>
+                    Successfully Imported ({importReport.successes.length})
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Row</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Code</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {importReport.successes.map((success, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{success.row}</TableCell>
+                            <TableCell>{success.data?.Name || success.name || 'N/A'}</TableCell>
+                            <TableCell>{success.data?.Code || success.code || 'N/A'}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="success.main">
+                                ✓ {success.action || 'Imported'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {/* Recommendations */}
+              {importReport.type === 'validation_error' && (
+                <Box sx={{ p: 2, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                  <Typography variant="subtitle2" color="warning.dark" gutterBottom>
+                    💡 How to Fix These Errors
+                  </Typography>
+                  <Typography variant="body2" color="warning.dark" sx={{ mb: 1 }}>
+                    <strong>Mandatory Fields (must be filled):</strong>
+                  </Typography>
+                  <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
+                    • Name, Code, HSN Code, Minimum Stock, Category, Unit, Store, Tax, GST %, Status
+                  </Typography>
+                  <Typography variant="body2" color="warning.dark">
+                    <strong>Additional Checks:</strong><br/>
+                    • Numeric fields (Minimum Stock, GST %, etc.) must contain valid numbers<br/>
+                    • Status must be "Active" or "Inactive"<br/>
+                    • Category, Unit, Store, Tax must match existing system entries<br/>
+                    • Fix errors in the preview table, then click "Finalize Import" again
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportReportOpen(false)}>Close</Button>
+          {importReport?.type === 'validation_error' && (
+            <Button 
+              variant="outlined" 
+              color="primary"
+              onClick={() => {
+                setImportReportOpen(false);
+                // Keep the preview dialog open so user can fix errors
+              }}
+            >
+              Fix Errors
+            </Button>
+          )}
+          {importReport?.type === 'import_complete' && importReport.successCount > 0 && (
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={() => {
+                setImportReportOpen(false);
+                // Optionally navigate to product list or refresh
+                window.location.reload(); // Simple refresh to show new products
+              }}
+            >
+              View Products
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

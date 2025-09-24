@@ -194,30 +194,25 @@ const EnhancedEditableCell = ({
     options = hsnCodes.map(hsn => {
       // Get the code from various possible field names
       const code = String(hsn.Code || hsn.code || '').trim();
-
-      // Get tax information - id, name and percentage - check multiple possible structures
-      let taxId = hsn.tax_id || hsn.taxId || hsn.TaxID || '';
-      let taxName = '';
+      
+      // Get tax percentage - check multiple possible structures
       let taxPercentage = '';
-      if (hsn.Tax) {
-        taxId = hsn.Tax.ID || hsn.Tax.id || taxId;
-        taxName = hsn.Tax.Name || hsn.Tax.name || '';
-        taxPercentage = hsn.Tax.Percentage ?? hsn.Tax.percentage ?? '';
-      } else if (hsn.tax) {
-        taxId = hsn.tax.ID || hsn.tax.id || taxId;
-        taxName = hsn.tax.Name || hsn.tax.name || '';
-        taxPercentage = hsn.tax.Percentage ?? hsn.tax.percentage ?? '';
+      if (hsn.Tax && typeof hsn.Tax.Percentage === 'number') {
+        taxPercentage = hsn.Tax.Percentage;
+      } else if (hsn.tax && typeof hsn.tax.Percentage === 'number') {
+        taxPercentage = hsn.tax.Percentage;
+      } else if (hsn.Tax && typeof hsn.Tax.percentage === 'number') {
+        taxPercentage = hsn.Tax.percentage;
+      } else if (hsn.tax && typeof hsn.tax.percentage === 'number') {
+        taxPercentage = hsn.tax.percentage;
       }
-
+      
       // Create a label with tax percentage if available
       const label = code;
-
-      return {
-        value: code,
-        label: label,
-        taxId: taxId,
-        taxName: taxName,
-        taxPercentage: taxPercentage,
+      
+      return { 
+        value: code, 
+        label: label 
       };
     }).filter(opt => opt.value && opt.value.length > 0);
     
@@ -253,64 +248,6 @@ const EnhancedEditableCell = ({
   const isDropdown = options.length > 0;
   
   const handleSave = () => {
-    // If this is an HSN field, attempt to auto-fill tax and GST columns in the same row
-    if (isHsnCode) {
-      // Save HSN value itself
-      onUpdate(rowIndex, columnKey, editValue);
-
-      // Find selected option metadata
-      const selectedOption = options.find(o => o.value === editValue);
-
-      // Normalize row keys for matching
-      const rowKeys = Object.keys(row || {});
-
-      if (selectedOption) {
-        const taxNameValue = selectedOption.taxName || '';
-        const taxIdValue = selectedOption.taxId || '';
-        const gstValue = selectedOption.taxPercentage !== '' ? Number(selectedOption.taxPercentage) : '';
-
-        // Update any tax-like columns (name) and tax-id columns and gst-like columns
-        rowKeys.forEach((rk) => {
-          const rkNorm = rk.toLowerCase().replace(/\s+/g, '');
-
-          // If column is GST or contains gst
-          if (rkNorm.includes('gst')) {
-            onUpdate(rowIndex, rk, gstValue);
-          }
-
-          // If column is exactly tax id variant
-          if (rkNorm === 'taxid' || rkNorm === 'tax_id' || rkNorm === 'taxid' || rkNorm === 'taxid') {
-            if (taxIdValue) onUpdate(rowIndex, rk, taxIdValue);
-          }
-
-          // If column contains 'tax' but isn't tax id, update with tax name (preferred)
-          if (rkNorm.includes('tax') && !rkNorm.includes('taxid')) {
-            onUpdate(rowIndex, rk, taxNameValue || taxIdValue);
-          }
-        });
-
-        // Fallbacks: ensure common columns exist are updated
-        const hasTaxKey = rowKeys.some(k => k.toLowerCase().includes('tax'));
-        const hasGstKey = rowKeys.some(k => k.toLowerCase().includes('gst'));
-        if (!hasTaxKey) onUpdate(rowIndex, 'Tax', taxNameValue || taxIdValue);
-        if (!hasGstKey) onUpdate(rowIndex, 'GST %', gstValue);
-      } else {
-        // No matching HSN option found - clear related fields
-        rowKeys.forEach((rk) => {
-          const rkNorm = rk.toLowerCase().replace(/\s+/g, '');
-          if (rkNorm.includes('tax')) onUpdate(rowIndex, rk, '');
-          if (rkNorm.includes('gst')) onUpdate(rowIndex, rk, '');
-        });
-        // also clear common fallback keys
-        onUpdate(rowIndex, 'Tax', '');
-        onUpdate(rowIndex, 'GST %', '');
-      }
-
-      setEditing(false);
-      return;
-    }
-
-    // Default behavior for non-HSN fields
     onUpdate(rowIndex, columnKey, editValue);
     setEditing(false);
   };
