@@ -137,6 +137,7 @@ func main() {
 	api.Post("/hsncode", handler.CreateHsnCode)
 	api.Put("/hsncode/:id", handler.UpdateHsnCode)
 	api.Delete("/hsncode/:id", handler.DeleteHsnCode)
+	api.Get("/hsncode-search", handler.SearchHsnCodes)
 
 	// SIZES
 

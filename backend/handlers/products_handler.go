@@ -129,6 +129,9 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if productType := c.Query("product_type"); productType != "" {
 		query = query.Where("product_type ILIKE ?", "%"+productType+"%")
 	}
+	if productMode := c.Query("product_mode"); productMode != "" {
+		query = query.Where("product_mode ILIKE ?", "%"+productMode+"%")
+	}
 	if status := c.Query("status"); status != "" {
 		if status == "true" {
 			query = query.Where("is_active = ?", true)
