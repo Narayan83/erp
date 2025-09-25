@@ -51,6 +51,26 @@ func CreateProduct(c *fiber.Ctx) error {
 		}
 	}
 
+	// Collect any pre-existing image references sent from the client (as strings)
+	// Client appends many 'variant_images' JSON blobs like { sku, image }
+	// We'll gather them into a map and merge below with uploaded files.
+	existingImagesMap := make(map[string][]string) // map[variantSKU][]imagePath
+	for key, vals := range form.Value {
+		if key == "variant_images" {
+			for _, raw := range vals {
+				var vi struct {
+					SKU   string `json:"sku"`
+					Image string `json:"image"`
+				}
+				if err := json.Unmarshal([]byte(raw), &vi); err == nil {
+					if vi.SKU != "" && vi.Image != "" {
+						existingImagesMap[vi.SKU] = append(existingImagesMap[vi.SKU], vi.Image)
+					}
+				}
+			}
+		}
+	}
+
 	// Process uploaded images for each variant
 	imagesMap := make(map[string][]string) // map[variantSKU][]imagePath
 	for key, files := range form.File {
@@ -66,10 +86,18 @@ func CreateProduct(c *fiber.Ctx) error {
 		}
 	}
 
-	// Assign image paths to corresponding variant
+	// Assign image paths to corresponding variant (merge existing + newly uploaded)
 	for i := range variants {
-		if paths, ok := imagesMap[variants[i].SKU]; ok {
-			variants[i].Images = paths
+		sku := variants[i].SKU
+		var merged []string
+		if ex, ok := existingImagesMap[sku]; ok {
+			merged = append(merged, ex...)
+		}
+		if up, ok := imagesMap[sku]; ok {
+			merged = append(merged, up...)
+		}
+		if len(merged) > 0 {
+			variants[i].Images = merged
 		}
 	}
 
