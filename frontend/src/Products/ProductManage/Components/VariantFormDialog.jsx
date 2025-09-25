@@ -3,7 +3,13 @@ import {
   Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Select, FormControl, InputLabel, Autocomplete
 } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Cropper from 'react-easy-crop';
+import Slider from '@mui/material/Slider';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import axios from "axios";
 import { BASE_URL } from "../../../Config"; // adjust if needed
 
@@ -15,6 +21,13 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const [sizesLoading, setSizesLoading] = useState(false);
   const [sizesError, setSizesError] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
+  const [cropIndex, setCropIndex] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [mainImageIndex, setMainImageIndex] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -41,34 +54,168 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   useEffect(() => {
     if (initialData) {
       reset(initialData);
-      setImagesPreview(initialData.images || []);
+      // Initialize file entries from initialData.images (may be strings referencing uploads)
+      const initFiles = (initialData.images || []).map(img => {
+        if (typeof img === 'string') {
+          const normalized = img.replace(/\\/g, '/');
+          const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
+            ? normalized
+            : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+          return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
+        }
+        return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
+      });
+      setImageFiles(initFiles);
+      setImagesPreview(initFiles.map(f => f.preview));
       const colorMatch = ralColors.find(c => c.value === initialData.color);
       setSelectedColor(colorMatch || null);
+
+      // Determine initial main image: prefer explicit initialData.mainImage, else default to first image if any
+      let initialMain = null;
+      if (initialData.mainImage) {
+        const found = initFiles.findIndex(f => (f.original && f.original === initialData.mainImage) || f.name === initialData.mainImage);
+        if (found >= 0) initialMain = found;
+      }
+      if (initialMain === null && initFiles.length > 0) {
+        initialMain = 0;
+      }
+      setMainImageIndex(initialMain);
     } else {
       reset();
       setImagesPreview([]);
       setSelectedColor(null);
+      setMainImageIndex(null);
     }
   }, [initialData, open, reset]);
 
   const onSubmit = (data) => {
+    // Prepare images/files: keep original strings, and Files for uploads
+    const images = imageFiles.map((entry) => entry.file ? entry.file : entry.original);
+    const files = imageFiles.filter(entry => entry.file).map(entry => entry.file);
+
     const formData = {
       ...data,
       color: selectedColor?.value || '',
-      images: imageFiles,
+      images, // mixture of strings (existing) and File objects (new)
+      files, // only File objects for convenience
+      mainImage: mainImageIndex != null ? images[mainImageIndex] : null,
+      mainImageIndex: mainImageIndex,
       isActive: data.isActive || false,
     };
+
     onSave(formData);
+
+    // cleanup object URLs
+    imageFiles.forEach(entry => {
+      try { if (entry.preview && entry.file) URL.revokeObjectURL(entry.preview); } catch (e) {}
+    });
     reset();
     setImageFiles([]);
     setImagesPreview([]);
     setSelectedColor(null);
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setImageFiles(prev => [...prev, ...files]);
-    setImagesPreview(prev => [...prev, ...files.map((file) => file.name)]);
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    // Create entries: always store file; preview is an object URL (useful for images) for all files
+    const newFiles = files.map((file) => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
+    setImageFiles(prev => {
+      const result = [...prev, ...newFiles];
+      // if no main image selected yet, set first uploaded as main
+      if (mainImageIndex == null && result.length > 0) {
+        setMainImageIndex(0);
+      }
+      return result;
+    });
+    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
+  };
+
+  const openCropDialog = (index) => {
+    const entry = imageFiles[index];
+    if (!entry) return;
+    // Only allow cropping for actual image File entries (not existing server-path strings)
+    const isImageFile = entry.file && entry.file.type && entry.file.type.startsWith('image/');
+    if (!isImageFile) return;
+    setCropIndex(index);
+    setCropSrc(entry.preview);
+    setCropDialogOpen(true);
+  };
+
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  // helper to create a cropped file from image and area
+  const getCroppedImg = async (imageSrc, pixelCrop) => {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = imageSrc;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(null);
+        const file = new File([blob], `cropped_${Date.now()}.png`, { type: blob.type });
+        resolve(file);
+      }, 'image/png');
+    });
+  };
+
+  const applyCrop = async () => {
+    if (cropIndex == null || !croppedAreaPixels) return;
+    const src = imageFiles[cropIndex].preview;
+    const croppedFile = await getCroppedImg(src, croppedAreaPixels);
+    if (croppedFile) {
+      const newEntry = { file: croppedFile, preview: URL.createObjectURL(croppedFile) };
+      setImageFiles(prev => prev.map((it, idx) => idx === cropIndex ? newEntry : it));
+      setImagesPreview(prev => prev.map((p, idx) => idx === cropIndex ? newEntry.preview : p));
+    }
+    setCropDialogOpen(false);
+    setCropIndex(null);
+    setCropSrc(null);
+    setZoom(1);
+  };
+
+  const removeImage = (index) => {
+    // revoke objectURL if present and was a File
+    const entry = imageFiles[index];
+    if (entry && entry.file && entry.preview) {
+      try { URL.revokeObjectURL(entry.preview); } catch (e) {}
+    }
+    setImageFiles(prev => {
+      const newArr = prev.filter((_, i) => i !== index);
+      // adjust mainImageIndex
+      setMainImageIndex(prevMain => {
+        if (prevMain == null) return null;
+        if (index === prevMain) {
+          return newArr.length > 0 ? 0 : null;
+        }
+        if (index < prevMain) return prevMain - 1;
+        return prevMain;
+      });
+      return newArr;
+    });
+    setImagesPreview(prev => prev.filter((_, i) => i !== index));
   };
 
   // Define RAL colors from CSV data
@@ -365,18 +512,85 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
             </Grid>
             <Grid size={12}>
               <Button variant="outlined" component="label">
-                Upload Images
-                <input type="file" multiple hidden onChange={handleImageUpload} />
+                Upload Files
+                <input type="file" multiple hidden onChange={handleFileUpload} />
               </Button>
-              <ul style={{ marginTop: 8 }}>
-                {imageFiles.map((file, i) => (
-                  <li key={i}>
-                    <img src={URL.createObjectURL(file)} alt={file.name} width="50px" />
-                    <p>{file.name}</p>
-                  </li>
-                ))}
-              </ul>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {imageFiles.map((entry, i) => {
+                  const isImage = entry.preview && (entry.file ? entry.file.type && entry.file.type.startsWith('image/') : /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.preview));
+                  return (
+                    <div key={i} style={{ width: 120, textAlign: 'center', position: 'relative' }}>
+                      {isImage ? (
+                        <img src={entry.preview} alt={entry.name || 'file'} width={120} height={80} style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc' }} />
+                      ) : (
+                        <div style={{ width: 120, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ccc', borderRadius: 4 }}>
+                          <div style={{ fontSize: 12 }}>{entry.name || 'file'}</div>
+                        </div>
+                      )}
+
+                      {/* main image star overlay for images */}
+                      {isImage && (
+                        <IconButton
+                          size="small"
+                          onClick={() => setMainImageIndex(i)}
+                          title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
+                          sx={{
+                            position: 'absolute',
+                            right: 6,
+                            top: 6,
+                            background: 'rgba(255,255,255,0.8)'
+                          }}
+                        >
+                          {i === mainImageIndex ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
+                        </IconButton>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+                        {isImage && entry.file && <Button size="small" onClick={() => openCropDialog(i)}>Edit</Button>}
+                        <Button size="small" color="error" onClick={() => removeImage(i)}>Remove</Button>
+                      </div>
+                      <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name || (entry.file && entry.file.name)}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </Grid>
+
+            {/* Crop dialog */}
+            <Dialog open={cropDialogOpen} onClose={() => setCropDialogOpen(false)} maxWidth="sm" fullWidth>
+              <DialogTitle sx={{ m: 0, p: 2 }}>
+                Edit Image
+                <IconButton
+                  aria-label="close"
+                  onClick={() => setCropDialogOpen(false)}
+                  sx={{ position: 'absolute', right: 8, top: 8 }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </DialogTitle>
+              <DialogContent sx={{ position: 'relative', height: 400, bgcolor: '#111' }}>
+                {cropSrc && (
+                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <Cropper
+                      image={cropSrc}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={onCropComplete}
+                    />
+                  </div>
+                )}
+              </DialogContent>
+              <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
+                <Slider value={zoom} min={1} max={3} step={0.1} onChange={(e, v) => setZoom(v)} />
+                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
+                  <Button onClick={() => setCropDialogOpen(false)}>Cancel</Button>
+                  <Button variant="contained" onClick={applyCrop}>Apply</Button>
+                </div>
+              </DialogActions>
+            </Dialog>
             <Grid size={4}>
               <FormControlLabel
                 control={<Checkbox {...register("isActive")} defaultChecked />}

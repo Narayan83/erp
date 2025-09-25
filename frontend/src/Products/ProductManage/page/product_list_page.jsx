@@ -30,7 +30,7 @@ import {
 } from "@mui/material";
 
 import EnhancedEditableCell from "../Components/EnhancedEditableCell";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
@@ -260,6 +260,56 @@ const normalizeID = (val) => {
   if (val === "" || val === null || val === undefined) return null;
   const n = Number(val);
   return Number.isNaN(n) ? val : n;
+};
+
+// Normalize a possibly-relative image path into a full URL for rendering
+const normalizeImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return null;
+  const trimmed = img.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('data:')) {
+    return trimmed;
+  }
+  // Replace backslashes with forward slashes
+  const normalized = trimmed.replace(/\\/g, '/');
+  if (normalized.startsWith('uploads/')) {
+    return `${BASE_URL}/${normalized}`;
+  }
+  return `${BASE_URL}/uploads/${normalized}`;
+};
+
+// Pick a single "main" image for a product from its variants
+const getMainImageForProduct = (p) => {
+  if (!p || !Array.isArray(p.Variants) || p.Variants.length === 0) return null;
+
+  // 1) Prefer any variant with an explicit MainImageIndex pointing at Images
+  for (const v of p.Variants) {
+    const idx = v?.MainImageIndex;
+    const imgs = Array.isArray(v?.Images) ? v.Images : [];
+    if (idx !== undefined && idx !== null && Number.isInteger(idx) && idx >= 0 && idx < imgs.length) {
+      const url = normalizeImageUrl(imgs[idx]);
+      if (url) return url;
+    }
+  }
+
+  // 2) Next prefer any variant with an explicit MainImage string
+  for (const v of p.Variants) {
+    const main = v?.MainImage;
+    const url = normalizeImageUrl(main);
+    if (url) return url;
+  }
+
+  // 3) Fallback to the first available image across variants
+  for (const v of p.Variants) {
+    const imgs = Array.isArray(v?.Images) ? v.Images : [];
+    if (imgs.length > 0) {
+      const url = normalizeImageUrl(imgs[0]);
+      if (url) return url;
+    }
+  }
+
+  return null;
 };
 
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
@@ -561,58 +611,29 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
           )}
           {visibleColumns.image && (
             <TableCell sx={{ py: 0.5, width: 120 }}>
-              {p.Variants && p.Variants.length > 0 && p.Variants.some(v => v.Images && v.Images.length > 0) ? (
-                <Box display="flex" gap={0.5} flexWrap="wrap">
-                  {p.Variants.flatMap(v => v.Images || []).slice(0, 3).map((img, idx) => {
-                    // If img is an absolute URL, use as is; else construct relative path
-                    let imgSrc = '';
-                    if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:'))) {
-                      imgSrc = img;
-                    } else if (typeof img === 'string' && img.trim() !== '') {
-                      // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
-                      // Also replace backslashes with forward slashes for URL safety
-                      const normalizedImg = img.replace(/\\/g, '/');
-                      if (normalizedImg.startsWith('uploads/')) {
-                        imgSrc = `${BASE_URL}/${normalizedImg}`;
-                      } else {
-                        imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
-                      }
-                    } else {
-                      imgSrc = 'https://via.placeholder.com/30?text=No+Image';
-                    }
-                    return (
-                      <img
-                        key={idx}
-                        src={imgSrc}
-                        alt={`variant-${idx}`}
-                        style={{
-                          width: 30,
-                          height: 30,
-                          objectFit: 'cover',
-                          borderRadius: 4,
-                          border: '1px solid #ccc'
-                        }}
-                        onError={(e) => {
-                          console.error(`Failed to load variant image:`, {
-                            src: e.target.src,
-                            original: img,
-                            variantIndex: idx,
-                            productId: p.ID
-                          });
-                          e.target.src = 'https://via.placeholder.com/30?text=No+Image';
-                        }}
-                      />
-                    );
-                  })}
-                  {p.Variants.flatMap(v => v.Images || []).length > 3 && (
-                    <Typography variant="caption" color="textSecondary">
-                      +{p.Variants.flatMap(v => v.Images || []).length - 3}
-                    </Typography>
-                  )}
-                </Box>
-              ) : (
-                <Typography variant="caption" color="textSecondary">No images</Typography>
-              )}
+              {(() => {
+                const imgSrc = getMainImageForProduct(p);
+                if (imgSrc) {
+                  return (
+                    <img
+                      src={imgSrc}
+                      alt={`product-main-${p.ID}`}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        objectFit: 'cover',
+                        borderRadius: 4,
+                        border: '1px solid #ccc'
+                      }}
+                      onError={(e) => {
+                        console.error('Failed to load main product image:', { src: e.target.src, productId: p.ID });
+                        e.target.src = 'https://via.placeholder.com/40?text=No+Image';
+                      }}
+                    />
+                  );
+                }
+                return <Typography variant="caption" color="textSecondary">No image</Typography>;
+              })()}
             </TableCell>
           )}
           <TableCell align="center" sx={{ width: 120 }}>
@@ -2348,6 +2369,31 @@ export default function ProductListPage() {
     setSelectedProduct(null);
   };
 
+  // Set a specific image as the main/star image for a variant and persist via API
+  const handleSetMainImage = async (variant, index, imageValue) => {
+    if (!variant || !variant.ID) {
+      console.error('Cannot set main image: variant missing ID');
+      return;
+    }
+    try {
+      // Build payload: set MainImageIndex and MainImage
+      const payload = {
+        MainImageIndex: index,
+        MainImage: imageValue,
+        Images: variant.Images || [] // keep existing images
+      };
+      // Use multipart only if there are files to upload; here we only update JSON
+      await axios.put(`${BASE_URL}/api/product_variants/${variant.ID}`, payload);
+      // Refresh view product
+      if (selectedProduct && selectedProduct.ID) {
+        await handleOpenView(selectedProduct.ID);
+      }
+    } catch (err) {
+      console.error('Failed to set main image:', err.response?.data || err.message);
+      alert('Failed to set main image');
+    }
+  };
+
   // CSV download function
   const downloadCSV = (data, filename = "products.csv") => {
     const headers = Object.keys(data[0] || {}).map(h => `"${h}"`).join(",");
@@ -3111,39 +3157,40 @@ export default function ProductListPage() {
                         <TableCell>{v.LeadTime ?? ''}</TableCell>
                         <TableCell>
                           <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
-                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.slice(0,3).map((img, idx) => {
-                              // If img is an absolute URL, use as is; else construct relative path
-                              let imgSrc = '';
-                              if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
-                                imgSrc = img;
-                              } else if (typeof img === 'string' && img.trim() !== '') {
-                                // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
-                                // Also replace backslashes with forward slashes for URL safety
-                                const normalizedImg = img.replace(/\\/g, '/');
-                                if (normalizedImg.startsWith('uploads/')) {
-                                  imgSrc = `${BASE_URL}/${normalizedImg}`;
-                                } else {
-                                  imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
-                                }
-                              } else {
-                                imgSrc = 'https://via.placeholder.com/60?text=No+Image';
-                              }
+                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.map((img, idx) => {
+                              const imgSrc = normalizeImageUrl(img) || 'https://via.placeholder.com/60?text=No+Image';
+                              // Determine whether this image is the main image for this variant
+                              const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === idx) || (v.MainImage && v.MainImage === img);
                               return (
-                                <img
-                                  key={idx}
-                                  src={imgSrc}
-                                  alt={`img-${idx}`}
-                                  style={{
-                                    width: 60,
-                                    height: 60,
-                                    objectFit: 'cover',
-                                    borderRadius: 4,
-                                    border: '1px solid #ccc',
-                                  }}
-                                  onError={(e) => {
-                                    e.target.src = 'https://via.placeholder.com/60?text=No+Image';
-                                  }}
-                                />
+                                <Box key={idx} sx={{ position: 'relative', display: 'inline-block' }}>
+                                  <img
+                                    src={imgSrc}
+                                    alt={`img-${idx}`}
+                                    style={{
+                                      width: 60,
+                                      height: 60,
+                                      objectFit: 'cover',
+                                      borderRadius: 4,
+                                      border: '1px solid #ccc',
+                                    }}
+                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
+                                  />
+                                  <IconButton
+                                    size="small"
+                                    onClick={async () => {
+                                      await handleSetMainImage(v, idx, img);
+                                    }}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 2,
+                                      right: 2,
+                                      bgcolor: 'rgba(255,255,255,0.8)'
+                                    }}
+                                    title={isMain ? 'Main image' : 'Set as main image'}
+                                  >
+                                    {isMain ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
+                                  </IconButton>
+                                </Box>
                               );
                             }) : <Typography variant="caption" color="textSecondary">No images</Typography>}
                           </Box>
