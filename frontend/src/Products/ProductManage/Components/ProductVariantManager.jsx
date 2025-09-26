@@ -17,6 +17,7 @@ import { BASE_URL } from "../../../Config";
 import VariantEditDialog from "./VariantEditDialog"; // reuse
 import { Edit } from "@mui/icons-material";
 import { Delete } from "@mui/icons-material";
+import { Star as StarIcon, StarBorder as StarBorderIcon } from '@mui/icons-material';
 import { useNavigate } from "react-router-dom";
 
 
@@ -286,6 +287,26 @@ export default function ProductVariantManager() {
       });
   };
 
+  // Allow marking an image as main for a variant
+  const handleSetMainImage = async (variant, index, imageValue) => {
+    if (!variant || !variant.ID) {
+      console.error('Cannot set main image: variant missing ID');
+      return;
+    }
+    try {
+      const payload = {
+        MainImageIndex: index,
+        MainImage: imageValue,
+        Images: variant.Images || []
+      };
+      await axios.put(`${BASE_URL}/api/product_variants/${variant.ID}`, payload);
+      await loadProduct();
+    } catch (err) {
+      console.error('Failed to set main image for variant:', err.response?.data || err.message);
+      alert('Failed to set main image');
+    }
+  };
+
   const handleSave = async (variant) => {
     setVariantError("");
     // Check for duplicate SKU (ignore current variant if editing)
@@ -298,29 +319,46 @@ export default function ProductVariantManager() {
     }
     try {
       console.log("Saving variant:", variant);
+
+      const hasFiles = Array.isArray(variant.Files) && variant.Files.length > 0;
+      let res;
+
       if (variant.ID) {
         // Existing variant – Update
-        await axios.put(`${BASE_URL}/api/product_variants/${variant.ID}`, variant);
+        if (hasFiles) {
+          const formData = new FormData();
+          const variantPayload = { ...variant };
+          // ProductID is not required for update, keep Images/MainImage fields from payload
+          formData.append('variant', JSON.stringify(variantPayload));
+          variant.Files.forEach((file) => formData.append('images', file));
+          res = await axios.put(`${BASE_URL}/api/product_variants/${variant.ID}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } else {
+          res = await axios.put(`${BASE_URL}/api/product_variants/${variant.ID}`, variant);
+        }
       } else {
-        //New variant – Insert
-        const res = await axios.post(`${BASE_URL}/api/product_variants`, {
-          ...variant,
-          ProductID: product.ID, // ensure ProductID is passed
-        });
-        variant = res.data; // update with ID and other backend-populated fields
+        // New variant – Insert
+        if (hasFiles) {
+          const formData = new FormData();
+          const variantPayload = { ...variant, ProductID: product.ID };
+          formData.append('variant', JSON.stringify(variantPayload));
+          variant.Files.forEach((file) => formData.append('images', file));
+          res = await axios.post(`${BASE_URL}/api/product_variants`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } else {
+          res = await axios.post(`${BASE_URL}/api/product_variants`, {
+            ...variant,
+            ProductID: product.ID,
+          });
+        }
       }
 
-      // Update local state
-      const updatedVariants = [...product.Variants];
-      if (editIndex !== null) {
-        updatedVariants[editIndex] = variant;
-      } else {
-        updatedVariants.push(variant);
-      }
-
-      setProduct({ ...product, Variants: updatedVariants });
+      // Always reload from backend to reflect saved images/paths
       setDialogOpen(false);
       setEditIndex(null);
+      await loadProduct();
     } catch (err) {
       // Backend duplicate error handling
       if (err.response?.data?.error && err.response.data.error.includes('duplicate key value') && err.response.data.error.includes('uni_product_variants_sku')) {
@@ -484,53 +522,70 @@ export default function ProductVariantManager() {
                           fullPath: imgSrc
                         });
                         
+                        const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === i) || (v.MainImage && v.MainImage === img);
                         return (
-                          <img
-                            key={i}
-                            src={imgSrc}
-                            alt={`variant-${v.ID || i}-img-${i}`}
-                            style={{
-                              width: 40,
-                              height: 40,
-                              objectFit: 'cover',
-                              borderRadius: 4,
-                              border: '1px solid #ccc',
-                            }}
-                            onLoad={() => console.log(`Successfully loaded image ${i} for ${v.SKU}`)}
-                            onError={(e) => {
-                              console.error(`Failed to load image for ${v.SKU}:`, {
-                                src: e.target.src,
-                                originalImg: img,
-                                variant: v.SKU
-                              });
-                              
-                              // Try alternative paths if the first one fails
-                              if (typeof img === 'string' && !imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
-                                // Try a few alternative paths
-                                const altPaths = [
-                                  `/uploads/${img.replace(/\\/g, '/')}`,
-                                  `${window.location.origin}/uploads/${img.replace(/\\/g, '/')}`,
-                                  `${BASE_URL}${img.startsWith('/') ? '' : '/'}${img.replace(/\\/g, '/')}`
-                                ];
+                          <Box key={i} sx={{ position: 'relative', display: 'inline-block' }}>
+                            <img
+                              src={imgSrc}
+                              alt={`variant-${v.ID || i}-img-${i}`}
+                              style={{
+                                width: 40,
+                                height: 40,
+                                objectFit: 'cover',
+                                borderRadius: 4,
+                                border: '1px solid #ccc',
+                              }}
+                              onLoad={() => console.log(`Successfully loaded image ${i} for ${v.SKU}`)}
+                              onError={(e) => {
+                                console.error(`Failed to load image for ${v.SKU}:`, {
+                                  src: e.target.src,
+                                  originalImg: img,
+                                  variant: v.SKU
+                                });
                                 
-                                const tryNextPath = (pathIndex) => {
-                                  if (pathIndex >= altPaths.length) {
-                                    // If all alternatives fail, use placeholder
-                                    e.target.src = 'https://via.placeholder.com/40?text=Not+Found';
-                                    return;
-                                  }
+                                // Try alternative paths if the first one fails
+                                if (typeof img === 'string' && !imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
+                                  // Try a few alternative paths
+                                  const altPaths = [
+                                    `/uploads/${img.replace(/\\/g, '/')}`,
+                                    `${window.location.origin}/uploads/${img.replace(/\\/g, '/')}`,
+                                    `${BASE_URL}${img.startsWith('/') ? '' : '/'}${img.replace(/\\/g, '/')}`
+                                  ];
                                   
-                                  console.log(`Trying alternative path ${pathIndex+1}/${altPaths.length}: ${altPaths[pathIndex]}`);
-                                  e.target.src = altPaths[pathIndex];
-                                  e.target.onerror = () => tryNextPath(pathIndex + 1);
-                                };
-                                
-                                tryNextPath(0);
-                              } else {
-                                e.target.src = 'https://via.placeholder.com/40?text=Error';
-                              }
-                            }}
-                          />
+                                  const tryNextPath = (pathIndex) => {
+                                    if (pathIndex >= altPaths.length) {
+                                      // If all alternatives fail, use placeholder
+                                      e.target.src = 'https://via.placeholder.com/40?text=Not+Found';
+                                      return;
+                                    }
+                                    
+                                    console.log(`Trying alternative path ${pathIndex+1}/${altPaths.length}: ${altPaths[pathIndex]}`);
+                                    e.target.src = altPaths[pathIndex];
+                                    e.target.onerror = () => tryNextPath(pathIndex + 1);
+                                  };
+                                  
+                                  tryNextPath(0);
+                                } else {
+                                  e.target.src = 'https://via.placeholder.com/40?text=Error';
+                                }
+                              }}
+                            />
+                            <Button
+                              size="small"
+                              onClick={() => handleSetMainImage(v, i, img)}
+                              sx={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 2,
+                                minWidth: 0,
+                                padding: 0,
+                                bgcolor: 'rgba(255,255,255,0.8)'
+                              }}
+                              title={isMain ? 'Main image' : 'Set as main image'}
+                            >
+                              {isMain ? <StarIcon sx={{ color: 'orange' }} fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+                            </Button>
+                          </Box>
                         );
                       })}
                       {v.Images.length > 3 && <Typography variant="caption">+{v.Images.length - 3} more</Typography>}

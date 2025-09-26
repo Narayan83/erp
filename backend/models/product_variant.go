@@ -14,8 +14,11 @@ type ProductVariant struct {
 	Stock         int
 	LeadTime      int
 	Images        StringArray `gorm:"type:json"`
-	IsActive      bool        `gorm:"default:true"`
-	CreatedAt     time.Time
+	// Persist main/star image selection
+	MainImage      string `gorm:"type:text"`
+	MainImageIndex *int   `gorm:"default:null"`
+	IsActive       bool   `gorm:"default:true"`
+	CreatedAt      time.Time
 
 	Product Product `gorm:"constraint:OnDelete:CASCADE"`
 }

@@ -369,7 +369,7 @@ export default function ReviewStep({
       formData.append("product", JSON.stringify(transformedProduct));
 
       // Transform variants to match backend's capitalized field names
-      const transformedVariants = variants.map(({ images, ...v }) => ({
+      const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }) => ({
         Color: v.color,
         Size: v.size,
         SKU: v.sku,
@@ -379,6 +379,9 @@ export default function ReviewStep({
         Stock: v.stock,
         LeadTime: v.leadTime,
         IsActive: v.isActive,
+        // Persist main image selection if present
+        MainImage: mainImage ?? null,
+        MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
         // Don't include Images here - they'll be handled separately
       }));
 

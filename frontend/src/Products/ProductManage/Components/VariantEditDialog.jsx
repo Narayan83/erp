@@ -2,16 +2,29 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Box, Typography, IconButton, Autocomplete
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Delete } from "@mui/icons-material";
+import Cropper from 'react-easy-crop';
+import Slider from '@mui/material/Slider';
+import CloseIcon from '@mui/icons-material/Close';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import { BASE_URL } from "../../../Config"; // Import BASE_URL from Config
 
 export default function VariantEditDialog({ open, onClose, onSave, defaultValues, sizes = [] }) {
   const { register, handleSubmit, reset, setValue } = useForm();
   const [imagesPreview, setImagesPreview] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
   const [variantID, setVariantID] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
+  const [cropIndex, setCropIndex] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [mainImageIndex, setMainImageIndex] = useState(null);
 
   // Define RAL colors from CSV data
   const ralColors = [
@@ -248,41 +261,159 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
         isActive: defaultValues.IsActive ?? true,
         images: defaultValues.Images || [],
      };
+     // Build structured entries for images
+     const initFiles = (mappedDefaults.images || []).map(img => {
+       if (typeof img === 'string') {
+         const normalized = img.replace(/\\/g, '/');
+         const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:'))
+           ? normalized
+           : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+         return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
+       }
+       return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
+     });
      reset(mappedDefaults);
-     setImagesPreview(mappedDefaults.images);
+     setImagesPreview(initFiles.map(f => f.preview));
+     setImageFiles(initFiles);
      setVariantID(defaultValues.ID || null);
      const colorMatch = ralColors.find(c => c.value === defaultValues.Color);
      setSelectedColor(colorMatch || null);
+
+     // Initialize main image selection from backend values
+     let initialMainIndex = null;
+     // Prefer explicit index from backend if valid
+     if (typeof defaultValues.MainImageIndex === 'number' && initFiles.length > 0) {
+       const idx = defaultValues.MainImageIndex;
+       if (idx >= 0 && idx < initFiles.length) {
+         initialMainIndex = idx;
+       }
+     }
+     // Fallback to find by MainImage path/name
+     if (initialMainIndex === null && defaultValues.MainImage) {
+       const target = String(defaultValues.MainImage).replace(/\\/g, '/');
+       const byPathIdx = initFiles.findIndex(f => {
+         if (!f) return false;
+         if (f.original) {
+           const orig = String(f.original).replace(/\\/g, '/');
+           // match full or basename
+           return orig === target || orig.endsWith('/' + target.split('/').pop());
+         }
+         return false;
+       });
+       if (byPathIdx >= 0) initialMainIndex = byPathIdx;
+     }
+     // Default to first image if still not set
+     if (initialMainIndex === null && initFiles.length > 0) initialMainIndex = 0;
+     setMainImageIndex(initialMainIndex);
     } else {
      reset({});
      setImagesPreview([]);
      setVariantID(null);
      setSelectedColor(null);
+     setMainImageIndex(null);
     }
   }, [defaultValues, reset]);
 
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const getCroppedImg = async (imageSrc, pixelCrop) => {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = imageSrc;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(null);
+        const file = new File([blob], `cropped_${Date.now()}.png`, { type: blob.type });
+        resolve(file);
+      }, 'image/png');
+    });
+  };
+
   const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setImagesPreview(prev => [...prev, ...files]); // Append new files to existing ones
+    const files = Array.from(e.target.files || []);
+    const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
+    setImageFiles(prev => {
+      const result = [...prev, ...newFiles];
+      if (mainImageIndex == null && result.length > 0) setMainImageIndex(0);
+      return result;
+    });
+    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
   };
 
   // Add this function to remove an image from preview
   const removeImage = (index) => {
+    // revoke objectURL if present
+    const entry = imageFiles[index];
+    if (entry && entry.file && entry.preview) {
+      try { URL.revokeObjectURL(entry.preview); } catch (e) {}
+    }
+    setImageFiles(prev => {
+      const newArr = prev.filter((_, i) => i !== index);
+      setMainImageIndex(prevMain => {
+        if (prevMain == null) return null;
+        if (index === prevMain) return newArr.length > 0 ? 0 : null;
+        if (index < prevMain) return prevMain - 1;
+        return prevMain;
+      });
+      return newArr;
+    });
     setImagesPreview(prev => prev.filter((_, i) => i !== index));
   };
 
   const onSubmit = (data) => {
-   const finalData = {
-        ID: variantID,
-        ...data,
-        color: selectedColor?.value || '',
-        isActive: data.isActive || false,
-        images: imagesPreview.map(file =>
-            typeof file === "string" ? file : file.name
-        ),
-        files: imagesPreview.filter(file => file instanceof File),
-        };
-    onSave(finalData);
+    // Build Images as server-side string paths (ignore new File uploads in edit API)
+    const imagesStrings = imageFiles
+      .map(entry => entry.original)
+      .filter(Boolean);
+
+    // Compute main image string based on current selection
+    const mainImgStr = (typeof mainImageIndex === 'number' && imageFiles[mainImageIndex])
+      ? (imageFiles[mainImageIndex].original || null)
+      : null;
+
+    const payload = {
+      ID: variantID,
+      Color: selectedColor?.value || defaultValues?.Color || '',
+      Size: data.size,
+      SKU: data.sku,
+      Barcode: data.barcode,
+      PurchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : Number(data.purchaseCost || 0),
+      StdSalesPrice: typeof data.stdSalesPrice === 'number' ? data.stdSalesPrice : Number(data.stdSalesPrice || 0),
+      Stock: typeof data.stock === 'number' ? data.stock : Number(data.stock || 0),
+      LeadTime: typeof data.leadTime === 'number' ? data.leadTime : Number(data.leadTime || 0),
+      IsActive: Boolean(data.isActive),
+      Images: imagesStrings,
+      // Send newly added/edited files for backend to store
+      Files: imageFiles.filter(e => e.file instanceof File).map(e => e.file),
+      MainImage: mainImgStr,
+      MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
+    };
+
+    onSave(payload);
     onClose(); // optionally close
   };
 
@@ -434,7 +565,7 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
 
             <Grid size={12}>
               <Button variant="outlined" component="label">
-                Upload Images
+                Upload Files
                 <input
                   type="file"
                   multiple
@@ -442,44 +573,25 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
                   onChange={handleImageUpload}
                 />
               </Button>
-              {imagesPreview.length > 0 && (
+              {imageFiles.length > 0 && (
                 <Box display="flex" flexWrap="wrap" gap={1} alignItems="center" mt={1}>
-                  {imagesPreview.map((file, i) => {
+                  {imageFiles.map((entry, i) => {
                     // Try direct URL if it's a string that looks like a URL
-                    const isDirectUrl = typeof file === "string" && (
-                      file.startsWith("http://") || 
-                      file.startsWith("https://") || 
-                      file.startsWith("data:")
+                    const file = entry;
+                    const isDirectUrl = typeof file.preview === "string" && (
+                      file.preview.startsWith("http://") || 
+                      file.preview.startsWith("https://") || 
+                      file.preview.startsWith("data:")
                     );
-                    
-                    // Construct path with proper logic
                     let imgPath = '';
-                    if (typeof file === 'string') {
-                      if (isDirectUrl) {
-                        imgPath = file;
-                      } else {
-                        // If already starts with uploads/, prepend BASE_URL/; else prepend BASE_URL/uploads/
-                        // Also replace backslashes with forward slashes for URL safety
-                        const normalizedFile = file.replace(/\\/g, '/');
-                        if (normalizedFile.startsWith('uploads/')) {
-                          imgPath = `${BASE_URL}/${normalizedFile}`;
-                        } else {
-                          imgPath = `${BASE_URL}/uploads/${normalizedFile}`;
-                        }
-                      }
-                    } else if (file instanceof File) {
-                      imgPath = URL.createObjectURL(file);
+                    if (typeof file.preview === 'string') {
+                      imgPath = file.preview;
+                    } else if (file.file instanceof File) {
+                      imgPath = file.preview;
                     } else {
                       imgPath = 'https://via.placeholder.com/60?text=No+Image';
                     }
-                    
-                    console.log(`Rendering image ${i}:`, { 
-                      file, 
-                      type: typeof file,
-                      imgPath,
-                      isFile: file instanceof File
-                    });
-                    
+
                     return (
                       <Box key={i} position="relative">
                         <img
@@ -493,31 +605,48 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
                             border: '1px solid #ccc',
                           }}
                           onError={(e) => {
-                            console.error(`Failed to load image:`, {
-                              src: e.target.src,
-                              originalFile: file,
-                              attempt: 'primary'
-                            });
-                            
-                            // Try alternative paths if the main one fails
-                            if (typeof file === 'string' && !isDirectUrl) {
-                              const altPath = `/uploads/${file.replace(/\\/g, '/')}`; // Try relative path
-                              console.log(`Trying alternative path: ${altPath}`);
+                            if (file.original && !isDirectUrl) {
+                              const altPath = `/uploads/${file.original.replace(/\\/g, '/')}`;
                               e.target.src = altPath;
-                              e.target.setAttribute('data-retry', 'true');
                             } else {
                               e.target.src = 'https://via.placeholder.com/60?text=Not+Found';
                             }
                           }}
-                          // Add a second error handler for the alternative path
-                          data-original={typeof file === 'string' ? file : 'file-object'}
+                          data-original={file.original || (file.file && file.file.name) || 'file-object'}
                         />
+
+                        {/* Main image star */}
+                        { (file.preview) && (
+                          <IconButton
+                            size="small"
+                            onClick={() => setMainImageIndex(i)}
+                            title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
+                            sx={{
+                              position: 'absolute',
+                              right: -6,
+                              top: -6,
+                              backgroundColor: 'rgba(255,255,255,0.8)'
+                            }}
+                          >
+                            {i === mainImageIndex ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
+                          </IconButton>
+                        )}
+
+                        {/* Edit button for image files */}
+                        {entry.file && entry.file.type && entry.file.type.startsWith('image/') && (
+                          <Button size="small" sx={{ position: 'absolute', bottom: 4, left: 4 }} onClick={() => {
+                            setCropIndex(i);
+                            setCropSrc(entry.preview);
+                            setCropDialogOpen(true);
+                          }}>Edit</Button>
+                        )}
+
                         <IconButton 
                           size="small" 
                           sx={{ 
                             position: 'absolute', 
                             top: -8, 
-                            right: -8,
+                            left: -8,
                             backgroundColor: 'rgba(255,255,255,0.8)',
                             '&:hover': { backgroundColor: 'rgba(255,0,0,0.1)' }
                           }}
@@ -530,6 +659,54 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
                   })}
                 </Box>
               )}
+              {/* Crop dialog */}
+              <Dialog open={cropDialogOpen} onClose={() => setCropDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ m: 0, p: 2 }}>
+                  Edit Image
+                  <IconButton
+                    aria-label="close"
+                    onClick={() => setCropDialogOpen(false)}
+                    sx={{ position: 'absolute', right: 8, top: 8 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ position: 'relative', height: 400, bgcolor: '#111' }}>
+                  {cropSrc && (
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <Cropper
+                        image={cropSrc}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={1}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={onCropComplete}
+                      />
+                    </div>
+                  )}
+                </DialogContent>
+                <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
+                  <Slider value={zoom} min={1} max={3} step={0.1} onChange={(e, v) => setZoom(v)} />
+                  <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
+                    <Button onClick={() => setCropDialogOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={async () => {
+                      if (cropIndex == null || !croppedAreaPixels) return;
+                      const src = imageFiles[cropIndex].preview;
+                      const croppedFile = await getCroppedImg(src, croppedAreaPixels);
+                      if (croppedFile) {
+                        const newEntry = { file: croppedFile, preview: URL.createObjectURL(croppedFile), original: null, name: croppedFile.name };
+                        setImageFiles(prev => prev.map((it, idx) => idx === cropIndex ? newEntry : it));
+                        setImagesPreview(prev => prev.map((p, idx) => idx === cropIndex ? newEntry.preview : p));
+                      }
+                      setCropDialogOpen(false);
+                      setCropIndex(null);
+                      setCropSrc(null);
+                      setZoom(1);
+                    }}>Apply</Button>
+                  </div>
+                </DialogActions>
+              </Dialog>
             </Grid>
 
             <Grid size={4}>

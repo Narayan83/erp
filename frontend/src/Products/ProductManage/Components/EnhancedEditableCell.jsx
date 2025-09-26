@@ -24,7 +24,8 @@ const EnhancedEditableCell = ({
   // Normalize column key by removing spaces and common variations
   const normalizedColumnKey = columnKeyLower
     .replace(/\s+/g, '') // Remove all spaces
-    .replace(/^hsn(code)?$/, 'hsn') // Normalize HSN/HSN Code to hsn
+    .replace(/^hsn(code|num|number)?$/, 'hsn') // Normalize HSN/HSN Code/HSN Number to hsn
+    .replace(/^hsnno$/, 'hsn') // HSN No.
     .replace(/^category$/, 'category')
     .replace(/^subcategory$/, 'subcategory')
     .replace(/^store$/, 'store')
@@ -191,19 +192,23 @@ const EnhancedEditableCell = ({
     }
     
     options = hsnCodes.map(hsn => {
-      // Get the code from the standard field
-      const code = String(hsn.code || '').trim();
+      // Get the code from various possible field names
+      const code = String(hsn.Code || hsn.code || '').trim();
       
-      // Get tax percentage - check both Tax.Percentage and tax.Percentage
+      // Get tax percentage - check multiple possible structures
       let taxPercentage = '';
-      if (hsn.Tax && hsn.Tax.Percentage) {
+      if (hsn.Tax && typeof hsn.Tax.Percentage === 'number') {
         taxPercentage = hsn.Tax.Percentage;
-      } else if (hsn.tax && hsn.tax.Percentage) {
+      } else if (hsn.tax && typeof hsn.tax.Percentage === 'number') {
         taxPercentage = hsn.tax.Percentage;
+      } else if (hsn.Tax && typeof hsn.Tax.percentage === 'number') {
+        taxPercentage = hsn.Tax.percentage;
+      } else if (hsn.tax && typeof hsn.tax.percentage === 'number') {
+        taxPercentage = hsn.tax.percentage;
       }
       
       // Create a label with tax percentage if available
-      const label = code + (taxPercentage ? ` (${taxPercentage}%)` : '');
+      const label = code;
       
       return { 
         value: code, 
