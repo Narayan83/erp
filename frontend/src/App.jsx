@@ -34,8 +34,10 @@ import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
 import QuotationNewForm from './CRM/Pages/Quotation/QuotationForm';
-import QuotationList from './CRM/Pages/Quotation/QuotationList';
+// import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
+import QutationList from "./Qutation/QutationList";
+import AddQutation from "./Qutation/AddQutation";
 
 import RoleCreation from "./CAG/page/RoleCreation/RoleCreation";
 import MenuCreation from "./CAG/page/MenuCreation/MenuCreation";
@@ -134,8 +136,12 @@ function App() {
           <Route path="/reports" element={<Report />} />
           
 
-           <Route path="/quotation" element={<QuotationNewForm />} />
-          <Route path="/quotation-list" element={<QuotationList />} />
+           {/* <Route path="/quotation" element={<QuotationNewForm />} /> */}
+           <Route path="/quotation" element={<AddQutation />} />
+
+          {/* <Route path="/quotation-list" element={<QuotationList />} /> */}
+
+           <Route path="/quotation-list" element={<QutationList />} />
           
           {/* Quotation nested routes */}
           {/* <Route path="/quotation" element={<QuotationLayout />}>
