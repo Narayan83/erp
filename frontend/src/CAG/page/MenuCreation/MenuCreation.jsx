@@ -30,7 +30,7 @@ const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCance
 const loadMenus = async () => {
   try {
     setLoading(true);
-    const res = await axios.get(`${BASE_URL}/api/loadMenus`); // Updated endpoint to match backend GetAllMenus
+    const res = await axios.get(`${BASE_URL}/api/loadMenus?limit=1000`); // Load up to 1000 menus for parent selection
 
     console.log("Loaded menus raw:", res.data);
 

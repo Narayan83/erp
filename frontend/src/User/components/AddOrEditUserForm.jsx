@@ -12,6 +12,10 @@ import {
   FormControl,
   Box,
   Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useForm, Controller,useWatch  } from "react-hook-form";
 import axios from "axios";
@@ -250,6 +254,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       salutation: "",
       gender: "",
       username: "",
+      usercode: "",
       account_types: [], // New field for dropdown selections
       // all your controlled values
   }
@@ -316,6 +321,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         is_distributor: !!defaultValues.is_distributor,
         active: typeof defaultValues.active === 'boolean' ? defaultValues.active : true,
         username: defaultValues.username || "", // Added prefill for new field
+        usercode: defaultValues.usercode || "",
       });
       // Prefill additionalAddresses by parsing Addresses JSON strings
       setAdditionalAddresses(
@@ -360,6 +366,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         Addresses: additionalAddresses.map(addr => JSON.stringify(addr)), // Convert to JSON string array
         AdditionalBankInfos: additionalBankInfos.map(bi => JSON.stringify(bi)), // Convert to JSON string array
         id: defaultValues?.id || undefined,
+  usercode: data.usercode || undefined,
         // Convert empty strings to undefined for pointer fields
         salutation: data.salutation || undefined,
         website: data.website || undefined,
@@ -411,13 +418,21 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       if (defaultValues?.id) {
         // Update user
         const response = await axios.put(`${BASE_URL}/api/users/${defaultValues.id}`, payload);
-        alert("User updated successfully.");
-        onSubmitUser(response.data);
+        // Show confirmation dialog with returned user
+        const created = response.data.user || response.data;
+        setCreatedUser(created);
+        setUsercode(created.usercode || created.username || "");
+        setDialogOpen(true);
+        // notify parent if needed
+        onSubmitUser && onSubmitUser(created);
       } else {
         // Add new user
         const response = await axios.post(`${BASE_URL}/api/users`, payload);
-        alert("User added successfully.");
-        onSubmitUser(response.data);
+        const created = response.data.user || response.data;
+        setCreatedUser(created);
+        setUsercode(created.usercode || created.username || "");
+        setDialogOpen(true);
+        onSubmitUser && onSubmitUser(created);
       }
     } catch (error) {
       console.error("Error submitting user form:", error);
@@ -510,8 +525,43 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
   // Extract industry segments array
   const industrySegments = industries["industry segments"] || [];
 
+  // Dialog state for showing created/updated user id and usercode
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [createdUser, setCreatedUser] = React.useState(null);
+  const [usercode, setUsercode] = React.useState("");
+  
+  const handleDialogConfirm = () => {
+    // Navigate to users list only after user confirms in the dialog
+    navigate('/users');
+  };
+
+
+  const handleDialogClose = () => setDialogOpen(false);
+
+  const handleDialogSubmit = async () => {
+    if (!createdUser) {
+      handleDialogClose();
+      navigate('/users');
+      return;
+    }
+
+    try {
+      // Update the usercode field on backend if it differs or is provided
+      if (usercode && (createdUser.usercode !== usercode)) {
+        const payload = { ...createdUser, usercode };
+        await axios.put(`${BASE_URL}/api/users/${createdUser.id}`, payload);
+      }
+    } catch (err) {
+      console.error('Failed to update usercode:', err);
+    }
+
+    handleDialogClose();
+    navigate('/users');
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <>
+      <form onSubmit={handleSubmit(onSubmit)}>
       <Typography variant="h5" gutterBottom>
         {defaultValues ? "Edit User" : "Add User"}
       </Typography>
@@ -1204,6 +1254,22 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 
         
 
+        {/* Primary Key & User Code placed here, under Authentication and above Add/Update button */}
+        {defaultValues?.id && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField
+              size="small"
+              fullWidth
+              label="Primary Key (ID)"
+              value={defaultValues?.id || ''}
+              InputProps={{ readOnly: true }}
+            />
+          </Grid>
+        )}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <TextField size="small" fullWidth label="User Code" {...register("usercode")} />
+        </Grid>
+
         <Grid size={{ xs: 12, md: 12 }}>
           <Button type="submit" variant="contained" color="primary">
             {defaultValues ? "Update User" : "Add User"}
@@ -1230,7 +1296,28 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           </Button>
         </Grid>
       </Grid>
-    </form>
+      </form>
+
+      <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
+        <DialogTitle>{defaultValues ? 'User Updated' : 'User Created'}</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField label="Primary Key (ID)" value={createdUser?.id ?? ''} InputProps={{ readOnly: true }} />
+            <TextField
+              label="User Code"
+              value={usercode}
+              onChange={(e) => setUsercode(e.target.value)}
+              helperText="Edit user code if you want to change it. Ex : USR - 0001"
+              fullWidth
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDialogClose}>Cancel</Button>
+          <Button variant="contained" onClick={handleDialogSubmit}>Confirm</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 
