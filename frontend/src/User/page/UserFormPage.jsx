@@ -28,9 +28,8 @@ const UserFormPage = () => {
   }, [id]);
 
   const handleSubmit = async (data) => {
-    
-    navigate("/users");
-   
+    // navigation is handled by the form component after user confirms the dialog
+    console.log('User form submitted, received:', data);
   };
 
   if (loading) {

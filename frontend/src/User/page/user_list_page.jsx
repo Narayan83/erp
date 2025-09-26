@@ -49,6 +49,7 @@ export default function UserListPage() {
   const [displayPrefOpen, setDisplayPrefOpen] = useState(false);
   // User struct fields from user.go, customized for display
   const userFields = [
+    "User Code",
     "Name", // Salutation + Firstname + Lastname
     "DOB",
     "Gender",
@@ -214,7 +215,9 @@ export default function UserListPage() {
               const data = exportSource.map(user => {
                 const obj = {};
                 checkedFields.forEach(field => {
-                  obj[field] = field === "Name"
+                  obj[field] = field === "User Code"
+                    ? (user.usercode || user.username || "")
+                    : field === "Name"
                     ? [user.salutation, user.firstname, user.lastname].filter(Boolean).join(" ")
                     : field === "DOB"
                     ? (user.dob ? new Date(user.dob).toLocaleDateString() : "")
@@ -429,7 +432,9 @@ export default function UserListPage() {
                     <TableCell>{page * limit + index + 1}</TableCell>
                     {userFields.filter(field => checkedFields.includes(field)).map((field) => (
                       <TableCell key={field} sx={field === "Name" ? { whiteSpace: 'nowrap' } : {}}>
-                        {field === "Name"
+                        {field === "User Code"
+                          ? (user.usercode || user.username || "")
+                          : field === "Name"
                           ? [user.salutation, user.firstname, user.lastname].filter(Boolean).join(" ")
                           : field === "DOB"
                           ? user.dob ? new Date(user.dob).toLocaleDateString() : ""
@@ -591,9 +596,15 @@ export default function UserListPage() {
                         {/* Change View button to open dialog */}
                         <Tooltip title="View">
                           <IconButton
-                            onClick={() => {
-                              setSelectedUser(user);
+                            onClick={async () => {
                               setViewDialogOpen(true);
+                              try {
+                                const res = await axios.get(`${BASE_URL}/api/users/${user.id}`);
+                                setSelectedUser(res.data);
+                              } catch (err) {
+                                console.error('Failed to fetch user details, falling back to list item:', err);
+                                setSelectedUser(user);
+                              }
                             }}
                           >
                             <Visibility />
@@ -1270,6 +1281,17 @@ export default function UserListPage() {
                     <TextField
                       label="Role ID"
                       value={selectedUser.role_id || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Show User Code after Authentication fields */}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="User Code"
+                      value={selectedUser.usercode || ""}
                       fullWidth
                       InputProps={{ readOnly: true }}
                       variant="outlined"

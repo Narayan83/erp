@@ -17,12 +17,14 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
   const [editingMenu, setEditingMenu] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [loading, setLoading] = useState(false); // Added for fetch loading
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Load menus from backend
   const loadMenus = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/api/loadMenus`); // Use BASE_URL
+      const res = await axios.get(`${BASE_URL}/api/loadMenus?limit=1000`); // Load up to 1000 menus to handle pagination on frontend
       const menusArray = Array.isArray(res.data) ? res.data : res.data.data || [];
       displaySetMenus(menusArray);
     } catch (error) {
@@ -91,6 +93,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
 
   const handleSearch = (e) => {
     setSearch(e.target.value);
+    setCurrentPage(1);
   };
 
   const handleRefresh = () => {
@@ -100,10 +103,12 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     }
     loadMenus(); // Fetch from backend on refresh
     setSearch("");
+    setCurrentPage(1);
   };
 
   const handleSort = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    setCurrentPage(1);
   };
 
   const filteredMenus = safeMenus.filter((menu) =>
@@ -117,6 +122,9 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
       return b.menu_name.localeCompare(a.menu_name); // Use menu_name
     }
   });
+
+  const totalPages = Math.ceil(sortedMenus.length / itemsPerPage);
+  const paginatedMenus = sortedMenus.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="existing-menus-container">
@@ -168,7 +176,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
             </tr>
           </thead>
           <tbody>
-            {sortedMenus.map((menu) => (
+            {paginatedMenus.map((menu) => (
               <tr key={menu.id}>
                 <td>{menu.menu_name}</td>
                 <td>{menu.url || ''}</td>
@@ -208,6 +216,51 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
           </tbody>
         </table>
       )}
+      <div className="pagination-container">
+        <div className="pagination-info">
+          Showing {paginatedMenus.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, sortedMenus.length)} of {sortedMenus.length} entries
+        </div>
+        <div className="pagination-controls">
+          <button 
+            className="pagination-btn" 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button 
+              key={page} 
+              className={`pagination-btn ${currentPage === page ? 'active' : ''}`} 
+              onClick={() => setCurrentPage(page)}
+            >
+              {page}
+            </button>
+          ))}
+          <button 
+            className="pagination-btn" 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+        </div>
+        <div className="items-per-page">
+          <label>Show:</label>
+          <select 
+            value={itemsPerPage} 
+            onChange={(e) => { 
+              setItemsPerPage(Number(e.target.value)); 
+              setCurrentPage(1); 
+            }}
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      </div>
     </div>
   );
 }
