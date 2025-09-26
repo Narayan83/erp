@@ -72,7 +72,9 @@ const (
 )
 
 type User struct {
-	ID              uint        `gorm:"primaryKey" json:"id"`
+	ID uint `gorm:"primaryKey" json:"id"`
+	// Usercode is an optional unique code for display/lookup (e.g., U12345)
+	Usercode        *string     `gorm:"uniqueIndex;size:100" json:"usercode,omitempty"`
 	Salutation      *string     `json:"salutation,omitempty"`
 	Firstname       string      `gorm:"not null" json:"firstname"`
 	Lastname        string      `gorm:"not null" json:"lastname"`
