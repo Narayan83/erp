@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"time"
 
 	"erp.local/backend/models"
@@ -20,9 +21,6 @@ func CreateLead(c *fiber.Ctx) error {
 	if err := c.BodyParser(&lead); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
-
-	lead.CreatedAt = time.Now()
-	lead.UpdatedAt = time.Now()
 
 	if err := leadsDB.Create(&lead).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -109,9 +107,16 @@ func UpdateLead(c *fiber.Ctx) error {
 
 // 📌 Delete Lead
 func DeleteLead(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if err := leadsDB.Delete(&models.Lead{}, id).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete lead"})
+	idParam := c.Params("id")
+	// Ensure id is numeric (prevent trying to delete imported/local leads from DB)
+	parsed, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid lead id"})
+	}
+
+	if err := leadsDB.Delete(&models.Lead{}, uint(parsed)).Error; err != nil {
+		// return actual DB error for easier debugging on client
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"message": "Lead deleted successfully"})
 }

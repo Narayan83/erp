@@ -37,12 +37,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
 
   useEffect(() => {
     if (leadData) {
-      // Try to split contact into prefix, firstName, lastName
+      // Try to split contact/name into prefix, firstName, lastName
       let prefix = 'Mr.';
       let firstName = '';
       let lastName = '';
-      if (leadData.contact) {
-        const parts = leadData.contact.split(' ');
+      const nameSource = leadData.contact || leadData.name || '';
+      if (nameSource) {
+        const parts = nameSource.split(' ');
         if (['Mr.', 'Ms.', 'Mrs.'].includes(parts[0])) {
           prefix = parts[0];
           firstName = parts[1] || '';
@@ -93,8 +94,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         mobile: leadData.mobile || '',
         email: leadData.email || '',
         website: leadData.website || '',
-        addressLine1: leadData.addressLine1 || '',
-        addressLine2: leadData.addressLine2 || '',
+        addressLine1: leadData.addressLine1 || leadData.AddressLine1 || leadData.addressLine1 || '',
+        addressLine2: leadData.addressLine2 || leadData.AddressLine2 || leadData.addressLine2 || '',
         country: leadData.country || '',
         city: leadData.city || '',
         state: leadData.state || '',
@@ -108,7 +109,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         assignedTo: assignedToId,
         stage: leadData.stage || '',
         notes: leadData.notes || '',
-        tags: leadData.tags || ''
+        tags: leadData.tags || leadData.Tags || ''
       });
     } else {
       setFormData({
@@ -234,7 +235,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         }
         
         let product_id = formData.product ? Number(formData.product) : undefined;
-        if (isNaN(product_id)) product_id = undefined;
+        if (isNaN(product_id)) {
+          // try to resolve by product name from the products list
+          const found = products.find(p => (p.ID && String(p.ID) === String(formData.product)) || (p.id && String(p.id) === String(formData.product)) || (p.Name && p.Name === formData.product) || (p.name && p.name === formData.product));
+          product_id = found ? (found.ID || found.id) : undefined;
+        }
         
         let potential = parseFloat(formData.potential);
         if (isNaN(potential)) potential = 0;
@@ -286,39 +291,83 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         const isImportedLead = leadData && (typeof leadData.id !== 'number' || String(leadData.id).startsWith('imported_'));
 
         if (isImportedLead) {
-          // Imported lead: update in localStorage and local state via TopMenu
-          if (typeof onAddLeadSubmit === 'function') {
-            onAddLeadSubmit({ ...leadData, ...formData, ...payload, id: leadData.id });
+          // Imported lead: create on backend, then remove from local importedLeads and refresh
+          try {
+            // Preserve imported timestamps and name if available
+            if (leadData.createdAt) payload.created_at = leadData.createdAt;
+            if (leadData.updatedAt) payload.updated_at = leadData.updatedAt;
+            // include name key as well (backend accepts both contact/name)
+            payload.name = payload.name || payload.contact || `${formData.firstName} ${formData.lastName}`.trim();
+
+            const res = await fetch(`${BASE_URL}/api/leads`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (res && res.ok) {
+              const created = await res.json().catch(() => null);
+              // transfer starred flag from imported id to new backend id
+              try {
+                const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
+                if (starredMap && leadData.id && starredMap[leadData.id]) {
+                  if (created && created.id) {
+                    starredMap[created.id] = true;
+                  }
+                  delete starredMap[leadData.id];
+                  localStorage.setItem('starredLeads', JSON.stringify(starredMap));
+                }
+              } catch (e) {}
+              // remove the imported lead from localStorage if present
+              try {
+                const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+                const updated = imported.filter(l => l.id !== leadData.id);
+                localStorage.setItem('importedLeads', JSON.stringify(updated));
+              } catch (e) {
+                // ignore localStorage errors
+              }
+              if (typeof onAddLeadSubmit === 'function') {
+                // let parent refresh or handle newly added lead
+                onAddLeadSubmit();
+              }
+              setFormData({
+                business: '',
+                prefix: 'Mr.',
+                firstName: '',
+                lastName: '',
+                designation: '',
+                mobile: '',
+                email: '',
+                website: '',
+                addressLine1: '',
+                addressLine2: '',
+                country: '',
+                city: '',
+                state: '',
+                gstin: '',
+                source: '',
+                since: '',
+                requirement: '',
+                category: '',
+                product: '',
+                potential: '',
+                assignedTo: '',
+                stage: '',
+                notes: '',
+                tags: ''
+              });
+              setErrors({});
+              onClose();
+              return;
+            } else {
+              const err = await res.json().catch(() => ({ error: 'Failed to save imported lead' }));
+              setSaveError(err.error || 'Failed to save imported lead');
+              return;
+            }
+          } catch (err) {
+            console.error('Error saving imported lead to backend:', err);
+            setSaveError('Error saving imported lead to backend.');
+            return;
           }
-          setFormData({
-            business: '',
-            prefix: 'Mr.',
-            firstName: '',
-            lastName: '',
-            designation: '',
-            mobile: '',
-            email: '',
-            website: '',
-            addressLine1: '',
-            addressLine2: '',
-            country: '',
-            city: '',
-            state: '',
-            gstin: '',
-            source: '',
-            since: '',
-            requirement: '',
-            category: '',
-            product: '',
-            potential: '',
-            assignedTo: '',
-            stage: '',
-            notes: '',
-            tags: ''
-          });
-          setErrors({});
-          onClose();
-          return;
         }
 
         let res;

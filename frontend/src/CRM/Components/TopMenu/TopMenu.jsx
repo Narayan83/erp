@@ -157,13 +157,22 @@ const TopMenu = () => {
         addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
         addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
         category: lead.category || lead.Category || lead.formData?.category || '',
-        tags: lead.tags || lead.Tags || lead.formData?.tags || ''
+        tags: lead.tags || lead.Tags || lead.formData?.tags || '',
+        // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
+        createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
+        updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
       }));
 
       // Get imported leads from localStorage (those without backend id)
-      const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+      const importedLeadsRaw = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+      // Ensure imported leads have createdAt/updatedAt for display
+      const importedLeads = importedLeadsRaw.map(l => ({
+        ...l,
+        createdAt: l.createdAt || l.CreatedAt || l.created_at || new Date().toISOString(),
+        updatedAt: l.updatedAt || l.UpdatedAt || l.updated_at || l.createdAt || new Date().toISOString()
+      }));
 
-      // Merge backend and imported leads
+      // Merge backend and imported leads (backend first)
       setLeads([...backendLeads, ...importedLeads]);
     } catch (err) {
       console.error('Failed to fetch leads:', err);
@@ -199,9 +208,17 @@ const TopMenu = () => {
       const contact = [newLeadData.prefix || '', newLeadData.firstName || '', newLeadData.lastName || ''].filter(Boolean).join(' ').trim();
       const assignedToObj = assignedToOptions.find(opt => opt.name === newLeadData.assignedTo);
       const assigned_to_id = assignedToObj ? assignedToObj.id : 1;
+      // Resolve product to a valid numeric product_id when possible to avoid FK errors
+      let product_id = newLeadData.product ? Number(newLeadData.product) : undefined;
+      if (isNaN(product_id)) {
+        // try to find by product name in products list
+        const foundProduct = products.find(p => (p.ID && String(p.ID) === String(newLeadData.product)) || (p.id && String(p.id) === String(newLeadData.product)) || (p.Name && p.Name === newLeadData.product) || (p.name && p.name === newLeadData.product));
+        product_id = foundProduct ? (foundProduct.ID || foundProduct.id) : undefined;
+      }
+
       const payload = {
         business: newLeadData.business,
-        contact,
+        contact: contact || newLeadData.name || newLeadData.contact,
         designation: newLeadData.designation,
         mobile: newLeadData.mobile,
         email: newLeadData.email,
@@ -217,12 +234,13 @@ const TopMenu = () => {
         requirements: newLeadData.requirement,
         notes: newLeadData.notes,
         assigned_to_id,
-        product: newLeadData.product,
         addressLine1: newLeadData.addressLine1,
         addressLine2: newLeadData.addressLine2,
         category: newLeadData.category,
         tags: newLeadData.tags
       };
+
+      if (product_id !== undefined) payload.product_id = product_id;
       if (editLead && editLead.id) {
         // Backend lead: update via API
         await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
@@ -232,36 +250,47 @@ const TopMenu = () => {
         });
         await fetchLeads();
       } else if (editLead && (!editLead.id || typeof editLead.id !== 'number')) {
-        // Imported lead: update in localStorage and state
+        // Imported lead: create on backend, then remove from local importedLeads
+        try {
+          // If editLead contains createdAt/updatedAt (imported), include them in payload
+          if (editLead && editLead.createdAt) payload.created_at = editLead.createdAt;
+          if (editLead && editLead.updatedAt) payload.updated_at = editLead.updatedAt;
+          // include name as fallback
+          payload.name = payload.name || payload.contact || editLead?.name || '';
 
-        // Get product name from products list
-        let productName = newLeadData.product;
-        const foundProduct = products.find(
-          p => p.ID === newLeadData.product || p.id === newLeadData.product
-        );
-        productName = foundProduct ? (foundProduct.Name || foundProduct.name) : newLeadData.product;
-
-        // Get assignedTo name from assignedToOptions
-        let assignedToName = newLeadData.assignedTo;
-        const foundAssignee = assignedToOptions.find(opt => opt.id === Number(newLeadData.assignedTo));
-        assignedToName = foundAssignee ? foundAssignee.name : newLeadData.assignedTo;
-
-        setLeads(prevLeads => {
-          const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
-          const updatedImportedLeads = importedLeads.map(lead =>
-            lead.id === editLead.id
-              ? {
-                  ...lead,
-                  ...newLeadData,
-                  product: productName,
-                  assignedTo: assignedToName
+          const res = await fetch(`${BASE_URL}/api/leads`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res && res.ok) {
+            const created = await res.json().catch(() => null);
+            // transfer starred flag from imported to new backend id
+            try {
+              const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
+              if (starredMap && editLead.id && starredMap[editLead.id]) {
+                if (created && created.id) {
+                  starredMap[created.id] = true;
                 }
-              : lead
-          );
-          localStorage.setItem('importedLeads', JSON.stringify(updatedImportedLeads));
-          const backendLeads = prevLeads.filter(l => l.id && typeof l.id === 'number');
-          return [...backendLeads, ...updatedImportedLeads];
-        });
+                delete starredMap[editLead.id];
+                localStorage.setItem('starredLeads', JSON.stringify(starredMap));
+              }
+            } catch (e) {}
+            // remove from imported localStorage
+            try {
+              const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+              const updated = imported.filter(l => l.id !== editLead.id);
+              localStorage.setItem('importedLeads', JSON.stringify(updated));
+            } catch (e) {}
+            await fetchLeads();
+          } else {
+            const err = await res.json().catch(() => ({ error: 'Failed to save imported lead' }));
+            console.error('Failed saving imported lead:', err);
+            alert(err.error || 'Failed to save imported lead');
+          }
+        } catch (err) {
+          console.error('Failed to save imported lead to backend:', err);
+        }
         setShowAddLead(false);
         setEditLead(null);
       } else {
@@ -305,7 +334,23 @@ const TopMenu = () => {
   const handleDeleteRow = async (leadId) => {
     if (window.confirm('Are you sure you want to delete this lead?')) {
       try {
-        await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE' });
+        // If leadId is not a number (imported/local lead), remove from localStorage instead of calling backend
+        const idNum = Number(leadId);
+        if (!idNum || isNaN(idNum)) {
+          const importedLeads = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+          const updated = importedLeads.filter(l => l.id !== leadId);
+          localStorage.setItem('importedLeads', JSON.stringify(updated));
+          setLeads(prev => prev.filter(l => l.id !== leadId));
+          return;
+        }
+
+        const res = await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Failed to delete lead' }));
+          console.error('Delete failed:', err);
+          alert(err.error || 'Failed to delete lead');
+          return;
+        }
         await fetchLeads();
       } catch (err) {
         console.error('Failed to delete lead:', err);
@@ -427,30 +472,42 @@ const TopMenu = () => {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+          const nowIso = new Date().toISOString();
           const newLeads = jsonData.map((row, index) => ({
             // Remove id or use a string id to avoid collision with backend ids
             id: `imported_${Date.now()}_${index}`,
             business: row.Business || row.business || '',
-            contact: row.Contact || row.contact || '',
+            // Name/contact
+            contact: row.Contact || row.contact || row.Name || row.name || '',
+            name: row.Name || row.name || row.Contact || row.contact || '',
             designation: row.Designation || row.designation || '',
             mobile: row.Mobile || row.mobile || '',
             email: row.Email || row.email || '',
+            // Address lines
+            addressLine1: row['Address Line 1'] || row.AddressLine1 || row.addressLine1 || row.Address1 || row.address1 || '',
+            addressLine2: row['Address Line 2'] || row.AddressLine2 || row.addressLine2 || row.Address2 || row.address2 || '',
             city: row.City || row.city || '',
             state: row.State || row.state || '',
             country: row.Country || row.country || '',
             source: row.Source || row.source || '',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
-            since: row.Since || row.since || new Date().toISOString().split('T')[0],
+            since: row.Since || row.since || nowIso,
             assignedTo: row['Assigned to'] || row['AssignedTo'] || row['Assigned To'] || '',
             product: row.Product || row.product || '',
             gstin: row.GSTIN || row.gstin || '',
             website: row.Website || row.website || '',
-            lastTalk: row['Last Talk'] || row.LastTalk || new Date().toISOString().split('T')[0],
+            lastTalk: row['Last Talk'] || row.LastTalk || nowIso,
             nextTalk: row['Next Talk'] || row.NextTalk || row.Next || '',
-            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || new Date().toISOString().split('T')[0],
+            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || nowIso,
+            // Category and tags
+            category: row.Category || row.category || '',
+            tags: row.Tags || row.tags || row.Tag || row.tag || '',
             requirements: row.Requirements || row.requirements || '',
             notes: row.Notes || row.notes || '',
+            // timestamps for local display and later POSTing
+            createdAt: nowIso,
+            updatedAt: nowIso,
             selected: false
           }));
           if (newLeads.length === 0) throw new Error('No valid data found in Excel file');
