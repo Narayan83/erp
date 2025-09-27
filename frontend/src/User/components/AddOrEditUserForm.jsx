@@ -525,6 +525,18 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
   // Extract industry segments array
   const industrySegments = industries["industry segments"] || [];
 
+  // Keep individual boolean fields in sync with the account_types multi-select
+  const watchedAccountTypes = useWatch({ control, name: "account_types", defaultValue: [] });
+
+  useEffect(() => {
+    if (Array.isArray(watchedAccountTypes)) {
+      accountTypes.forEach(type => {
+        // mark fields as touched/dirty when changed by selection
+        setValue(type.value, watchedAccountTypes.includes(type.value), { shouldDirty: true, shouldTouch: true });
+      });
+    }
+  }, [watchedAccountTypes, setValue]);
+
   // Dialog state for showing created/updated user id and usercode
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [createdUser, setCreatedUser] = React.useState(null);

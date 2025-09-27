@@ -16,7 +16,7 @@ const SubcategoryTable = ({
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>#</TableCell>
+            <TableCell>S No.</TableCell>
             <TableCell>Cat. Name</TableCell>
             <TableCell>Sub. Name</TableCell>
             <TableCell align="right">Actions</TableCell>
@@ -25,7 +25,9 @@ const SubcategoryTable = ({
         <TableBody>
           {data.map((sub, i) => (
             <TableRow key={sub.ID}>
-              <TableCell>{page * limit + i + 1}</TableCell>
+        {/* page is 1-based in the parent; convert to zero-based for calculation
+          guard against undefined/zero values to avoid NaN */}
+        <TableCell>{((page || 1) - 1) * (limit || 1) + i + 1}</TableCell>
              
               <TableCell>{sub.Category.Name}</TableCell>
                <TableCell>{sub.Name}</TableCell>
@@ -42,8 +44,11 @@ const SubcategoryTable = ({
       <TablePagination
         component="div"
         count={total}
-        page={page}
-        onPageChange={(_, newPage) => onPageChange(newPage)}
+        // MUI TablePagination expects a zero-based page index.
+        // Parent `page` is 1-based, so convert here.
+        page={Math.max(0, page - 1)}
+        // newPage from MUI is zero-based; convert back to 1-based for parent.
+        onPageChange={(_, newPage) => onPageChange(newPage + 1)}
         rowsPerPage={limit}
         onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
         rowsPerPageOptions={[5, 10, 20]}

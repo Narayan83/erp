@@ -3172,24 +3172,16 @@ export default function ProductListPage() {
                                       objectFit: 'cover',
                                       borderRadius: 4,
                                       border: '1px solid #ccc',
+                                      cursor: 'default' // don't show pointer/hover as actionable in read-only view
                                     }}
                                     onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
                                   />
-                                  <IconButton
-                                    size="small"
-                                    onClick={async () => {
-                                      await handleSetMainImage(v, idx, img);
-                                    }}
-                                    sx={{
-                                      position: 'absolute',
-                                      top: 2,
-                                      right: 2,
-                                      bgcolor: 'rgba(255,255,255,0.8)'
-                                    }}
-                                    title={isMain ? 'Main image' : 'Set as main image'}
-                                  >
-                                    {isMain ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
-                                  </IconButton>
+                                  {/* Non-interactive main-image indicator for read-only product view */}
+                                  {isMain && (
+                                    <Box sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,255,255,0.8)', p: 0.3, borderRadius: 1 }} title="Main image">
+                                      <StarIcon fontSize="small" color="warning" />
+                                    </Box>
+                                  )}
                                 </Box>
                               );
                             }) : <Typography variant="caption" color="textSecondary">No images</Typography>}
