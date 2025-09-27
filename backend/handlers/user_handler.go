@@ -157,7 +157,6 @@ func CreateUser(c *fiber.Ctx) error {
 	// 	req.User.ContactPincode = req.User.Pincode
 	// }
 
-	
 	req.User.Password = req.Password
 
 	// Save user
@@ -239,4 +238,53 @@ func DeleteUser(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.SendStatus(204)
+}
+
+// GET /api/users/role/:role?page=1&limit=10
+func GetUsersByType(c *fiber.Ctx) error {
+	role := c.Params("role") // e.g., "customer", "supplier"
+	var users []models.User
+	var total int64
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	filter := c.Query("filter") // new filter parameter
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	query := usersDB.Model(&models.User{})
+
+	switch role {
+	case "customer":
+		query = query.Where("is_customer = ?", true)
+	case "supplier":
+		query = query.Where("is_supplier = ?", true)
+	case "employee":
+		query = query.Where("is_employee = ?", true)
+	default:
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid role"})
+	}
+
+	// filter by name/email if provided
+	if filter != "" {
+		likeQuery := "%" + filter + "%"
+		query = query.Where("firstname ILIKE ? OR lastname ILIKE ? OR email ILIKE ?", likeQuery, likeQuery, likeQuery)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if err := query.Order("id DESC").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"data":  users,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
