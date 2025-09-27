@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -17,12 +20,36 @@ func SetLeadsDB(db *gorm.DB) {
 // 📌 Create Lead
 func CreateLead(c *fiber.Ctx) error {
 	var lead models.Lead
-	if err := c.BodyParser(&lead); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+
+	// Read raw body and clean up empty time fields which would fail
+	// to unmarshal into time.Time (empty string causes parse errors).
+	raw := c.Body()
+	if len(raw) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "Empty request body"})
 	}
 
-	lead.CreatedAt = time.Now()
-	lead.UpdatedAt = time.Now()
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		// Fallback to BodyParser for non-JSON or unexpected formats
+		if err2 := c.BodyParser(&lead); err2 != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+		}
+	} else {
+		// Remove keys that map to time.Time fields when they are empty strings
+		timeKeys := []string{"since", "lastTalk", "nextTalk", "transferredOn", "createdAt", "updatedAt", "created_at", "updated_at", "last_talk", "next_talk", "transferred_on"}
+		for _, k := range timeKeys {
+			if v, ok := payload[k]; ok {
+				if s, ok2 := v.(string); ok2 && strings.TrimSpace(s) == "" {
+					delete(payload, k)
+				}
+			}
+		}
+
+		cleaned, _ := json.Marshal(payload)
+		if err := json.Unmarshal(cleaned, &lead); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid input", "detail": err.Error()})
+		}
+	}
 
 	if err := leadsDB.Create(&lead).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -109,9 +136,16 @@ func UpdateLead(c *fiber.Ctx) error {
 
 // 📌 Delete Lead
 func DeleteLead(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if err := leadsDB.Delete(&models.Lead{}, id).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete lead"})
+	idParam := c.Params("id")
+	// Ensure id is numeric (prevent trying to delete imported/local leads from DB)
+	parsed, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid lead id"})
+	}
+
+	if err := leadsDB.Delete(&models.Lead{}, uint(parsed)).Error; err != nil {
+		// return actual DB error for easier debugging on client
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"message": "Lead deleted successfully"})
 }

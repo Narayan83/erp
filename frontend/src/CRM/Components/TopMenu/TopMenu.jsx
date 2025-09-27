@@ -157,13 +157,22 @@ const TopMenu = () => {
         addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
         addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
         category: lead.category || lead.Category || lead.formData?.category || '',
-        tags: lead.tags || lead.Tags || lead.formData?.tags || ''
+        tags: lead.tags || lead.Tags || lead.formData?.tags || '',
+        // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
+        createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
+        updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
       }));
 
       // Get imported leads from localStorage (those without backend id)
-      const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+      const importedLeadsRaw = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
+      // Ensure imported leads have createdAt/updatedAt for display
+      const importedLeads = importedLeadsRaw.map(l => ({
+        ...l,
+        createdAt: l.createdAt || l.CreatedAt || l.created_at || new Date().toISOString(),
+        updatedAt: l.updatedAt || l.UpdatedAt || l.updated_at || l.createdAt || new Date().toISOString()
+      }));
 
-      // Merge backend and imported leads
+      // Merge backend and imported leads (backend first)
       setLeads([...backendLeads, ...importedLeads]);
     } catch (err) {
       console.error('Failed to fetch leads:', err);
@@ -197,11 +206,28 @@ const TopMenu = () => {
   const handleAddLeadSubmit = async (newLeadData) => {
     try {
       const contact = [newLeadData.prefix || '', newLeadData.firstName || '', newLeadData.lastName || ''].filter(Boolean).join(' ').trim();
-      const assignedToObj = assignedToOptions.find(opt => opt.name === newLeadData.assignedTo);
-      const assigned_to_id = assignedToObj ? assignedToObj.id : 1;
+      // Only include assigned_to_id if it's a valid known option; otherwise omit to avoid FK errors
+      let assigned_to_id = undefined;
+      if (newLeadData.assignedTo !== undefined && newLeadData.assignedTo !== null && newLeadData.assignedTo !== '') {
+        const numericAssignee = Number(newLeadData.assignedTo);
+        if (!isNaN(numericAssignee) && assignedToOptions.some(opt => Number(opt.id) === numericAssignee)) {
+          assigned_to_id = numericAssignee;
+        } else {
+          const assignedToObj = assignedToOptions.find(opt => opt.name === newLeadData.assignedTo);
+          if (assignedToObj) assigned_to_id = assignedToObj.id;
+        }
+      }
+      // Resolve product to a valid numeric product_id when possible to avoid FK errors
+      let product_id = newLeadData.product ? Number(newLeadData.product) : undefined;
+      if (isNaN(product_id)) {
+        // try to find by product name in products list
+        const foundProduct = products.find(p => (p.ID && String(p.ID) === String(newLeadData.product)) || (p.id && String(p.id) === String(newLeadData.product)) || (p.Name && p.Name === newLeadData.product) || (p.name && p.name === newLeadData.product));
+        product_id = foundProduct ? (foundProduct.ID || foundProduct.id) : undefined;
+      }
+
       const payload = {
         business: newLeadData.business,
-        contact,
+        contact: contact || newLeadData.name || newLeadData.contact,
         designation: newLeadData.designation,
         mobile: newLeadData.mobile,
         email: newLeadData.email,
@@ -217,12 +243,21 @@ const TopMenu = () => {
         requirements: newLeadData.requirement,
         notes: newLeadData.notes,
         assigned_to_id,
-        product: newLeadData.product,
         addressLine1: newLeadData.addressLine1,
         addressLine2: newLeadData.addressLine2,
         category: newLeadData.category,
         tags: newLeadData.tags
       };
+
+      if (product_id !== undefined) payload.product_id = product_id;
+      if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+
+      // Strip empty/undefined/null values to avoid backend parse/validation issues
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === '' || payload[k] === undefined || payload[k] === null) {
+          delete payload[k];
+        }
+      });
       if (editLead && editLead.id) {
         // Backend lead: update via API
         await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
@@ -232,36 +267,47 @@ const TopMenu = () => {
         });
         await fetchLeads();
       } else if (editLead && (!editLead.id || typeof editLead.id !== 'number')) {
-        // Imported lead: update in localStorage and state
+        // Imported lead: create on backend, then remove from local importedLeads
+        try {
+          // If editLead contains createdAt/updatedAt (imported), include them in payload
+          if (editLead && editLead.createdAt) payload.created_at = editLead.createdAt;
+          if (editLead && editLead.updatedAt) payload.updated_at = editLead.updatedAt;
+          // include name as fallback
+          payload.name = payload.name || payload.contact || editLead?.name || '';
 
-        // Get product name from products list
-        let productName = newLeadData.product;
-        const foundProduct = products.find(
-          p => p.ID === newLeadData.product || p.id === newLeadData.product
-        );
-        productName = foundProduct ? (foundProduct.Name || foundProduct.name) : newLeadData.product;
-
-        // Get assignedTo name from assignedToOptions
-        let assignedToName = newLeadData.assignedTo;
-        const foundAssignee = assignedToOptions.find(opt => opt.id === Number(newLeadData.assignedTo));
-        assignedToName = foundAssignee ? foundAssignee.name : newLeadData.assignedTo;
-
-        setLeads(prevLeads => {
-          const importedLeads = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
-          const updatedImportedLeads = importedLeads.map(lead =>
-            lead.id === editLead.id
-              ? {
-                  ...lead,
-                  ...newLeadData,
-                  product: productName,
-                  assignedTo: assignedToName
+          const res = await fetch(`${BASE_URL}/api/leads`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res && res.ok) {
+            const created = await res.json().catch(() => null);
+            // transfer starred flag from imported to new backend id
+            try {
+              const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
+              if (starredMap && editLead.id && starredMap[editLead.id]) {
+                if (created && created.id) {
+                  starredMap[created.id] = true;
                 }
-              : lead
-          );
-          localStorage.setItem('importedLeads', JSON.stringify(updatedImportedLeads));
-          const backendLeads = prevLeads.filter(l => l.id && typeof l.id === 'number');
-          return [...backendLeads, ...updatedImportedLeads];
-        });
+                delete starredMap[editLead.id];
+                localStorage.setItem('starredLeads', JSON.stringify(starredMap));
+              }
+            } catch (e) {}
+            // remove from imported localStorage
+            try {
+              const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+              const updated = imported.filter(l => l.id !== editLead.id);
+              localStorage.setItem('importedLeads', JSON.stringify(updated));
+            } catch (e) {}
+            await fetchLeads();
+          } else {
+            const err = await res.json().catch(() => ({ error: 'Failed to save imported lead' }));
+            console.error('Failed saving imported lead:', err);
+            alert(err.error || 'Failed to save imported lead');
+          }
+        } catch (err) {
+          console.error('Failed to save imported lead to backend:', err);
+        }
         setShowAddLead(false);
         setEditLead(null);
       } else {
@@ -305,7 +351,23 @@ const TopMenu = () => {
   const handleDeleteRow = async (leadId) => {
     if (window.confirm('Are you sure you want to delete this lead?')) {
       try {
-        await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE' });
+        // If leadId is not a number (imported/local lead), remove from localStorage instead of calling backend
+        const idNum = Number(leadId);
+        if (!idNum || isNaN(idNum)) {
+          const importedLeads = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+          const updated = importedLeads.filter(l => l.id !== leadId);
+          localStorage.setItem('importedLeads', JSON.stringify(updated));
+          setLeads(prev => prev.filter(l => l.id !== leadId));
+          return;
+        }
+
+        const res = await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Failed to delete lead' }));
+          console.error('Delete failed:', err);
+          alert(err.error || 'Failed to delete lead');
+          return;
+        }
         await fetchLeads();
       } catch (err) {
         console.error('Failed to delete lead:', err);
@@ -427,30 +489,42 @@ const TopMenu = () => {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+          const nowIso = new Date().toISOString();
           const newLeads = jsonData.map((row, index) => ({
             // Remove id or use a string id to avoid collision with backend ids
             id: `imported_${Date.now()}_${index}`,
             business: row.Business || row.business || '',
-            contact: row.Contact || row.contact || '',
+            // Name/contact
+            contact: row.Contact || row.contact || row.Name || row.name || '',
+            name: row.Name || row.name || row.Contact || row.contact || '',
             designation: row.Designation || row.designation || '',
             mobile: row.Mobile || row.mobile || '',
             email: row.Email || row.email || '',
+            // Address lines
+            addressLine1: row['Address Line 1'] || row.AddressLine1 || row.addressLine1 || row.Address1 || row.address1 || '',
+            addressLine2: row['Address Line 2'] || row.AddressLine2 || row.addressLine2 || row.Address2 || row.address2 || '',
             city: row.City || row.city || '',
             state: row.State || row.state || '',
             country: row.Country || row.country || '',
             source: row.Source || row.source || '',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
-            since: row.Since || row.since || new Date().toISOString().split('T')[0],
+            since: row.Since || row.since || nowIso,
             assignedTo: row['Assigned to'] || row['AssignedTo'] || row['Assigned To'] || '',
             product: row.Product || row.product || '',
             gstin: row.GSTIN || row.gstin || '',
             website: row.Website || row.website || '',
-            lastTalk: row['Last Talk'] || row.LastTalk || new Date().toISOString().split('T')[0],
+            lastTalk: row['Last Talk'] || row.LastTalk || nowIso,
             nextTalk: row['Next Talk'] || row.NextTalk || row.Next || '',
-            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || new Date().toISOString().split('T')[0],
+            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || nowIso,
+            // Category and tags
+            category: row.Category || row.category || '',
+            tags: row.Tags || row.tags || row.Tag || row.tag || '',
             requirements: row.Requirements || row.requirements || '',
             notes: row.Notes || row.notes || '',
+            // timestamps for local display and later POSTing
+            createdAt: nowIso,
+            updatedAt: nowIso,
             selected: false
           }));
           if (newLeads.length === 0) throw new Error('No valid data found in Excel file');
@@ -464,13 +538,129 @@ const TopMenu = () => {
             return [...backendLeads, ...updatedImportedLeads];
           });
           if (fileInputRef.current) fileInputRef.current.value = '';
-          alert(`Successfully imported ${newLeads.length} leads`);
+          // Attempt to persist imported leads to backend immediately
+          persistImportedLeads(newLeads).then(({ successCount, failCount }) => {
+            const msg = `Imported ${newLeads.length} row(s). Saved to database: ${successCount}. Failed: ${failCount}.`;
+            alert(msg);
+          });
         } catch (error) {
           alert('Error importing file. Please ensure the column names match exactly: "Assigned to" and "Transferred on"');
         }
       };
       reader.readAsArrayBuffer(file);
     }
+  };
+
+  // Persist a batch of imported leads to backend and update localStorage accordingly
+  const persistImportedLeads = async (leadsBatch) => {
+    let successCount = 0;
+    let failCount = 0;
+    const succeededIds = [];
+
+    for (const l of leadsBatch) {
+      try {
+        // Resolve assigned_to_id only if valid in our limited options
+        let assigned_to_id;
+        if (l.assignedTo !== undefined && l.assignedTo !== null && l.assignedTo !== '') {
+          const num = Number(l.assignedTo);
+          if (!isNaN(num) && assignedToOptions.some(opt => Number(opt.id) === num)) {
+            assigned_to_id = num;
+          } else {
+            const match = assignedToOptions.find(opt => opt.name === l.assignedTo);
+            if (match) assigned_to_id = match.id;
+          }
+        }
+
+        // Resolve product id if possible (by id or by name from loaded products)
+        let product_id;
+        if (l.product !== undefined && l.product !== null && l.product !== '') {
+          const pnum = Number(l.product);
+          if (!isNaN(pnum)) {
+            product_id = pnum;
+          } else {
+            const foundProduct = products.find(p => (p.ID && (String(p.ID) === String(l.product) || p.Name === l.product)) || (p.id && (String(p.id) === String(l.product) || p.name === l.product)));
+            if (foundProduct) product_id = foundProduct.ID || foundProduct.id;
+          }
+        }
+
+        // Build payload
+        const payload = {
+          business: l.business,
+          contact: l.contact || l.name || [l.prefix, l.firstName, l.lastName].filter(Boolean).join(' '),
+          designation: l.designation,
+          mobile: l.mobile,
+          email: l.email,
+          city: l.city,
+          state: l.state,
+          country: l.country,
+          source: l.source,
+          stage: l.stage,
+          potential: parseFloat((l.potential || '0').toString()) || 0,
+          since: (() => {
+            const d = new Date(l.since || l.createdAt);
+            return isNaN(d) ? new Date().toISOString() : d.toISOString();
+          })(),
+          gstin: l.gstin,
+          website: l.website,
+          requirements: l.requirements || l.requirement,
+          notes: l.notes,
+          addressLine1: l.addressLine1,
+          addressLine2: l.addressLine2,
+          category: l.category,
+          tags: l.tags,
+        };
+
+        if (product_id !== undefined) payload.product_id = product_id;
+        if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+        if (l.createdAt) payload.created_at = l.createdAt;
+        if (l.updatedAt) payload.updated_at = l.updatedAt;
+        // also include name explicitly for backend compatibility
+        payload.name = payload.name || payload.contact;
+
+        // Strip empty-like fields
+        Object.keys(payload).forEach((k) => {
+          if (payload[k] === '' || payload[k] === undefined || payload[k] === null) delete payload[k];
+        });
+
+        // Skip if required fields are missing
+        if (!payload.business || !payload.contact || !payload.mobile || !payload.email) {
+          console.warn('Skipping lead due to missing required fields:', payload);
+          failCount += 1;
+          continue;
+        }
+
+        console.log('Sending payload:', payload); // Debug log
+
+        const res = await fetch(`${BASE_URL}/api/leads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          successCount += 1;
+          succeededIds.push(l.id);
+        } else {
+          failCount += 1;
+          console.error(`Failed to save lead ${l.id}:`, res.status, await res.text()); // Debug log
+        }
+      } catch (err) {
+        failCount += 1;
+      }
+    }
+
+    // Remove succeeded from localStorage importedLeads
+    try {
+      const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+      const remaining = imported.filter(x => !succeededIds.includes(x.id));
+      localStorage.setItem('importedLeads', JSON.stringify(remaining));
+      // Refresh table to reflect backend + remaining imported
+      await fetchLeads();
+    } catch (e) {
+      // ignore localStorage errors
+    }
+
+    return { successCount, failCount };
   };
 
   const handleExportToExcel = () => {
