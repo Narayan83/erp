@@ -118,6 +118,10 @@ func main() {
 	api.Delete("/product_variants/:id", handler.DeleteProduct_variant)
 
 	// Users
+
+	//users search
+	api.Get("/users/roles/:role", handler.GetUsersByType)
+
 	api.Get("/users", handler.GetAllUsers)
 	api.Get("/users/:id", handler.GetUserByID)
 	api.Post("/users", handler.CreateUser)
