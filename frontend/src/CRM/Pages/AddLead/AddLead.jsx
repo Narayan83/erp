@@ -299,6 +299,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             // include name key as well (backend accepts both contact/name)
             payload.name = payload.name || payload.contact || `${formData.firstName} ${formData.lastName}`.trim();
 
+            // Strip empty/undefined/null values again after enriching
+            Object.keys(payload).forEach((key) => {
+              if (payload[key] === '' || payload[key] === undefined || payload[key] === null) {
+                delete payload[key];
+              }
+            });
+
             const res = await fetch(`${BASE_URL}/api/leads`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

@@ -206,8 +206,17 @@ const TopMenu = () => {
   const handleAddLeadSubmit = async (newLeadData) => {
     try {
       const contact = [newLeadData.prefix || '', newLeadData.firstName || '', newLeadData.lastName || ''].filter(Boolean).join(' ').trim();
-      const assignedToObj = assignedToOptions.find(opt => opt.name === newLeadData.assignedTo);
-      const assigned_to_id = assignedToObj ? assignedToObj.id : 1;
+      // Only include assigned_to_id if it's a valid known option; otherwise omit to avoid FK errors
+      let assigned_to_id = undefined;
+      if (newLeadData.assignedTo !== undefined && newLeadData.assignedTo !== null && newLeadData.assignedTo !== '') {
+        const numericAssignee = Number(newLeadData.assignedTo);
+        if (!isNaN(numericAssignee) && assignedToOptions.some(opt => Number(opt.id) === numericAssignee)) {
+          assigned_to_id = numericAssignee;
+        } else {
+          const assignedToObj = assignedToOptions.find(opt => opt.name === newLeadData.assignedTo);
+          if (assignedToObj) assigned_to_id = assignedToObj.id;
+        }
+      }
       // Resolve product to a valid numeric product_id when possible to avoid FK errors
       let product_id = newLeadData.product ? Number(newLeadData.product) : undefined;
       if (isNaN(product_id)) {
@@ -241,6 +250,14 @@ const TopMenu = () => {
       };
 
       if (product_id !== undefined) payload.product_id = product_id;
+      if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+
+      // Strip empty/undefined/null values to avoid backend parse/validation issues
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === '' || payload[k] === undefined || payload[k] === null) {
+          delete payload[k];
+        }
+      });
       if (editLead && editLead.id) {
         // Backend lead: update via API
         await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
@@ -521,13 +538,129 @@ const TopMenu = () => {
             return [...backendLeads, ...updatedImportedLeads];
           });
           if (fileInputRef.current) fileInputRef.current.value = '';
-          alert(`Successfully imported ${newLeads.length} leads`);
+          // Attempt to persist imported leads to backend immediately
+          persistImportedLeads(newLeads).then(({ successCount, failCount }) => {
+            const msg = `Imported ${newLeads.length} row(s). Saved to database: ${successCount}. Failed: ${failCount}.`;
+            alert(msg);
+          });
         } catch (error) {
           alert('Error importing file. Please ensure the column names match exactly: "Assigned to" and "Transferred on"');
         }
       };
       reader.readAsArrayBuffer(file);
     }
+  };
+
+  // Persist a batch of imported leads to backend and update localStorage accordingly
+  const persistImportedLeads = async (leadsBatch) => {
+    let successCount = 0;
+    let failCount = 0;
+    const succeededIds = [];
+
+    for (const l of leadsBatch) {
+      try {
+        // Resolve assigned_to_id only if valid in our limited options
+        let assigned_to_id;
+        if (l.assignedTo !== undefined && l.assignedTo !== null && l.assignedTo !== '') {
+          const num = Number(l.assignedTo);
+          if (!isNaN(num) && assignedToOptions.some(opt => Number(opt.id) === num)) {
+            assigned_to_id = num;
+          } else {
+            const match = assignedToOptions.find(opt => opt.name === l.assignedTo);
+            if (match) assigned_to_id = match.id;
+          }
+        }
+
+        // Resolve product id if possible (by id or by name from loaded products)
+        let product_id;
+        if (l.product !== undefined && l.product !== null && l.product !== '') {
+          const pnum = Number(l.product);
+          if (!isNaN(pnum)) {
+            product_id = pnum;
+          } else {
+            const foundProduct = products.find(p => (p.ID && (String(p.ID) === String(l.product) || p.Name === l.product)) || (p.id && (String(p.id) === String(l.product) || p.name === l.product)));
+            if (foundProduct) product_id = foundProduct.ID || foundProduct.id;
+          }
+        }
+
+        // Build payload
+        const payload = {
+          business: l.business,
+          contact: l.contact || l.name || [l.prefix, l.firstName, l.lastName].filter(Boolean).join(' '),
+          designation: l.designation,
+          mobile: l.mobile,
+          email: l.email,
+          city: l.city,
+          state: l.state,
+          country: l.country,
+          source: l.source,
+          stage: l.stage,
+          potential: parseFloat((l.potential || '0').toString()) || 0,
+          since: (() => {
+            const d = new Date(l.since || l.createdAt);
+            return isNaN(d) ? new Date().toISOString() : d.toISOString();
+          })(),
+          gstin: l.gstin,
+          website: l.website,
+          requirements: l.requirements || l.requirement,
+          notes: l.notes,
+          addressLine1: l.addressLine1,
+          addressLine2: l.addressLine2,
+          category: l.category,
+          tags: l.tags,
+        };
+
+        if (product_id !== undefined) payload.product_id = product_id;
+        if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+        if (l.createdAt) payload.created_at = l.createdAt;
+        if (l.updatedAt) payload.updated_at = l.updatedAt;
+        // also include name explicitly for backend compatibility
+        payload.name = payload.name || payload.contact;
+
+        // Strip empty-like fields
+        Object.keys(payload).forEach((k) => {
+          if (payload[k] === '' || payload[k] === undefined || payload[k] === null) delete payload[k];
+        });
+
+        // Skip if required fields are missing
+        if (!payload.business || !payload.contact || !payload.mobile || !payload.email) {
+          console.warn('Skipping lead due to missing required fields:', payload);
+          failCount += 1;
+          continue;
+        }
+
+        console.log('Sending payload:', payload); // Debug log
+
+        const res = await fetch(`${BASE_URL}/api/leads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          successCount += 1;
+          succeededIds.push(l.id);
+        } else {
+          failCount += 1;
+          console.error(`Failed to save lead ${l.id}:`, res.status, await res.text()); // Debug log
+        }
+      } catch (err) {
+        failCount += 1;
+      }
+    }
+
+    // Remove succeeded from localStorage importedLeads
+    try {
+      const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+      const remaining = imported.filter(x => !succeededIds.includes(x.id));
+      localStorage.setItem('importedLeads', JSON.stringify(remaining));
+      // Refresh table to reflect backend + remaining imported
+      await fetchLeads();
+    } catch (e) {
+      // ignore localStorage errors
+    }
+
+    return { successCount, failCount };
   };
 
   const handleExportToExcel = () => {

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -18,8 +20,35 @@ func SetLeadsDB(db *gorm.DB) {
 // 📌 Create Lead
 func CreateLead(c *fiber.Ctx) error {
 	var lead models.Lead
-	if err := c.BodyParser(&lead); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+
+	// Read raw body and clean up empty time fields which would fail
+	// to unmarshal into time.Time (empty string causes parse errors).
+	raw := c.Body()
+	if len(raw) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "Empty request body"})
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		// Fallback to BodyParser for non-JSON or unexpected formats
+		if err2 := c.BodyParser(&lead); err2 != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+		}
+	} else {
+		// Remove keys that map to time.Time fields when they are empty strings
+		timeKeys := []string{"since", "lastTalk", "nextTalk", "transferredOn", "createdAt", "updatedAt", "created_at", "updated_at", "last_talk", "next_talk", "transferred_on"}
+		for _, k := range timeKeys {
+			if v, ok := payload[k]; ok {
+				if s, ok2 := v.(string); ok2 && strings.TrimSpace(s) == "" {
+					delete(payload, k)
+				}
+			}
+		}
+
+		cleaned, _ := json.Marshal(payload)
+		if err := json.Unmarshal(cleaned, &lead); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid input", "detail": err.Error()})
+		}
 	}
 
 	if err := leadsDB.Create(&lead).Error; err != nil {
