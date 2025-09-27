@@ -21,6 +21,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const [sizesLoading, setSizesLoading] = useState(false);
   const [sizesError, setSizesError] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedSize, setSelectedSize] = useState('');
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState(null);
   const [cropIndex, setCropIndex] = useState(null);
@@ -69,6 +70,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       setImagesPreview(initFiles.map(f => f.preview));
       const colorMatch = ralColors.find(c => c.value === initialData.color);
       setSelectedColor(colorMatch || null);
+      setSelectedSize(initialData.size || '');
 
       // Determine initial main image: prefer explicit initialData.mainImage, else default to first image if any
       let initialMain = null;
@@ -84,6 +86,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       reset();
       setImagesPreview([]);
       setSelectedColor(null);
+      setSelectedSize('');
       setMainImageIndex(null);
     }
   }, [initialData, open, reset]);
@@ -95,6 +98,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
 
     const formData = {
       ...data,
+      size: selectedSize,
       color: selectedColor?.value || '',
       images, // mixture of strings (existing) and File objects (new)
       files, // only File objects for convenience
@@ -113,6 +117,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
     setImageFiles([]);
     setImagesPreview([]);
     setSelectedColor(null);
+    setSelectedSize('');
   };
 
   const handleFileUpload = (e) => {
@@ -477,8 +482,8 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                 select
                 fullWidth
                 size="small"
-                {...register("size")}
-                defaultValue=""
+                value={selectedSize}
+                onChange={(e) => setSelectedSize(e.target.value)}
                 helperText={sizesError || ""}
                 error={Boolean(sizesError)}
               >

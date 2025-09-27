@@ -570,21 +570,12 @@ export default function ProductVariantManager() {
                                 }
                               }}
                             />
-                            <Button
-                              size="small"
-                              onClick={() => handleSetMainImage(v, i, img)}
-                              sx={{
-                                position: 'absolute',
-                                top: 2,
-                                right: 2,
-                                minWidth: 0,
-                                padding: 0,
-                                bgcolor: 'rgba(255,255,255,0.8)'
-                              }}
-                              title={isMain ? 'Main image' : 'Set as main image'}
-                            >
-                              {isMain ? <StarIcon sx={{ color: 'orange' }} fontSize="small" /> : <StarBorderIcon fontSize="small" />}
-                            </Button>
+                            {/* Read-only: non-interactive main-image indicator (no click/hover effect) */}
+                            {isMain && (
+                              <Box sx={{ position: 'absolute', top: 2, right: 2, minWidth: 0, padding: 0, bgcolor: 'rgba(255,255,255,0.8)', borderRadius: 0.5 }} title="Main image">
+                                <StarIcon sx={{ color: 'orange' }} fontSize="small" />
+                              </Box>
+                            )}
                           </Box>
                         );
                       })}

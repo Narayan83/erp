@@ -44,6 +44,10 @@ const AddQutation = () => {
   const navigate = useNavigate();
   const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
 
+  const [saving, setSaving] = useState(false);
+  const [quotationDate, setQuotationDate] = useState(today);
+  const [validTill, setValidTill] = useState(today);
+
 
 
 
@@ -72,7 +76,7 @@ const AddQutation = () => {
   // Fetch employees from API
   const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/users/roles/customer?page=1&limit=20`);
+      const res = await fetch(`${BASE_URL}/api/users/roles/employee?page=1&limit=20`);
       const data = await res.json();
       setEmployees(data.data || []);
     } catch (err) {
@@ -131,7 +135,8 @@ const AddQutation = () => {
   // Add product to table with calculations
   const handleSelectProduct = (prod) => {
     const qty = 1; // default quantity
-    const rate = prod.Variants?.[0]?.PurchaseCost || 0;
+    const selectedVariant = prod.Variants?.[0] || null;
+    const rate = selectedVariant?.PurchaseCost || 0;
     const discount = 0;
     const taxable = rate * qty - discount;
     const cgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
@@ -145,6 +150,7 @@ const AddQutation = () => {
         name: prod.Name,
         hsn: prod.HsnSacCode,
         unit: prod.Unit?.name,
+        variantId: selectedVariant?.ID || null,
         qty,
         rate,
         discount,
@@ -157,6 +163,69 @@ const AddQutation = () => {
     ]);
 
     setOpenProdTable(false);
+  };
+
+  // Build payload and submit quotation to backend
+  const handleSaveQuotation = async (skipNavigate = false) => {
+    // basic validation
+    if (!selectedCustomer) {
+      alert("Please select a customer before saving the quotation.");
+      return;
+    }
+    if (tableItems.length === 0) {
+      alert("Please add at least one item to the quotation.");
+      return;
+    }
+    if (!selectedEmployee) {
+      alert("Please select Sales Credit (Employee) before saving.");
+      return;
+    }
+
+    const payload = {
+      quotation: {
+        quotation_number: selectedCustomer ? `${selectedCustomer.id}ERQUOTE-2025` : "",
+        quotation_date: quotationDate ? `${quotationDate}T00:00:00Z` : new Date().toISOString(),
+        // backend expects numeric IDs (uint) — avoid sending null which breaks parsing
+        customer_id: selectedCustomer ? Number(selectedCustomer.id) : 0,
+        marketing_person_id: selectedEmployee ? Number(selectedEmployee) : 0,
+        // send RFC3339 if selected, else null
+        valid_until: validTill ? `${validTill}T00:00:00Z` : null,
+        total_amount: Number(grandTotal) || 0,
+        tax_amount: 0,
+        grand_total: Number(grandTotal) || 0,
+        status: "Draft",
+        created_by: selectedEmployee ? Number(selectedEmployee) : 0,
+      },
+      quotation_items: tableItems.map((it) => ({
+        product_id: Number(it.id) || 0,
+        product_variant_id: Number(it.variantId) || 0,
+        description: it.name,
+        quantity: Number(it.qty) || 0,
+        rate: Number(it.rate) || 0,
+        tax_percent: 0,
+        tax_amount: Number((it.cgst || 0) + (it.sgst || 0)) || 0,
+        line_total: Number(it.amount) || 0,
+      })),
+    };
+
+    // helpful debug info
+    console.log('Quotation payload', payload);
+
+    try {
+      setSaving(true);
+      const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
+      console.log("Saved quotation response:", res.data);
+      alert("Quotation saved successfully.");
+      // navigate to quotation list unless caller requested otherwise
+      if (!skipNavigate) navigate("/quotation-list");
+    } catch (err) {
+      console.error("Failed to save quotation:", err);
+      // show backend response body if available for easier debugging
+      console.error('Backend response data:', err?.response?.data);
+      alert("Failed to save quotation. See console for details.");
+    } finally {
+      setSaving(false);
+    }
   };
 
 
@@ -203,7 +272,7 @@ const AddQutation = () => {
             </span>{" "}
             Print Settings{" "}
           </button>
-          <button>
+          <button onClick={() => navigate(-1)}>
             {" "}
             <span>
               {" "}
@@ -211,7 +280,7 @@ const AddQutation = () => {
             </span>{" "}
             Back{" "}
           </button>
-          <button>
+          <button onClick={() => handleSaveQuotation()} disabled={saving}>
             {" "}
             <span>
               {" "}
@@ -398,7 +467,8 @@ const AddQutation = () => {
                         label="Quotation Date"
                         size="small"
                         type="date"
-                        defaultValue={today}
+                        value={quotationDate}
+                        onChange={(e)=> setQuotationDate(e.target.value)}
                         sx={{ width: "260px" }}
                         InputLabelProps={{ shrink: true }} // keeps the label above the date
                       />
@@ -410,7 +480,8 @@ const AddQutation = () => {
           label="Valid Till"
           size="small"
           type="date"
-          defaultValue={today}
+          value={validTill}
+          onChange={(e)=> setValidTill(e.target.value)}
           sx={{ width: "260px" }}
           InputLabelProps={{ shrink: true }}
         />
@@ -622,8 +693,14 @@ const AddQutation = () => {
 
 
               <div>
-                <button className="btn btn-warning rounded-0 ml-4"> SAVE </button>
-                <button className="btn btn-warning rounded-0 ml-4"> SAVE & Add New </button>
+                <button className="btn btn-warning rounded-0 ml-4" onClick={handleSaveQuotation} disabled={saving}> SAVE </button>
+                <button className="btn btn-warning rounded-0 ml-4" onClick={async ()=>{
+                  await handleSaveQuotation();
+                  // reset form for new quotation
+                  setSelectedCustomer(null);
+                  setTableItems([]);
+                  setGrandTotal(0);
+                }} disabled={saving}> SAVE & Add New </button>
               </div>
 
 
