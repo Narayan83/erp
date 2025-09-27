@@ -22,6 +22,9 @@ func GetAllUsers(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
 	filter := c.Query("filter")
+	userType := c.Query("user_type")
+	roleID := c.QueryInt("role_id", 0)
+	deptHeadID := c.QueryInt("dept_head", 0)
 
 	if page < 1 {
 		page = 1
@@ -32,6 +35,36 @@ func GetAllUsers(c *fiber.Ctx) error {
 
 	if filter != "" {
 		query = query.Where("firstname ILIKE ? OR lastname ILIKE ? OR email ILIKE ?", "%"+filter+"%", "%"+filter+"%", "%"+filter+"%")
+	}
+
+	// Apply user type filter if provided (matches frontend values)
+	if userType != "" {
+		switch userType {
+		case "user":
+			query = query.Where("is_user = ?", true)
+		case "customer":
+			query = query.Where("is_customer = ?", true)
+		case "supplier":
+			query = query.Where("is_supplier = ?", true)
+		case "employee":
+			query = query.Where("is_employee = ?", true)
+		case "dealer":
+			query = query.Where("is_dealer = ?", true)
+		case "distributor":
+			query = query.Where("is_distributor = ?", true)
+		default:
+			// unknown user_type - ignore and continue without filtering
+		}
+	}
+
+	// Filter by role_id if provided
+	if roleID > 0 {
+		query = query.Where("role_id = ?", roleID)
+	}
+
+	// Filter by dept_head if provided (expects numeric id)
+	if deptHeadID > 0 {
+		query = query.Where("dept_head = ?", deptHeadID)
 	}
 
 	if err := query.Count(&total).Error; err != nil {

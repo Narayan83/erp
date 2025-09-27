@@ -119,8 +119,8 @@ type User struct {
 	IsUser              bool        `json:"is_user"`
 	IsCustomer          bool        `json:"is_customer"`
 	IsSupplier          bool        `json:"is_supplier"`
-	IsEmployee          bool        `json:"IsEmployee"`
-	IsDealer            bool        `json:"IsDealer"`
-	IsDistributor       bool        `json:"IsDistributor"`
+	IsEmployee          bool        `json:"is_employee"`
+	IsDealer            bool        `json:"is_dealer"`
+	IsDistributor       bool        `json:"is_distributor"`
 	RoleID              *int        `json:"role_id,omitempty"`
 }
