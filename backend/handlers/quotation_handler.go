@@ -23,9 +23,20 @@ func CreateQuotation(c *fiber.Ctx) error {
 		QuotationItems []models.QuotationItem `json:"quotation_items"`
 	}
 
+	// Debug: capture raw body to help diagnose parsing issues
+	raw := c.Body()
 	if err := c.BodyParser(&input); err != nil {
+		// Log error and raw body (trim to reasonable length)
 		fmt.Println("Error parsing body:", err)
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+		if len(raw) > 0 {
+			snippet := string(raw)
+			if len(snippet) > 2000 {
+				snippet = snippet[:2000] + "..."
+			}
+			fmt.Println("Raw request body (snippet):", snippet)
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid input", "parse_error": err.Error(), "raw_body_snippet": snippet})
+		}
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid input", "parse_error": err.Error()})
 	}
 
 	// Start DB transaction
