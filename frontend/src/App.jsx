@@ -27,6 +27,7 @@ import ProductEditPage from "./Products/ProductManage/page/ProductEditPage";
 import ProductVariantManager from "./Products/ProductManage/Components/ProductVariantManager";
 import UserFormPage from "./User/page/UserFormPage";
 import UserListPage from "./User/page/user_list_page";
+import Branch from "./Branch/Branch";
 // import ProductAtributesPage from "./Products/ProductAtributesPage/ProductAtributesPage";
 
 import CrmPage from "./CRM/Components/TopMenu/TopMenu";
@@ -122,6 +123,7 @@ function App() {
           <Route path="/ManageTag" element={ < TagPage /> } />
           <Route path="/ManageUnitStoreTax" element={ < UnitStoreTaxMasterPage / > } />
           <Route path="/ManageProduct" element={< ProductMultiStepForm /> } />
+          <Route path="/ManageBranch" element={<Branch />} />
           <Route path="/ProductMaster" element={< ProductListPage /> } />
           <Route path="/products/:id/edit" element={<ProductEditPage />} />
           <Route path="/products/:id/variants" element={<ProductVariantManager />} />

@@ -90,6 +90,13 @@ export const menuItems = [
     icon: MdOutlinePhonelinkSetup,
     submenu: [{ title: "Company/Firm setups", path: "/" }],
   },
+
+  {
+    id: 8,
+    title: "Branch Master",
+    icon: GiRingmaster,
+    submenu: [{ title: "Branch Management", path: "/ManageBranch" }],
+  },
   {
     id: 5,
     title: "Reports",
