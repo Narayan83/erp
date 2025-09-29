@@ -2,9 +2,14 @@ import React, { useState } from "react";
 import Button from "@mui/material/Button";
 import { MdOutlineClear } from "react-icons/md";
 import { IoMdLock, IoMdMail } from "react-icons/io";
+import { AiOutlineDatabase } from 'react-icons/ai';
+import { FaUsers } from 'react-icons/fa';
+import { FiBarChart2 } from 'react-icons/fi';
+import { GiGears } from 'react-icons/gi';
 import Skeleton from '@mui/material/Skeleton';
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from '../../../Config';
+import './Login.scss';
 
 
 function LoginPage() {
@@ -74,111 +79,119 @@ function LoginPage() {
   };
 
   return (
-    <div className="login-container">
-      <section className="login-content">
-        <div className="login-header">
-          <h2>Welcome Back</h2>
-          <p>Please enter your credentials to login</p>
+    <div className="login-page">
+      <div className="left-panel">
+        <div className="marketing-wrap">
+          <h1 className="app-title">Enterprise Resource Planning</h1>
+          <p className="app-sub">Streamline your business operations with our comprehensive ERP solution</p>
+
+          <ul className="features-list">
+            <li>
+              <span className="feature-icon"><AiOutlineDatabase /></span>
+              <div>
+                <h4>Centralized Data Management</h4>
+                <p>All your business data in one secure location</p>
+              </div>
+            </li>
+            <li>
+              <span className="feature-icon"><FaUsers /></span>
+              <div>
+                <h4>Human Resources</h4>
+                <p>Efficient employee management and payroll processing</p>
+              </div>
+            </li>
+            <li>
+              <span className="feature-icon"><FiBarChart2 /></span>
+              <div>
+                <h4>Real-time Analytics</h4>
+                <p>Make data-driven decisions with powerful insights</p>
+              </div>
+            </li>
+            <li>
+              <span className="feature-icon"><GiGears /></span>
+              <div>
+                <h4>Process Automation</h4>
+                <p>Automate routine tasks and improve efficiency</p>
+              </div>
+            </li>
+          </ul>
         </div>
-        
-        {error && (
-          <div className="error-message">
-            {error}
+      </div>
+
+      <div className="right-panel">
+        <div className="login-card">
+          <div className="login-header">
+            <h2>Welcome Back</h2>
+            <p>Please enter your credentials to login</p>
           </div>
-        )}
-        
-        <div className="container">
-          <form onSubmit={handleSubmit}>
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-container">
-                  <div className="form-items">
-                    <label>Email Address</label>
-                    <div className="input-with-icon">
-                      <IoMdMail className="input-icon" />
-                      <input
-                        type="email"
-                        placeholder="Enter your email"
-                        name="email"
-                        value={loginData.email}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+
+          {error && (
+            <div className="error-message">{error}</div>
+          )}
+
+          <form onSubmit={handleSubmit} className="login-form">
+            <label className="label">Email Address</label>
+            <div className="input-with-icon">
+              <IoMdMail className="input-icon" />
+              <input
+                type="email"
+                placeholder="Enter your email"
+                name="email"
+                value={loginData.email}
+                onChange={handleInputChange}
+                required
+              />
             </div>
-            
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-container">
-                  <div className="form-items">
-                    <label>Password</label>
-                    <div className="input-with-icon">
-                      <IoMdLock className="input-icon" />
-                      <input
-                        type="password"
-                        placeholder="Enter your password"
-                        name="password"
-                        value={loginData.password}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+
+            <label className="label">Password</label>
+            <div className="input-with-icon">
+              <IoMdLock className="input-icon" />
+              <input
+                type="password"
+                placeholder="Enter your password"
+                name="password"
+                value={loginData.password}
+                onChange={handleInputChange}
+                required
+              />
             </div>
-            
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-container">
-                  <div className="form-buttons">
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      type="submit"
-                      disabled={isLoading}
-                      fullWidth
-                    >
-                      {isLoading ? (
-                        <>
-                          <Skeleton variant="circular" width={10} height={10} />
-                          <span className="mr-4"> Logging in...</span>
-                        </>
-                      ) : (
-                        <span>Login</span>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      variant="outlined" 
-                      color="secondary" 
-                      onClick={handleReset}
-                      fullWidth
-                    >
-                      <span className="icon">
-                        <MdOutlineClear />
-                      </span>
-                      Reset
-                    </Button>
-                  </div>
-                </div>
-              </div>
+
+            <div className="form-actions">
+              <Button
+                variant="contained"
+                color="primary"
+                type="submit"
+                disabled={isLoading}
+                className="btn-login"
+              >
+                {isLoading ? (
+                  <>
+                    <Skeleton variant="circular" width={14} height={14} />
+                    <span className="ml-8"> Logging in...</span>
+                  </>
+                ) : (
+                  <span>Login</span>
+                )}
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleReset}
+                className="btn-reset"
+              >
+                <span className="icon"><MdOutlineClear /></span>
+                Reset
+              </Button>
             </div>
-            
+
             <div className="login-footer">
-              <p>
-                Don't have an account? <a href="/register">Sign up</a>
-              </p>
-              <p>
-                <a href="/forgot-password">Forgot password?</a>
-              </p>
+              <p>Don't have an account? <a href="/register">Sign up</a></p>
+              <p><a href="/forgot-password">Forgot password?</a></p>
             </div>
           </form>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
