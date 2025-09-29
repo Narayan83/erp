@@ -66,7 +66,7 @@
 }
 
 .nav-icon-hover {
-  transition: all .3s ease-in-out;
+  transition: all 0.3s ease-in-out;
 
   &:hover {
     &::before {
@@ -79,20 +79,55 @@
       width: 40px;
       z-index: -1;
       border-radius: 100px;
-      transition: all .3s ease-in-out;
-      background-color:  var(--bs-primary-bg-subtle);
+      transition: all 0.3s ease-in-out;
+      background-color: var(--bs-primary-bg-subtle);
     }
   }
 }
 
 .navbar-nav .dropdown-menu {
   position: absolute;
-  min-width: 200px;
+  /* Increased minimum width so dropdowns are much wider on desktop */
+  min-width: 360px;
+  /* Prevent extremely wide dropdowns on very large screens */
+  max-width: 720px;
+  width: auto;
 
   .dropdown-item {
     border-radius: 8px;
   }
+}
 
+/* Styles for account menu (moved from inline sx in Header.jsx) */
+.account-menu-paper {
+  overflow: visible !important;
+  filter: drop-shadow(0px 2px 8px rgba(0, 0, 0, 0.32));
+  margin-top: 0.375rem; // ~1.5 * 0.25rem base
+  position: relative;
+  /* Make account menu wider for profile / settings / logout items */
+  min-width: 320px;
+  max-width: 480px;
+  width: auto;
+
+  .MuiAvatar-root {
+    width: 32px;
+    height: 32px;
+    margin-left: -0.5rem;
+    margin-right: 1rem;
+  }
+
+  &::before {
+    content: "";
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 14px;
+    width: 10px;
+    height: 10px;
+    background: var(--bs-body-bg, #fff);
+    transform: translateY(-50%) rotate(45deg);
+    z-index: 0;
+  }
 }
 
 .notification {
@@ -120,6 +155,15 @@
   .navbar-nav .dropdown-menu {
     position: absolute;
     width: 100%;
+  }
+
+  /* Ensure the account menu becomes full-width on small screens */
+  .account-menu-paper {
+    width: 100% !important;
+    min-width: unset !important;
+    max-width: unset !important;
+    left: 0 !important;
+    right: 0 !important;
   }
 
   .navbar-nav .nav-item.dropdown {
@@ -168,10 +212,11 @@
 }
 
 .dropdown-menu-animate-up {
-  -webkit-animation: animation-dropdown-menu-fade-in 0.5s ease 1, animation-dropdown-menu-move-up 0.5s ease-out 1;
-  animation: animation-dropdown-menu-fade-in 0.5s ease 1, animation-dropdown-menu-move-up 0.5s ease-out 1;
+  -webkit-animation: animation-dropdown-menu-fade-in 0.5s ease 1,
+    animation-dropdown-menu-move-up 0.5s ease-out 1;
+  animation: animation-dropdown-menu-fade-in 0.5s ease 1,
+    animation-dropdown-menu-move-up 0.5s ease-out 1;
 }
-
 
 @keyframes fadeInUp {
   from {

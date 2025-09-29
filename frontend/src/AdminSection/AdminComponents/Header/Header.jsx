@@ -1,5 +1,5 @@
-import React, { useContext, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useContext, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import images from "../../../assets/images";
 import Button from "@mui/material/Button";
 import { MdOutlineMenuOpen } from "react-icons/md";
@@ -12,7 +12,7 @@ import { IoIosNotificationsOutline } from "react-icons/io";
 // drop down menu
 
 import Box from "@mui/material/Box";
-import Avatar from "@mui/material/Avatar";
+// Avatar removed (not used for Profile menu icon)
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -22,7 +22,7 @@ import Typography from "@mui/material/Typography";
 import Tooltip from "@mui/material/Tooltip";
 import PersonAdd from "@mui/icons-material/PersonAdd";
 import Settings from "@mui/icons-material/Settings";
-import Logout from "@mui/icons-material/Logout";
+import PowerSettingsNew from "@mui/icons-material/PowerSettingsNew";
 import { myContext } from "../../../App";
 
 function Header() {
@@ -36,6 +36,56 @@ function Header() {
   };
 
   const context = useContext(myContext);
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState({ name: "Logged In user name", role: "user role", avatar: null });
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const stored = localStorage.getItem("userProfile");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setProfile({
+            name: parsed.name || "Logged In user name",
+            role: parsed.role || "user role",
+            avatar: parsed.avatar || null,
+          });
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    load();
+    const handler = () => load();
+    window.addEventListener("userProfileUpdated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("userProfileUpdated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  const handleProfile = () => {
+    handleClose();
+    navigate("/profile");
+  };
+
+  const handleSettings = () => {
+    handleClose();
+    navigate("/settings");
+  };
+
+  const handleLogout = () => {
+    handleClose();
+    if (context && typeof context.logout === "function") {
+      context.logout();
+    } else {
+      // fallback: navigate to login
+      navigate("/login");
+    }
+  };
 
   return (
     <>
@@ -74,18 +124,15 @@ function Header() {
                      <Button className='rounded-circle mr-3'> <MdOutlineMenuOpen /> </Button>
                      <Button className='rounded-circle mr-3'> <MdOutlineMenuOpen /> </Button> */}
 
-              <Button
-                className="my-account d-flex align-items-center"
-                onClick={handleClick}
-              >
+              <Button className="my-account d-flex align-items-center" onClick={handleClick}>
                 <div className="user-image">
                   <span className="rounded-circle">
-                    <img src={images.userIcon} alt="" />
+                    <img src={profile.avatar || images.userIcon} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '50%' }} />
                   </span>
                 </div>
                 <div className="user-info">
-                  <h4>Logged In user name</h4>
-                  <p>user role</p>
+                  <h4>{profile.name}</h4>
+                  <p>{profile.role}</p>
                 </div>
               </Button>
 
@@ -94,60 +141,30 @@ function Header() {
                 id="account-menu"
                 open={open}
                 onClose={handleClose}
-                onClick={handleClose}
                 slotProps={{
                   paper: {
                     elevation: 0,
-                    sx: {
-                      overflow: "visible",
-                      filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.32))",
-                      mt: 1.5,
-                      "& .MuiAvatar-root": {
-                        width: 32,
-                        height: 32,
-                        ml: -0.5,
-                        mr: 1,
-                      },
-                      "&::before": {
-                        content: '""',
-                        display: "block",
-                        position: "absolute",
-                        top: 0,
-                        right: 14,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "background.paper",
-                        transform: "translateY(-50%) rotate(45deg)",
-                        zIndex: 0,
-                      },
-                    },
+                    className: "account-menu-paper",
                   },
                 }}
                 transformOrigin={{ horizontal: "right", vertical: "top" }}
                 anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
               >
-                <MenuItem onClick={handleClose}>
-                  <Avatar /> Profile
-                </MenuItem>
-                <MenuItem onClick={handleClose}>
-                  <Avatar /> My account
-                </MenuItem>
-                <Divider />
-                <MenuItem onClick={handleClose}>
+                <MenuItem onClick={handleProfile}>
                   <ListItemIcon>
                     <PersonAdd fontSize="small" />
                   </ListItemIcon>
-                  Add another account
+                  Profile
                 </MenuItem>
-                <MenuItem onClick={handleClose}>
+                <MenuItem onClick={handleSettings}>
                   <ListItemIcon>
                     <Settings fontSize="small" />
                   </ListItemIcon>
                   Settings
                 </MenuItem>
-                <MenuItem onClick={handleClose}>
+                <MenuItem onClick={handleLogout}>
                   <ListItemIcon>
-                    <Logout fontSize="small" />
+                    <PowerSettingsNew fontSize="small" />
                   </ListItemIcon>
                   Logout
                 </MenuItem>

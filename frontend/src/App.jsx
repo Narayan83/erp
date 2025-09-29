@@ -16,6 +16,8 @@ import LoginPage from "./AdminSection/AdminPages/Login/Login";
 import Registration from "./Roles/Registration/Registration";
 import RegistrationView from "./Roles/Registration/RegistrationView";
 import NotFoundPage from "./AdminSection/AdminPages/NotFoundPage/NotFoundPage";
+import Profile from "./AdminSection/AdminPages/Profile/Profile";
+import Settings from "./AdminSection/AdminPages/Settings/Settings";
 import RolesView from "./Roles/RoleCreation/RolesView";
 import CategoryPage from "./Products/Category/page/CategoryPage";
 import SubcategoryPage from "./Products/Subcategory/page/SubcategoryPage";
@@ -108,6 +110,8 @@ function App() {
 
           {/* Layout routes */}
           <Route path="/home" element={<HomePage />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           {/* <Route path="/product" element={<AddProduct />} />
           <Route path="/manage-product" element={<ManageProduct />} />
           <Route path="/pattributes" element={<ProductAtributesPage />} />
