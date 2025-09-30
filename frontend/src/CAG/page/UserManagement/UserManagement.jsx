@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import "../../styles/user_management.scss";
+import { BASE_URL } from "../../../Config";
 
 const users = [
   { label: "admin assignor (admin@cag.com)", value: "admin@cag.com" },
@@ -29,15 +31,33 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(users[0].value);
   const [selectedRole, setSelectedRole] = useState(roles[0].value);
 
-  const [menus, setMenus] = useState(() => {
-    const stored = JSON.parse(localStorage.getItem("menus") || "[]");
-    return [
-      { label: "All menus...", value: "all" },
-      ...stored.map(m => ({ label: m.name, value: m.name }))
-    ];
-  });
+  const [menus, setMenus] = useState([{ label: "All menus...", value: "all" }]);
+  const [selectedMenu, setSelectedMenu] = useState("all");
 
-  const [selectedMenu, setSelectedMenu] = useState(menus[0].value);
+  useEffect(() => {
+    // fetch menus from backend and populate dropdown
+    const fetchMenus = async () => {
+      try {
+        const res = await axios.get(`${BASE_URL}/api/loadMenus?limit=1000`);
+        const menusArray = Array.isArray(res.data) ? res.data : res.data.data || [];
+        const mapped = [{ label: "All menus...", value: "all" }, ...menusArray.map(m => ({ label: m.menu_name, value: m.menu_name, id: m.id }))];
+        setMenus(mapped);
+        // store in localStorage for compatibility
+        try { localStorage.setItem('menus', JSON.stringify(menusArray)); } catch(e) {}
+        if (mapped.length) setSelectedMenu(mapped[0].value);
+      } catch (err) {
+        console.error('UserManagement: failed to fetch menus, falling back to localStorage', err);
+        const stored = JSON.parse(localStorage.getItem("menus") || "[]");
+        if (stored.length) {
+          const mapped = [{ label: "All menus...", value: "all" }, ...stored.map(m => ({ label: m.name || m.menu_name, value: m.name || m.menu_name }))];
+          setMenus(mapped);
+          if (mapped.length) setSelectedMenu(mapped[0].value);
+        }
+      }
+    };
+
+    fetchMenus();
+  }, []);
 
   // Permissions state: { [menu]: { [perm]: boolean } }
   const loadPermissions = (user, role) => {
