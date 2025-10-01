@@ -94,9 +94,49 @@ export default function RoleManagement() {
 
   const [permissions, setPermissions] = useState(loadPermissions(selectedRole));
 
+  // Keep the latest menu tree returned by backend for id lookup when saving
+  const [roleMenuTree, setRoleMenuTree] = useState([]);
+
   // Update permissions when selectedRole changes
   useEffect(() => {
-    setPermissions(loadPermissions(selectedRole));
+    // Try to load permissions from backend for the selected role
+    const roleObj = roles.find(r => r.value === selectedRole);
+    if (roleObj && roleObj.id) {
+      (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/roles/${roleObj.id}/permissions/menu-tree`);
+          if (!res.ok) throw new Error('Failed to fetch role menu tree');
+          const data = await res.json();
+          // data is expected to be an array of menus with .menu_name and .permissions
+          setRoleMenuTree(data);
+          // Map backend permissions (can_view/can_create/...) into our UI shape
+          const mapped = {};
+          permissionsData.forEach(({ menu, permissions: perms }) => {
+            // Find menu in returned tree by name
+            const found = data.find(m => (m.menu_name || m.MenuName || m.name) === menu || (m.Menu && m.Menu.menu_name) === menu);
+            if (found) {
+              const p = found.permissions || found.Permissions || {};
+              mapped[menu] = {
+                All: !!p.can_all,
+                View: !!p.can_view,
+                Create: !!p.can_create,
+                Update: !!p.can_update,
+                Delete: !!p.can_delete,
+              };
+            } else {
+              // fallback to local default
+              mapped[menu] = (loadPermissions(selectedRole)[menu]) || { All: false, View: false, Create: false, Update: false, Delete: false };
+            }
+          });
+          setPermissions(mapped);
+        } catch (err) {
+          console.error('Failed to load permissions from backend, falling back to localStorage', err);
+          setPermissions(loadPermissions(selectedRole));
+        }
+      })();
+    } else {
+      setPermissions(loadPermissions(selectedRole));
+    }
   }, [selectedRole]);
 
   const handlePermissionChange = (menu, perm) => {
@@ -152,13 +192,13 @@ export default function RoleManagement() {
         </div>
         <div className="permissions-table">
           {permissionsData.map(({ menu, permissions: perms }) => (
-            <div className={`permissions-row${permissions[menu].All ? " active" : ""}`} key={menu}>
+            <div className={`permissions-row${permissions[menu]?.All ? " active" : ""}`} key={menu}>
               <span className="menu-title">{menu}</span>
               {perms.map(perm => (
                 <label key={perm} className="perm-label">
                   <input
                     type="checkbox"
-                    checked={permissions[menu][perm]}
+                    checked={!!permissions[menu]?.[perm]}
                     onChange={() => perm === "All" ? handleAllChange(menu) : handlePermissionChange(menu, perm)}
                   />
                   {perm}
@@ -168,8 +208,52 @@ export default function RoleManagement() {
           ))}
         </div>
         <button className="save-button" onClick={() => {
-          localStorage.setItem(`permissions_${selectedRole}`, JSON.stringify(permissions));
-          console.log('Changes saved for role:', selectedRole);
+          // Persist locally first
+          try { localStorage.setItem(`permissions_${selectedRole}`, JSON.stringify(permissions)); } catch (e) {}
+
+          // Attempt to save to backend
+          (async () => {
+            const roleObj = roles.find(r => r.value === selectedRole);
+            if (!roleObj || !roleObj.id) {
+              console.error('Cannot save permissions: role id not found for', selectedRole);
+              return;
+            }
+
+            // Build payload keyed by menu ID (string) as backend expects
+            const payload = {};
+
+            // Use roleMenuTree if available to map names to IDs, otherwise try menus state
+            const lookupList = roleMenuTree.length ? roleMenuTree : (menus.map(m => ({ menu_name: m.label, id: m.id })));
+
+            permissionsData.forEach(({ menu }) => {
+              const perms = permissions[menu] || { All: false, View: false, Create: false, Update: false, Delete: false };
+              // Find menu id
+              const found = lookupList.find(l => (l.menu_name || l.label || l.name) === menu || (l.Menu && l.Menu.menu_name) === menu || (l.menu_name && l.menu_name === menu));
+              const menuId = found && (found.id || found.ID || (found.Menu && found.Menu.ID));
+              const key = menuId ? String(menuId) : menu; // fallback to name key if id not present
+
+              payload[key] = {
+                can_all: !!perms.All,
+                can_view: !!perms.View,
+                can_create: !!perms.Create,
+                can_update: !!perms.Update,
+                can_delete: !!perms.Delete,
+              };
+            });
+
+            try {
+              const res = await fetch(`${API_BASE}/api/roles/${roleObj.id}/permissions`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || data.message || 'Failed to update permissions');
+              console.log('Permissions updated on server for role:', selectedRole, data);
+            } catch (err) {
+              console.error('Failed to save permissions to backend:', err);
+            }
+          })();
         }}>
           Save Changes
         </button>
