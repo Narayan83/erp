@@ -105,6 +105,21 @@ func CreateProduct(c *fiber.Ctx) error {
 	product.Variants = variants
 	product.CreatedAt = time.Now()
 
+	// Pre-check SKUs to avoid unique constraint DB errors
+	var skusToCheck []string
+	for _, v := range variants {
+		s := strings.TrimSpace(v.SKU)
+		if s != "" {
+			skusToCheck = append(skusToCheck, s)
+		}
+	}
+	if len(skusToCheck) > 0 {
+		var existingSkus []string
+		if err := productsDB.Model(&models.ProductVariant{}).Where("sku IN ?", skusToCheck).Pluck("sku", &existingSkus).Error; err == nil && len(existingSkus) > 0 {
+			return c.Status(409).JSON(fiber.Map{"error": "duplicate_skus", "skus": existingSkus})
+		}
+	}
+
 	if err := productsDB.Create(&product).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

@@ -38,6 +38,9 @@ func main() {
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	handler.SetRolesDB(initializers.DB)
+	// Initialize role-management DB used by role permission handlers
+	handler.SetRolesManagementDB(initializers.DB)
 	handler.SetMenusDB(initializers.DB)
 
 	// set up fiber

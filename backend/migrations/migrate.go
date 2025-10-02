@@ -29,6 +29,7 @@ func main() {
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+		&models.RoleManagement{},
 
 		&models.Employee{},
 		&models.Customer{},

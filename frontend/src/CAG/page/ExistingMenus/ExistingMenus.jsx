@@ -36,6 +36,12 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
 
   useEffect(() => {
     loadMenus(); // Fetch on mount
+    const onMenuCreated = (e) => {
+      // refresh lists when a menu is created elsewhere
+      loadMenus();
+    };
+    window.addEventListener('menuCreated', onMenuCreated);
+    return () => window.removeEventListener('menuCreated', onMenuCreated);
   }, []);
 
   const displayMenus = menus || localMenus;
