@@ -14,7 +14,7 @@ const MainSideBar = () => {
     setActiveTab((prev) => (prev === tabIndex ? null : tabIndex));
   };
 
-   const context = useContext(myContext);
+  const context = useContext(myContext) || { isToggleSideBar: false, setIsToggleSideBar: () => {} };
   
   return (
     <div className="sidebar">
@@ -70,7 +70,7 @@ const MainSideBar = () => {
         </li> */}
 
         {menuItems.map((item) => {
-          const Icon = item.icon; 
+          const Icon = item.icon || (() => null);
 
           return (
             <li key={item.id}>

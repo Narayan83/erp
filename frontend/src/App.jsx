@@ -27,6 +27,7 @@ import ProductMultiStepForm from "./Products/ProductManage/Components/ProductMul
 import ProductListPage from "./Products/ProductManage/page/product_list_page";
 import ProductEditPage from "./Products/ProductManage/page/ProductEditPage";
 import ProductVariantManager from "./Products/ProductManage/Components/ProductVariantManager";
+import Bank from "./Bank/Bank";
 import UserFormPage from "./User/page/UserFormPage";
 import UserListPage from "./User/page/user_list_page";
 import Branch from "./Branch/Branch";
@@ -128,6 +129,7 @@ function App() {
           <Route path="/ManageUnitStoreTax" element={ < UnitStoreTaxMasterPage / > } />
           <Route path="/ManageProduct" element={< ProductMultiStepForm /> } />
           <Route path="/ManageBranch" element={<Branch />} />
+          <Route path="/ManageBank" element={<Bank />} />
           <Route path="/ProductMaster" element={< ProductListPage /> } />
           <Route path="/products/:id/edit" element={<ProductEditPage />} />
           <Route path="/products/:id/variants" element={<ProductVariantManager />} />
