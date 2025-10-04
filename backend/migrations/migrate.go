@@ -36,6 +36,7 @@ func main() {
 		&models.Supplier{},
 		&models.Dealer{},
 		&models.Distributor{},
+		&models.Bank{},
 	)
 
 	if err != nil {
