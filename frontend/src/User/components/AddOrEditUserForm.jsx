@@ -415,24 +415,45 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         }
       }
 
+      let created
       if (defaultValues?.id) {
         // Update user
         const response = await axios.put(`${BASE_URL}/api/users/${defaultValues.id}`, payload);
-        // Show confirmation dialog with returned user
-        const created = response.data.user || response.data;
-        setCreatedUser(created);
-        setUsercode(created.usercode || created.username || "");
-        setDialogOpen(true);
-        // notify parent if needed
-        onSubmitUser && onSubmitUser(created);
+        created = response.data.user || response.data;
       } else {
         // Add new user
         const response = await axios.post(`${BASE_URL}/api/users`, payload);
-        const created = response.data.user || response.data;
-        setCreatedUser(created);
-        setUsercode(created.usercode || created.username || "");
-        setDialogOpen(true);
-        onSubmitUser && onSubmitUser(created);
+        created = response.data.user || response.data;
+      }
+
+      // Show confirmation dialog with returned user
+      setCreatedUser(created);
+      setUsercode(created.usercode || created.username || "");
+      setDialogOpen(true);
+      onSubmitUser && onSubmitUser(created);
+
+      // If bank info was provided in the form, save to bank master
+      try {
+        const bankName = payload.bank_name || payload.bankName || "";
+        const accountNumber = payload.account_number || payload.accountNumber || "";
+        if (bankName && accountNumber) {
+          const bankPayload = {
+            name: bankName,
+            branch_name: payload.branch_name || payload.branchName || "",
+            branch_address: payload.branch_address || payload.branchAddress || "",
+            account_number: accountNumber,
+            ifsc_code: payload.ifsc_code || payload.ifscCode || "",
+            // include user reference so bank master can show linked user
+            user_id: created.id,
+            user_code: created.usercode || created.usercode || created.username || "",
+            user_name: `${created.firstname || created.Firstname || ''} ${created.lastname || created.Lastname || ''}`.trim(),
+          };
+          // create or update bank master
+          await axios.post(`${BASE_URL}/api/banks`, bankPayload);
+        }
+      } catch (bankErr) {
+        console.error('Failed to save bank master:', bankErr);
+        // don't block user flow; optionally notify user
       }
     } catch (error) {
       console.error("Error submitting user form:", error);

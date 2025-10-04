@@ -35,7 +35,7 @@ function Header() {
     setAnchorEl(null);
   };
 
-  const context = useContext(myContext);
+  const context = useContext(myContext) || { isToggleSideBar: false, setIsToggleSideBar: () => {} };
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState({ name: "Logged In user name", role: "user role", avatar: null });
@@ -103,10 +103,7 @@ function Header() {
             {/* Search Box */}
             <div className="col-sm-2 d-flex align-items-center menu-btn-part">
               <Button className="rounded-circle mr-3" onClick={()=>context.setIsToggleSideBar(!context.isToggleSideBar)}>
-                {
-                  context.isToggleSideBar === false ? <MdOutlineMenuOpen /> : <MdOutlineMenu />
-                }
-               
+                {context.isToggleSideBar === false ? <MdOutlineMenuOpen /> : <MdOutlineMenu />}
               </Button>
               <AdminTopSearchBar />
             </div>

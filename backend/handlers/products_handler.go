@@ -105,6 +105,15 @@ func CreateProduct(c *fiber.Ctx) error {
 	product.Variants = variants
 	product.CreatedAt = time.Now()
 
+	// Defensive: ensure any client-supplied IDs are cleared so DB can assign them.
+	// This prevents INSERTs that try to use explicit primary key values which
+	// can lead to duplicate key violations if sequences are out of sync.
+	product.ID = 0
+	for i := range product.Variants {
+		product.Variants[i].ID = 0
+		product.Variants[i].ProductID = 0
+	}
+
 	// Pre-check SKUs to avoid unique constraint DB errors
 	var skusToCheck []string
 	for _, v := range variants {
@@ -121,7 +130,12 @@ func CreateProduct(c *fiber.Ctx) error {
 	}
 
 	if err := productsDB.Create(&product).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		// Detect common Postgres duplicate key / sequence-out-of-sync scenarios
+		errStr := err.Error()
+		if strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "SQLSTATE 23505") || strings.Contains(errStr, "products_pkey") {
+			return c.Status(409).JSON(fiber.Map{"error": "duplicate_key", "message": errStr})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": errStr})
 	}
 
 	return c.JSON(product)
