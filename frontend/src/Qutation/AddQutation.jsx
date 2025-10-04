@@ -12,7 +12,7 @@ import { FaSave } from "react-icons/fa";
 import { IoMdAdd } from "react-icons/io";
 import { useForm, Controller } from "react-hook-form";
 import { debounce } from "lodash";
-
+import { MdDeleteOutline } from "react-icons/md";
 import {
   FormControl,
   InputLabel,
@@ -58,6 +58,16 @@ const AddQutation = () => {
   const [grandTotal , setGrandTotal] = useState(0);
 
 
+const [productSelections, setProductSelections] = useState({});
+
+const [tandc,setTandc]=useState([]);
+const [openTandCModal, setOpenTandCModal] = useState(false);
+const [tandcSearch, setTandcSearch] = useState('');
+const [tandcSelections, setTandcSelections] = useState([]); 
+
+useEffect(()=>{
+  console.log(selectedEmployee);
+},[selectedEmployee])
 
   // Fetch customers from API using role endpoint
   const fetchCustomers = async (query = "") => {
@@ -88,7 +98,7 @@ const AddQutation = () => {
   // Fetch products from API
   const fetchProducts = async (query = "") => {
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=10&name=${query}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=10&code=${query}`);
      const data = await res.json();
      console.log(data);
       setProducts(data.data || []);
@@ -98,6 +108,24 @@ const AddQutation = () => {
   };
 
 
+
+    // Fetch tandc from API
+  const fetchTandC = async (query = "") => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/tandc`);
+     const data = await res.json();
+     console.log(data);
+      setTandc(data.data || []);
+    } catch (err) {
+      console.error("Error fetching TandC:", err);
+    }
+  };
+
+
+
+
+
+
   // Debounced fetch for smoother typing
   const debouncedFetch = useMemo(() => debounce(fetchProducts, 500), []);
 
@@ -105,6 +133,7 @@ const AddQutation = () => {
     fetchCustomers();
     fetchEmployees();
     fetchProducts();
+    fetchTandC();
   }, []);
 
     useEffect(() => {
@@ -127,6 +156,9 @@ const AddQutation = () => {
 
   const handleProdClose = () => setOpenProdTable(false);
 
+  const handleTandCOpen = () => setOpenTandCModal(true);
+const handleTandCClose = () => setOpenTandCModal(false);
+
    useEffect(()=>{
      const grandTotal = tableItems.reduce((sum, item) => sum + item.amount, 0);
      setGrandTotal(grandTotal);
@@ -142,6 +174,7 @@ const AddQutation = () => {
     const cgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
     const sgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
     const amount = taxable + cgst + sgst;
+    const desc = '';
 
     setTableItems((prev) => [
       ...prev,
@@ -158,6 +191,7 @@ const AddQutation = () => {
         cgst,
         sgst,
         amount,
+        desc,
         leadTime: prod.LeadTime,
       },
     ]);
@@ -165,68 +199,117 @@ const AddQutation = () => {
     setOpenProdTable(false);
   };
 
-  // Build payload and submit quotation to backend
-  const handleSaveQuotation = async (skipNavigate = false) => {
-    // basic validation
-    if (!selectedCustomer) {
-      alert("Please select a customer before saving the quotation.");
-      return;
-    }
-    if (tableItems.length === 0) {
-      alert("Please add at least one item to the quotation.");
-      return;
-    }
-    if (!selectedEmployee) {
-      alert("Please select Sales Credit (Employee) before saving.");
-      return;
-    }
+  // // Build payload and submit quotation to backend
+  // const handleSaveQuotation = async (skipNavigate = false) => {
+  //   // basic validation
+  //   if (!selectedCustomer) {
+  //     alert("Please select a customer before saving the quotation.");
+  //     return;
+  //   }
+  //   if (tableItems.length === 0) {
+  //     alert("Please add at least one item to the quotation.");
+  //     return;
+  //   }
+  //   if (!selectedEmployee) {
+  //     alert("Please select Sales Credit (Employee) before saving.");
+  //     return;
+  //   }
 
-    const payload = {
-      quotation: {
-        quotation_number: selectedCustomer ? `${selectedCustomer.id}ERQUOTE-2025` : "",
-        quotation_date: quotationDate ? `${quotationDate}T00:00:00Z` : new Date().toISOString(),
-        // backend expects numeric IDs (uint) — avoid sending null which breaks parsing
-        customer_id: selectedCustomer ? Number(selectedCustomer.id) : 0,
-        marketing_person_id: selectedEmployee ? Number(selectedEmployee) : 0,
-        // send RFC3339 if selected, else null
-        valid_until: validTill ? `${validTill}T00:00:00Z` : null,
-        total_amount: Number(grandTotal) || 0,
-        tax_amount: 0,
-        grand_total: Number(grandTotal) || 0,
-        status: "Draft",
-        created_by: selectedEmployee ? Number(selectedEmployee) : 0,
-      },
-      quotation_items: tableItems.map((it) => ({
-        product_id: Number(it.id) || 0,
-        product_variant_id: Number(it.variantId) || 0,
-        description: it.name,
-        quantity: Number(it.qty) || 0,
-        rate: Number(it.rate) || 0,
-        tax_percent: 0,
-        tax_amount: Number((it.cgst || 0) + (it.sgst || 0)) || 0,
-        line_total: Number(it.amount) || 0,
-      })),
-    };
+  //   const payload = {
+  //     quotation: {
+  //       quotation_number: selectedCustomer ? `${selectedCustomer.id}ERQUOTE-2025` : "",
+  //       quotation_date: quotationDate ? `${quotationDate}T00:00:00Z` : new Date().toISOString(),
+  //       // backend expects numeric IDs (uint) — avoid sending null which breaks parsing
+  //       customer_id: selectedCustomer ? Number(selectedCustomer.id) : 0,
+  //       marketing_person_id: selectedEmployee ? Number(selectedEmployee) : 0,
+  //       // send RFC3339 if selected, else null
+  //       valid_until: validTill ? `${validTill}T00:00:00Z` : null,
+  //       total_amount: Number(grandTotal) || 0,
+  //       tax_amount: 0,
+  //       grand_total: Number(grandTotal) || 0,
+  //       status: "Draft",
+  //       created_by: selectedEmployee ? Number(selectedEmployee) : 0,
+  //     },
+  //     quotation_items: tableItems.map((it) => ({
+  //       product_id: Number(it.id) || 0,
+  //       product_variant_id: Number(it.variantId) || 0,
+  //       description: it.name,
+  //       quantity: Number(it.qty) || 0,
+  //       rate: Number(it.rate) || 0,
+  //       tax_percent: 0,
+  //       tax_amount: Number((it.cgst || 0) + (it.sgst || 0)) || 0,
+  //       line_total: Number(it.amount) || 0,
+  //     })),
+  //   };
 
-    // helpful debug info
-    console.log('Quotation payload', payload);
+  //   // helpful debug info
+  //   console.log('Quotation payload', payload);
 
-    try {
-      setSaving(true);
-      const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
-      console.log("Saved quotation response:", res.data);
-      alert("Quotation saved successfully.");
-      // navigate to quotation list unless caller requested otherwise
-      if (!skipNavigate) navigate("/quotation-list");
-    } catch (err) {
-      console.error("Failed to save quotation:", err);
-      // show backend response body if available for easier debugging
-      console.error('Backend response data:', err?.response?.data);
-      alert("Failed to save quotation. See console for details.");
-    } finally {
-      setSaving(false);
-    }
-  };
+  //   try {
+  //     setSaving(true);
+  //     const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
+  //     console.log("Saved quotation response:", res.data);
+  //     alert("Quotation saved successfully.");
+  //     // navigate to quotation list unless caller requested otherwise
+  //     if (!skipNavigate) navigate("/quotation-list");
+  //   } catch (err) {
+  //     console.error("Failed to save quotation:", err);
+  //     // show backend response body if available for easier debugging
+  //     console.error('Backend response data:', err?.response?.data);
+  //     alert("Failed to save quotation. See console for details.");
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
+
+
+
+  const handleSaveQuotation = async () => {
+  if (!selectedCustomer) return alert("Select a customer.");
+  if (!selectedEmployee) return alert("Select a sales credit.");
+  if (!tableItems.length) return alert("Add at least one item.");
+
+const payload = {
+  quotation: {
+    quotation_number: `${selectedEmployee}ERQUOTE${2025}1`,
+    quotation_date: new Date(quotationDate).toISOString(), // convert to ISO string
+    customer_id: Number(selectedCustomer.id),
+    sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : null,
+    valid_until: new Date(validTill).toISOString(), // convert to ISO string
+    total_amount: grandTotal,
+    tax_amount: 0,
+    grand_total: grandTotal,
+    status: "Draft",
+    created_by: Number(selectedEmployee),
+    billing_address_id: 1,
+    shipping_address_id: 1,
+    t_and_c_id: 1,
+  },
+  quotation_items: tableItems.map((it) => ({
+    product_id: it.id,
+    product_variant_id: it.variantId,
+    description: it.name,
+    quantity: it.qty,
+    rate: it.rate,
+    tax_percent: 0,
+    tax_amount: it.cgst + it.sgst,
+    line_total: it.amount,
+  })),
+};
+
+  try {
+    setSaving(true);
+    const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
+    alert("Quotation saved successfully.");
+    navigate("/quotation-list");
+  } catch (err) {
+    console.error(err?.response?.data || err);
+    alert("Failed to save quotation.");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
 
 
@@ -516,27 +599,137 @@ const AddQutation = () => {
                     <th>SGST</th>
                     <th>Amount</th>
                     <th>Lead Time</th>
+                     <th>remove</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {tableItems.map((item, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>{/* image if available */}</td>
-                      <td>{item.name}</td>
-                      <td>{item.hsn}</td>
-                      <td>{item.qty}</td>
-                      <td>{item.unit}</td>
-                      <td>{item.rate}</td>
-                      <td>{item.discount}</td>
-                      <td>{item.taxable}</td>
-                      <td>{item.cgst}</td>
-                      <td>{item.sgst}</td>
-                      <td>{item.amount}</td>
-                      <td>{item.leadTime}</td>
-                    </tr>
-                  ))}
-                </tbody>
+               <tbody>
+  {tableItems.map((item, index) => (
+    <tr key={index}>
+      <td>{index + 1}</td>
+      <td>{/* image if available */}</td>
+      <td>
+        <TextField
+          value={item.name}
+          size="small"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].name = e.target.value;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>
+        <TextField
+          value={item.hsn}
+          size="small"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].hsn = e.target.value;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>
+        <TextField
+          value={item.qty}
+          size="small"
+          type="number"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].qty = Number(e.target.value);
+              // recalc taxable, cgst, sgst, amount
+              const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
+              const cgst = (taxable * (item.cgst + item.sgst) / 2) / 100; // adjust if needed
+              const sgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
+              newItems[index].taxable = taxable;
+              newItems[index].cgst = cgst;
+              newItems[index].sgst = sgst;
+              newItems[index].amount = taxable + cgst + sgst;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>
+        <TextField
+          value={item.unit}
+          size="small"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].unit = e.target.value;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>
+        <TextField
+          value={item.rate}
+          size="small"
+          type="number"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].rate = Number(e.target.value);
+              const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
+              const cgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
+              const sgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
+              newItems[index].taxable = taxable;
+              newItems[index].cgst = cgst;
+              newItems[index].sgst = sgst;
+              newItems[index].amount = taxable + cgst + sgst;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>
+        <TextField
+          value={item.discount}
+          size="small"
+          type="number"
+          onChange={(e) =>
+            setTableItems((prev) => {
+              const newItems = [...prev];
+              newItems[index].discount = Number(e.target.value);
+              const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
+              const cgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
+              const sgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
+              newItems[index].taxable = taxable;
+              newItems[index].cgst = cgst;
+              newItems[index].sgst = sgst;
+              newItems[index].amount = taxable + cgst + sgst;
+              return newItems;
+            })
+          }
+        />
+      </td>
+      <td>{item.taxable}</td>
+      <td>{item.cgst}</td>
+      <td>{item.sgst}</td>
+      <td>{item.amount}</td>
+      <td>{item.leadTime}</td>
+      <td>
+        <Button
+          size="small"
+          color="error"
+          onClick={() =>
+            setTableItems((prev) => prev.filter((_, i) => i !== index))
+          }
+        >
+          <MdDeleteOutline />
+        </Button>
+      </td>
+    </tr>
+  ))}
+</tbody>
+
               </table>
             </div>
             <div className="col-md-12">
@@ -553,22 +746,38 @@ const AddQutation = () => {
           <div className="col-md-8">
             <div className="customer-info-container flex-column">
               <h5>Terms & Condition</h5>
-              <div>
+              <div style={{marginBottom:'10px'}}>
                 <TextField
                   label="End Customer Name"
                   size="small"
                   sx={{ width: "100%" }}
                 />
               </div>
-              <div>
+              <div style={{marginBottom:'10px'}}>
                 <TextField
                   label="Sub Dealer Name"
                   size="small"
                   sx={{ width: "100%" }}
                 />
               </div>
+
+              {tandcSelections.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2">Selected Terms & Conditions:</Typography>
+                  {tandcSelections.map((id) => {
+                    const tcItem = tandc.find((t) => t.id === id);
+                    return (
+                      <Typography key={id} variant="body2" sx={{ ml: 2 }}>
+                        {tcItem?.TandcName}
+                      </Typography>
+                    );
+                  })}
+                </Box>
+              )}
+
+
               <div className="mt-2">
-                <button className="btn btn-secondary rounded-0">
+                <button className="btn btn-secondary rounded-0"  onClick={handleTandCOpen}>
                   {" "}
                   + Add Terms/ Condition{" "}
                 </button>
@@ -775,7 +984,7 @@ const AddQutation = () => {
 
 
       {/* Product Modal */}
-      <Modal open={openProdTable} onClose={handleProdClose}>
+      {/* <Modal open={openProdTable} onClose={handleProdClose}>
         <Box
           sx={{
             position: "absolute",
@@ -831,7 +1040,358 @@ const AddQutation = () => {
             </TableBody>
           </Table>
         </Box>
+      </Modal> */}
+
+
+
+
+
+{/* Product Modal */}
+      <Modal open={openProdTable} onClose={handleProdClose}>
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 800,
+            bgcolor: "background.paper",
+            boxShadow: 24,
+            p: 3,
+            borderRadius: 2,
+            maxHeight: "80vh",
+            overflowY: "auto",
+          }}
+        >
+          <h5>Select Products</h5>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search Products"
+            value={prodsearch}
+            onChange={handleProductSearch}
+          />
+
+          {products.map((prod) => {
+            const sel = productSelections[prod.ID] || {
+              checked: false,
+              qty: 1,
+              rate: prod.Variants?.[0]?.PurchaseCost || 0,
+              discount: 0,
+              gst: prod.Tax?.Percentage || 0,
+              hsn: prod.HsnSacCode || "",
+              unit: prod.Unit?.name || "",
+              leadTime: prod.LeadTime || "",
+              variantId: prod.Variants?.[0]?.ID || null,
+            };
+
+            return (
+              <Box key={prod.ID} sx={{ mb: 2 }}>
+                <div
+                  className="d-flex align-items-center justify-content-between"
+                  style={{border:'1px solid #ccc',padding:'5px',margin:'5px'}}
+                >
+                  <div className="d-flex align-items-center gap-2 " >
+                    <input
+                      type="checkbox"
+                      checked={sel.checked}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, checked: e.target.checked },
+                        }))
+                      }
+                    />
+                    <Typography variant="subtitle1" >
+                      {prod.Code}
+                    </Typography>
+                    <Typography variant="subtitle1" >
+                      {prod.Name}
+                    </Typography>
+                  </div>
+                  <Typography variant="body2" color="text.secondary">
+                    Stock: {prod.Stock}
+                  </Typography>
+                </div>
+
+                {sel.checked && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+                      gap: "8px",
+                    }}
+                  >
+                    <TextField
+                      label="Qty"
+                      size="small"
+                      type="number"
+                      value={sel.qty}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, qty: Number(e.target.value) },
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="Rate"
+                      size="small"
+                      type="number"
+                      value={sel.rate}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, rate: Number(e.target.value) },
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="Discount"
+                      size="small"
+                      type="number"
+                      value={sel.discount}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, discount: Number(e.target.value) },
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="HSN"
+                      size="small"
+                      value={sel.hsn}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, hsn: e.target.value },
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="GST %"
+                      size="small"
+                      type="number"
+                      value={sel.gst}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, gst: Number(e.target.value) },
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="Unit"
+                      size="small"
+                      value={sel.unit}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, unit: e.target.value },
+                        }))
+                      }
+                    />
+
+                    <TextField
+                      label="Lead Time"
+                      size="small"
+                      value={sel.leadTime}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, leadTime: e.target.value },
+                        }))
+                      }
+                    />
+
+                     <TextField
+                      label="Description"
+                      size="small"
+                      value={sel.desc}
+                      onChange={(e) =>
+                        setProductSelections((prev) => ({
+                          ...prev,
+                          [prod.ID]: { ...sel, desc: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </Box>
+            );
+          })}
+
+          <Button
+  variant="contained"
+  onClick={() => {
+    const selectedItems = Object.entries(productSelections)
+      .filter(([_, sel]) => sel.checked)
+      .map(([prodID, sel]) => {
+        const prod = products.find((p) => p.ID === Number(prodID));
+        const taxable = sel.rate * sel.qty - sel.discount;
+        const cgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
+        const sgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
+        const amount = taxable + cgst + sgst;
+        const desc = '';
+
+        return {
+          id: prod.ID,
+          name: prod.Name,
+          hsn: sel.hsn,
+          unit: sel.unit,
+          variantId: sel.variantId,
+          qty: sel.qty,
+          rate: sel.rate,
+          discount: sel.discount,
+          taxable,
+          cgst,
+          sgst,
+          amount,
+          desc,
+          leadTime: sel.leadTime,
+        };
+      });
+
+    setTableItems((prev) => {
+      const merged = [...prev];
+
+      selectedItems.forEach((newItem) => {
+        const existingIndex = merged.findIndex(
+          (item) => item.id === newItem.id
+        );
+        if (existingIndex >= 0) {
+          // If product already exists, increase quantity
+          merged[existingIndex].qty = newItem.qty;
+          const taxable = merged[existingIndex].rate * merged[existingIndex].qty - merged[existingIndex].discount;
+          const cgst = (taxable * (merged[existingIndex].cgst + merged[existingIndex].sgst) / 2) / 100;
+          const sgst = (taxable * (merged[existingIndex].cgst + merged[existingIndex].sgst) / 2) / 100;
+          merged[existingIndex].taxable = taxable;
+          merged[existingIndex].cgst = cgst;
+          merged[existingIndex].sgst = sgst;
+          merged[existingIndex].amount = taxable + cgst + sgst;
+        } else {
+          merged.push(newItem);
+        }
+      });
+
+      return merged;
+    });
+
+    handleProdClose();
+  }}
+  sx={{ mt: 2 }}
+>
+  Add Selected
+</Button>
+        </Box>
       </Modal>
+
+
+
+
+
+
+
+
+
+
+
+<Modal open={openTandCModal} onClose={handleTandCClose}>
+  <Box
+    sx={{
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: 600,
+      bgcolor: "background.paper",
+      boxShadow: 24,
+      p: 3,
+      borderRadius: 2,
+      maxHeight: "80vh",
+      overflowY: "auto",
+    }}
+  >
+    <Typography variant="h6" gutterBottom>
+      Select Terms & Conditions
+    </Typography>
+
+    <TextField
+      fullWidth
+      size="small"
+      placeholder="Search Terms & Conditions"
+      value={tandcSearch}
+      onChange={fetchTandC}
+      sx={{ mb: 2 }}
+    />
+
+    {tandc.length === 0 ? (
+      <Typography>No Terms&Conditions found.</Typography>
+    ) : (
+      tandc.map((tc) => {
+        const sel = tandcSelections[tc.id] || { checked: false };
+        return (
+          <Box key={tc.id} sx={{ mb: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                border: "1px solid #ccc",
+                padding: "5px",
+              }}
+            >
+              <div>
+               <input
+                  type="checkbox"
+                  checked={tandcSelections.includes(tc.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setTandcSelections((prev) => [...prev, tc.id]);
+                    } else {
+                      setTandcSelections((prev) => prev.filter((id) => id !== tc.id));
+                    }
+                  }}
+                />
+                <span>{tc.TandcName}</span>
+              </div>
+            </div>
+            {sel.checked && (
+              <Typography variant="body2" sx={{ ml: 3 }}>
+                {tc.tandc_name}
+              </Typography>
+            )}
+          </Box>
+        );
+      })
+    )}
+
+    <Button
+      variant="contained"
+      sx={{ mt: 2 }}
+      onClick={() => {
+        const selectedItems = Object.entries(tandcSelections)
+          .filter(([_, sel]) => sel.checked)
+          .map(([id, _]) => tandc.find((t) => t.id === Number(id)));
+        
+        // optional: merge into state for quotation
+        console.log("Selected T&C:", selectedItems);
+        setTandcSelections({});
+        handleTandCClose();
+      }}
+    >
+      Add Selected
+    </Button>
+  </Box>
+</Modal>
+
+
+
+
+
+
+
     </section>
   );
 };

@@ -39,6 +39,9 @@ func main() {
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
 	handler.SetMenusDB(initializers.DB)
+	handler.SetQuotationTableDB(initializers.DB)
+	handler.SetAddressesDB(initializers.DB)
+	handler.SetTandcDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
@@ -129,10 +132,16 @@ func main() {
 	api.Delete("/users/:id", handler.DeleteUser)
 
 	// Quotations
-	api.Get("/quotations", handler.GetAllQuotations)
-	api.Get("/quotations/:id", handler.GetQuotationByID)
-	api.Post("/quotations", handler.CreateQuotation)
-	api.Put("/quotations/:id", handler.UpdateQuotation)
+	// api.Get("/quotations", handler.GetAllQuotations)
+	// api.Get("/quotations/:id", handler.GetQuotationByID)
+	// api.Post("/quotations", handler.CreateQuotation)
+	// api.Put("/quotations/:id", handler.UpdateQuotation)
+
+	app.Post("/api/quotations", handler.CreateQuotationTable)
+	app.Get("/api/quotations", handler.GetAllQuotationsTable)
+	app.Get("/api/quotations/:id", handler.GetQuotationTable)
+	app.Put("/api/quotations/:id", handler.UpdateQuotationTable)
+	app.Delete("/api/quotations/:id", handler.DeleteQuotationTable)
 
 	//HsnCode
 
@@ -187,6 +196,14 @@ func main() {
 	api.Delete("/user/:user_id/role/:role_id", handler.RemoveRoleFromUser)
 	api.Get("/role/:role_id/users", handler.GetUsersByRole)
 	api.Put("/user/:user_id", handler.UpdateUserRoles)
+
+	// terms and conditions
+
+	api.Get("/tandc", handler.GetAllTandc)
+	api.Get("/tandc/:id", handler.GetTagByID)
+	api.Post("/tandc", handler.CreateTandc)
+	api.Put("/tandc/:id", handler.UpdateTandc)
+	api.Delete("/tandc/:id", handler.DeleteTandc)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))
