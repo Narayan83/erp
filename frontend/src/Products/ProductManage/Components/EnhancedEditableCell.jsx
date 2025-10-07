@@ -19,24 +19,58 @@ const EnhancedEditableCell = ({
   const [editValue, setEditValue] = useState(value);
 
   // Convert column key to lowercase for case-insensitive comparison
-  const columnKeyLower = columnKey.toLowerCase();
+  const columnKeyLower = columnKey.toLowerCase().trim();
   
-  // Normalize column key by removing spaces and common variations
+  // Normalize column key by removing spaces and special characters
   const normalizedColumnKey = columnKeyLower
-    .replace(/\s+/g, '') // Remove all spaces
-    .replace(/^hsn(code|num|number)?$/, 'hsn') // Normalize HSN/HSN Code/HSN Number to hsn
-    .replace(/^hsnno$/, 'hsn') // HSN No.
-    .replace(/^category$/, 'category')
-    .replace(/^subcategory$/, 'subcategory')
-    .replace(/^store$/, 'store')
-    .replace(/^producttype$/, 'producttype')
-    .replace(/^status$/, 'status')
-    .replace(/^importance$/, 'importance')
-    .replace(/^unit$/, 'unit')
-    .replace(/^productmode$/, 'productmode')
-    .replace(/^size$/, 'size');
+    .replace(/\s+/g, '') // Remove all spaces first
+    .replace(/[^\w]/g, ''); // Remove non-alphanumeric characters
   
-  console.log(`Column: "${columnKey}" → Normalized: "${normalizedColumnKey}"`);
+  // Map to standardized field names
+  let standardizedKey = normalizedColumnKey;
+  
+  // HSN variations
+  if (/^hsn/.test(normalizedColumnKey) || normalizedColumnKey === 'hsncode') {
+    standardizedKey = 'hsn';
+  }
+  // Category variations
+  else if (normalizedColumnKey === 'category') {
+    standardizedKey = 'category';
+  }
+  // Subcategory variations
+  else if (normalizedColumnKey === 'subcategory') {
+    standardizedKey = 'subcategory';
+  }
+  // Store variations
+  else if (normalizedColumnKey === 'store') {
+    standardizedKey = 'store';
+  }
+  // Unit variations
+  else if (normalizedColumnKey === 'unit') {
+    standardizedKey = 'unit';
+  }
+  // Size variations
+  else if (normalizedColumnKey === 'size') {
+    standardizedKey = 'size';
+  }
+  // Product Type variations
+  else if (normalizedColumnKey === 'producttype') {
+    standardizedKey = 'producttype';
+  }
+  // Product Mode variations
+  else if (normalizedColumnKey === 'productmode') {
+    standardizedKey = 'productmode';
+  }
+  // Status variations
+  else if (normalizedColumnKey === 'status') {
+    standardizedKey = 'status';
+  }
+  // Importance variations
+  else if (normalizedColumnKey === 'importance') {
+    standardizedKey = 'importance';
+  }
+  
+  console.log(`Column: "${columnKey}" → Normalized: "${normalizedColumnKey}" → Standardized: "${standardizedKey}"`);
   
   // Check if this field should have a dropdown
   const isCategory = normalizedColumnKey === 'category';
@@ -45,7 +79,7 @@ const EnhancedEditableCell = ({
   const isProductType = normalizedColumnKey === 'producttype';
   const isStatus = normalizedColumnKey === 'status';
   const isImportance = normalizedColumnKey === 'importance';
-  const isHsnCode = normalizedColumnKey === 'hsn';
+  const isHsnCode = standardizedKey === 'hsn';
   const isUnit = normalizedColumnKey === 'unit';
   const isProductMode = normalizedColumnKey === 'productmode';
   const isSize = normalizedColumnKey === 'size';
@@ -105,10 +139,18 @@ const EnhancedEditableCell = ({
     }).filter(opt => opt.value);
   } else if (isSubcategory && Array.isArray(allSubcategories)) {
     // Try to find category column using different possible names
-    const categoryValue = 
-      row['Category'] || row['category'] || 
-      row['CategoryName'] || row['categoryName'] || 
-      row['category_name'] || row['CATEGORY'];
+    const possibleCategoryKeys = [
+      'Category', 'category', 'CategoryName', 'categoryName', 
+      'category_name', 'CATEGORY', 'Category *'
+    ];
+    
+    let categoryValue = null;
+    for (const key of possibleCategoryKeys) {
+      if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+        categoryValue = row[key];
+        break;
+      }
+    }
     
     if (categoryValue && Array.isArray(categories)) {
       // Try to find the category by name or ID
@@ -120,37 +162,33 @@ const EnhancedEditableCell = ({
       
       if (category) {
         const categoryId = category.ID || category.id;
-        options = allSubcategories
-          .filter(sub => {
-            const subCatId = sub.CategoryID || sub.categoryID || sub.category_id;
-            return String(subCatId) === String(categoryId);
-          })
-          .map(sub => { 
-            const name = sub.Name || sub.name || '';
-            return { 
-              value: name, 
-              label: name 
-            };
-          }).filter(opt => opt.value);
-      } else {
-        // If category not found, show all subcategories
-        options = allSubcategories.map(sub => {
+        // Filter subcategories that belong to this category
+        const filteredSubcategories = allSubcategories.filter(sub => {
+          const subCatId = sub.CategoryID || sub.categoryID || sub.category_id;
+          return String(subCatId) === String(categoryId);
+        });
+        
+        options = filteredSubcategories.map(sub => { 
           const name = sub.Name || sub.name || '';
           return { 
             value: name, 
             label: name 
           };
         }).filter(opt => opt.value);
+        
+        // If no subcategories found for this category, show empty dropdown
+        if (options.length === 0) {
+          console.warn(`No subcategories found for category: ${categoryValue} (ID: ${categoryId})`);
+        }
+      } else {
+        // Category specified but not found - show empty dropdown to prompt user to select valid category
+        console.warn(`Category '${categoryValue}' not found in available categories`);
+        options = [];
       }
     } else {
-      // If no category column or no categories data, show all subcategories
-      options = allSubcategories.map(sub => {
-        const name = sub.Name || sub.name || '';
-        return { 
-          value: name, 
-          label: name 
-        };
-      }).filter(opt => opt.value);
+      // No category selected - show empty dropdown to prompt user to select category first
+      console.log('No category selected for subcategory dropdown');
+      options = [];
     }
   } else if (isStore && Array.isArray(stores)) {
     options = stores.map(store => {
@@ -207,7 +245,7 @@ const EnhancedEditableCell = ({
         taxPercentage = hsn.tax.percentage;
       }
       
-      // Create a label with tax percentage if available
+      // Create a label with only the HSN code as requested
       const label = code;
       
       return { 

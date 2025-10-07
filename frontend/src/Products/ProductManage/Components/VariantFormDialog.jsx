@@ -96,15 +96,29 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
     const images = imageFiles.map((entry) => entry.file ? entry.file : entry.original);
     const files = imageFiles.filter(entry => entry.file).map(entry => entry.file);
 
+    // Helper to convert empty strings to null for numeric fields
+    const sanitizeNumber = (v) => {
+      if (v === undefined || v === null) return null;
+      if (typeof v === 'number') return v;
+      const s = String(v).trim();
+      return s === '' ? null : Number(s);
+    };
+
     const formData = {
-      ...data,
-      size: selectedSize,
+      // keep raw data but normalize a few fields
+      sku: data.sku || '',
+      barcode: data.barcode || '',
+      PurchaseCost: sanitizeNumber(data.purchaseCost),
+      StdSalesPrice: sanitizeNumber(data.stdSalesPrice),
+      Stock: sanitizeNumber(data.stock),
+      LeadTime: sanitizeNumber(data.leadTime),
+      size: selectedSize || '',
       color: selectedColor?.value || '',
       images, // mixture of strings (existing) and File objects (new)
       files, // only File objects for convenience
       mainImage: mainImageIndex != null ? images[mainImageIndex] : null,
       mainImageIndex: mainImageIndex,
-      isActive: data.isActive || false,
+      isActive: !!data.isActive,
     };
 
     onSave(formData);
@@ -504,16 +518,16 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
               <TextField label="Barcode" fullWidth size="small" {...register("barcode")} />
             </Grid>
             <Grid size={4}>
-              <TextField label="Purchase Cost" type="number" fullWidth size="small" {...register("purchaseCost", { valueAsNumber: true })} />
+              <TextField label="Purchase Cost" type="number" fullWidth size="small" {...register("purchaseCost")} />
             </Grid>
             <Grid size={4}>
-              <TextField label="Sales Price" type="number" fullWidth size="small" {...register("stdSalesPrice", { valueAsNumber: true })} />
+              <TextField label="Sales Price" type="number" fullWidth size="small" {...register("stdSalesPrice")} />
             </Grid>
             <Grid size={4}>
-              <TextField label="Stock" type="number" fullWidth size="small" {...register("stock", { valueAsNumber: true })} />
+              <TextField label="Stock" type="number" fullWidth size="small" {...register("stock")} />
             </Grid>
             <Grid size={4}>
-              <TextField label="Lead Time (days)" type="number" fullWidth size="small" {...register("leadTime", { valueAsNumber: true })} />
+              <TextField label="Lead Time (days)" type="number" fullWidth size="small" {...register("leadTime")} />
             </Grid>
             <Grid size={12}>
               <Button variant="outlined" component="label">

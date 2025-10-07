@@ -384,19 +384,13 @@ export default function ReviewStep({
         // Don't include Images here - they'll be handled separately
       }));
 
-      // Client-side SKU validation: check for empty SKUs and duplicates
-      const skuList = transformedVariants.map((tv) => (tv.SKU || '').toString().trim());
-      const emptySkus = skuList.reduce((acc, s, idx) => {
-        if (!s) acc.push(idx);
-        return acc;
-      }, []);
+      // Client-side SKU validation: allow empty SKUs (optional)
+      // but still block submission when non-empty SKUs are duplicated
+      const skuList = transformedVariants.map((tv) => (tv.SKU ?? '').toString().trim());
 
-      if (emptySkus.length > 0) {
-        alert(`Please provide SKU for all variants. Missing SKU on variant indexes: ${emptySkus.join(', ')}`);
-        return;
-      }
-
+      // consider only non-empty SKUs for duplication checks
       const skuCounts = skuList.reduce((acc, s) => {
+        if (!s) return acc; // skip empty
         acc[s] = (acc[s] || 0) + 1;
         return acc;
       }, {});
@@ -496,7 +490,7 @@ export default function ReviewStep({
       { label: "Subcategory", value: subcategoryName },
       { label: "Unit", value: unitName },
       { label: "Product Mode", value: product.product_mode },
-      { label: "MOQ", value: product.minimumStock },
+      { label: "MOQ", value: product.moq ?? product.MOQ ?? product.minimumStock },
       { label: "Store", value: storeName },
       { label: "Tax", value: taxName },
       { label: "GST %", value: `${product.gstPercent}%` },

@@ -32,15 +32,7 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <TextField
-            autoFocus
-            label="Name"
-            fullWidth
-            margin="dense"
-            size="small"
-            {...register("name", { required: true })}
-          />
-          <TextField
-            label="Code"
+            label="Size Code"
             fullWidth
             margin="dense"
             size="small"

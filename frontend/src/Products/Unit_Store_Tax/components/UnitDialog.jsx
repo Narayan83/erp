@@ -46,7 +46,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
         <DialogContent>
           <TextField
             autoFocus
-            label="Unit Name"
+            label="Unit"
             fullWidth
             margin="dense"
             size="small"

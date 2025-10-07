@@ -2538,16 +2538,18 @@ export default function ProductListPage() {
   };
 
   const downloadTemplateCSV = () => {
-    // Create template CSV headers and mark required fields with an asterisk
-    const req = new Set(['name','code','hsn code','minimum stock','category','unit','store','tax','gst %','status']);
+    // Create template CSV headers with asterisks for required fields
+    const req = new Set(['name','code','hsn code','importance','product type','category','unit','product mode','store','status','size']);
+    
+    // Add asterisks to required fields and dropdown fields
     const headersArr = [
-      'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
-      'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
-      'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
+      'Name *', 'Code *', 'HSN Code *', 'Importance *', 'Product Type *', 'Minimum Stock',
+      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tax',
+      'GST %', 'Description', 'Internal Notes', 'Status *', 'Size *',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
-    ].map(h => {
-      return req.has(h.toLowerCase()) ? `${h} *` : h;
-    });
+    ];
+    
+    // Join headers for CSV
     const headers = headersArr.join(',');
     
     // Create template data row with example values
@@ -2672,49 +2674,50 @@ export default function ProductListPage() {
             return;
           }
           
-          // Basic validation of required fields
+          // Basic validation of required fields - collect warnings but don't block preview
           const invalidRows = [];
           objectData.forEach((row, index) => {
+            // Only check for completely missing Name or Code
             if (!row.Name || !row.Code) {
               invalidRows.push(`Row ${index + 2}: Missing Name or Code`);
             }
             
-            // Validate numeric fields
-            if (row['Minimum Stock'] && isNaN(Number(row['Minimum Stock']))) {
+            // Validate numeric fields (only if present and not empty)
+            if (row['Minimum Stock'] && row['Minimum Stock'].toString().trim() !== '' && isNaN(Number(row['Minimum Stock']))) {
               invalidRows.push(`Row ${index + 2}: Minimum Stock must be a number`);
             }
-            if (row['MOQ'] && isNaN(Number(row['MOQ']))) {
+            if (row['MOQ'] && row['MOQ'].toString().trim() !== '' && isNaN(Number(row['MOQ']))) {
               invalidRows.push(`Row ${index + 2}: MOQ must be a number`);
             }
-            if (row['GST %'] && isNaN(Number(row['GST %']))) {
+            if (row['GST %'] && row['GST %'].toString().trim() !== '' && isNaN(Number(row['GST %']))) {
               invalidRows.push(`Row ${index + 2}: GST % must be a number`);
             }
-            if (row['Purchase Cost'] && isNaN(Number(row['Purchase Cost']))) {
+            if (row['Purchase Cost'] && row['Purchase Cost'].toString().trim() !== '' && isNaN(Number(row['Purchase Cost']))) {
               invalidRows.push(`Row ${index + 2}: Purchase Cost must be a number`);
             }
-            if (row['Sales Price'] && isNaN(Number(row['Sales Price']))) {
+            if (row['Sales Price'] && row['Sales Price'].toString().trim() !== '' && isNaN(Number(row['Sales Price']))) {
               invalidRows.push(`Row ${index + 2}: Sales Price must be a number`);
             }
-            if (row['Stock'] && isNaN(Number(row['Stock']))) {
+            if (row['Stock'] && row['Stock'].toString().trim() !== '' && isNaN(Number(row['Stock']))) {
               invalidRows.push(`Row ${index + 2}: Stock must be a number`);
             }
-            if (row['Lead Time'] && isNaN(Number(row['Lead Time']))) {
+            if (row['Lead Time'] && row['Lead Time'].toString().trim() !== '' && isNaN(Number(row['Lead Time']))) {
               invalidRows.push(`Row ${index + 2}: Lead Time must be a number`);
             }
             
-            // Validate Status field if present
-            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+            // Validate Status field if present and not empty
+            if (row['Status'] && row['Status'].toString().trim() !== '' && !['Active', 'Inactive'].includes(row['Status'])) {
               invalidRows.push(`Row ${index + 2}: Status must be 'Active' or 'Inactive'`);
             }
           });
           
+          // Show warnings but still allow preview - users can fix issues in the editable table
           if (invalidRows.length > 0) {
-            const errorMessage = `Found ${invalidRows.length} validation error(s):\n\n${invalidRows.slice(0, 5).join('\n')}${
-              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more errors.` : ''
+            const warningMessage = `Found ${invalidRows.length} potential issue(s). You can review and fix them in the preview:\n\n${invalidRows.slice(0, 5).join('\n')}${
+              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more issues.` : ''
             }`;
-            alert(errorMessage);
-            setImportLoading(false);
-            return;
+            console.warn('CSV validation warnings:', warningMessage);
+            // Don't block - let users proceed to preview to fix issues
           }
 
           // Refresh metadata from backend before showing preview
@@ -2769,16 +2772,32 @@ export default function ProductListPage() {
     const errors = [];
     // All required fields based on importRequiredHeaders
     const requiredFields = [
-      'Name', 'Code', 'HSN Code', 'Minimum Stock', 'Category', 
-      'Unit', 'Store', 'Tax', 'GST %', 'Status'
+      'Name','Code','HSN Code','Importance','Product Type','Category','Unit','Product Mode','Store','Status','Size'
     ];
     
     data.forEach((row, index) => {
       const rowErrors = [];
       
+      // Helper function to find value in row with or without asterisk
+      const getFieldValue = (fieldName) => {
+        // Try exact match first
+        if (row[fieldName] !== undefined) return row[fieldName];
+        // Try with asterisk and space
+        if (row[`${fieldName} *`] !== undefined) return row[`${fieldName} *`];
+        // Try all keys that match when normalized (remove spaces, asterisks, case-insensitive)
+        const normalizedField = fieldName.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+        for (const key in row) {
+          const normalizedKey = key.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+          if (normalizedKey === normalizedField) {
+            return row[key];
+          }
+        }
+        return undefined;
+      };
+      
       // Check required fields - all must be filled
       requiredFields.forEach(field => {
-        const value = row[field];
+        const value = getFieldValue(field);
         if (!value || value.toString().trim() === '') {
           rowErrors.push(`${field} is mandatory and cannot be empty`);
         }
@@ -2787,29 +2806,34 @@ export default function ProductListPage() {
       // Validate numeric fields
       const numericFields = ['Minimum Stock', 'MOQ', 'GST %', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'];
       numericFields.forEach(field => {
-        if (row[field] && row[field].toString().trim() !== '' && isNaN(Number(row[field]))) {
+        const value = getFieldValue(field);
+        if (value && value.toString().trim() !== '' && isNaN(Number(value))) {
           rowErrors.push(`${field} must be a valid number`);
         }
       });
       
       // Validate Status field
-      if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+      const statusValue = getFieldValue('Status');
+      if (statusValue && !['Active', 'Inactive'].includes(statusValue)) {
         rowErrors.push('Status must be "Active" or "Inactive"');
       }
       
       // Validate Importance field
-      if (row['Importance'] && !['Low', 'Normal', 'High', 'Critical'].includes(row['Importance'])) {
+      const importanceValue = getFieldValue('Importance');
+      if (importanceValue && !['Low', 'Normal', 'High', 'Critical'].includes(importanceValue)) {
         rowErrors.push('Importance must be "Low", "Normal", "High", or "Critical"');
       }
       
       // Validate Product Type
-      if (row['Product Type'] && ![ 'All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'].includes(row['Product Type'])) {
+      const productTypeValue = getFieldValue('Product Type');
+      if (productTypeValue && !['All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'].includes(productTypeValue)) {
         rowErrors.push('Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"');
       }
       
       // Validate Product Mode
-      if (row['Product Mode'] && !['Purchase', 'Internal Manufacturing'].includes(row['Product Mode'])) {
-        rowErrors.push('Product Mode must be "Purchase", or "Internal Manufacturing"');
+      const productModeValue = getFieldValue('Product Mode');
+      if (productModeValue && !['Purchase', 'Internal Manufacturing'].includes(productModeValue)) {
+        rowErrors.push('Product Mode must be "Purchase" or "Internal Manufacturing"');
       }
       
       if (rowErrors.length > 0) {
@@ -3215,39 +3239,8 @@ export default function ProductListPage() {
         <DialogTitle>Import Products</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import products from a CSV file. Make sure your file follows the correct format with the following headers:
+            Import products from a CSV file. Make sure your have downloaded the template and filled it correctly.
           </Typography>
-          
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              CSV Template Headers (required fields are marked with a red *)
-            </Typography>
-            <Grid container spacing={1}>
-              {(() => {
-                const cols = [[], [], []];
-                importTemplateHeaders.forEach((h, i) => cols[i % 3].push(h));
-                return cols.map((col, idx) => (
-                  <Grid item xs={4} key={idx}>
-                    {col.map((h) => {
-                      const normalized = normalizeHeaderKey(h);
-                      const isReq = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
-                      return (
-                        <Typography variant="body2" color="textSecondary" key={h} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <span>•</span>
-                          <span>{h}</span>
-                          {isReq && <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-hidden>*</span>}
-                        </Typography>
-                      );
-                    })}
-                  </Grid>
-                ));
-              })()}
-            </Grid>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
-              Note: Fields marked with * are required. Category, Unit, Store, and Tax must match existing entries in the system.
-            </Typography>
-          </Box>
-          
           <input
             type="file"
             accept=".csv"
@@ -3626,7 +3619,13 @@ export default function ProductListPage() {
       {/* Import Preview Dialog */}
       <Dialog 
         open={importPreviewOpen} 
-        onClose={() => setImportPreviewOpen(false)} 
+        onClose={(event, reason) => {
+          // Prevent closing on backdrop click or escape key
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return;
+          }
+          setImportPreviewOpen(false);
+        }}
         maxWidth="xl" 
         fullWidth
         onEnter={async () => {
@@ -3734,16 +3733,23 @@ export default function ProductListPage() {
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
                   {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
-                    const normalized = normalizeHeaderKey(header);
-                    const isRequired = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
+                    // Get the clean header name first (remove any existing asterisks)
+                    const cleanHeader = String(header).replace(/\s*\*\s*$/g, '');
+                    
+                    // Check if this is a required field - lowercase for case-insensitive comparison
+                    const normalizedHeader = cleanHeader.toLowerCase();
+                    // List of required fields - note that we keep the header normalized form for comparison
+                    const requiredFields = ['name', 'code', 'hsn code', 'importance', 'product type', 'category', 'unit', 'product mode', 'store', 'status', 'size'];
+                    
+                    // Check if this header is in our required fields list
+                    const isRequired = requiredFields.includes(normalizedHeader);
+                    
+                    // Add asterisk for required fields
+                    const displayHeader = isRequired ? `${cleanHeader} *` : cleanHeader;
+                    
                     return (
                       <TableCell key={header} sx={{ fontWeight: 'bold' }}>
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <span>{header}</span>
-                          {isRequired && (
-                            <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-label="required">*</span>
-                          )}
-                        </Box>
+                        {displayHeader}
                       </TableCell>
                     );
                   })}
@@ -4029,7 +4035,7 @@ export default function ProductListPage() {
                     <strong>Mandatory Fields (must be filled):</strong>
                   </Typography>
                   <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
-                    • Name, Code, HSN Code, Minimum Stock, Category, Unit, Store, Tax, GST %, Status
+                    • Name, Code, HSN Code, Importance,Category, Unit, Product Mode, Store, Status, Size
                   </Typography>
                   <Typography variant="body2" color="warning.dark">
                     <strong>Additional Checks:</strong><br/>
