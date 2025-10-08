@@ -501,8 +501,8 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                 helperText={sizesError || ""}
                 error={Boolean(sizesError)}
               >
-                <MenuItem value="" disabled>
-                  {sizesLoading ? "Loading sizes..." : "Select Size"}
+                <MenuItem value="">
+                  {sizesLoading ? "Loading sizes..." : "None (Clear selection)"}
                 </MenuItem>
                 {!sizesLoading && sizeOptions.map((size) => (
                   <MenuItem key={size.id} value={size.code}>
