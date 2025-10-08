@@ -10,8 +10,7 @@ export default function SizeTable({ data, onEdit, onDelete, page = 0, rowsPerPag
         <TableHead>
           <TableRow>
             <TableCell>S.No.</TableCell>
-            <TableCell>Name</TableCell>
-            <TableCell>Size</TableCell>
+            <TableCell>Size Code</TableCell>
             <TableCell>Description</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
@@ -22,7 +21,6 @@ export default function SizeTable({ data, onEdit, onDelete, page = 0, rowsPerPag
               <TableCell sx={{ py: 0.5 }}>
                 {(page * rowsPerPage) + index + 1}
               </TableCell>
-              <TableCell sx={{ py: 0.5 }}>{size.name}</TableCell>
               <TableCell sx={{ py: 0.5 }}>{size.code}</TableCell>
               <TableCell sx={{ py: 0.5 }}>{size.description}</TableCell>
               <TableCell align="right" sx={{ py: 0.5 }}>

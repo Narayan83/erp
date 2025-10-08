@@ -11,7 +11,7 @@ export default function UnitTable({ units, onEdit, onDelete, page, rowsPerPage }
         <TableHead>
           <TableRow>
             <TableCell>S.No.</TableCell>
-            <TableCell>Tag Name</TableCell>
+            <TableCell>Unit</TableCell>
             <TableCell>Description</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>

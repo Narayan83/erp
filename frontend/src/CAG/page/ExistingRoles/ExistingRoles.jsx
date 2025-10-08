@@ -16,6 +16,8 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
   const [isEditing, setIsEditing] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const displayRoles = roles || localRoles;
 
@@ -102,6 +104,7 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
 
   const handleSearch = (e) => {
     setSearch(e.target.value);
+    setCurrentPage(1);
   };
 
   const handleRefresh = () => {
@@ -167,6 +170,13 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
     }
   });
 
+  const totalPages = Math.max(1, Math.ceil(sortedRoles.length / itemsPerPage));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [sortedRoles.length, itemsPerPage]);
+
+  const paginatedRoles = sortedRoles.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="existing-roles-container">
       <section className="title-section">
@@ -210,7 +220,7 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
             </tr>
           </thead>
           <tbody>
-            {sortedRoles.map((role) => (
+            {paginatedRoles.map((role) => (
               <tr key={role.name}>
                 <td>{role.name}</td>
                 <td>{role.description}</td>
@@ -243,6 +253,30 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
           </tbody>
         </table>
       )}
+      <div className="pagination">
+        <div className="page-info">
+          Showing {(sortedRoles.length === 0) ? 0 : ( (currentPage - 1) * itemsPerPage + 1 )} - {Math.min(currentPage * itemsPerPage, sortedRoles.length)} of {sortedRoles.length}
+        </div>
+        <div className="page-controls">
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Prev</button>
+          {[...Array(totalPages)].map((_, i) => {
+            const p = i + 1;
+            return (
+              <button key={p} className={p === currentPage ? 'active' : ''} onClick={() => setCurrentPage(p)}>{p}</button>
+            );
+          })}
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>Next</button>
+        </div>
+        <div className="items-per-page">
+          <label>Show:</label>
+          <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      </div>
     </div>
   );
 }

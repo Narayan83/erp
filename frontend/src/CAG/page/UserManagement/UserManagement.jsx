@@ -34,6 +34,9 @@ export default function UserManagement() {
   const [menus, setMenus] = useState([{ label: "All menus...", value: "all" }]);
   const [selectedMenu, setSelectedMenu] = useState("all");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   useEffect(() => {
     // fetch menus from backend and populate dropdown
     const fetchMenus = async () => {
@@ -79,6 +82,10 @@ export default function UserManagement() {
   useEffect(() => {
     setPermissions(loadPermissions(selectedUser, selectedRole));
   }, [selectedUser, selectedRole]);
+
+  useEffect(() => {
+    if (currentPage > Math.max(1, Math.ceil(permissionsData.length / itemsPerPage))) setCurrentPage(1);
+  }, [permissionsData.length]);
 
   const handlePermissionChange = (menu, perm) => {
     setPermissions(prev => {
@@ -143,7 +150,7 @@ export default function UserManagement() {
           Assign Permissions for: <b>{selectedRole}</b>
         </div>
         <div className="permissions-table">
-          {permissionsData.map(({ menu, permissions: perms }) => (
+          {permissionsData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(({ menu, permissions: perms }) => (
             <div className={`permissions-row${permissions[menu].All ? " active" : ""}`} key={menu}>
               <span className="menu-title">{menu}</span>
               {perms.map(perm => (
@@ -158,6 +165,26 @@ export default function UserManagement() {
               ))}
             </div>
           ))}
+        </div>
+        <div className="pagination">
+          <div className="page-info">Showing {(permissionsData.length === 0) ? 0 : ((currentPage - 1) * itemsPerPage + 1)} - {Math.min(currentPage * itemsPerPage, permissionsData.length)} of {permissionsData.length}</div>
+          <div className="page-controls">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Prev</button>
+            {[...Array(Math.max(1, Math.ceil(permissionsData.length / itemsPerPage)))].map((_, i) => {
+              const p = i + 1;
+              return <button key={p} className={p === currentPage ? 'active' : ''} onClick={() => setCurrentPage(p)}>{p}</button>;
+            })}
+            <button disabled={currentPage === Math.max(1, Math.ceil(permissionsData.length / itemsPerPage))} onClick={() => setCurrentPage(p => Math.min(Math.max(1, Math.ceil(permissionsData.length / itemsPerPage)), p + 1))}>Next</button>
+          </div>
+          <div className="items-per-page">
+            <label>Show:</label>
+            <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
         <div className="buttons-container">
           <button className="save-button" onClick={handleReset}>
