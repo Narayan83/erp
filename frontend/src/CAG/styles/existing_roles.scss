@@ -117,3 +117,56 @@
   border: 1px solid #ccc;
   border-radius: 5px;
 }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  gap: 12px;
+}
+
+.page-info {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.page-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.page-controls button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+}
+
+.page-controls button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-controls button.active {
+  background: #1677ff;
+  color: #fff;
+  border-color: #1677ff;
+}
+
+.items-per-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.items-per-page label {
+  color: #666;
+  font-size: 0.9rem;
+}
+.items-per-page select {
+  padding: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
