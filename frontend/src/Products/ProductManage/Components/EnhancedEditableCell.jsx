@@ -13,7 +13,8 @@ const EnhancedEditableCell = ({
   stores,
   hsnCodes,
   units,
-  sizes
+  sizes,
+  taxes
 }) => {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -69,6 +70,10 @@ const EnhancedEditableCell = ({
   else if (normalizedColumnKey === 'importance') {
     standardizedKey = 'importance';
   }
+  // Tax variations
+  else if (normalizedColumnKey === 'tax') {
+    standardizedKey = 'tax';
+  }
   
   console.log(`Column: "${columnKey}" → Normalized: "${normalizedColumnKey}" → Standardized: "${standardizedKey}"`);
   
@@ -83,13 +88,14 @@ const EnhancedEditableCell = ({
   const isUnit = normalizedColumnKey === 'unit';
   const isProductMode = normalizedColumnKey === 'productmode';
   const isSize = normalizedColumnKey === 'size';
+  const isTax = normalizedColumnKey === 'tax';
   
   // Debugging in useEffect to not interfere with rendering
   useEffect(() => {
     if (editing) {
       console.log(`Editing cell "${columnKey}" (normalized: "${normalizedColumnKey}"):`, {
         isCategory, isSubcategory, isStore, isProductType,
-        isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize
+        isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize, isTax
       });
       
       // Debug dropdown data availability
@@ -99,7 +105,8 @@ const EnhancedEditableCell = ({
         stores: Array.isArray(stores) ? `${stores.length} items` : stores,
         hsnCodes: Array.isArray(hsnCodes) ? `${hsnCodes.length} items` : hsnCodes,
         units: Array.isArray(units) ? `${units.length} items` : units,
-        sizes: Array.isArray(sizes) ? `${sizes.length} items` : sizes
+        sizes: Array.isArray(sizes) ? `${sizes.length} items` : sizes,
+        taxes: Array.isArray(taxes) ? `${taxes.length} items` : taxes
       });
       
       // Show sample data for debugging
@@ -121,10 +128,13 @@ const EnhancedEditableCell = ({
       if (isSize && sizes?.length > 0) {
         console.log("Sample size data:", sizes[0]);
       }
+      if (isTax && taxes?.length > 0) {
+        console.log("Sample tax data:", taxes[0]);
+      }
     }
   }, [editing, columnKey, normalizedColumnKey, categories, allSubcategories, 
-      stores, hsnCodes, units, sizes, isCategory, isSubcategory, isStore, 
-      isProductType, isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize]);
+      stores, hsnCodes, units, sizes, taxes, isCategory, isSubcategory, isStore, 
+      isProductType, isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize, isTax]);
   
   // Get dropdown options based on field type
   let options = [];
@@ -276,10 +286,30 @@ const EnhancedEditableCell = ({
         label: name 
       };
     }).filter(opt => opt.value);
+  } else if (isTax && Array.isArray(taxes)) {
+    console.log("Generating Tax dropdown options from:", taxes.length, "taxes");
+    
+    if (taxes.length > 0) {
+      console.log("Sample tax item:", taxes[0]);
+      console.log("Tax properties:", Object.keys(taxes[0]));
+    }
+    
+    options = taxes.map(tax => {
+      // Get the name from various possible field names
+      const name = tax.Name || tax.name || '';
+
+      // For import table we only show the tax name (no percentage)
+      return {
+        value: name,
+        label: name
+      };
+    }).filter(opt => opt.value && opt.value.length > 0);
+    
+    console.log("Generated Tax options:", options.length > 0 ? options.slice(0, 5) : "No options");
   }
   
   // Debugging for empty options
-  if ((isCategory || isSubcategory || isStore || isHsnCode || isUnit || isSize) && options.length === 0) {
+  if ((isCategory || isSubcategory || isStore || isHsnCode || isUnit || isSize || isTax) && options.length === 0) {
     console.warn(`No options found for dropdown field: ${columnKey} (${normalizedColumnKey})`);
   }
   
