@@ -54,7 +54,9 @@ export const menuItems = [
     id: 3,
     title: "Users Masters",
     icon: GiRingmaster,
-    submenu: [{ title: "Users Management", path: "/users" }],
+    submenu: [{ title: "Users Management", path: "/users" },
+      { title: "User Address", path: "/address" },
+    ],
   },
 
   {
