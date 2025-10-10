@@ -217,6 +217,15 @@ func main() {
 	api.Put("/tandc/:id", handler.UpdateTandc)
 	api.Delete("/tandc/:id", handler.DeleteTandc)
 
+	// Addresses (master + aggregated from users)
+	api.Get("/addresses/from-users", handler.GetAddressesFromUsers) // Must come before /:id route
+	api.Get("/addresses", handler.GetAllAddresses)
+	api.Get("/addresses/:id", handler.GetAddressByID)
+	api.Post("/addresses", handler.CreateAddress)
+	api.Put("/addresses/:id", handler.UpdateAddress)
+	api.Delete("/addresses/:id", handler.DeleteAddress)
+	api.Get("/addresses-search", handler.SearchAddresses)
+
 	// start server
 	log.Fatal(app.Listen(":8000"))
 

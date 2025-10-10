@@ -30,6 +30,7 @@ import ProductVariantManager from "./Products/ProductManage/Components/ProductVa
 import Bank from "./Bank/Bank";
 import UserFormPage from "./User/page/UserFormPage";
 import UserListPage from "./User/page/user_list_page";
+import Address from "./User/page/Address";
 import Branch from "./Branch/Branch";
 // import ProductAtributesPage from "./Products/ProductAtributesPage/ProductAtributesPage";
 
@@ -137,6 +138,10 @@ function App() {
            <Route path="/users/add" element={< UserFormPage />} />
           <Route path="/users/:id/edit" element={<UserFormPage />} />
           <Route path="/users" element={< UserListPage />} />
+          
+          <Route path="/address" element={< Address />} />
+          <Route path="/address/create" element={< Address />} />
+          <Route path="/address/edit/:id" element={< Address />} />
 
           <Route path="/crm-master" element={<CrmPage />} />
           <Route path="/account" element={<AccountPage />} />

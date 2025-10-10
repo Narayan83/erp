@@ -13,11 +13,12 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import { BASE_URL } from "../../../Config"; // Import BASE_URL from Config
 
 export default function VariantEditDialog({ open, onClose, onSave, defaultValues, sizes = [] }) {
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const { register, handleSubmit, reset, setValue, getValues } = useForm();
   const [imagesPreview, setImagesPreview] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [variantID, setVariantID] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState(null);
   const [cropIndex, setCropIndex] = useState(null);
@@ -278,6 +279,16 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
      setVariantID(defaultValues.ID || null);
      const colorMatch = ralColors.find(c => c.value === defaultValues.Color);
      setSelectedColor(colorMatch || null);
+     
+     // Initialize selected size
+     if (defaultValues.Size && Array.isArray(sizes)) {
+       const sizeMatch = sizes.find(s => s.code === defaultValues.Size);
+       if (sizeMatch) {
+         setSelectedSize({ id: sizeMatch.id, code: sizeMatch.code });
+       }
+     } else {
+       setSelectedSize(null);
+     }
 
      // Initialize main image selection from backend values
      let initialMainIndex = null;
@@ -310,6 +321,7 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
      setImagesPreview([]);
      setVariantID(null);
      setSelectedColor(null);
+     setSelectedSize(null);
      setMainImageIndex(null);
     }
   }, [defaultValues, reset]);
@@ -398,7 +410,7 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
     const payload = {
       ID: variantID,
       Color: selectedColor?.value || defaultValues?.Color || '',
-      Size: data.size,
+      Size: selectedSize?.code || '',
       SKU: data.sku,
       Barcode: data.barcode,
       PurchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : Number(data.purchaseCost || 0),
@@ -480,23 +492,21 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
             </Grid>
 
             <Grid size={4}>
-              <TextField
-                label="Size"
-                select
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.Size || ""}
-                {...register("size")}
-              >
-                {Array.isArray(sizes) && sizes.length > 0 && sizes.map((size) => (
-                  <MenuItem
-                    key={size.id}
-                    value={size.code}
-                  >
-                    {size.code}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={Array.isArray(sizes) ? sizes.map(size => ({ id: size.id, code: size.code })) : []}
+                getOptionLabel={(option) => option.code || ""}
+                value={selectedSize}
+                onChange={(event, newValue) => {
+                  setSelectedSize(newValue);
+                  setValue("size", newValue?.code || "");
+                }}
+                renderInput={(params) => <TextField {...params} label="Size" size="small" />}
+                clearOnBlur={false}
+                clearOnEscape
+                clearIcon={<CloseIcon fontSize="small" />}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                sx={{ width: '100%' }}
+              />
             </Grid>
 
             <Grid size={4}>
