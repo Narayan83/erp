@@ -144,6 +144,7 @@ function App() {
 
            {/* <Route path="/quotation" element={<QuotationNewForm />} /> */}
            <Route path="/quotation" element={<AddQutation />} />
+           <Route path="/quotation/:id" element={<AddQutation />} />
 
           {/* <Route path="/quotation-list" element={<QuotationList />} /> */}
 

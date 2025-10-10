@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type QuotationStatuses string
@@ -21,6 +23,7 @@ type QuotationTable struct {
 	Customer            User              `gorm:"foreignKey:CustomerID" json:"customer"`
 	SalesCreditPersonID uint              `json:"sales_credit_person_id"` // FK to User
 	SalesCreditPerson   User              `gorm:"foreignKey:SalesCreditPersonID" json:"sales_credit_person"`
+	QutationScpCount    uint              `gorm:"not null" json:"qutation_scp_count"`
 	ValidUntil          *time.Time        `json:"valid_until,omitempty"`
 	TotalAmount         float64           `gorm:"not null" json:"total_amount"`
 	Discount            *float64          `json:"discount,omitempty"`
@@ -45,10 +48,19 @@ type QuotationTable struct {
 	ShippingAddressID uint      `gorm:"not null" json:"shipping_address_id"`
 	ShippingAddress   Addresses `gorm:"foreignKey:ShippingAddressID" json:"shipping_address"`
 
-	TandCId           uint    `json:"t_and_c_id"`
-	TermsAndCondtions TandC   `gorm:"foreignKey:TandCId" json:"terms_and_conditions"`
-	References        *string `gorm:"type:text" json:"references,omitempty"`
-	Note              *string `gorm:"type:text" json:"note,omitempty"`
+	// TandCId           uint    `json:"t_and_c_id"`
+	// TermsAndCondtions TandC   `gorm:"foreignKey:TandCId" json:"terms_and_conditions"`
+	TermsAndConditions datatypes.JSON `gorm:"type:json" json:"terms_and_conditions"`
+	EndCustomerName    *string        `gorm:"type:text" json:"end_customer_name,omitempty"`
+	EndDealerName      *string        `gorm:"type:text" json:"end_dealer_name,omitempty"`
+	ContactPerson      *string        `gorm:"type:text" json:"contact_person,omitempty"`
+	References         *string        `gorm:"type:text" json:"references,omitempty"`
+	Note               *string        `gorm:"type:text" json:"note,omitempty"`
+
+	ExtraCharges datatypes.JSON `gorm:"type:json" json:"extra_charges,omitempty"`
+	Discounts    datatypes.JSON `gorm:"type:json"`
+
+	AttachmentPath *string `gorm:"type:text" json:"attachment_path,omitempty"`
 
 	QuotationTableItems []QuotationTableItems `gorm:"foreignKey:QuotationID" json:"quotation_items,omitempty"`
 }
