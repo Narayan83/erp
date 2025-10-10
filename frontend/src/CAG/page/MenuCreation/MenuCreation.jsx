@@ -153,6 +153,16 @@ const loadMenus = async () => {
         
         // Reload menus to update dropdown with new menu
         await loadMenus();
+
+        // store in localStorage for compatibility with other components
+        try {
+          const stored = JSON.parse(localStorage.getItem('menus') || '[]');
+          stored.push(res.data);
+          localStorage.setItem('menus', JSON.stringify(stored));
+        } catch (e) {}
+
+        // dispatch global event so other components (ExistingMenus) can refresh
+        try { window.dispatchEvent(new CustomEvent('menuCreated', { detail: res.data })); } catch (e) {}
         
         // Reset form
         setMenuName("");

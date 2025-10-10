@@ -30,7 +30,7 @@ import {
 } from "@mui/material";
 
 import EnhancedEditableCell from "../Components/EnhancedEditableCell";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, ArrowBack } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
@@ -1427,6 +1427,7 @@ export default function ProductListPage() {
   const [hsnCodes, setHsnCodes] = useState([]);
   const [units, setUnits] = useState([]);
   const [sizes, setSizes] = useState([]);
+  const [taxes, setTaxes] = useState([]);
   
   // Define default filters
   const defaultFilters = { 
@@ -1653,7 +1654,7 @@ export default function ProductListPage() {
       console.log("Fetching dropdown data from backend...");
       
       // Fetch all metadata in parallel
-      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes] = await Promise.all([
+      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes, taxRes] = await Promise.all([
         axios.get(`${BASE_URL}/api/categories`).catch(err => {
           console.error("Error fetching categories:", err);
           return { data: [] };
@@ -1678,6 +1679,10 @@ export default function ProductListPage() {
           console.error("Error fetching sizes:", err);
           return { data: [] };
         }),
+        axios.get(`${BASE_URL}/api/taxes`).catch(err => {
+          console.error("Error fetching taxes:", err);
+          return { data: [] };
+        }),
       ]);
       
       // Handle different response structures and ensure we have arrays
@@ -1693,6 +1698,7 @@ export default function ProductListPage() {
       const hsnCodesData = processData(hsnRes);
       const unitsData = processData(unitRes);
       const sizesData = processData(sizeRes);
+      const taxesData = processData(taxRes);
       
       // Log the first item of each type to check data structure
       console.log("Dropdown data samples:");
@@ -1702,6 +1708,7 @@ export default function ProductListPage() {
       if (hsnCodesData.length > 0) console.log("HSN Code sample:", hsnCodesData[0]);
       if (unitsData.length > 0) console.log("Unit sample:", unitsData[0]);
       if (sizesData.length > 0) console.log("Size sample:", sizesData[0]);
+      if (taxesData.length > 0) console.log("Tax sample:", taxesData[0]);
       
       // Log the counts
       console.log("Dropdown data counts:");
@@ -1711,6 +1718,7 @@ export default function ProductListPage() {
       console.log("HSN Codes:", hsnCodesData.length);
       console.log("Units:", unitsData.length);
       console.log("Sizes:", sizesData.length);
+      console.log("Taxes:", taxesData.length);
       
       // Detailed logging of raw HSN codes data
       console.log("Raw HSN codes data (first item):", hsnCodesData.length > 0 ? hsnCodesData[0] : "No HSN data");
@@ -1741,6 +1749,7 @@ export default function ProductListPage() {
       setHsnCodes(standardizedHsnCodes);
       setUnits(unitsData);
       setSizes(sizesData);
+      setTaxes(taxesData);
       
       return {
         categories: categoriesData,
@@ -1748,6 +1757,7 @@ export default function ProductListPage() {
         stores: storesData,
         hsnCodes: standardizedHsnCodes,
         units: unitsData,
+        taxes: taxesData,
         sizes: sizesData
       };
     } catch (err) {
@@ -2087,6 +2097,8 @@ export default function ProductListPage() {
             limit,
             ...filterParams,
             ...sortParams,
+            // Add timestamp to prevent caching
+            _t: new Date().getTime()
           },
           // Add timeout to prevent hanging requests
           timeout: 15000
@@ -2171,7 +2183,8 @@ export default function ProductListPage() {
       page, 
       limit, 
       sorts: { nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort }, 
-      stockFilter 
+      stockFilter,
+      forceRefresh 
     });
     
     // Safeguard against undefined debouncedFilters
@@ -2180,7 +2193,7 @@ export default function ProductListPage() {
     } else {
       console.error('debouncedFilters is undefined in useEffect - cannot fetch products');
     }
-  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter]);
+  }, [debouncedFilters, page, limit, nameSort, stockSort, leadTimeSort, purchaseCostSort, salesPriceSort, stockFilter, forceRefresh]);
 
   // Debug: Monitor products state changes
   useEffect(() => {
@@ -2538,16 +2551,18 @@ export default function ProductListPage() {
   };
 
   const downloadTemplateCSV = () => {
-    // Create template CSV headers and mark required fields with an asterisk
-    const req = new Set(['name','code','hsn code','minimum stock','category','unit','store','tax','gst %','status']);
+    // Create template CSV headers with asterisks for required fields
+    const req = new Set(['name','code','hsn code','importance','product type','category','unit','product mode','store','status','size']);
+    
+    // Add asterisks to required fields and dropdown fields
     const headersArr = [
-      'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
-      'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
-      'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
+      'Name *', 'Code *', 'HSN Code *', 'Importance *', 'Product Type *', 'Minimum Stock',
+      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tax *',
+      'GST %', 'Description', 'Internal Notes', 'Status *', 'Size *',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
-    ].map(h => {
-      return req.has(h.toLowerCase()) ? `${h} *` : h;
-    });
+    ];
+    
+    // Join headers for CSV
     const headers = headersArr.join(',');
     
     // Create template data row with example values
@@ -2672,49 +2687,50 @@ export default function ProductListPage() {
             return;
           }
           
-          // Basic validation of required fields
+          // Basic validation of required fields - collect warnings but don't block preview
           const invalidRows = [];
           objectData.forEach((row, index) => {
+            // Only check for completely missing Name or Code
             if (!row.Name || !row.Code) {
               invalidRows.push(`Row ${index + 2}: Missing Name or Code`);
             }
             
-            // Validate numeric fields
-            if (row['Minimum Stock'] && isNaN(Number(row['Minimum Stock']))) {
+            // Validate numeric fields (only if present and not empty)
+            if (row['Minimum Stock'] && row['Minimum Stock'].toString().trim() !== '' && isNaN(Number(row['Minimum Stock']))) {
               invalidRows.push(`Row ${index + 2}: Minimum Stock must be a number`);
             }
-            if (row['MOQ'] && isNaN(Number(row['MOQ']))) {
+            if (row['MOQ'] && row['MOQ'].toString().trim() !== '' && isNaN(Number(row['MOQ']))) {
               invalidRows.push(`Row ${index + 2}: MOQ must be a number`);
             }
-            if (row['GST %'] && isNaN(Number(row['GST %']))) {
+            if (row['GST %'] && row['GST %'].toString().trim() !== '' && isNaN(Number(row['GST %']))) {
               invalidRows.push(`Row ${index + 2}: GST % must be a number`);
             }
-            if (row['Purchase Cost'] && isNaN(Number(row['Purchase Cost']))) {
+            if (row['Purchase Cost'] && row['Purchase Cost'].toString().trim() !== '' && isNaN(Number(row['Purchase Cost']))) {
               invalidRows.push(`Row ${index + 2}: Purchase Cost must be a number`);
             }
-            if (row['Sales Price'] && isNaN(Number(row['Sales Price']))) {
+            if (row['Sales Price'] && row['Sales Price'].toString().trim() !== '' && isNaN(Number(row['Sales Price']))) {
               invalidRows.push(`Row ${index + 2}: Sales Price must be a number`);
             }
-            if (row['Stock'] && isNaN(Number(row['Stock']))) {
+            if (row['Stock'] && row['Stock'].toString().trim() !== '' && isNaN(Number(row['Stock']))) {
               invalidRows.push(`Row ${index + 2}: Stock must be a number`);
             }
-            if (row['Lead Time'] && isNaN(Number(row['Lead Time']))) {
+            if (row['Lead Time'] && row['Lead Time'].toString().trim() !== '' && isNaN(Number(row['Lead Time']))) {
               invalidRows.push(`Row ${index + 2}: Lead Time must be a number`);
             }
             
-            // Validate Status field if present
-            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+            // Validate Status field if present and not empty
+            if (row['Status'] && row['Status'].toString().trim() !== '' && !['Active', 'Inactive'].includes(row['Status'])) {
               invalidRows.push(`Row ${index + 2}: Status must be 'Active' or 'Inactive'`);
             }
           });
           
+          // Show warnings but still allow preview - users can fix issues in the editable table
           if (invalidRows.length > 0) {
-            const errorMessage = `Found ${invalidRows.length} validation error(s):\n\n${invalidRows.slice(0, 5).join('\n')}${
-              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more errors.` : ''
+            const warningMessage = `Found ${invalidRows.length} potential issue(s). You can review and fix them in the preview:\n\n${invalidRows.slice(0, 5).join('\n')}${
+              invalidRows.length > 5 ? `\n\n...and ${invalidRows.length - 5} more issues.` : ''
             }`;
-            alert(errorMessage);
-            setImportLoading(false);
-            return;
+            console.warn('CSV validation warnings:', warningMessage);
+            // Don't block - let users proceed to preview to fix issues
           }
 
           // Refresh metadata from backend before showing preview
@@ -2769,16 +2785,32 @@ export default function ProductListPage() {
     const errors = [];
     // All required fields based on importRequiredHeaders
     const requiredFields = [
-      'Name', 'Code', 'HSN Code', 'Minimum Stock', 'Category', 
-      'Unit', 'Store', 'Tax', 'GST %', 'Status'
+      'Name','Code','HSN Code','Importance','Product Type','Category','Unit','Product Mode','Store','Status','Size'
     ];
     
     data.forEach((row, index) => {
       const rowErrors = [];
       
+      // Helper function to find value in row with or without asterisk
+      const getFieldValue = (fieldName) => {
+        // Try exact match first
+        if (row[fieldName] !== undefined) return row[fieldName];
+        // Try with asterisk and space
+        if (row[`${fieldName} *`] !== undefined) return row[`${fieldName} *`];
+        // Try all keys that match when normalized (remove spaces, asterisks, case-insensitive)
+        const normalizedField = fieldName.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+        for (const key in row) {
+          const normalizedKey = key.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+          if (normalizedKey === normalizedField) {
+            return row[key];
+          }
+        }
+        return undefined;
+      };
+      
       // Check required fields - all must be filled
       requiredFields.forEach(field => {
-        const value = row[field];
+        const value = getFieldValue(field);
         if (!value || value.toString().trim() === '') {
           rowErrors.push(`${field} is mandatory and cannot be empty`);
         }
@@ -2787,29 +2819,106 @@ export default function ProductListPage() {
       // Validate numeric fields
       const numericFields = ['Minimum Stock', 'MOQ', 'GST %', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'];
       numericFields.forEach(field => {
-        if (row[field] && row[field].toString().trim() !== '' && isNaN(Number(row[field]))) {
+        const value = getFieldValue(field);
+        if (value && value.toString().trim() !== '' && isNaN(Number(value))) {
           rowErrors.push(`${field} must be a valid number`);
         }
       });
       
       // Validate Status field
-      if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'])) {
+      const statusValue = getFieldValue('Status');
+      if (statusValue && !['Active', 'Inactive'].includes(statusValue)) {
         rowErrors.push('Status must be "Active" or "Inactive"');
       }
       
       // Validate Importance field
-      if (row['Importance'] && !['Low', 'Normal', 'High', 'Critical'].includes(row['Importance'])) {
+      const importanceValue = getFieldValue('Importance');
+      if (importanceValue && !['Low', 'Normal', 'High', 'Critical'].includes(importanceValue)) {
         rowErrors.push('Importance must be "Low", "Normal", "High", or "Critical"');
       }
       
       // Validate Product Type
-      if (row['Product Type'] && ![ 'All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'].includes(row['Product Type'])) {
+      const productTypeValue = getFieldValue('Product Type');
+      if (productTypeValue && !['All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'].includes(productTypeValue)) {
         rowErrors.push('Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"');
       }
       
       // Validate Product Mode
-      if (row['Product Mode'] && !['Purchase', 'Internal Manufacturing'].includes(row['Product Mode'])) {
-        rowErrors.push('Product Mode must be "Purchase", or "Internal Manufacturing"');
+      const productModeValue = getFieldValue('Product Mode');
+      if (productModeValue && !['Purchase', 'Internal Manufacturing'].includes(productModeValue)) {
+        rowErrors.push('Product Mode must be "Purchase" or "Internal Manufacturing"');
+      }
+      
+      // Validate Category - must exist in dropdown
+      const categoryValue = getFieldValue('Category');
+      if (categoryValue) {
+        const categoryExists = categories.some(cat => 
+          (cat.Name || cat.name || '') === categoryValue
+        );
+        if (!categoryExists) {
+          const availableCategories = categories.map(c => c.Name || c.name).filter(Boolean).join(', ');
+          rowErrors.push(`Category "${categoryValue}" does not exist. Available options: ${availableCategories || 'None'}`);
+        }
+      }
+      
+      // Validate Subcategory - must exist in dropdown (if provided)
+      const subcategoryValue = getFieldValue('Subcategory');
+      if (subcategoryValue && subcategoryValue.trim() !== '') {
+        const subcategoryExists = allSubcategories.some(sub => 
+          (sub.Name || sub.name || '') === subcategoryValue
+        );
+        if (!subcategoryExists) {
+          const availableSubcategories = allSubcategories.map(s => s.Name || s.name).filter(Boolean).slice(0, 10).join(', ');
+          rowErrors.push(`Subcategory "${subcategoryValue}" does not exist. Available options include: ${availableSubcategories || 'None'}...`);
+        }
+      }
+      
+      // Validate Store - must exist in dropdown
+      const storeValue = getFieldValue('Store');
+      if (storeValue) {
+        const storeExists = stores.some(store => 
+          (store.Name || store.name || '') === storeValue
+        );
+        if (!storeExists) {
+          const availableStores = stores.map(s => s.Name || s.name).filter(Boolean).join(', ');
+          rowErrors.push(`Store "${storeValue}" does not exist. Available options: ${availableStores || 'None'}`);
+        }
+      }
+      
+      // Validate HSN Code - must exist in dropdown
+      const hsnValue = getFieldValue('HSN Code');
+      if (hsnValue) {
+        const hsnExists = hsnCodes.some(hsn => 
+          String(hsn.Code || hsn.code || '').trim() === String(hsnValue).trim()
+        );
+        if (!hsnExists) {
+          const availableHsn = hsnCodes.map(h => h.Code || h.code).filter(Boolean).slice(0, 10).join(', ');
+          rowErrors.push(`HSN Code "${hsnValue}" does not exist. Available options include: ${availableHsn || 'None'}...`);
+        }
+      }
+      
+      // Validate Unit - must exist in dropdown
+      const unitValue = getFieldValue('Unit');
+      if (unitValue) {
+        const unitExists = units.some(unit => 
+          (unit.Name || unit.name || '') === unitValue
+        );
+        if (!unitExists) {
+          const availableUnits = units.map(u => u.Name || u.name).filter(Boolean).join(', ');
+          rowErrors.push(`Unit "${unitValue}" does not exist. Available options: ${availableUnits || 'None'}`);
+        }
+      }
+      
+      // Validate Size - must exist in dropdown
+      const sizeValue = getFieldValue('Size');
+      if (sizeValue) {
+        const sizeExists = sizes.some(size => 
+          (size.Name || size.name || '') === sizeValue
+        );
+        if (!sizeExists) {
+          const availableSizes = sizes.map(s => s.Name || s.name).filter(Boolean).join(', ');
+          rowErrors.push(`Size "${sizeValue}" does not exist. Available options: ${availableSizes || 'None'}`);
+        }
       }
       
       if (rowErrors.length > 0) {
@@ -2853,9 +2962,21 @@ export default function ProductListPage() {
         return;
       }
 
-      console.log('Sending import data (selected rows):', selectedArray); // Debug log
+      // Normalize field names before sending to backend
+      // Remove asterisks and extra spaces from field names
+      const normalizedArray = selectedArray.map(row => {
+        const normalizedRow = {};
+        Object.keys(row).forEach(key => {
+          // Remove asterisks and trim spaces
+          const normalizedKey = key.replace(/\s*\*\s*/g, '').trim();
+          normalizedRow[normalizedKey] = row[key];
+        });
+        return normalizedRow;
+      });
 
-      const response = await axios.post(`${BASE_URL}/api/products/import`, selectedArray, {
+      console.log('Sending import data (selected rows):', normalizedArray); // Debug log
+
+      const response = await axios.post(`${BASE_URL}/api/products/import`, normalizedArray, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -2863,52 +2984,162 @@ export default function ProductListPage() {
 
       console.log('Import response:', response.data); // Debug log
       
+      // Parse backend errors which come as strings like "Row 1: Error message"
+      // Convert them to the format expected by the import report dialog
+      const parsedErrors = [];
+      if (response.data.errors && Array.isArray(response.data.errors)) {
+        response.data.errors.forEach(errorStr => {
+          // Try to parse "Row X: Error message" format
+          const match = errorStr.match(/^Row (\d+):\s*(.+)$/);
+          if (match) {
+            const rowNum = parseInt(match[1], 10);
+            const errorMessage = match[2];
+            const rowIndex = rowNum - 1; // Convert to 0-based index
+            
+            // Get the row data if available
+            const rowData = normalizedArray[rowIndex] || {};
+            
+            parsedErrors.push({
+              row: rowNum,
+              data: rowData,
+              productName: rowData.Name || 'N/A',
+              code: rowData.Code || 'N/A',
+              errors: [errorMessage]
+            });
+          } else {
+            // If format doesn't match, add as generic error
+            parsedErrors.push({
+              row: 'N/A',
+              data: {},
+              productName: 'N/A',
+              code: 'N/A',
+              errors: [errorStr]
+            });
+          }
+        });
+      }
+      
       // Prepare import report
       const report = {
         type: 'import_complete',
         totalRows: selectedArray.length,
         successCount: response.data.imported || 0,
-        errorCount: (response.data.errors && response.data.errors.length) || 0,
-        errors: response.data.errors || [],
+        errorCount: parsedErrors.length,
+        errors: parsedErrors,
         successes: response.data.successes || [],
         skipped: response.data.skipped || 0
       };
       
+      // Close preview dialog
+      setImportPreviewOpen(false);
+      
+      // Only clear import data if there are no errors (fully successful import)
+      // This allows users to go back and fix errors if needed
+      if (parsedErrors.length === 0) {
+        setImportFile(null);
+        setImportedData([]);
+        setImportSelectedRows(new Set());
+      }
+      
+      // Show the import report
       setImportReport(report);
       setImportReportOpen(true);
       
-      // Close preview dialog
-      setImportPreviewOpen(false);
-      setImportFile(null);
-      setImportedData([]);
-      setImportSelectedRows(new Set());
-      
-      // Reset filters and pagination to show newly imported products
-      setPage(0);
-      setFilters(defaultFilters);
-      setDebouncedFilters({...defaultFilters});
-      setInputFilters({ 
-        name: "", code: "", productType: "", productMode: "", stock: "", moq: "", 
-        leadTime: "", note: "", color: "", size: "", sku: "", 
-        barcode: "", purchaseCost: "", salesPrice: "" 
-      });
-      
-      // Use checkAPI to force a clean fetch without filters
-      console.log('Calling checkAPI after import to refresh data...'); // Debug log
-      await checkAPI();
-      console.log('checkAPI completed, products state:', products); // Debug log
+      // Only refresh the product list if some products were successfully imported
+      if (response.data.imported > 0) {
+        // Reset filters and pagination to show newly imported products
+        setPage(0);
+        setFilters(defaultFilters);
+        setInputFilters({ 
+          name: "", code: "", productType: "", productMode: "", stock: "", moq: "", 
+          leadTime: "", note: "", color: "", size: "", sku: "", 
+          barcode: "", purchaseCost: "", salesPrice: "" 
+        });
+        
+        // Reset sorting
+        setNameSort(null);
+        setStockSort(null);
+        setLeadTimeSort(null);
+        setPurchaseCostSort(null);
+        setSalesPriceSort(null);
+        
+        // Reset stock filter
+        setStockFilter('all');
+        
+        // IMPORTANT: Directly update debouncedFilters to bypass the 500ms debounce delay
+        // This ensures products are fetched immediately after import
+        console.log('Resetting filters and triggering product refresh after successful import...'); // Debug log
+        setDebouncedFilters({...defaultFilters});
+        
+        // Force refresh by incrementing the forceRefresh counter
+        // This will trigger the useEffect to fetch products immediately
+        setForceRefresh(prev => {
+          const newValue = prev + 1;
+          console.log('Force refresh triggered, new value:', newValue); // Debug log
+          return newValue;
+        });
+        
+        // Directly fetch products to ensure immediate refresh after import
+        setTimeout(() => {
+          console.log('Explicitly fetching products after import...');
+          fetchProducts();
+        }, 300);
+      }
     } catch (error) {
       console.error('Error importing products:', error);
+      console.error('Error response:', error.response); // Additional debug log
+      
+      // Parse error details from response
+      let errorMessage = 'Unknown server error';
+      let detailedErrors = [];
+      
+      if (error.response?.data) {
+        // Check for various error formats
+        if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        // Check if there are specific row errors
+        if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          error.response.data.errors.forEach(errorStr => {
+            // Parse "Row X: Error message" format
+            const match = errorStr.match(/^Row (\d+):\s*(.+)$/);
+            if (match) {
+              const rowNum = parseInt(match[1], 10);
+              const errorDetails = match[2];
+              detailedErrors.push({
+                row: rowNum,
+                productName: 'N/A',
+                code: 'N/A',
+                errors: [errorDetails]
+              });
+            } else {
+              detailedErrors.push({
+                row: 'N/A',
+                productName: 'N/A',
+                code: 'N/A',
+                errors: [errorStr]
+              });
+            }
+          });
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
       
       // Show error in report dialog
       setImportReport({
         type: 'import_failed',
         totalRows: importedData.filter((_, idx) => importSelectedRows.has(idx)).length,
         successCount: 0,
-        errorCount: 1,
-        errors: [{ 
-          row: 'Server Error', 
-          errors: [error.response?.data?.error || error.message || 'Unknown server error'] 
+        errorCount: detailedErrors.length > 0 ? detailedErrors.length : 1,
+        errors: detailedErrors.length > 0 ? detailedErrors : [{ 
+          row: 'Server Error',
+          productName: 'N/A',
+          code: 'N/A',
+          errors: [errorMessage]
         }],
         successes: []
       });
@@ -3215,39 +3446,8 @@ export default function ProductListPage() {
         <DialogTitle>Import Products</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import products from a CSV file. Make sure your file follows the correct format with the following headers:
+            Import products from a CSV file. Make sure your have downloaded the template and filled it correctly.
           </Typography>
-          
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              CSV Template Headers (required fields are marked with a red *)
-            </Typography>
-            <Grid container spacing={1}>
-              {(() => {
-                const cols = [[], [], []];
-                importTemplateHeaders.forEach((h, i) => cols[i % 3].push(h));
-                return cols.map((col, idx) => (
-                  <Grid item xs={4} key={idx}>
-                    {col.map((h) => {
-                      const normalized = normalizeHeaderKey(h);
-                      const isReq = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
-                      return (
-                        <Typography variant="body2" color="textSecondary" key={h} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <span>•</span>
-                          <span>{h}</span>
-                          {isReq && <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-hidden>*</span>}
-                        </Typography>
-                      );
-                    })}
-                  </Grid>
-                ));
-              })()}
-            </Grid>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, fontStyle: 'italic' }}>
-              Note: Fields marked with * are required. Category, Unit, Store, and Tax must match existing entries in the system.
-            </Typography>
-          </Box>
-          
           <input
             type="file"
             accept=".csv"
@@ -3626,7 +3826,13 @@ export default function ProductListPage() {
       {/* Import Preview Dialog */}
       <Dialog 
         open={importPreviewOpen} 
-        onClose={() => setImportPreviewOpen(false)} 
+        onClose={(event, reason) => {
+          // Prevent closing on backdrop click or escape key
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return;
+          }
+          setImportPreviewOpen(false);
+        }}
         maxWidth="xl" 
         fullWidth
         onEnter={async () => {
@@ -3734,16 +3940,23 @@ export default function ProductListPage() {
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
                   {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
-                    const normalized = normalizeHeaderKey(header);
-                    const isRequired = importRequiredHeaders.has(normalized) || importRequiredHeaders.has(normalized.replace(/code$/, ''));
+                    // Get the clean header name first (remove any existing asterisks)
+                    const cleanHeader = String(header).replace(/\s*\*\s*$/g, '');
+                    
+                    // Check if this is a required field - lowercase for case-insensitive comparison
+                    const normalizedHeader = cleanHeader.toLowerCase();
+                    // List of required fields - note that we keep the header normalized form for comparison
+                    const requiredFields = ['name', 'code', 'hsn code', 'importance', 'product type', 'category', 'unit', 'product mode', 'store', 'status', 'size', 'tax'];
+                    
+                    // Check if this header is in our required fields list
+                    const isRequired = requiredFields.includes(normalizedHeader);
+                    
+                    // Add asterisk for required fields
+                    const displayHeader = isRequired ? `${cleanHeader} *` : cleanHeader;
+                    
                     return (
                       <TableCell key={header} sx={{ fontWeight: 'bold' }}>
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <span>{header}</span>
-                          {isRequired && (
-                            <span style={{ color: '#d32f2f', fontWeight: 700 }} aria-label="required">*</span>
-                          )}
-                        </Box>
+                        {displayHeader}
                       </TableCell>
                     );
                   })}
@@ -3835,6 +4048,7 @@ export default function ProductListPage() {
                           hsnCodes={hsnCodes}
                           units={units}
                           sizes={sizes}
+                          taxes={taxes}
                         />
                       );
                     })}
@@ -3945,13 +4159,15 @@ export default function ProductListPage() {
                       <TableBody>
                         {importReport.errors.map((error, index) => (
                           <TableRow key={index}>
-                            <TableCell>{error.row}</TableCell>
-                            <TableCell>{error.data?.Name || 'N/A'}</TableCell>
-                            <TableCell>{error.data?.Code || 'N/A'}</TableCell>
+                            <TableCell>{error.row || 'N/A'}</TableCell>
+                            <TableCell>{error.productName || error.data?.Name || 'N/A'}</TableCell>
+                            <TableCell>{error.code || error.data?.Code || 'N/A'}</TableCell>
                             <TableCell>
                               <Box>
                                 {Array.isArray(error.errors) ? error.errors.map((err, i) => {
                                   const isMandatoryError = err.includes('mandatory') || err.includes('required');
+                                  const isNotFoundError = err.includes('not found') || err.includes('does not exist');
+                                  const isAlreadyExistsError = err.includes('already exists');
                                   return (
                                     <Typography 
                                       key={i} 
@@ -3959,14 +4175,16 @@ export default function ProductListPage() {
                                       color="error.main" 
                                       sx={{ 
                                         mb: 0.5,
-                                        fontWeight: isMandatoryError ? 600 : 400,
-                                        bgcolor: isMandatoryError ? 'error.lighter' : 'transparent',
-                                        px: isMandatoryError ? 1 : 0,
-                                        py: isMandatoryError ? 0.5 : 0,
-                                        borderRadius: isMandatoryError ? 1 : 0
+                                        fontWeight: (isMandatoryError || isNotFoundError || isAlreadyExistsError) ? 600 : 400,
+                                        bgcolor: isMandatoryError ? 'rgba(255, 152, 0, 0.1)' : 
+                                                isNotFoundError ? 'rgba(244, 67, 54, 0.1)' : 
+                                                isAlreadyExistsError ? 'rgba(156, 39, 176, 0.1)' : 'transparent',
+                                        px: (isMandatoryError || isNotFoundError || isAlreadyExistsError) ? 1 : 0,
+                                        py: (isMandatoryError || isNotFoundError || isAlreadyExistsError) ? 0.5 : 0,
+                                        borderRadius: (isMandatoryError || isNotFoundError || isAlreadyExistsError) ? 1 : 0
                                       }}
                                     >
-                                      {isMandatoryError ? '⚠ ' : '• '}{err}
+                                      {isMandatoryError ? '⚠ ' : isNotFoundError ? '❌ ' : isAlreadyExistsError ? '🔁 ' : '• '}{err}
                                     </Typography>
                                   );
                                 }) : (
@@ -4029,14 +4247,48 @@ export default function ProductListPage() {
                     <strong>Mandatory Fields (must be filled):</strong>
                   </Typography>
                   <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
-                    • Name, Code, HSN Code, Minimum Stock, Category, Unit, Store, Tax, GST %, Status
+                    • Name, Code, HSN Code, Importance, Category, Unit, Product Mode, Store, Status, Size
                   </Typography>
                   <Typography variant="body2" color="warning.dark">
                     <strong>Additional Checks:</strong><br/>
                     • Numeric fields (Minimum Stock, GST %, etc.) must contain valid numbers<br/>
                     • Status must be "Active" or "Inactive"<br/>
-                    • Category, Unit, Store, Tax must match existing system entries<br/>
-                    • Fix errors in the preview table, then click "Finalize Import" again
+                    • Importance must be "Low", "Normal", "High", or "Critical"<br/>
+                    • Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"<br/>
+                    • Product Mode must be "Purchase" or "Internal Manufacturing"<br/>
+                    • <strong>Category, Subcategory, Store, HSN Code, Unit, and Size must match existing system entries (use dropdown options)</strong><br/>
+                    • You can edit values directly in the preview table using the dropdowns, then click "Finalize Import" again
+                  </Typography>
+                </Box>
+              )}
+              
+              {/* Recommendations for import errors */}
+              {importReport.type === 'import_complete' && importReport.errorCount > 0 && (
+                <Box sx={{ p: 2, bgcolor: 'error.lighter', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                  <Typography variant="subtitle2" color="error.dark" gutterBottom>
+                    💡 How to Fix Import Errors
+                  </Typography>
+                  <Typography variant="body2" color="error.dark" sx={{ mb: 1 }}>
+                    Click the <strong>"Back to Edit"</strong> button below to return to the import preview where you can:
+                  </Typography>
+                  <Typography variant="body2" color="error.dark" sx={{ ml: 2 }}>
+                    • Edit field values directly in the editable table<br/>
+                    • Use dropdown menus for Category, Subcategory, Store, HSN Code, Unit, Size, etc.<br/>
+                    • Deselect rows with errors if you don't want to import them<br/>
+                    • After making changes, click "Finalize Import" again to retry
+                  </Typography>
+                </Box>
+              )}
+              
+              {/* Recommendations for import failures */}
+              {importReport.type === 'import_failed' && (
+                <Box sx={{ p: 2, bgcolor: 'error.lighter', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                  <Typography variant="subtitle2" color="error.dark" gutterBottom>
+                    ⚠ Import Failed
+                  </Typography>
+                  <Typography variant="body2" color="error.dark">
+                    The import process encountered a server error. Please check the error details above and try again.
+                    If the problem persists, contact your system administrator.
                   </Typography>
                 </Box>
               )}
@@ -4044,27 +4296,65 @@ export default function ProductListPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setImportReportOpen(false)}>Close</Button>
-          {importReport?.type === 'validation_error' && (
+          {/* Back to Edit button - available for validation errors and import errors */}
+          {(importReport?.type === 'validation_error' || 
+            (importReport?.type === 'import_complete' && importReport.errorCount > 0) ||
+            importReport?.type === 'import_failed') && (
             <Button 
               variant="outlined" 
-              color="primary"
+              color="warning"
+              startIcon={<ArrowBack />}
               onClick={() => {
                 setImportReportOpen(false);
-                // Keep the preview dialog open so user can fix errors
+                // Re-open the preview dialog so user can fix errors
+                setImportPreviewOpen(true);
               }}
             >
-              Fix Errors
+              Back to Edit
             </Button>
           )}
-          {importReport?.type === 'import_complete' && importReport.successCount > 0 && (
+          
+          {/* Close button */}
+          <Button onClick={() => {
+            setImportReportOpen(false);
+            // If import was successful, clear the preview data
+            if (importReport?.type === 'import_complete' && importReport.errorCount === 0) {
+              setImportFile(null);
+              setImportedData([]);
+              setImportSelectedRows(new Set());
+            }
+          }}>
+            Close
+          </Button>
+          
+          {/* Fix Errors button for validation errors - alternative to Back to Edit */}
+          {importReport?.type === 'validation_error' && (
             <Button 
               variant="contained" 
               color="primary"
               onClick={() => {
                 setImportReportOpen(false);
-                // Optionally navigate to product list or refresh
-                window.location.reload(); // Simple refresh to show new products
+                // Keep the preview dialog open so user can fix errors
+                setImportPreviewOpen(true);
+              }}
+            >
+              Fix Errors
+            </Button>
+          )}
+          
+          {/* View Products button for successful imports */}
+          {importReport?.type === 'import_complete' && importReport.successCount > 0 && (
+            <Button 
+              variant="contained" 
+              color="success"
+              onClick={() => {
+                setImportReportOpen(false);
+                // Clear import data
+                setImportFile(null);
+                setImportedData([]);
+                setImportSelectedRows(new Set());
+                // Product list is already refreshed after import
+                // User can see the newly imported products in the table
               }}
             >
               View Products

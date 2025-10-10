@@ -71,7 +71,7 @@ $card-bg: #ffffff;
   }
 
   .right-panel {
-    width: 580px;
+    width: 600px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -81,8 +81,14 @@ $card-bg: #ffffff;
     .login-card {
       width: 100%;
       height: auto;
-        background: $card-bg;
-      
+      background: $card-bg;
+      /* spacing and highlight */
+      margin: 20px 0;
+      padding: 28px;
+      border-radius: 12px;
+      border: 1px solid rgba(30, 78, 138, 0.26);
+      box-shadow: 0 8px 20px rgba(30, 78, 138, 0.4);
+      transition: box-shadow 150ms ease, transform 120ms ease;
 
       .login-header {
         h2 {

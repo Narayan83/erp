@@ -31,6 +31,7 @@ func main() {
 	handler.SetunitsDB(initializers.DB)
 	handler.SettaxesDB(initializers.DB)
 	handler.SetstoresDB(initializers.DB)
+	handler.SetbanksDB(initializers.DB)
 	handler.SetproductsDB(initializers.DB)
 	handler.Setproduct_variantsDB(initializers.DB)
 	handler.SetUsersDB(initializers.DB)
@@ -38,6 +39,9 @@ func main() {
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	handler.SetRolesDB(initializers.DB)
+	// Initialize role-management DB used by role permission handlers
+	handler.SetRolesManagementDB(initializers.DB)
 	handler.SetMenusDB(initializers.DB)
 	handler.SetQuotationTableDB(initializers.DB)
 	handler.SetAddressesDB(initializers.DB)
@@ -102,6 +106,14 @@ func main() {
 	api.Post("/stores", handler.CreateStore)
 	api.Put("/stores/:id", handler.UpdateStore)
 	api.Delete("/stores/:id", handler.DeleteStore)
+
+	// Banks (bank master)
+	api.Get("/banks/from-users", handler.GetBanksFromUsers)
+	api.Get("/banks", handler.GetAllBanks)
+	api.Get("/banks/:id", handler.GetBankByID)
+	api.Post("/banks", handler.CreateBank)
+	api.Put("/banks/:id", handler.UpdateBank)
+	api.Delete("/banks/:id", handler.DeleteBank)
 
 	// Products
 	api.Post("/products", handler.CreateProduct)

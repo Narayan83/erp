@@ -365,7 +365,6 @@ export default function ReviewStep({
         IsActive: productData.isActive !== undefined ? Boolean(productData.isActive) : true,
       };
 
-      console.log("Transformed product JSON:", JSON.stringify(transformedProduct));
       formData.append("product", JSON.stringify(transformedProduct));
 
       // Transform variants to match backend's capitalized field names
@@ -385,6 +384,23 @@ export default function ReviewStep({
         // Don't include Images here - they'll be handled separately
       }));
 
+      // Client-side SKU validation: allow empty SKUs (optional)
+      // but still block submission when non-empty SKUs are duplicated
+      const skuList = transformedVariants.map((tv) => (tv.SKU ?? '').toString().trim());
+
+      // consider only non-empty SKUs for duplication checks
+      const skuCounts = skuList.reduce((acc, s) => {
+        if (!s) return acc; // skip empty
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {});
+
+      const duplicateSkus = Object.keys(skuCounts).filter((s) => skuCounts[s] > 1);
+      if (duplicateSkus.length > 0) {
+        alert(`Duplicate SKUs found in variants: ${duplicateSkus.join(', ')}. Please ensure each variant has a unique SKU.`);
+        return;
+      }
+
       formData.append("variants", JSON.stringify(transformedVariants));
       formData.append("tagIDs", JSON.stringify(product.tagIDs || []));
 
@@ -393,7 +409,7 @@ export default function ReviewStep({
       variants.forEach((variant, variantIndex) => {
         if (Array.isArray(variant.images)) {
           console.log(`Variant ${variant.sku} has ${variant.images.length} images`);
-          
+
           variant.images.forEach((file, fileIndex) => {
             if (file instanceof File) {
               const fieldName = `images_${variant.sku}`;
@@ -417,7 +433,7 @@ export default function ReviewStep({
       console.log("Debug product submission:");
       console.log("- Product data:", transformedProduct);
       console.log("- Variants:", transformedVariants);
-      
+
       // Add special debug field to help track submission on backend
       formData.append("_debug", "true");
 
@@ -430,8 +446,23 @@ export default function ReviewStep({
       setDialogOpen(true); // Show success dialog
     } catch (error) {
       console.error("Submission failed:", error);
-      console.error("Error details:", error.response?.data);
-      alert(`Product submission failed: ${error.message}`);
+      console.error("Error details:", error.response?.data || error.message);
+
+      // Try to provide a clearer message for unique constraint violations (Postgres 23505)
+      const serverError = error.response?.data;
+      let userMessage = `Product submission failed: ${error.message}`;
+
+      if (serverError) {
+        const errText = (typeof serverError === 'string') ? serverError : (serverError.error || serverError.message || JSON.stringify(serverError));
+        if (errText && errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')) {
+          // Friendly guidance to the user
+          userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+        } else if (errText) {
+          userMessage = `Submission failed: ${errText}`;
+        }
+      }
+
+      alert(userMessage);
     }
   };
 
@@ -459,7 +490,7 @@ export default function ReviewStep({
       { label: "Subcategory", value: subcategoryName },
       { label: "Unit", value: unitName },
       { label: "Product Mode", value: product.product_mode },
-      { label: "MOQ", value: product.minimumStock },
+      { label: "MOQ", value: product.moq ?? product.MOQ ?? product.minimumStock },
       { label: "Store", value: storeName },
       { label: "Tax", value: taxName },
       { label: "GST %", value: `${product.gstPercent}%` },

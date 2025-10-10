@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Fragment } from "react";
 import {
   Grid,
   Typography,
@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  CircularProgress,
 } from "@mui/material";
 import { useForm, Controller,useWatch  } from "react-hook-form";
 import axios from "axios";
@@ -256,6 +257,8 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       username: "",
       usercode: "",
       account_types: [], // New field for dropdown selections
+      distributor_id: null, // For customer-distributor relationship
+      dealer_id: null, // For distributor-dealer relationship
       // all your controlled values
   }
 });
@@ -290,7 +293,79 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
   };
     
   const isUser = watch("is_user", false); // default to false
+  const watchedAccountTypesLocal = watch("account_types", []);
+  const isDealerSelected = Array.isArray(watchedAccountTypesLocal) && watchedAccountTypesLocal.includes("is_dealer");
   const sameAsPermanent = watch("same_as_permanent");
+
+  // User lists state
+  const [distributors, setDistributors] = React.useState([]);
+  const [isLoadingDistributors, setIsLoadingDistributors] = React.useState(false);
+  const [dealers, setDealers] = React.useState([]);
+  const [isLoadingDealers, setIsLoadingDealers] = React.useState(false);
+
+  // Watch customer selection and distributor selection for enabling dropdowns
+  const isCustomerSelected = Array.isArray(watchedAccountTypesLocal) && watchedAccountTypesLocal.includes("is_customer");
+  const selectedDistributorId = watch("distributor_id", null);
+  const hasSelectedDistributor = !!selectedDistributorId;
+
+  // Fetch distributors when customer is selected
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDistributors = async () => {
+      setIsLoadingDistributors(true);
+      try {
+        const resp = await axios.get(`${BASE_URL}/api/users`, { params: { user_type: 'distributor', limit: 1000 } });
+        if (!cancelled) {
+          // expect backend returns { data: users, total, ... } per GetAllUsers
+          const users = Array.isArray(resp.data.data) ? resp.data.data : resp.data;
+          setDistributors(users || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch distributors', err);
+        setDistributors([]);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDistributors(false);
+        }
+      }
+    };
+
+    // only fetch when customer is selected
+    if (isCustomerSelected) fetchDistributors();
+
+    return () => { cancelled = true; };
+  }, [isCustomerSelected]);
+  
+  // Fetch dealers when a distributor is selected
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDealers = async () => {
+      if (!selectedDistributorId) {
+        setDealers([]);
+        return;
+      }
+      
+      setIsLoadingDealers(true);
+      try {
+        const resp = await axios.get(`${BASE_URL}/api/users`, { params: { user_type: 'dealer', limit: 1000 } });
+        if (!cancelled) {
+          const users = Array.isArray(resp.data.data) ? resp.data.data : resp.data;
+          setDealers(users || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch dealers', err);
+        setDealers([]);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDealers(false);
+        }
+      }
+    };
+
+    fetchDealers();
+
+    return () => { cancelled = true; };
+  }, [selectedDistributorId]);
 
 
   // Watch permanent address fields
@@ -322,6 +397,8 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         active: typeof defaultValues.active === 'boolean' ? defaultValues.active : true,
         username: defaultValues.username || "", // Added prefill for new field
         usercode: defaultValues.usercode || "",
+        distributor_id: defaultValues.distributor_id || null, // Initialize distributor_id
+        dealer_id: defaultValues.dealer_id || null, // Initialize dealer_id
       });
       // Prefill additionalAddresses by parsing Addresses JSON strings
       setAdditionalAddresses(
@@ -356,6 +433,13 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
       if (defaultValues.is_dealer) selectedTypes.push("is_dealer");
       if (defaultValues.is_distributor) selectedTypes.push("is_distributor");
       setValue("account_types", selectedTypes);
+      // set distributor and dealer selection if present in default values
+      if (defaultValues.distributor_id) {
+        setValue('distributor_id', defaultValues.distributor_id);
+      }
+      if (defaultValues.dealer_id) {
+        setValue('dealer_id', defaultValues.dealer_id);
+      }
     }
   }, [defaultValues, reset, setValue]);
 
@@ -366,7 +450,9 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         Addresses: additionalAddresses.map(addr => JSON.stringify(addr)), // Convert to JSON string array
         AdditionalBankInfos: additionalBankInfos.map(bi => JSON.stringify(bi)), // Convert to JSON string array
         id: defaultValues?.id || undefined,
-  usercode: data.usercode || undefined,
+        usercode: data.usercode || undefined,
+        distributor_id: isCustomerSelected ? data.distributor_id : null, // Only include if customer is selected
+        dealer_id: (isCustomerSelected && hasSelectedDistributor) ? data.dealer_id : null, // Only include if customer and distributor selected
         // Convert empty strings to undefined for pointer fields
         salutation: data.salutation || undefined,
         website: data.website || undefined,
@@ -415,24 +501,45 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         }
       }
 
+      let created
       if (defaultValues?.id) {
         // Update user
         const response = await axios.put(`${BASE_URL}/api/users/${defaultValues.id}`, payload);
-        // Show confirmation dialog with returned user
-        const created = response.data.user || response.data;
-        setCreatedUser(created);
-        setUsercode(created.usercode || created.username || "");
-        setDialogOpen(true);
-        // notify parent if needed
-        onSubmitUser && onSubmitUser(created);
+        created = response.data.user || response.data;
       } else {
         // Add new user
         const response = await axios.post(`${BASE_URL}/api/users`, payload);
-        const created = response.data.user || response.data;
-        setCreatedUser(created);
-        setUsercode(created.usercode || created.username || "");
-        setDialogOpen(true);
-        onSubmitUser && onSubmitUser(created);
+        created = response.data.user || response.data;
+      }
+
+      // Show confirmation dialog with returned user
+      setCreatedUser(created);
+      setUsercode(created.usercode || created.username || "");
+      setDialogOpen(true);
+      onSubmitUser && onSubmitUser(created);
+
+      // If bank info was provided in the form, save to bank master
+      try {
+        const bankName = payload.bank_name || payload.bankName || "";
+        const accountNumber = payload.account_number || payload.accountNumber || "";
+        if (bankName && accountNumber) {
+          const bankPayload = {
+            name: bankName,
+            branch_name: payload.branch_name || payload.branchName || "",
+            branch_address: payload.branch_address || payload.branchAddress || "",
+            account_number: accountNumber,
+            ifsc_code: payload.ifsc_code || payload.ifscCode || "",
+            // include user reference so bank master can show linked user
+            user_id: created.id,
+            user_code: created.usercode || created.usercode || created.username || "",
+            user_name: `${created.firstname || created.Firstname || ''} ${created.lastname || created.Lastname || ''}`.trim(),
+          };
+          // create or update bank master
+          await axios.post(`${BASE_URL}/api/banks`, bankPayload);
+        }
+      } catch (bankErr) {
+        console.error('Failed to save bank master:', bankErr);
+        // don't block user flow; optionally notify user
       }
     } catch (error) {
       console.error("Error submitting user form:", error);
@@ -580,7 +687,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
 
       {/* === USER ROLES === */}
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 2 }}>
           <Box display="flex" flexDirection="column" justifyContent="center" height="100%">
             <Typography variant="h6">Account Type</Typography>
             {/* Multi-select dropdown */}
@@ -618,8 +725,102 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
             />
           </Box>
         </Grid>
+        
+        <Grid size={{ xs: 12, md: 2 }}>
+          <Box display="flex" flexDirection="column" justifyContent="center" height="100%">
+            <Typography variant="h6">Distributor</Typography>
+            <Controller
+              name="distributor_id"
+              control={control}
+              render={({ field: { onChange, value, ...restField } }) => (
+                <Autocomplete
+                  {...restField}
+                  options={distributors}
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'object' && option !== null) {
+                      return `${option.firstname || ''} ${option.lastname || ''}${option.usercode ? ` (${option.usercode})` : ''}`;
+                    }
+                    return '';
+                  }}
+                  isOptionEqualToValue={(option, val) => {
+                    if (option === null || val === null) return option === val;
+                    return option.id === (typeof val === 'object' ? val.id : val);
+                  }}
+                  value={distributors.find(d => d.id === value) || null}
+                  onChange={(_, newValue) => {
+                    onChange(newValue ? newValue.id : null);
+                    // Clear dealer selection when distributor changes
+                    setValue("dealer_id", null);
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Select Distributor" 
+                      size="small"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <Fragment>
+                            {isLoadingDistributors ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </Fragment>
+                        ),
+                      }} 
+                    />
+                  )}
+                  disabled={!isCustomerSelected}
+                />
+              )}
+            />
+          </Box>
+        </Grid>
+        
+        <Grid size={{ xs: 12, md: 2 }}>
+          <Box display="flex" flexDirection="column" justifyContent="center" height="100%">
+            <Typography variant="h6">Dealer</Typography>
+            <Controller
+              name="dealer_id"
+              control={control}
+              render={({ field: { onChange, value, ...restField } }) => (
+                <Autocomplete
+                  {...restField}
+                  options={dealers}
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'object' && option !== null) {
+                      return `${option.firstname || ''} ${option.lastname || ''}${option.usercode ? ` (${option.usercode})` : ''}`;
+                    }
+                    return '';
+                  }}
+                  isOptionEqualToValue={(option, val) => {
+                    if (option === null || val === null) return option === val;
+                    return option.id === (typeof val === 'object' ? val.id : val);
+                  }}
+                  value={dealers.find(d => d.id === value) || null}
+                  onChange={(_, newValue) => onChange(newValue ? newValue.id : null)}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Select Dealer" 
+                      size="small"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <Fragment>
+                            {isLoadingDealers ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </Fragment>
+                        ),
+                      }} 
+                    />
+                  )}
+                  disabled={!(isCustomerSelected && hasSelectedDistributor)}
+                />
+              )}
+            />
+          </Box>
+        </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 2 }}>
           <Box display="flex" alignItems="flex-end" justifyContent="center" height="100%">
             {/* Active checkbox */}
             <Controller
@@ -636,7 +837,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           </Box>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 1 }}>
           <Box display="flex" alignItems="flex-end" justifyContent="flex-end" height="100%">
             <Button
             variant="outlined" onClick={() => navigate(`/users`)}  > View </Button>
@@ -776,6 +977,26 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField size="small" fullWidth label="Company Name" {...register("companyname")} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <FormControl fullWidth size="small">
+            <Controller
+              name="distributor_id"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  options={distributors}
+                  getOptionLabel={(option) => (option.firstname || '') + ' ' + (option.lastname || '')}
+                  value={distributors.find(d => d.id === field.value) || null}
+                  onChange={(_, newValue) => field.onChange(newValue ? newValue.id : null)}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Distributor" size="small" />
+                  )}
+                  disabled={!isDealerSelected}
+                />
+              )}
+            />
+          </FormControl>
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField size="small" fullWidth label="Designation" {...register("designation")} />

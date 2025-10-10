@@ -97,6 +97,13 @@ export const menuItems = [
     icon: GiRingmaster,
     submenu: [{ title: "Branch Management", path: "/ManageBranch" }],
   },
+
+  {
+    id: 9,
+    title: "Bank Master",
+    icon: GiRingmaster,
+    submenu: [{ title: "Bank Management", path: "/ManageBank" }],
+  },
   {
     id: 5,
     title: "Reports",

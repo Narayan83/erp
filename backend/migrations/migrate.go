@@ -29,19 +29,24 @@ func main() {
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+		&models.RoleManagement{},
 
 		&models.Employee{},
 		&models.Customer{},
 		&models.Supplier{},
 		&models.Dealer{},
 		&models.Distributor{},
+// <<<<<<< staging
+// 		&models.Bank{},
+// =======
 
-		//30/9/2025
-		&models.TandC{},
-		&models.Addresses{},
-		&models.QuotationTable{},
-		&models.QuotationTableItems{},
-		&models.QutationTemplates{},
+// 		//30/9/2025
+// 		&models.TandC{},
+// 		&models.Addresses{},
+// 		&models.QuotationTable{},
+// 		&models.QuotationTableItems{},
+// 		&models.QutationTemplates{},
+// >>>>>>> staging
 	)
 
 	if err != nil {
