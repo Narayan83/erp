@@ -337,6 +337,18 @@ export default function ReviewStep({
     }
   }, [product]);
 
+  const handleSequenceFix = async () => {
+    try {
+      console.log("Attempting to fix database sequence...");
+      const response = await axios.post(`${BASE_URL}/api/products/fix-sequence`);
+      console.log("Sequence fix response:", response.data);
+      alert("Database sequence has been reset successfully. You can now try submitting the product again.");
+    } catch (error) {
+      console.error("Sequence fix failed:", error);
+      alert(`Failed to fix database sequence: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
   const handleFinalSubmit = async () => {
     try {
       const formData = new FormData();
@@ -454,9 +466,15 @@ export default function ReviewStep({
 
       if (serverError) {
         const errText = (typeof serverError === 'string') ? serverError : (serverError.error || serverError.message || JSON.stringify(serverError));
-        if (errText && errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')) {
-          // Friendly guidance to the user
-          userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+        
+        if (serverError.error === 'duplicate_skus' && serverError.skus) {
+          userMessage = `Submission failed: The following SKUs already exist in the database: ${serverError.skus.join(', ')}. Please use unique SKUs for each variant.`;
+        } else if (serverError.error === 'duplicate_key' || (errText && (errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')))) {
+          if (errText.includes('products_pkey')) {
+            userMessage = 'Submission failed due to a database sequence issue. Please use the "Fix Database Sequence" button below and try again.';
+          } else {
+            userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+          }
         } else if (errText) {
           userMessage = `Submission failed: ${errText}`;
         }
@@ -643,6 +661,25 @@ export default function ReviewStep({
           ))}
         </TableBody>
       </Table>
+
+      {/* Debug/Admin Panel (only show if there was a sequence error) */}
+      {/* <Box mt={2} p={2} bgcolor="grey.100" borderRadius={1}>
+        <Typography variant="subtitle2" color="textSecondary" mb={1}>
+          Debug Panel
+        </Typography>
+        <Typography variant="body2" color="textSecondary" mb={2}>
+          If you're experiencing "duplicate key" errors, this usually indicates a database sequence synchronization issue.
+        </Typography>
+        <Button 
+          size="small" 
+          color="warning" 
+          variant="outlined" 
+          onClick={handleSequenceFix}
+          sx={{ mr: 1 }}
+        >
+          Fix Database Sequence
+        </Button>
+      </Box> */}
 
       <Box mt={4} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
