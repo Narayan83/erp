@@ -132,7 +132,34 @@ func CreateProduct(c *fiber.Ctx) error {
 	if err := productsDB.Create(&product).Error; err != nil {
 		// Detect common Postgres duplicate key / sequence-out-of-sync scenarios
 		errStr := err.Error()
+		fmt.Printf("Product creation error: %s\n", errStr)
+
 		if strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "SQLSTATE 23505") || strings.Contains(errStr, "products_pkey") {
+			fmt.Printf("Detected duplicate key error, attempting automatic sequence fix...\n")
+
+			// Try to fix the sequence issue by resetting it to the max ID + 1
+			var maxID uint
+			if seqErr := productsDB.Model(&models.Product{}).Select("COALESCE(MAX(id), 0)").Scan(&maxID).Error; seqErr == nil {
+				fmt.Printf("Current max product ID: %d\n", maxID)
+
+				// Reset the sequence to max_id + 1
+				resetQuery := fmt.Sprintf("SELECT setval('products_id_seq', %d, true)", maxID+1)
+				if resetErr := productsDB.Exec(resetQuery).Error; resetErr == nil {
+					fmt.Printf("Sequence reset successful, retrying product creation...\n")
+
+					// Try the insert again after fixing the sequence
+					if retryErr := productsDB.Create(&product).Error; retryErr == nil {
+						fmt.Printf("Product creation successful after sequence fix!\n")
+						return c.JSON(product)
+					} else {
+						fmt.Printf("Product creation still failed after sequence fix: %s\n", retryErr.Error())
+					}
+				} else {
+					fmt.Printf("Sequence reset failed: %s\n", resetErr.Error())
+				}
+			} else {
+				fmt.Printf("Failed to get max ID: %s\n", seqErr.Error())
+			}
 			return c.Status(409).JSON(fiber.Map{"error": "duplicate_key", "message": errStr})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": errStr})
@@ -1301,4 +1328,36 @@ func getBoolValue(val interface{}) bool {
 		return strings.ToLower(str) == "active"
 	}
 	return true
+}
+
+// FixProductSequence manually resets the products sequence to fix duplicate key issues
+func FixProductSequence(c *fiber.Ctx) error {
+	// Get the maximum ID from the products table
+	var maxID uint
+	if err := productsDB.Model(&models.Product{}).Select("COALESCE(MAX(id), 0)").Scan(&maxID).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get max product ID", "details": err.Error()})
+	}
+
+	// Reset the sequence to max_id + 1
+	resetQuery := fmt.Sprintf("SELECT setval('products_id_seq', %d, true)", maxID+1)
+	if err := productsDB.Exec(resetQuery).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to reset sequence", "details": err.Error()})
+	}
+
+	// Also reset product_variants sequence while we're at it
+	var maxVariantID uint
+	if err := productsDB.Model(&models.ProductVariant{}).Select("COALESCE(MAX(id), 0)").Scan(&maxVariantID).Error; err == nil {
+		variantResetQuery := fmt.Sprintf("SELECT setval('product_variants_id_seq', %d, true)", maxVariantID+1)
+		productsDB.Exec(variantResetQuery)
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Sequences reset successfully",
+		"details": map[string]interface{}{
+			"products_max_id":     maxID,
+			"products_next_value": maxID + 1,
+			"variants_max_id":     maxVariantID,
+			"variants_next_value": maxVariantID + 1,
+		},
+	})
 }
