@@ -155,6 +155,8 @@ func main() {
 	app.Put("/api/quotations/:id", handler.UpdateQuotationTable)
 	app.Delete("/api/quotations/:id", handler.DeleteQuotationTable)
 
+	app.Get("/api/quotations/max-scp-count/:sales_credit_person_id", handler.GetMaxQuotationScpCount)
+
 	//HsnCode
 
 	api.Get("/hsncode", handler.GetAllHsnCode)
