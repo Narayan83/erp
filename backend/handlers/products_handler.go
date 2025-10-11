@@ -114,14 +114,20 @@ func CreateProduct(c *fiber.Ctx) error {
 		product.Variants[i].ProductID = 0
 	}
 
-	// Pre-check SKUs to avoid unique constraint DB errors
+	// Replace temporary SKUs with auto-generated ones and pre-check for duplicates
 	var skusToCheck []string
-	for _, v := range variants {
-		s := strings.TrimSpace(v.SKU)
-		if s != "" {
+	for i := range variants {
+		s := strings.TrimSpace(variants[i].SKU)
+		// Check if SKU is temporary (starts with TEMP_SKU_)
+		if strings.HasPrefix(s, "TEMP_SKU_") || s == "" {
+			// Generate a unique SKU
+			variants[i].SKU = fmt.Sprintf("SKU-%d-%d", time.Now().UnixNano(), i)
+		} else if s != "" {
 			skusToCheck = append(skusToCheck, s)
 		}
 	}
+
+	// Only check for duplicates if there are user-provided (non-temporary) SKUs
 	if len(skusToCheck) > 0 {
 		var existingSkus []string
 		if err := productsDB.Model(&models.ProductVariant{}).Where("sku IN ?", skusToCheck).Pluck("sku", &existingSkus).Error; err == nil && len(existingSkus) > 0 {
@@ -261,6 +267,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 	type ProductWithStock struct {
 		models.Product
 		Stock       int    `json:"Stock"`
+		MinStock    int    `json:"MinimumStock"`
 		MOQ         int    `json:"MOQ"`
 		LeadTime    int    `json:"LeadTime"`
 		Note        string `json:"Note"`
@@ -279,6 +286,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 		productsWithStock = append(productsWithStock, ProductWithStock{
 			Product:     p,
 			Stock:       stock,
+			MinStock:    p.MinimumStock,
 			MOQ:         p.Moq,
 			LeadTime:    leadTime,
 			Note:        p.InternalNotes,
@@ -338,6 +346,32 @@ func GetAllProducts(c *fiber.Ctx) error {
 		}
 		productsWithStock = filtered
 	}
+
+	// Stock filter based on stock vs minimum stock comparison
+	if stockFilter := c.Query("stock_filter"); stockFilter != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			shouldInclude := false
+			switch stockFilter {
+			case "less_than_minimum_stock":
+				// Stock is less than minimum stock (only include if minimum stock is set)
+				if p.MinStock > 0 {
+					shouldInclude = p.Stock < p.MinStock
+				}
+			case "greater_than_minimum_stock":
+				// Stock is greater than or equal to minimum stock (only include if minimum stock is set)
+				if p.MinStock > 0 {
+					shouldInclude = p.Stock >= p.MinStock
+				}
+			}
+
+			if shouldInclude {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
 	// In-memory filtering for product_type
 	if productTypeQuery := c.Query("product_type"); productTypeQuery != "" {
 		filtered := make([]ProductWithStock, 0)
