@@ -380,37 +380,51 @@ export default function ReviewStep({
       formData.append("product", JSON.stringify(transformedProduct));
 
       // Transform variants to match backend's capitalized field names
-      const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }) => ({
-        Color: v.color,
-        Size: v.size,
-        SKU: v.sku,
-        Barcode: v.barcode,
-        PurchaseCost: v.purchaseCost,
-        StdSalesPrice: v.stdSalesPrice,
-        Stock: v.stock,
-        LeadTime: v.leadTime,
-        IsActive: v.isActive,
-        // Persist main image selection if present
-        MainImage: mainImage ?? null,
-        MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
-        // Don't include Images here - they'll be handled separately
-      }));
+      // Generate unique temporary IDs for variants without SKUs
+      const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }, index) => {
+        const variant = {
+          Color: v.color,
+          Size: v.size,
+          Barcode: v.barcode,
+          PurchaseCost: v.purchaseCost,
+          StdSalesPrice: v.stdSalesPrice,
+          Stock: v.stock,
+          LeadTime: v.leadTime,
+          IsActive: v.isActive,
+          // Persist main image selection if present
+          MainImage: mainImage ?? null,
+          MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
+          // Don't include Images here - they'll be handled separately
+        };
+        
+        // Generate a unique temporary SKU for variants that don't have one
+        // This ensures unique identification for image mapping
+        if (!v.sku || v.sku.toString().trim() === '') {
+          variant.SKU = `TEMP_SKU_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+        } else {
+          variant.SKU = v.sku;
+        }
+        
+        return variant;
+      });
 
-      // Client-side SKU validation: allow empty SKUs (optional)
-      // but still block submission when non-empty SKUs are duplicated
-      const skuList = transformedVariants.map((tv) => (tv.SKU ?? '').toString().trim());
+      // Client-side SKU validation: only check if SKUs are actually provided
+      const providedSkus = transformedVariants
+        .map((tv) => tv.SKU)
+        .filter((sku) => sku && sku.toString().trim() !== '');
 
-      // consider only non-empty SKUs for duplication checks
-      const skuCounts = skuList.reduce((acc, s) => {
-        if (!s) return acc; // skip empty
-        acc[s] = (acc[s] || 0) + 1;
-        return acc;
-      }, {});
+      if (providedSkus.length > 0) {
+        // Only check for duplicates if there are SKUs provided
+        const skuCounts = providedSkus.reduce((acc, s) => {
+          acc[s] = (acc[s] || 0) + 1;
+          return acc;
+        }, {});
 
-      const duplicateSkus = Object.keys(skuCounts).filter((s) => skuCounts[s] > 1);
-      if (duplicateSkus.length > 0) {
-        alert(`Duplicate SKUs found in variants: ${duplicateSkus.join(', ')}. Please ensure each variant has a unique SKU.`);
-        return;
+        const duplicateSkus = Object.keys(skuCounts).filter((s) => skuCounts[s] > 1);
+        if (duplicateSkus.length > 0) {
+          alert(`Duplicate SKUs found in variants: ${duplicateSkus.join(', ')}. Please ensure each variant has a unique SKU.`);
+          return;
+        }
       }
 
       formData.append("variants", JSON.stringify(transformedVariants));
@@ -420,22 +434,24 @@ export default function ReviewStep({
       console.log("Appending images to FormData:");
       variants.forEach((variant, variantIndex) => {
         if (Array.isArray(variant.images)) {
-          console.log(`Variant ${variant.sku} has ${variant.images.length} images`);
+          // Use the temporary SKU generated for this variant
+          const variantIdentifier = transformedVariants[variantIndex].SKU;
+          console.log(`Variant ${variantIdentifier} has ${variant.images.length} images`);
 
           variant.images.forEach((file, fileIndex) => {
             if (file instanceof File) {
-              const fieldName = `images_${variant.sku}`;
+              const fieldName = `images_${variantIdentifier}`;
               console.log(`Adding File: ${fieldName}, name: ${file.name}, size: ${file.size}, type: ${file.type}`);
               formData.append(fieldName, file);
             } else if (typeof file === 'string') {
-              console.log(`String image for ${variant.sku}: ${file}`);
+              console.log(`String image for ${variantIdentifier}: ${file}`);
               // Keep the existing image reference in a separate field
               formData.append(`variant_images`, JSON.stringify({
-                sku: variant.sku,
+                sku: variantIdentifier,
                 image: file
               }));
             } else {
-              console.log(`Unknown image type for ${variant.sku}:`, typeof file, file);
+              console.log(`Unknown image type for ${variantIdentifier}:`, typeof file, file);
             }
           });
         }
@@ -445,6 +461,7 @@ export default function ReviewStep({
       console.log("Debug product submission:");
       console.log("- Product data:", transformedProduct);
       console.log("- Variants:", transformedVariants);
+      console.log("- Variants JSON:", JSON.stringify(transformedVariants, null, 2));
 
       // Add special debug field to help track submission on backend
       formData.append("_debug", "true");

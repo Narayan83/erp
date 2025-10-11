@@ -414,6 +414,10 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             label="Stock"
           />
           <FormControlLabel
+            control={<Checkbox checked={columns.minimumStock} onChange={handleColumnToggle('minimumStock')} />}
+            label="Minimum Stock"
+          />
+          <FormControlLabel
             control={<Checkbox checked={columns.moq} onChange={handleColumnToggle('moq')} />}
             label="MOQ"
           />
@@ -519,6 +523,11 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             // show common fallback fields for stock if p.Stock is not present
             <TableCell sx={{ py: 0.5, width: 100 }}>
               {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
+            </TableCell>
+          )}
+          {visibleColumns.minimumStock && (
+            <TableCell sx={{ py: 0.5, width: 100 }}>
+              {p.MinimumStock ?? p.MinStock ?? p.minimum_stock ?? p.min_stock ?? ''}
             </TableCell>
           )}
           {visibleColumns.moq && (
@@ -941,6 +950,17 @@ const FiltersRow = memo(function FiltersRow({
             disableClearable={false}
             clearOnBlur={false}
             blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.minimumStock && (
+        <TableCell sx={{ width: 120 }}>
+          <TextField
+            placeholder="Min Stock"
+            fullWidth
+            size="small"
+            value={inputFilters.minimumStock || ''}
+            onChange={(e) => setInputFilters(f => ({ ...f, minimumStock: e.target.value }))}
           />
         </TableCell>
       )}
@@ -1442,7 +1462,7 @@ export default function ProductListPage() {
   
   // NEW: local input state to avoid re-fetch on every keystroke
   const [inputFilters, setInputFilters] = useState({ 
-    name: "", code: "", productType: "", productMode: "", stock: "", moq: "", 
+    name: "", code: "", productType: "", productMode: "", stock: "", minimumStock: "", moq: "", 
     leadTime: "", note: "", color: "", size: "", sku: "", 
     barcode: "", purchaseCost: "", salesPrice: "" 
   });
@@ -1486,6 +1506,7 @@ export default function ProductListPage() {
       productType: true,
       productMode: true,
       stock: true,
+      minimumStock: true,
       moq: true,
       leadTime: true,
       note: true,
@@ -1631,14 +1652,15 @@ export default function ProductListPage() {
           prev.sku === inputFilters.sku &&
           prev.barcode === inputFilters.barcode &&
           prev.purchaseCost === inputFilters.purchaseCost &&
-          prev.salesPrice === inputFilters.salesPrice
+          prev.salesPrice === inputFilters.salesPrice &&
+          prev.minimumStock === inputFilters.minimumStock
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, productMode: inputFilters.productMode, stock: inputFilters.stock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, productMode: inputFilters.productMode, stock: inputFilters.stock, minimumStock: inputFilters.minimumStock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.productMode, inputFilters.stock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.productMode, inputFilters.stock, inputFilters.minimumStock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -2040,6 +2062,10 @@ export default function ProductListPage() {
         stock:
           debouncedFilters.stock !== "" && !isNaN(Number(debouncedFilters.stock))
             ? Number(debouncedFilters.stock)
+            : undefined,
+        minimum_stock:
+          debouncedFilters.minimumStock !== "" && !isNaN(Number(debouncedFilters.minimumStock))
+            ? Number(debouncedFilters.minimumStock)
             : undefined,
         moq:
           debouncedFilters.moq !== "" && !isNaN(Number(debouncedFilters.moq))
@@ -3503,8 +3529,8 @@ export default function ProductListPage() {
               sx={{ width: '180px' }}
             >
               <MenuItem value="all">All</MenuItem>
-              <MenuItem value="less_than_moq">Less than MOQ</MenuItem>
-              <MenuItem value="greater_than_moq">More than MOQ</MenuItem>
+              <MenuItem value="less_than_minimum_stock">Less than Minimum Stock</MenuItem>
+              <MenuItem value="greater_than_minimum_stock">More than Minimum Stock</MenuItem>
             </TextField>
           </Grid>
         </Grid>
@@ -3616,6 +3642,7 @@ export default function ProductListPage() {
                     </Box>
                   </TableCell>
                 )}
+                {visibleColumns.minimumStock && <TableCell sx={{fontWeight : "bold", width: 100}}>Minimum Stock</TableCell>}
                 {visibleColumns.moq && <TableCell sx={{fontWeight : "bold", width: 100}}>MOQ</TableCell>}
                 {visibleColumns.leadTime && (
                   <TableCell sx={{fontWeight : "bold", width: 120}}>
