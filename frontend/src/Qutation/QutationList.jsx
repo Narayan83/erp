@@ -11,7 +11,7 @@ import { MdSummarize } from "react-icons/md";
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { BASE_URL } from "../Config";
-
+import { MdEdit } from "react-icons/md";
 const QutationList = () => {
     const navigate = useNavigate();
     const [quotations, setQuotations] = useState([]);
@@ -187,7 +187,9 @@ const QutationList = () => {
                                                         <th>Sales Credit</th>
                                                         <th>Items</th>
                                                         <th>Grand Total</th>
-                                                        <th>Status</th>
+                                                        <th>Valid till</th>
+                                                        
+                                                        <th>op</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -197,10 +199,20 @@ const QutationList = () => {
                                                             <td>{q.quotation_number}</td>
                                                             <td>{q.quotation_date ? new Date(q.quotation_date).toLocaleDateString() : ''}</td>
                                                             <td>{q.customer ? `${q.customer.firstname || ''} ${q.customer.lastname || ''}`.trim() : ''}</td>
-                                                            <td>{q.marketing_person ? `${q.marketing_person.firstname || ''} ${q.marketing_person.lastname || ''}`.trim() : ''}</td>
+                                                            <td>{q.sales_credit_person ? `${q.sales_credit_person.firstname || ''} ${q.sales_credit_person.lastname || ''}`.trim() : ''}</td>
                                                             <td>{Array.isArray(q.quotation_items) ? q.quotation_items.length : 0}</td>
                                                             <td>{q.grand_total?.toFixed ? q.grand_total.toFixed(2) : q.grand_total}</td>
-                                                            <td>{q.status}</td>
+                                                            <td>
+                                                                {q.valid_until ? new Date(q.valid_until).toLocaleDateString() : ''}
+                                                            </td>
+                                                           
+
+                                                           <td>
+                                                            <a className='btn'  href={`/quotation/${q.quotation_id}`}   >
+                                                                    <MdEdit />
+                                                            </a>
+                                                                
+                                                            </td> 
                                                         </tr>
                                                     ))}
                                                 </tbody>
