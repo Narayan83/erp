@@ -330,7 +330,7 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
                   </Box>
                 </TableCell>
                 <TableCell>{v.size}</TableCell>
-                <TableCell>{v.sku}</TableCell>
+                <TableCell>{v.sku || "(Auto-generated)"}</TableCell>
                 <TableCell>{v.barcode}</TableCell>
                 <TableCell>₹{v.purchaseCost}</TableCell>
                 <TableCell>₹{v.stdSalesPrice}</TableCell>
@@ -401,7 +401,11 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
           setEditIndex(null);
           setInitialData(null);
         }}
-        onSave={handleSave}
+        onSave={variant => {
+          // Set SKU to null explicitly to force backend to generate one
+          variant.sku = null;
+          handleSave(variant);
+        }}
         initialData={initialData}
         sizes={sizes}
       />

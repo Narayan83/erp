@@ -122,6 +122,7 @@ func main() {
 	api.Put("/products/:id", handler.UpdateProduct)
 	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
+	api.Post("/products/fix-sequence", handler.FixProductSequence)
 
 	api.Get("/products/stats", handler.GetProductStats)
 

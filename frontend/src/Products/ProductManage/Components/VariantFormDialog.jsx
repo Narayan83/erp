@@ -1,6 +1,7 @@
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Select, FormControl, InputLabel, Autocomplete
+  Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Select, FormControl, InputLabel, Autocomplete,
+  Alert, Snackbar
 } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { useEffect, useState, useCallback } from "react";
@@ -14,7 +15,19 @@ import axios from "axios";
 import { BASE_URL } from "../../../Config"; // adjust if needed
 
 export default function VariantFormDialog({ open, onClose, onSave, initialData = null, sizes = [] }) {
-  const { register, handleSubmit, reset } = useForm();
+  // Remove sku from defaultValues to ensure it starts empty
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
+    mode: 'onSubmit',
+    defaultValues: {
+      sku: null, // Set to null explicitly
+      barcode: '',
+      purchaseCost: '',
+      stdSalesPrice: '',
+      stock: '',
+      leadTime: '',
+      isActive: true
+    }
+  });
   const [imagesPreview, setImagesPreview] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]);
@@ -29,6 +42,8 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [mainImageIndex, setMainImageIndex] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +69,14 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
 
   useEffect(() => {
     if (initialData) {
-      reset(initialData);
+      // Create a copy of initialData without the SKU
+      const dataWithoutSku = { ...initialData };
+      delete dataWithoutSku.sku; // Remove SKU to prevent it from being set
+      
+      // Reset form with modified data
+      reset(dataWithoutSku);
+      setValue('sku', null); // Explicitly set SKU to null
+      
       // Initialize file entries from initialData.images (may be strings referencing uploads)
       const initFiles = (initialData.images || []).map(img => {
         if (typeof img === 'string') {
@@ -103,15 +125,15 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const s = String(v).trim();
       return s === '' ? null : Number(s);
     };
-
+    
     const formData = {
       // keep raw data but normalize a few fields
-      sku: data.sku || '',
+      sku: null, // Explicitly set SKU to null to force backend to generate one
       barcode: data.barcode || '',
-      PurchaseCost: sanitizeNumber(data.purchaseCost),
-      StdSalesPrice: sanitizeNumber(data.stdSalesPrice),
-      Stock: sanitizeNumber(data.stock),
-      LeadTime: sanitizeNumber(data.leadTime),
+      purchaseCost: sanitizeNumber(data.purchaseCost),
+      stdSalesPrice: sanitizeNumber(data.stdSalesPrice),
+      stock: sanitizeNumber(data.stock),
+      leadTime: sanitizeNumber(data.leadTime),
       size: selectedSize || '',
       color: selectedColor?.value || '',
       images, // mixture of strings (existing) and File objects (new)
@@ -121,17 +143,23 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       isActive: !!data.isActive,
     };
 
-    onSave(formData);
-
-    // cleanup object URLs
-    imageFiles.forEach(entry => {
-      try { if (entry.preview && entry.file) URL.revokeObjectURL(entry.preview); } catch (e) {}
-    });
-    reset();
-    setImageFiles([]);
-    setImagesPreview([]);
-    setSelectedColor(null);
-    setSelectedSize('');
+    try {
+      onSave(formData);
+      
+      // cleanup object URLs
+      imageFiles.forEach(entry => {
+        try { if (entry.preview && entry.file) URL.revokeObjectURL(entry.preview); } catch (e) {}
+      });
+      reset();
+      setImageFiles([]);
+      setImagesPreview([]);
+      setSelectedColor(null);
+      setSelectedSize('');
+    } catch (error) {
+      console.error("Error saving variant:", error);
+      setErrorMessage("Failed to save variant. Please try again.");
+      setSnackbarOpen(true);
+    }
   };
 
   const handleFileUpload = (e) => {
@@ -460,6 +488,16 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>{initialData ? "Edit Variant" : "Add Variant"}</DialogTitle>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity="error" sx={{ width: '100%' }}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Grid container spacing={2}>
@@ -484,6 +522,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                         }}
                       />
                       {option.name}
+
                     </div>
                   </li>
                 )}
@@ -512,7 +551,15 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
               </TextField>
             </Grid>
             <Grid size={4}>
-              <TextField label="SKU" fullWidth size="small" {...register("sku")} />
+              <TextField 
+                label="SKU (Leave empty to auto-generate)" 
+                fullWidth 
+                size="small" 
+                InputProps={{
+                  placeholder: "Leave empty for auto-generated SKU"
+                }}
+                {...register("sku", { required: false })}
+              />
             </Grid>
             <Grid size={4}>
               <TextField label="Barcode" fullWidth size="small" {...register("barcode")} />

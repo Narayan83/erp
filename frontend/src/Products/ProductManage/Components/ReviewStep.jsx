@@ -337,6 +337,18 @@ export default function ReviewStep({
     }
   }, [product]);
 
+  const handleSequenceFix = async () => {
+    try {
+      console.log("Attempting to fix database sequence...");
+      const response = await axios.post(`${BASE_URL}/api/products/fix-sequence`);
+      console.log("Sequence fix response:", response.data);
+      alert("Database sequence has been reset successfully. You can now try submitting the product again.");
+    } catch (error) {
+      console.error("Sequence fix failed:", error);
+      alert(`Failed to fix database sequence: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
   const handleFinalSubmit = async () => {
     try {
       const formData = new FormData();
@@ -368,37 +380,51 @@ export default function ReviewStep({
       formData.append("product", JSON.stringify(transformedProduct));
 
       // Transform variants to match backend's capitalized field names
-      const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }) => ({
-        Color: v.color,
-        Size: v.size,
-        SKU: v.sku,
-        Barcode: v.barcode,
-        PurchaseCost: v.purchaseCost,
-        StdSalesPrice: v.stdSalesPrice,
-        Stock: v.stock,
-        LeadTime: v.leadTime,
-        IsActive: v.isActive,
-        // Persist main image selection if present
-        MainImage: mainImage ?? null,
-        MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
-        // Don't include Images here - they'll be handled separately
-      }));
+      // Generate unique temporary IDs for variants without SKUs
+      const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }, index) => {
+        const variant = {
+          Color: v.color,
+          Size: v.size,
+          Barcode: v.barcode,
+          PurchaseCost: v.purchaseCost,
+          StdSalesPrice: v.stdSalesPrice,
+          Stock: v.stock,
+          LeadTime: v.leadTime,
+          IsActive: v.isActive,
+          // Persist main image selection if present
+          MainImage: mainImage ?? null,
+          MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
+          // Don't include Images here - they'll be handled separately
+        };
+        
+        // Generate a unique temporary SKU for variants that don't have one
+        // This ensures unique identification for image mapping
+        if (!v.sku || v.sku.toString().trim() === '') {
+          variant.SKU = `TEMP_SKU_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+        } else {
+          variant.SKU = v.sku;
+        }
+        
+        return variant;
+      });
 
-      // Client-side SKU validation: allow empty SKUs (optional)
-      // but still block submission when non-empty SKUs are duplicated
-      const skuList = transformedVariants.map((tv) => (tv.SKU ?? '').toString().trim());
+      // Client-side SKU validation: only check if SKUs are actually provided
+      const providedSkus = transformedVariants
+        .map((tv) => tv.SKU)
+        .filter((sku) => sku && sku.toString().trim() !== '');
 
-      // consider only non-empty SKUs for duplication checks
-      const skuCounts = skuList.reduce((acc, s) => {
-        if (!s) return acc; // skip empty
-        acc[s] = (acc[s] || 0) + 1;
-        return acc;
-      }, {});
+      if (providedSkus.length > 0) {
+        // Only check for duplicates if there are SKUs provided
+        const skuCounts = providedSkus.reduce((acc, s) => {
+          acc[s] = (acc[s] || 0) + 1;
+          return acc;
+        }, {});
 
-      const duplicateSkus = Object.keys(skuCounts).filter((s) => skuCounts[s] > 1);
-      if (duplicateSkus.length > 0) {
-        alert(`Duplicate SKUs found in variants: ${duplicateSkus.join(', ')}. Please ensure each variant has a unique SKU.`);
-        return;
+        const duplicateSkus = Object.keys(skuCounts).filter((s) => skuCounts[s] > 1);
+        if (duplicateSkus.length > 0) {
+          alert(`Duplicate SKUs found in variants: ${duplicateSkus.join(', ')}. Please ensure each variant has a unique SKU.`);
+          return;
+        }
       }
 
       formData.append("variants", JSON.stringify(transformedVariants));
@@ -408,22 +434,24 @@ export default function ReviewStep({
       console.log("Appending images to FormData:");
       variants.forEach((variant, variantIndex) => {
         if (Array.isArray(variant.images)) {
-          console.log(`Variant ${variant.sku} has ${variant.images.length} images`);
+          // Use the temporary SKU generated for this variant
+          const variantIdentifier = transformedVariants[variantIndex].SKU;
+          console.log(`Variant ${variantIdentifier} has ${variant.images.length} images`);
 
           variant.images.forEach((file, fileIndex) => {
             if (file instanceof File) {
-              const fieldName = `images_${variant.sku}`;
+              const fieldName = `images_${variantIdentifier}`;
               console.log(`Adding File: ${fieldName}, name: ${file.name}, size: ${file.size}, type: ${file.type}`);
               formData.append(fieldName, file);
             } else if (typeof file === 'string') {
-              console.log(`String image for ${variant.sku}: ${file}`);
+              console.log(`String image for ${variantIdentifier}: ${file}`);
               // Keep the existing image reference in a separate field
               formData.append(`variant_images`, JSON.stringify({
-                sku: variant.sku,
+                sku: variantIdentifier,
                 image: file
               }));
             } else {
-              console.log(`Unknown image type for ${variant.sku}:`, typeof file, file);
+              console.log(`Unknown image type for ${variantIdentifier}:`, typeof file, file);
             }
           });
         }
@@ -433,6 +461,7 @@ export default function ReviewStep({
       console.log("Debug product submission:");
       console.log("- Product data:", transformedProduct);
       console.log("- Variants:", transformedVariants);
+      console.log("- Variants JSON:", JSON.stringify(transformedVariants, null, 2));
 
       // Add special debug field to help track submission on backend
       formData.append("_debug", "true");
@@ -454,9 +483,15 @@ export default function ReviewStep({
 
       if (serverError) {
         const errText = (typeof serverError === 'string') ? serverError : (serverError.error || serverError.message || JSON.stringify(serverError));
-        if (errText && errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')) {
-          // Friendly guidance to the user
-          userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+        
+        if (serverError.error === 'duplicate_skus' && serverError.skus) {
+          userMessage = `Submission failed: The following SKUs already exist in the database: ${serverError.skus.join(', ')}. Please use unique SKUs for each variant.`;
+        } else if (serverError.error === 'duplicate_key' || (errText && (errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')))) {
+          if (errText.includes('products_pkey')) {
+            userMessage = 'Submission failed due to a database sequence issue. Please use the "Fix Database Sequence" button below and try again.';
+          } else {
+            userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+          }
         } else if (errText) {
           userMessage = `Submission failed: ${errText}`;
         }
@@ -643,6 +678,25 @@ export default function ReviewStep({
           ))}
         </TableBody>
       </Table>
+
+      {/* Debug/Admin Panel (only show if there was a sequence error) */}
+      {/* <Box mt={2} p={2} bgcolor="grey.100" borderRadius={1}>
+        <Typography variant="subtitle2" color="textSecondary" mb={1}>
+          Debug Panel
+        </Typography>
+        <Typography variant="body2" color="textSecondary" mb={2}>
+          If you're experiencing "duplicate key" errors, this usually indicates a database sequence synchronization issue.
+        </Typography>
+        <Button 
+          size="small" 
+          color="warning" 
+          variant="outlined" 
+          onClick={handleSequenceFix}
+          sx={{ mr: 1 }}
+        >
+          Fix Database Sequence
+        </Button>
+      </Box> */}
 
       <Box mt={4} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
