@@ -82,9 +82,9 @@ type User struct {
 	Gender          Gender      `gorm:"type:varchar(10)" json:"gender"`
 	CountryCode     string      `gorm:"not null" json:"country_code"`
 	MobileNumber    string      `gorm:"not null;unique" json:"mobile_number"`
-	EmergencyNumber string      `gorm:"unique" json:"emergency_number"`
-	AlternateNumber string      `gorm:"unique" json:"alternate_number"`
-	WhatsappNumber  string      `gorm:"unique" json:"whatsapp_number"`
+	EmergencyNumber *string     `gorm:"uniqueIndex" json:"emergency_number,omitempty"`
+	AlternateNumber *string     `gorm:"uniqueIndex" json:"alternate_number,omitempty"`
+	WhatsappNumber  *string     `gorm:"uniqueIndex" json:"whatsapp_number,omitempty"`
 	ContactNo       *string     `json:"contact_no,omitempty"`
 	Email           string      `gorm:"unique;not null" json:"email"`
 	Website         *string     `json:"website,omitempty"`

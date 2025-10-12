@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -194,6 +195,31 @@ func CreateUser(c *fiber.Ctx) error {
 
 	// Save user
 	if err := usersDB.Create(&req.User).Error; err != nil {
+		// Check for duplicate key error
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "duplicate key") || strings.Contains(errMsg, "unique constraint") {
+			// Return 409 Conflict instead of 500 for unique constraint violations
+			statusCode := 409
+			errorMessage := "Failed to create user: duplicate value"
+
+			// Provide more specific error message based on the field
+			if strings.Contains(errMsg, "email") {
+				errorMessage = "A user with this email already exists"
+			} else if strings.Contains(errMsg, "mobile_number") {
+				errorMessage = "A user with this mobile number already exists"
+			} else if strings.Contains(errMsg, "emergency_number") ||
+				strings.Contains(errMsg, "alternate_number") ||
+				strings.Contains(errMsg, "whatsapp_number") {
+				errorMessage = "One of the contact numbers already exists"
+			}
+
+			return c.Status(statusCode).JSON(fiber.Map{
+				"error":   errorMessage,
+				"details": err.Error(),
+			})
+		}
+
+		// For other errors, return 500
 		return c.Status(500).JSON(fiber.Map{
 			"error":   "Failed to create user",
 			"details": err.Error(),
@@ -252,6 +278,31 @@ func UpdateUser(c *fiber.Ctx) error {
 
 	// Save updated user to DB
 	if err := usersDB.Save(&req.User).Error; err != nil {
+		// Check for duplicate key error
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "duplicate key") || strings.Contains(errMsg, "unique constraint") {
+			// Return 409 Conflict instead of 500 for unique constraint violations
+			statusCode := 409
+			errorMessage := "Failed to update user: duplicate value"
+
+			// Provide more specific error message based on the field
+			if strings.Contains(errMsg, "email") {
+				errorMessage = "A user with this email already exists"
+			} else if strings.Contains(errMsg, "mobile_number") {
+				errorMessage = "A user with this mobile number already exists"
+			} else if strings.Contains(errMsg, "emergency_number") ||
+				strings.Contains(errMsg, "alternate_number") ||
+				strings.Contains(errMsg, "whatsapp_number") {
+				errorMessage = "One of the contact numbers already exists"
+			}
+
+			return c.Status(statusCode).JSON(fiber.Map{
+				"error":   errorMessage,
+				"details": err.Error(),
+			})
+		}
+
+		// For other errors, return 500
 		return c.Status(500).JSON(fiber.Map{
 			"error":   "Failed to update user",
 			"details": err.Error(),
