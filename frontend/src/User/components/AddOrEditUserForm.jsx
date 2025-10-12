@@ -372,7 +372,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     const permanentAddress = useWatch({
       control,
       name: [
-        "address1", "address2", "address3", "address4", "address5",
+        "address1", "address2", "address3", "city",
         "state", "country", "pincode"
       ],
     });
@@ -461,11 +461,10 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         companyname: data.companyname || undefined,
         designation: data.designation || undefined,
         industry_segment: data.industry_segment || undefined,
-        address1: data.address1 || undefined,
-        address2: data.address2 || undefined,
-        address3: data.address3 || undefined,
-        address4: data.address4 || undefined,
-        address5: data.address5 || undefined,
+  address1: data.address1 || undefined,
+  address2: data.address2 || undefined,
+  address3: data.address3 || undefined,
+  city: data.city || undefined,
         state: data.state || undefined,
         country: data.country || undefined,
         pincode: data.pincode || undefined,
@@ -1076,11 +1075,14 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         <Grid size={{ xs: 12, md: 12 }}>
           <Typography variant="h6">Permanent Address</Typography>
         </Grid>
-        {[1, 2, 3, 4, 5].map((n) => (
+        {[1, 2, 3].map((n) => (
           <Grid size={{ xs: 12, md: 3 }}  key={`address${n}`}>
             <TextField size="small" fullWidth label={`Address ${n}`} {...register(`address${n}`)} />
           </Grid>
         ))}
+        <Grid size={{ xs: 12, md: 3 }}>
+          <TextField size="small" fullWidth label="City" {...register("city")} />
+        </Grid>
         <Grid size={{ xs: 12, md: 3 }} >
           {/* Show state dropdown if country is India, else show text field */}
           {watch("country") === "India" ? (
@@ -1106,7 +1108,26 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
             <TextField size="small" fullWidth label="State" {...register("state")} />
           )}
         </Grid>
-        {/* Country dropdown is already present above; removed redundant TextField */}
+        <Grid size={{ xs: 12, md: 3 }}>
+          {/* Country dropdown for permanent address */}
+          <Controller
+            name="country"
+            control={control}
+            render={({ field }) => (
+              <Autocomplete
+                options={countries}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                value={countries.find((c) => c.name === field.value) || null}
+                onChange={(_, newValue) => field.onChange(newValue ? newValue.name : "")}
+                renderInput={(params) => (
+                  <TextField {...params} label="Country" size="small" fullWidth />
+                )}
+                clearOnEscape
+                fullWidth
+              />
+            )}
+          />
+        </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField size="small" fullWidth label="Pincode" {...register("pincode")} />
         </Grid>
@@ -1139,7 +1160,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
                       sx={{ mb: 1 }}
                     />
                   </Grid>
-                  {[1, 2, 3, 4, 5].map((n) => (
+                  {[1, 2, 3].map((n) => (
                     <Grid item xs={12} md={6} key={`additional_${idx}_address${n}`}>
                       <TextField
                         size="small"
@@ -1151,6 +1172,16 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
                       />
                     </Grid>
                   ))}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="City"
+                      value={address.city || ""}
+                      onChange={e => handleAdditionalAddressChange(idx, "city", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
                   <Grid item xs={12} md={6} sx={{ minWidth: 180 }}>
                     {/* Country dropdown */}
                     <Autocomplete
