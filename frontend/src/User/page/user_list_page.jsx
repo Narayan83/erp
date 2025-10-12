@@ -245,14 +245,14 @@ export default function UserListPage() {
   const downloadTemplateCSV = () => {
     // Define headers for user import template with required fields marked
     const headersArr = [
-      'User Code *', 'Salutation', 'First Name *', 'Last Name *', 'DOB', 'Gender', 
+      'User Code', 'Salutation', 'First Name *', 'Last Name *', 'DOB', 'Gender', 
       'Country Code', 'Mobile Number *', 'Emergency Number', 'Alternate Number', 
       'Whatsapp Number', 'Email *', 'Website', 'Business Name', 'Title', 
       'Company Name', 'Designation', 'Industry Segment', 'Address1', 'Address2', 
       'Address3', 'City', 'State', 'Country', 'Pincode', 'Aadhar Number', 
       'PAN Number', 'GSTIN', 'MSME No', 'Bank Name', 'Branch Name', 
       'Branch Address', 'Account Number', 'IFSC Code', 'Active *', 'IsUser', 
-      'IsCustomer', 'IsSupplier', 'IsEmployee', 'IsDealer', 'IsDistributor', 'Role ID'
+  'IsCustomer', 'IsSupplier', 'IsEmployee', 'IsDealer', 'IsDistributor'
     ];
     
     // Join headers for CSV
@@ -266,8 +266,8 @@ export default function UserListPage() {
       'XYZ Company', 'Senior Manager', 'IT', '123 Main St', 'Apt 4B',
       'Near Park', 'Mumbai', 'Maharashtra', 'India', '400001', '123456789012',
       'ABCDE1234F', '27ABCDE1234F1Z5', 'MSME12345', 'HDFC Bank', 'Andheri Branch',
-      'Andheri West, Mumbai', '1234567890', 'HDFC0001234', 'Active', 'true',
-      'false', 'false', 'true', 'false', 'false', '1'
+      'Andheri West', '1234567890', 'HDFC0001234', 'Yes', 'Yes',
+  'No', 'No', 'Yes', 'No', 'No'
     ].join(',');
     
     // Combine headers and example row
@@ -328,9 +328,9 @@ export default function UserListPage() {
           console.log('Headers:', headers);
           console.log('Data rows:', dataRows.length);
 
-          // Validate required headers
+          // Validate required headers (User Code is optional)
           const headersNormalized = headers.map(h => String(h).toLowerCase().replace(/[^a-z0-9]/g, ''));
-          const requiredNormalized = ['usercode', 'firstname', 'lastname', 'mobilenumber', 'email', 'active'];
+          const requiredNormalized = ['firstname', 'lastname', 'mobilenumber', 'email', 'active'];
           const missingNormalized = requiredNormalized.filter(r => !headersNormalized.includes(r));
 
           if (missingNormalized.length > 0) {
@@ -403,7 +403,8 @@ export default function UserListPage() {
   // Validate import data
   const validateImportData = (data) => {
     const errors = [];
-    const requiredFields = ['User Code', 'First Name', 'Last Name', 'Mobile Number', 'Email', 'Active'];
+    // User Code is optional; validate the essential fields only
+    const requiredFields = ['First Name', 'Last Name', 'Mobile Number', 'Email', 'Active'];
     
     data.forEach((row, index) => {
       const rowErrors = [];
@@ -441,18 +442,22 @@ export default function UserListPage() {
         rowErrors.push('Mobile Number must be a valid 10-digit number');
       }
 
-      // Validate Active field
+      // Validate Active field (accept common variants: Active/Inactive, true/false, yes/no, 1/0)
       const activeValue = getFieldValue('Active');
-      if (activeValue && !['Active', 'Inactive', 'true', 'false'].includes(activeValue)) {
-        rowErrors.push('Active must be "Active", "Inactive", "true", or "false"');
+      if (activeValue && String(activeValue).trim() !== '') {
+        const av = String(activeValue).toLowerCase().trim();
+        const allowed = ['yes', 'no'];
+        if (!allowed.includes(av)) {
+          rowErrors.push('Active must be one of: "yes", "no"');
+        }
       }
 
       // Validate boolean fields
       const booleanFields = ['IsUser', 'IsCustomer', 'IsSupplier', 'IsEmployee', 'IsDealer', 'IsDistributor'];
       booleanFields.forEach(field => {
         const value = getFieldValue(field);
-        if (value && value.toString().trim() !== '' && !['true', 'false', 'yes', 'no', '1', '0'].includes(value.toLowerCase())) {
-          rowErrors.push(`${field} must be "true", "false", "yes", "no", "1", or "0"`);
+        if (value && value.toString().trim() !== '' && !['yes', 'no'].includes(value.toLowerCase())) {
+          rowErrors.push(`${field} must be "yes" or "no"`);
         }
       });
 
@@ -495,19 +500,54 @@ export default function UserListPage() {
         return;
       }
 
-      // Normalize field names
+      // Normalize field names (keep human headers) and then map to backend keys
       const normalizedArray = selectedArray.map(row => {
         const normalizedRow = {};
         Object.keys(row).forEach(key => {
           const normalizedKey = key.replace(/\s*\*\s*/g, '').trim();
           normalizedRow[normalizedKey] = row[key];
         });
+        // Ensure Country Code includes a leading '+' if it's present but missing
+        const ccKeys = ['Country Code', 'CountryCode', 'country_code'];
+        for (const k of ccKeys) {
+          if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+            let cc = String(normalizedRow[k]).trim();
+            if (cc !== '' && !cc.startsWith('+')) {
+              // Prepend + if it's numeric (e.g., 91 -> +91)
+              // but avoid adding + to non-numeric values
+              const digitsOnly = cc.replace(/\D/g, '');
+              if (digitsOnly.length > 0 && digitsOnly.length <= 4) {
+                cc = '+' + cc;
+                normalizedRow[k] = cc;
+              }
+            }
+          }
+        }
         return normalizedRow;
       });
 
-      console.log('Sending import data:', normalizedArray);
+      // Map human-friendly headers to backend expected keys (ensure user code is sent)
+      const payloadArray = normalizedArray.map(row => {
+        const p = { ...row };
 
-      const response = await axios.post(`${BASE_URL}/api/users/import`, normalizedArray, {
+        // Common variants where the CSV might contain user code
+        const uc = p['User Code'] ?? p['UserCode'] ?? p['user code'] ?? p['usercode'] ?? p['user_code'];
+        if (uc !== undefined) {
+          // Backend accepts `usercode` or `user_code` in different places; include both to be safe
+          p.usercode = String(uc).trim();
+          p.user_code = String(uc).trim();
+          // Optionally remove the human header to avoid duplication on backend
+          delete p['User Code'];
+          delete p['UserCode'];
+          delete p['user code'];
+        }
+
+        return p;
+      });
+
+      console.log('Sending import data:', payloadArray);
+
+      const response = await axios.post(`${BASE_URL}/api/users/import`, payloadArray, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -1895,7 +1935,8 @@ export default function UserListPage() {
                   {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
                     const cleanHeader = String(header).replace(/\s*\*\s*$/g, '');
                     const normalizedHeader = cleanHeader.toLowerCase();
-                    const requiredFields = ['user code', 'first name', 'last name', 'mobile number', 'email', 'active'];
+                    // Mark required fields in preview (User Code is optional)
+                    const requiredFields = ['first name', 'last name', 'mobile number', 'email', 'active'];
                     const isRequired = requiredFields.includes(normalizedHeader);
                     const displayHeader = isRequired ? `${cleanHeader} *` : cleanHeader;
                     
@@ -2085,6 +2126,26 @@ export default function UserListPage() {
           )}
         </DialogContent>
         <DialogActions>
+          <Button
+            onClick={() => {
+              // Close report and go back to preview for editing
+              setImportReportOpen(false);
+              // If there are errors, ensure those rows are selected for easier editing
+              if (importReport?.errors && Array.isArray(importReport.errors)) {
+                const s = new Set(importSelectedRows);
+                importReport.errors.forEach(err => {
+                  const r = err?.row;
+                  if (typeof r === 'number' && r > 0) s.add(r - 1);
+                });
+                setImportSelectedRows(s);
+              }
+              setImportPreviewOpen(true);
+            }}
+            variant="outlined"
+          >
+            Edit
+          </Button>
+
           <Button 
             onClick={() => {
               setImportReportOpen(false);
