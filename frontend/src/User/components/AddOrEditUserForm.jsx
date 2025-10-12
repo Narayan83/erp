@@ -372,7 +372,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
     const permanentAddress = useWatch({
       control,
       name: [
-        "address1", "address2", "address3", "address4", "address5",
+        "address1", "address2", "address3", "city",
         "state", "country", "pincode"
       ],
     });
@@ -461,11 +461,10 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         companyname: data.companyname || undefined,
         designation: data.designation || undefined,
         industry_segment: data.industry_segment || undefined,
-        address1: data.address1 || undefined,
-        address2: data.address2 || undefined,
-        address3: data.address3 || undefined,
-        address4: data.address4 || undefined,
-        address5: data.address5 || undefined,
+  address1: data.address1 || undefined,
+  address2: data.address2 || undefined,
+  address3: data.address3 || undefined,
+  city: data.city || undefined,
         state: data.state || undefined,
         country: data.country || undefined,
         pincode: data.pincode || undefined,
@@ -473,6 +472,9 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         pan_number: data.pan_number || undefined,
         gstin: data.gstin || undefined,
         msme_no: data.msme_no || undefined,
+  emergency_number: data.emergency_number || undefined,
+  alternate_number: data.alternate_number || undefined,
+  whatsapp_number: data.whatsapp_number || undefined,
         bank_name: data.bank_name || undefined,
         branch_name: data.branch_name || undefined,
         branch_address: data.branch_address || undefined,
@@ -488,9 +490,6 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         "lastname",
         "country_code",
         "mobile_number",
-        "emergency_number",
-        "alternate_number",
-        "whatsapp_number",
         "email",
         "password"
       ];
@@ -508,6 +507,8 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         created = response.data.user || response.data;
       } else {
         // Add new user
+        // DEBUG: log payload being sent to backend
+        console.log('Submitting user payload:', payload);
         const response = await axios.post(`${BASE_URL}/api/users`, payload);
         created = response.data.user || response.data;
       }
@@ -542,8 +543,34 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         // don't block user flow; optionally notify user
       }
     } catch (error) {
+      // Log full axios error and server response if available
       console.error("Error submitting user form:", error);
-      alert("Something went wrong. Please try again.");
+      if (error?.response) {
+        console.error('Server responded with:', error.response.status, error.response.data);
+        
+        // Check for duplicate key errors and provide friendly messages
+        const details = String(error.response.data?.details || '').toLowerCase();
+        if (details.includes('duplicate key') || details.includes('unique constraint')) {
+          if (details.includes('email')) {
+            alert('A user with this email already exists. Please use a different email address.');
+          } else if (details.includes('mobile_number')) {
+            alert('A user with this mobile number already exists. Please use a different mobile number.');
+          } else if (details.includes('emergency_number') || details.includes('alternate_number') || details.includes('whatsapp_number')) {
+            alert('One of the contact numbers you entered is already used by another user. Please check and use different numbers.');
+          } else {
+            alert('This information already exists for another user. Please check and try again with different values.');
+          }
+        } else {
+          // For other server errors
+          const serverMsg = error.response.data?.error || error.response.data?.message || JSON.stringify(error.response.data);
+          alert(`Server error: ${serverMsg}`);
+        }
+      } else if (error?.request) {
+        console.error('No response received, request was:', error.request);
+        alert('No response received from server. Check backend logs.');
+      } else {
+        alert('Something went wrong. Please try again.');
+      }
     }
   };
 
@@ -869,10 +896,24 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
-          <TextField size="small" fullWidth label="First Name" {...register("firstname")} />
+          <TextField
+            size="small"
+            fullWidth
+            label="First Name"
+            {...register("firstname", { required: "First name is required" })}
+            error={!!errors.firstname}
+            helperText={errors.firstname ? errors.firstname.message : ""}
+          />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <TextField size="small" fullWidth label="Last Name" {...register("lastname")} />
+          <TextField
+            size="small"
+            fullWidth
+            label="Last Name"
+            {...register("lastname", { required: "Last name is required" })}
+            error={!!errors.lastname}
+            helperText={errors.lastname ? errors.lastname.message : ""}
+          />
         </Grid>
 
         <Grid size={{ xs: 12, md: 2 }}>
@@ -942,19 +983,19 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
           />
         </Grid>
 
-         <Grid size={{ xs: 12, md: 3 }}>
-          <TextField size="small" fullWidth label="Mobile Number" {...register("mobile_number", { required: true })} />
+        <Grid size={{ xs: 12, md: 3 }}>
+          <TextField size="small" fullWidth label="Mobile Number" {...register("mobile_number", { required: "Mobile number is required" })} error={!!errors.mobile_number} helperText={errors.mobile_number ? errors.mobile_number.message : ""} />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          {/* CHANGED: emergency_contact_no -> emergency_number */}
-          <TextField size="small" fullWidth label="Emergency Contact Number" {...register("emergency_number", { required: true })} />
+          {/* CHANGED: emergency_contact_no -> emergency_number - now optional */}
+          <TextField size="small" fullWidth label="Emergency Contact Number" {...register("emergency_number")} />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          {/* CHANGED: contact_no -> alternate_number */}
-          <TextField size="small" fullWidth label="Alternate Contact No" {...register("alternate_number", { required: true })} />
+          {/* CHANGED: contact_no -> alternate_number - now optional */}
+          <TextField size="small" fullWidth label="Alternate Contact No" {...register("alternate_number")} />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <TextField size="small" fullWidth label="WhatsApp Number" {...register("whatsapp_number", { required: true })} />
+          <TextField size="small" fullWidth label="WhatsApp Number" {...register("whatsapp_number")} />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField size="small" fullWidth label="Email" {...register("email", { required: true })} />
@@ -1034,11 +1075,14 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
         <Grid size={{ xs: 12, md: 12 }}>
           <Typography variant="h6">Permanent Address</Typography>
         </Grid>
-        {[1, 2, 3, 4, 5].map((n) => (
+        {[1, 2, 3].map((n) => (
           <Grid size={{ xs: 12, md: 3 }}  key={`address${n}`}>
             <TextField size="small" fullWidth label={`Address ${n}`} {...register(`address${n}`)} />
           </Grid>
         ))}
+        <Grid size={{ xs: 12, md: 3 }}>
+          <TextField size="small" fullWidth label="City" {...register("city")} />
+        </Grid>
         <Grid size={{ xs: 12, md: 3 }} >
           {/* Show state dropdown if country is India, else show text field */}
           {watch("country") === "India" ? (
@@ -1064,7 +1108,26 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
             <TextField size="small" fullWidth label="State" {...register("state")} />
           )}
         </Grid>
-        {/* Country dropdown is already present above; removed redundant TextField */}
+        <Grid size={{ xs: 12, md: 3 }}>
+          {/* Country dropdown for permanent address */}
+          <Controller
+            name="country"
+            control={control}
+            render={({ field }) => (
+              <Autocomplete
+                options={countries}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                value={countries.find((c) => c.name === field.value) || null}
+                onChange={(_, newValue) => field.onChange(newValue ? newValue.name : "")}
+                renderInput={(params) => (
+                  <TextField {...params} label="Country" size="small" fullWidth />
+                )}
+                clearOnEscape
+                fullWidth
+              />
+            )}
+          />
+        </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField size="small" fullWidth label="Pincode" {...register("pincode")} />
         </Grid>
@@ -1097,7 +1160,7 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
                       sx={{ mb: 1 }}
                     />
                   </Grid>
-                  {[1, 2, 3, 4, 5].map((n) => (
+                  {[1, 2, 3].map((n) => (
                     <Grid item xs={12} md={6} key={`additional_${idx}_address${n}`}>
                       <TextField
                         size="small"
@@ -1109,6 +1172,16 @@ const AddOrEditUserForm = ({ defaultValues = null, onSubmitUser }) => {
                       />
                     </Grid>
                   ))}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="City"
+                      value={address.city || ""}
+                      onChange={e => handleAdditionalAddressChange(idx, "city", e.target.value)}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
                   <Grid item xs={12} md={6} sx={{ minWidth: 180 }}>
                     {/* Country dropdown */}
                     <Autocomplete
