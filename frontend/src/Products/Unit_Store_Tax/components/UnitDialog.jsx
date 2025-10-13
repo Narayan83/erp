@@ -13,6 +13,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
   });
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch units when dialog opens
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{unit ? "Edit Unit" : "Add Unit"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -99,7 +100,9 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
                   options={unitOptions}
                   freeSolo
                   loading={loading}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
                   value={value || ""}
                   onChange={(_, newValue) => onChange(newValue)}
@@ -113,6 +116,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
                     />
                   )}
                 />

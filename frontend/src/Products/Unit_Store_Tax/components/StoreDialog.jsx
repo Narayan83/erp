@@ -11,6 +11,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
   const { control, handleSubmit, setValue } = useForm();
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch stores when dialog opens
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{store ? "Edit Store" : "Add Store"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -90,7 +91,9 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
                   options={storeOptions}
                   freeSolo
                   loading={loading}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
                   value={value || ""}
                   onChange={(_, newValue) => onChange(newValue)}
@@ -104,6 +107,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
                     />
                   )}
                 />

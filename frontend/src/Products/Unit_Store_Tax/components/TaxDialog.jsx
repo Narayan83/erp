@@ -11,6 +11,7 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
   const { control, handleSubmit, setValue } = useForm();
   const [taxes, setTaxes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch taxes when dialog opens
   useEffect(() => {
@@ -60,19 +61,28 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
 
   const onSubmit = async (data) => {
     try {
+      // Ensure payload keys match backend model and types
+      const payload = {
+        name: data.name,
+        percentage: Number(data.percentage),
+      };
+
       if (tax?.ID) {
-        await axios.put(`${BASE_URL}/api/taxes/${tax.ID}`, data);
+        await axios.put(`${BASE_URL}/api/taxes/${tax.ID}`, payload);
       } else {
-        await axios.post(`${BASE_URL}/api/taxes`, data);
+        await axios.post(`${BASE_URL}/api/taxes`, payload);
       }
       onSuccess();
     } catch (err) {
-      alert("Error saving Tax.");
+      // Try to surface server error message
+      console.error("Error saving Tax:", err);
+      const msg = err?.response?.data?.error || err?.response?.data || err.message;
+      alert("Error saving Tax: " + JSON.stringify(msg));
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{tax ? "Edit Tax" : "Add Tax"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -92,7 +102,9 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
                   options={taxOptions}
                   freeSolo
                   loading={loading}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
                   value={value || ""}
                   onChange={(_, newValue) => onChange(newValue)}
@@ -106,6 +118,7 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
                     />
                   )}
                 />
