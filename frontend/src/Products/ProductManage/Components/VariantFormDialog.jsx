@@ -19,7 +19,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     mode: 'onSubmit',
     defaultValues: {
-      sku: null, // Set to null explicitly
+      sku: '', // Start empty so SKU is optional
       barcode: '',
       purchaseCost: '',
       stdSalesPrice: '',
@@ -69,13 +69,9 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
 
   useEffect(() => {
     if (initialData) {
-      // Create a copy of initialData without the SKU
-      const dataWithoutSku = { ...initialData };
-      delete dataWithoutSku.sku; // Remove SKU to prevent it from being set
-      
-      // Reset form with modified data
-      reset(dataWithoutSku);
-      setValue('sku', null); // Explicitly set SKU to null
+      // Reset form with initial data (keep SKU if present so user can edit it)
+      const dataCopy = { ...initialData };
+      reset(dataCopy);
       
       // Initialize file entries from initialData.images (may be strings referencing uploads)
       const initFiles = (initialData.images || []).map(img => {
@@ -88,11 +84,11 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
         }
         return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
       });
-      setImageFiles(initFiles);
+  setImageFiles(initFiles);
       setImagesPreview(initFiles.map(f => f.preview));
       const colorMatch = ralColors.find(c => c.value === initialData.color);
       setSelectedColor(colorMatch || null);
-      setSelectedSize(initialData.size || '');
+  setSelectedSize(initialData.size || '');
 
       // Determine initial main image: prefer explicit initialData.mainImage, else default to first image if any
       let initialMain = null;
@@ -125,10 +121,13 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const s = String(v).trim();
       return s === '' ? null : Number(s);
     };
+    // generate SKU when not provided by user
+    const generateSku = () => `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    const skuValue = data.sku && String(data.sku).trim() !== '' ? data.sku : generateSku();
     
     const formData = {
       // keep raw data but normalize a few fields
-      sku: null, // Explicitly set SKU to null to force backend to generate one
+      sku: skuValue,
       barcode: data.barcode || '',
       purchaseCost: sanitizeNumber(data.purchaseCost),
       stdSalesPrice: sanitizeNumber(data.stdSalesPrice),
@@ -552,12 +551,9 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
             </Grid>
             <Grid size={4}>
               <TextField 
-                label="SKU (Leave empty to auto-generate)" 
+                label="SKU" 
                 fullWidth 
                 size="small" 
-                InputProps={{
-                  placeholder: "Leave empty for auto-generated SKU"
-                }}
                 {...register("sku", { required: false })}
               />
             </Grid>
