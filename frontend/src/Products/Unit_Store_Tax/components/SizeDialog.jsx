@@ -8,6 +8,7 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
   const { control, handleSubmit, setValue } = useForm();
   const [sizes, setSizes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch sizes when dialog opens
   useEffect(() => {
@@ -90,7 +91,9 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
                   options={sizeOptions}
                   freeSolo
                   loading={loading}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
                   value={value || ""}
                   onChange={(_, newValue) => onChange(newValue)}
@@ -104,6 +107,7 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
                     />
                   )}
                 />

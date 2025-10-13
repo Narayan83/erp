@@ -9,6 +9,7 @@ export default function HsnDialog({ open, onClose, hsn, onSuccess, onError }) {
   const [taxes, setTaxes] = useState([]);
   const [hsnOptions, setHsnOptions] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   useEffect(() => {
     // Fetch taxes when dialog opens
@@ -99,7 +100,7 @@ export default function HsnDialog({ open, onClose, hsn, onSuccess, onError }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{hsn ? "Edit HSN" : "Add HSN"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -133,11 +134,13 @@ export default function HsnDialog({ open, onClose, hsn, onSuccess, onError }) {
               <Autocomplete
                 freeSolo
                 autoSelect
-                openOnFocus
                 options={hsnOptions}
                 loading={inputValue.length > 0}
                 loadingText="Loading HSN codes..."
                 noOptionsText="No HSN codes found"
+                open={autocompleteOpen}
+                onOpen={() => setAutocompleteOpen(true)}
+                onClose={() => setAutocompleteOpen(false)}
                 value={value || ""}
                 onInputChange={(_, newValue) => {
                   console.log("Input changed to:", newValue);
@@ -161,6 +164,7 @@ export default function HsnDialog({ open, onClose, hsn, onSuccess, onError }) {
                     margin="dense"
                     size="small"
                     required
+                    onClick={() => setAutocompleteOpen(true)}
                   />
                 )}
               />
