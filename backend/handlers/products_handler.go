@@ -114,14 +114,20 @@ func CreateProduct(c *fiber.Ctx) error {
 		product.Variants[i].ProductID = 0
 	}
 
-	// Pre-check SKUs to avoid unique constraint DB errors
+	// Replace temporary SKUs with auto-generated ones and pre-check for duplicates
 	var skusToCheck []string
-	for _, v := range variants {
-		s := strings.TrimSpace(v.SKU)
-		if s != "" {
+	for i := range variants {
+		s := strings.TrimSpace(variants[i].SKU)
+		// Check if SKU is temporary (starts with TEMP_SKU_)
+		if strings.HasPrefix(s, "TEMP_SKU_") || s == "" {
+			// Generate a unique SKU
+			variants[i].SKU = fmt.Sprintf("SKU-%d-%d", time.Now().UnixNano(), i)
+		} else if s != "" {
 			skusToCheck = append(skusToCheck, s)
 		}
 	}
+
+	// Only check for duplicates if there are user-provided (non-temporary) SKUs
 	if len(skusToCheck) > 0 {
 		var existingSkus []string
 		if err := productsDB.Model(&models.ProductVariant{}).Where("sku IN ?", skusToCheck).Pluck("sku", &existingSkus).Error; err == nil && len(existingSkus) > 0 {
@@ -132,7 +138,34 @@ func CreateProduct(c *fiber.Ctx) error {
 	if err := productsDB.Create(&product).Error; err != nil {
 		// Detect common Postgres duplicate key / sequence-out-of-sync scenarios
 		errStr := err.Error()
+		fmt.Printf("Product creation error: %s\n", errStr)
+
 		if strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "SQLSTATE 23505") || strings.Contains(errStr, "products_pkey") {
+			fmt.Printf("Detected duplicate key error, attempting automatic sequence fix...\n")
+
+			// Try to fix the sequence issue by resetting it to the max ID + 1
+			var maxID uint
+			if seqErr := productsDB.Model(&models.Product{}).Select("COALESCE(MAX(id), 0)").Scan(&maxID).Error; seqErr == nil {
+				fmt.Printf("Current max product ID: %d\n", maxID)
+
+				// Reset the sequence to max_id + 1
+				resetQuery := fmt.Sprintf("SELECT setval('products_id_seq', %d, true)", maxID+1)
+				if resetErr := productsDB.Exec(resetQuery).Error; resetErr == nil {
+					fmt.Printf("Sequence reset successful, retrying product creation...\n")
+
+					// Try the insert again after fixing the sequence
+					if retryErr := productsDB.Create(&product).Error; retryErr == nil {
+						fmt.Printf("Product creation successful after sequence fix!\n")
+						return c.JSON(product)
+					} else {
+						fmt.Printf("Product creation still failed after sequence fix: %s\n", retryErr.Error())
+					}
+				} else {
+					fmt.Printf("Sequence reset failed: %s\n", resetErr.Error())
+				}
+			} else {
+				fmt.Printf("Failed to get max ID: %s\n", seqErr.Error())
+			}
 			return c.Status(409).JSON(fiber.Map{"error": "duplicate_key", "message": errStr})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": errStr})
@@ -234,6 +267,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 	type ProductWithStock struct {
 		models.Product
 		Stock       int    `json:"Stock"`
+		MinStock    int    `json:"MinimumStock"`
 		MOQ         int    `json:"MOQ"`
 		LeadTime    int    `json:"LeadTime"`
 		Note        string `json:"Note"`
@@ -252,6 +286,7 @@ func GetAllProducts(c *fiber.Ctx) error {
 		productsWithStock = append(productsWithStock, ProductWithStock{
 			Product:     p,
 			Stock:       stock,
+			MinStock:    p.MinimumStock,
 			MOQ:         p.Moq,
 			LeadTime:    leadTime,
 			Note:        p.InternalNotes,
@@ -311,6 +346,32 @@ func GetAllProducts(c *fiber.Ctx) error {
 		}
 		productsWithStock = filtered
 	}
+
+	// Stock filter based on stock vs minimum stock comparison
+	if stockFilter := c.Query("stock_filter"); stockFilter != "" {
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			shouldInclude := false
+			switch stockFilter {
+			case "less_than_minimum_stock":
+				// Stock is less than minimum stock (only include if minimum stock is set)
+				if p.MinStock > 0 {
+					shouldInclude = p.Stock < p.MinStock
+				}
+			case "greater_than_minimum_stock":
+				// Stock is greater than or equal to minimum stock (only include if minimum stock is set)
+				if p.MinStock > 0 {
+					shouldInclude = p.Stock >= p.MinStock
+				}
+			}
+
+			if shouldInclude {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
+	}
+
 	// In-memory filtering for product_type
 	if productTypeQuery := c.Query("product_type"); productTypeQuery != "" {
 		filtered := make([]ProductWithStock, 0)
@@ -1301,4 +1362,36 @@ func getBoolValue(val interface{}) bool {
 		return strings.ToLower(str) == "active"
 	}
 	return true
+}
+
+// FixProductSequence manually resets the products sequence to fix duplicate key issues
+func FixProductSequence(c *fiber.Ctx) error {
+	// Get the maximum ID from the products table
+	var maxID uint
+	if err := productsDB.Model(&models.Product{}).Select("COALESCE(MAX(id), 0)").Scan(&maxID).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get max product ID", "details": err.Error()})
+	}
+
+	// Reset the sequence to max_id + 1
+	resetQuery := fmt.Sprintf("SELECT setval('products_id_seq', %d, true)", maxID+1)
+	if err := productsDB.Exec(resetQuery).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to reset sequence", "details": err.Error()})
+	}
+
+	// Also reset product_variants sequence while we're at it
+	var maxVariantID uint
+	if err := productsDB.Model(&models.ProductVariant{}).Select("COALESCE(MAX(id), 0)").Scan(&maxVariantID).Error; err == nil {
+		variantResetQuery := fmt.Sprintf("SELECT setval('product_variants_id_seq', %d, true)", maxVariantID+1)
+		productsDB.Exec(variantResetQuery)
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Sequences reset successfully",
+		"details": map[string]interface{}{
+			"products_max_id":     maxID,
+			"products_next_value": maxID + 1,
+			"variants_max_id":     maxVariantID,
+			"variants_next_value": maxVariantID + 1,
+		},
+	})
 }

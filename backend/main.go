@@ -122,6 +122,7 @@ func main() {
 	api.Put("/products/:id", handler.UpdateProduct)
 	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
+	api.Post("/products/fix-sequence", handler.FixProductSequence)
 
 	api.Get("/products/stats", handler.GetProductStats)
 
@@ -218,6 +219,15 @@ func main() {
 	api.Post("/tandc", handler.CreateTandc)
 	api.Put("/tandc/:id", handler.UpdateTandc)
 	api.Delete("/tandc/:id", handler.DeleteTandc)
+
+	// Addresses (master + aggregated from users)
+	api.Get("/addresses/from-users", handler.GetAddressesFromUsers) // Must come before /:id route
+	api.Get("/addresses", handler.GetAllAddresses)
+	api.Get("/addresses/:id", handler.GetAddressByID)
+	api.Post("/addresses", handler.CreateAddress)
+	api.Put("/addresses/:id", handler.UpdateAddress)
+	api.Delete("/addresses/:id", handler.DeleteAddress)
+	api.Get("/addresses-search", handler.SearchAddresses)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))

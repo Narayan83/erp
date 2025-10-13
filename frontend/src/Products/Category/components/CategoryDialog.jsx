@@ -1,19 +1,66 @@
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField
+  Button, TextField, Autocomplete
 } from "@mui/material";
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
 import { BASE_URL }  from "../../../Config";
 
 export default function CategoryDialog({ open, onClose, category, onSuccess }) {
-  const { register, handleSubmit, reset } = useForm();
+  const { control, handleSubmit, reset, setValue } = useForm();
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch categories when dialog opens
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`${BASE_URL}/api/categories`);
+        // Log the raw response to understand its structure
+        console.log('API Raw Response:', response);
+        
+        // Process the API response
+        let categoriesData = [];
+        if (Array.isArray(response.data)) {
+          categoriesData = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          if (Array.isArray(response.data.data)) {
+            categoriesData = response.data.data;
+          } else if (Array.isArray(response.data.categories)) {
+            categoriesData = response.data.categories;
+          } else {
+            // Last resort: try to extract categories from response.data itself
+            // by collecting all array-like properties
+            Object.values(response.data).forEach(value => {
+              if (Array.isArray(value)) {
+                categoriesData = value;
+              }
+            });
+          }
+        }
+        
+        console.log('Processed categories:', categoriesData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setCategories([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (open) fetchCategories();
+  }, [open]);
 
   useEffect(() => {
-    if (category) reset({"name": category.Name});
-    else reset({ name: "" });
-  }, [category]);
+    if (category) {
+      setValue("name", category.Name);
+    } else {
+      setValue("name", "");
+    }
+  }, [category, setValue]);
 
   const onSubmit = async (data) => {
     try {
@@ -33,13 +80,64 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
       <DialogTitle>{category ? "Edit Category" : "Add Category"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
-          <TextField
-            autoFocus
-            label="Category Name"
-            fullWidth
-            margin="dense"
-            size="small"
-            {...register("name", { required: true })}
+          <Controller
+            name="name"
+            control={control}
+            rules={{ required: true }}
+            render={({ field: { onChange, value, ref } }) => {
+              // Extract category names from the categories array
+              // Handle different possible field names (Name, name, title, etc.)
+              const categoryOptions = Array.isArray(categories) ? 
+                categories.map(cat => {
+                  // Try different possible property names for category name
+                  return cat?.Name || cat?.name || cat?.Title || cat?.title || "";
+                }).filter(name => name !== "") : [];
+              
+              console.log('Category options for dropdown:', categoryOptions);
+              
+              return (
+                <Autocomplete
+                  options={categoryOptions}
+                  freeSolo
+                  loading={loading}
+                  disablePortal={false}
+                  openOnFocus
+                  autoSelect
+                  filterOptions={(options, params) => {
+                    const filtered = options.filter(option => 
+                      option.toLowerCase().includes(params.inputValue.toLowerCase())
+                    );
+                    
+                    // Always add the current input value if not empty
+                    if (params.inputValue !== '') {
+                      if (!filtered.some(option => option.toLowerCase() === params.inputValue.toLowerCase())) {
+                        filtered.push(params.inputValue);
+                      }
+                    }
+                    
+                    console.log('Filtered options:', filtered);
+                    return filtered;
+                  }}
+                  value={value || ""}
+                  onChange={(_, newValue) => onChange(newValue)}
+                  onInputChange={(_, newInputValue, reason) => {
+                    console.log("Input changed to:", newInputValue, "Reason:", reason);
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      autoFocus
+                      inputRef={ref}
+                      label="Category Name"
+                      fullWidth
+                      margin="dense"
+                      size="small"
+                      required
+                    />
+                  )}
+                />
+              );
+            }}
           />
         </DialogContent>
         <DialogActions>

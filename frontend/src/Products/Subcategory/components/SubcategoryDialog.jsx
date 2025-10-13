@@ -77,12 +77,25 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
 
        
 
-        <TextField
-          fullWidth
-          label="Subcategory Name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          margin="normal"
+        <Autocomplete
+          freeSolo
+          autoSelect
+          options={Array.isArray(categories) ? 
+            categories.flatMap(cat => 
+              Array.isArray(cat.Subcategories) ? 
+                cat.Subcategories.map(sub => sub.Name || "") : []
+            ).filter(name => name !== "") : []
+          }
+          value={formData.name || ""}
+          onChange={(_, newValue) => setFormData({ ...formData, name: newValue })}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              fullWidth
+              label="Subcategory Name"
+              margin="normal"
+            />
+          )}
         />
       </DialogContent>
       <DialogActions>
