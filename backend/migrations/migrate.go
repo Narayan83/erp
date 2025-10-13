@@ -36,17 +36,13 @@ func main() {
 		&models.Supplier{},
 		&models.Dealer{},
 		&models.Distributor{},
-// <<<<<<< staging
-// 		&models.Bank{},
-// =======
 
-// 		//30/9/2025
-// 		&models.TandC{},
-// 		&models.Addresses{},
-// 		&models.QuotationTable{},
-// 		&models.QuotationTableItems{},
-// 		&models.QutationTemplates{},
-// >>>>>>> staging
+		//30/9/2025
+		&models.TandC{},
+		&models.Addresses{},
+		&models.QuotationTable{},
+		&models.QuotationTableItems{},
+		&models.QutationTemplates{},
 	)
 
 	if err != nil {

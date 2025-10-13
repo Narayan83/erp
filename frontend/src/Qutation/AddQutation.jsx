@@ -118,9 +118,9 @@ useEffect(()=>{
 }, [quotationData, isEditMode]);
 
 
-useEffect(() => {
-  setOpenTandCModal(open);
-}, [open]);
+// useEffect(() => {
+//   setOpenTandCModal(open);
+// }, [open]);
 
   // Fetch customers from API using role endpoint
   const fetchCustomers = async (query = "") => {
@@ -1058,10 +1058,10 @@ const prefillFormData = (data) => {
           }
         />
       </td>
-      <td>{item.taxable}</td>
-      <td>{item.cgst}</td>
-      <td>{item.sgst}</td>
-      <td>{item.amount}</td>
+      <td>{item.taxable.toFixed(2)}</td>
+      <td>{item.cgst.toFixed(2)}</td>
+      <td>{item.sgst.toFixed(2)}</td>
+      <td>{item.amount.toFixed(2)}</td>
       <td>{item.leadTime}</td>
       <td>
         <Button
