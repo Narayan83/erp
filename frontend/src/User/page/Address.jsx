@@ -215,8 +215,7 @@ export default function Address() {
           (user.address1 || user.Address1) ||
           (user.address2 || user.Address2) ||
           (user.address3 || user.Address3) ||
-          (user.address4 || user.Address4) ||
-          (user.address5 || user.Address5)
+          (user.city || user.City)
         );
         
         if (hasAddress) {
@@ -235,7 +234,6 @@ export default function Address() {
             AddressLine1: user.address1 || user.Address1 || '',
             AddressLine2: user.address2 || user.Address2 || '',
             AddressLine3: user.address3 || user.Address3 || '',
-            AddressLine4: user.address4 || user.Address4 || '',
             City: user.city || user.City || '',
             District: user.district || user.District || '',
             State: user.state || user.State || '',

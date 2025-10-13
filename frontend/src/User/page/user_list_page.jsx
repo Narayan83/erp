@@ -1,5 +1,5 @@
 // UserListPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, memo, useRef } from "react";
 import {
   Box,
   Button,
@@ -29,12 +29,70 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Popover,
+  Autocomplete,
+  Divider,
 } from "@mui/material";
-import { Edit, Visibility, Search, TableView, WhatsApp, Mail, FileUpload, FileDownload } from "@mui/icons-material";
+import { Edit, Visibility, Search, TableView, WhatsApp, Mail, FileUpload, FileDownload, GetApp, Publish } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { debounce } from "lodash";
 import { BASE_URL } from "../../Config";
 import * as XLSX from 'xlsx';
+import EnhancedEditableCell from "../../Products/ProductManage/Components/EnhancedEditableCell";
+
+// Simple editable cell component for user import
+const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate }) => {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+
+  useEffect(() => {
+    setEditValue(value);
+  }, [value]);
+
+  const handleSave = () => {
+    onUpdate(rowIndex, columnKey, editValue);
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setEditValue(value);
+      setEditing(false);
+    }
+  };
+
+  return (
+    <TableCell 
+      onClick={() => !editing && setEditing(true)}
+      sx={{ 
+        cursor: !editing ? 'pointer' : 'default',
+        padding: editing ? '4px' : undefined,
+        '&:hover': !editing ? { 
+          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+        } : {}
+      }}
+    >
+      {editing ? (
+        <TextField
+          autoFocus
+          fullWidth
+          size="small"
+          variant="outlined"
+          value={editValue || ""}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          sx={{ margin: '-8px 0' }}
+        />
+      ) : (
+        value
+      )}
+    </TableCell>
+  );
+};
 
 export default function UserListPage() {
   const navigate = useNavigate();
@@ -65,11 +123,10 @@ export default function UserListPage() {
     "CompanyName",
     "Designation",
     "IndustrySegment",
-    "Address1",
-    "Address2",
-    "Address3",
-    "Address4",
-    "Address5",
+  "Address1",
+  "Address2",
+  "Address3",
+  "City",
     "State",
     "Country",
     "Pincode",
@@ -164,6 +221,16 @@ export default function UserListPage() {
   // Selection state for table rows
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Import functionality state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importedData, setImportedData] = useState([]);
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+  const [importSelectedRows, setImportSelectedRows] = useState(new Set());
+  const [importReportOpen, setImportReportOpen] = useState(false);
+  const [importReport, setImportReport] = useState(null);
+
   const handleToggleSelectAll = (e) => {
     const checked = e.target.checked;
     if (checked) setSelectedIds(users.map(u => u.id));
@@ -172,6 +239,437 @@ export default function UserListPage() {
 
   const handleToggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  // Download template CSV for user import
+  const downloadTemplateCSV = () => {
+    // Define headers for user import template with required fields marked
+    const headersArr = [
+      'User Code', 'Salutation', 'First Name *', 'Last Name *', 'DOB', 'Gender', 
+      'Country Code', 'Mobile Number *', 'Emergency Number', 'Alternate Number', 
+      'Whatsapp Number', 'Email *', 'Website', 'Business Name', 'Title', 
+      'Company Name', 'Designation', 'Industry Segment', 'Address1', 'Address2', 
+      'Address3', 'City', 'State', 'Country', 'Pincode', 'Aadhar Number', 
+      'PAN Number', 'GSTIN', 'MSME No', 'Bank Name', 'Branch Name', 
+      'Branch Address', 'Account Number', 'IFSC Code', 'Active *', 'IsUser', 
+  'IsCustomer', 'IsSupplier', 'IsEmployee', 'IsDealer', 'IsDistributor'
+    ];
+    
+    // Join headers for CSV
+    const headers = headersArr.join(',');
+    
+    // Create template data row with example values
+    const exampleRow = [
+      'USR001', 'Mr', 'John', 'Doe', '1990-01-15', 'Male',
+      '+91', '9876543210', '9876543211', '9876543212',
+      '9876543210', 'john.doe@example.com', 'www.example.com', 'ABC Corp', 'Manager',
+      'XYZ Company', 'Senior Manager', 'IT', '123 Main St', 'Apt 4B',
+      'Near Park', 'Mumbai', 'Maharashtra', 'India', '400001', '123456789012',
+      'ABCDE1234F', '27ABCDE1234F1Z5', 'MSME12345', 'HDFC Bank', 'Andheri Branch',
+      'Andheri West', '1234567890', 'HDFC0001234', 'Yes', 'Yes',
+  'No', 'No', 'Yes', 'No', 'No'
+    ].join(',');
+    
+    // Combine headers and example row
+    const csvContent = `${headers}\n${exampleRow}`;
+    
+    // Create blob and download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'user_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle CSV import
+  const handleImport = async () => {
+    if (!importFile) {
+      alert('Please select a file to import.');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      // Read the CSV file
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target.result;
+          console.log('Raw CSV data:', csvText);
+
+          if (!csvText.trim()) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Parse CSV
+          let lines = csvText.split('\n').filter(line => line.trim());
+          if (lines.length === 0) {
+            alert('The CSV file appears to be empty.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Handle different line endings
+          if (lines.length === 1 && lines[0].includes('\r')) {
+            lines = csvText.split('\r').filter(line => line.trim());
+          }
+
+          // Parse headers
+          const delimiter = lines[0].includes(';') ? ';' : ',';
+          const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const dataRows = lines.slice(1);
+
+          console.log('Headers:', headers);
+          console.log('Data rows:', dataRows.length);
+
+          // Validate required headers (User Code is optional)
+          const headersNormalized = headers.map(h => String(h).toLowerCase().replace(/[^a-z0-9]/g, ''));
+          const requiredNormalized = ['firstname', 'lastname', 'mobilenumber', 'email', 'active'];
+          const missingNormalized = requiredNormalized.filter(r => !headersNormalized.includes(r));
+
+          if (missingNormalized.length > 0) {
+            const missingHuman = missingNormalized.map(m => m.charAt(0).toUpperCase() + m.slice(1).replace(/([A-Z])/g, ' $1').trim());
+            alert(`Missing required headers: ${missingHuman.join(', ')}. Please check your CSV file format.`);
+            setImportLoading(false);
+            return;
+          }
+
+          const objectData = dataRows.map(row => {
+            let values = [];
+            let inQuote = false;
+            let currentValue = '';
+            
+            if (delimiter === ';') {
+              values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            } else {
+              for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                
+                if (char === '"' && (i === 0 || row[i-1] !== '\\')) {
+                  inQuote = !inQuote;
+                } else if (char === delimiter && !inQuote) {
+                  values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                  currentValue = '';
+                } else {
+                  currentValue += char;
+                }
+              }
+              values.push(currentValue.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+            }
+            
+            const obj = {};
+            headers.forEach((header, index) => {
+              obj[header] = values[index] || '';
+            });
+            return obj;
+          });
+
+          console.log('Converted object data:', objectData);
+
+          if (objectData.length === 0) {
+            alert('The CSV file has headers but no data rows.');
+            setImportLoading(false);
+            return;
+          }
+
+          // Store the parsed data, select all rows by default, and open the preview dialog
+          setImportedData(objectData);
+          const allIdx = new Set(objectData.map((_, i) => i));
+          setImportSelectedRows(allIdx);
+          setImportDialogOpen(false);
+          setImportPreviewOpen(true);
+          setImportLoading(false);
+        } catch (error) {
+          console.error('Error importing users:', error);
+          alert(`Failed to import users: ${error.message}`);
+          setImportLoading(false);
+        }
+      };
+
+      reader.readAsText(importFile);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Failed to read the selected file.');
+      setImportLoading(false);
+    }
+  };
+
+  // Validate import data
+  const validateImportData = (data) => {
+    const errors = [];
+    // User Code is optional; validate the essential fields only
+    const requiredFields = ['First Name', 'Last Name', 'Mobile Number', 'Email', 'Active'];
+    
+    data.forEach((row, index) => {
+      const rowErrors = [];
+      
+      const getFieldValue = (fieldName) => {
+        if (row[fieldName] !== undefined) return row[fieldName];
+        if (row[`${fieldName} *`] !== undefined) return row[`${fieldName} *`];
+        const normalizedField = fieldName.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+        for (const key in row) {
+          const normalizedKey = key.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '');
+          if (normalizedKey === normalizedField) {
+            return row[key];
+          }
+        }
+        return undefined;
+      };
+      
+      // Check required fields
+      requiredFields.forEach(field => {
+        const value = getFieldValue(field);
+        if (!value || value.toString().trim() === '') {
+          rowErrors.push(`${field} is mandatory and cannot be empty`);
+        }
+      });
+
+      // Validate email format
+      const emailValue = getFieldValue('Email');
+      if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+        rowErrors.push('Email must be in valid format');
+      }
+
+      // Validate mobile number (should be digits)
+      const mobileValue = getFieldValue('Mobile Number');
+      if (mobileValue && !/^\d{10}$/.test(mobileValue.replace(/\D/g, ''))) {
+        rowErrors.push('Mobile Number must be a valid 10-digit number');
+      }
+
+      // Validate Active field (accept common variants: Active/Inactive, true/false, yes/no, 1/0)
+      const activeValue = getFieldValue('Active');
+      if (activeValue && String(activeValue).trim() !== '') {
+        const av = String(activeValue).toLowerCase().trim();
+        const allowed = ['yes', 'no'];
+        if (!allowed.includes(av)) {
+          rowErrors.push('Active must be one of: "yes", "no"');
+        }
+      }
+
+      // Validate boolean fields
+      const booleanFields = ['IsUser', 'IsCustomer', 'IsSupplier', 'IsEmployee', 'IsDealer', 'IsDistributor'];
+      booleanFields.forEach(field => {
+        const value = getFieldValue(field);
+        if (value && value.toString().trim() !== '' && !['yes', 'no'].includes(value.toLowerCase())) {
+          rowErrors.push(`${field} must be "yes" or "no"`);
+        }
+      });
+
+      if (rowErrors.length > 0) {
+        errors.push({
+          row: index + 1,
+          data: row,
+          errors: rowErrors
+        });
+      }
+    });
+    
+    return errors;
+  };
+
+  // Handle final import
+  const handleFinalImport = async () => {
+    setImportLoading(true);
+    try {
+      const selectedArray = importedData.filter((_, idx) => importSelectedRows.has(idx));
+      if (selectedArray.length === 0) {
+        alert('No rows selected for import. Please select at least one row.');
+        setImportLoading(false);
+        return;
+      }
+
+      // Validate data before sending
+      const validationErrors = validateImportData(selectedArray);
+      if (validationErrors.length > 0) {
+        setImportReport({
+          type: 'validation_error',
+          totalRows: selectedArray.length,
+          successCount: 0,
+          errorCount: validationErrors.length,
+          errors: validationErrors,
+          successes: []
+        });
+        setImportReportOpen(true);
+        setImportLoading(false);
+        return;
+      }
+
+      // Normalize field names (keep human headers) and then map to backend keys
+      const normalizedArray = selectedArray.map(row => {
+        const normalizedRow = {};
+        Object.keys(row).forEach(key => {
+          const normalizedKey = key.replace(/\s*\*\s*/g, '').trim();
+          normalizedRow[normalizedKey] = row[key];
+        });
+        // Ensure Country Code includes a leading '+' if it's present but missing
+        const ccKeys = ['Country Code', 'CountryCode', 'country_code'];
+        for (const k of ccKeys) {
+          if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+            let cc = String(normalizedRow[k]).trim();
+            if (cc !== '' && !cc.startsWith('+')) {
+              // Prepend + if it's numeric (e.g., 91 -> +91)
+              // but avoid adding + to non-numeric values
+              const digitsOnly = cc.replace(/\D/g, '');
+              if (digitsOnly.length > 0 && digitsOnly.length <= 4) {
+                cc = '+' + cc;
+                normalizedRow[k] = cc;
+              }
+            }
+          }
+        }
+        return normalizedRow;
+      });
+
+      // Map human-friendly headers to backend expected keys (ensure user code is sent)
+      const payloadArray = normalizedArray.map(row => {
+        const p = { ...row };
+
+        // Common variants where the CSV might contain user code
+        const uc = p['User Code'] ?? p['UserCode'] ?? p['user code'] ?? p['usercode'] ?? p['user_code'];
+        if (uc !== undefined) {
+          // Backend accepts `usercode` or `user_code` in different places; include both to be safe
+          p.usercode = String(uc).trim();
+          p.user_code = String(uc).trim();
+          // Optionally remove the human header to avoid duplication on backend
+          delete p['User Code'];
+          delete p['UserCode'];
+          delete p['user code'];
+        }
+
+        return p;
+      });
+
+      console.log('Sending import data:', payloadArray);
+
+      const response = await axios.post(`${BASE_URL}/api/users/import`, payloadArray, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Import response:', response.data);
+
+      // Parse backend errors
+      const parsedErrors = [];
+      if (response.data.errors && Array.isArray(response.data.errors)) {
+        response.data.errors.forEach(errorStr => {
+          const match = errorStr.match(/^Row (\d+):\s*(.+)$/);
+          if (match) {
+            const rowNum = parseInt(match[1], 10);
+            const errorMessage = match[2];
+            const rowIndex = rowNum - 1;
+            const rowData = normalizedArray[rowIndex] || {};
+            
+            parsedErrors.push({
+              row: rowNum,
+              data: rowData,
+              userName: rowData['First Name'] + ' ' + rowData['Last Name'] || 'N/A',
+              userCode: rowData['User Code'] || 'N/A',
+              errors: [errorMessage]
+            });
+          } else {
+            parsedErrors.push({
+              row: 'N/A',
+              data: {},
+              userName: 'N/A',
+              userCode: 'N/A',
+              errors: [errorStr]
+            });
+          }
+        });
+      }
+
+      // Prepare import report
+      const report = {
+        type: 'import_complete',
+        totalRows: selectedArray.length,
+        successCount: response.data.imported || 0,
+        errorCount: parsedErrors.length,
+        errors: parsedErrors,
+        successes: response.data.successes || [],
+        skipped: response.data.skipped || 0
+      };
+
+      setImportPreviewOpen(false);
+
+      if (parsedErrors.length === 0) {
+        setImportFile(null);
+        setImportedData([]);
+        setImportSelectedRows(new Set());
+      }
+
+      setImportReport(report);
+      setImportReportOpen(true);
+
+      if (response.data.imported > 0) {
+        setPage(0);
+        setFilters({ name: "", roleID: '', deptHead: '', userType: '' });
+        setTimeout(() => {
+          fetchUsers();
+        }, 300);
+      }
+    } catch (error) {
+      console.error('Error importing users:', error);
+      
+      let errorMessage = 'Unknown server error';
+      let detailedErrors = [];
+      
+      if (error.response?.data) {
+        if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          error.response.data.errors.forEach(errorStr => {
+            const match = errorStr.match(/^Row (\d+):\s*(.+)$/);
+            if (match) {
+              const rowNum = parseInt(match[1], 10);
+              const errorDetails = match[2];
+              detailedErrors.push({
+                row: rowNum,
+                userName: 'N/A',
+                userCode: 'N/A',
+                errors: [errorDetails]
+              });
+            } else {
+              detailedErrors.push({
+                row: 'N/A',
+                userName: 'N/A',
+                userCode: 'N/A',
+                errors: [errorStr]
+              });
+            }
+          });
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setImportReport({
+        type: 'import_failed',
+        totalRows: importedData.filter((_, idx) => importSelectedRows.has(idx)).length,
+        successCount: 0,
+        errorCount: detailedErrors.length > 0 ? detailedErrors.length : 1,
+        errors: detailedErrors.length > 0 ? detailedErrors : [{ 
+          row: 'Server Error',
+          userName: 'N/A',
+          userCode: 'N/A',
+          errors: [errorMessage]
+        }],
+        successes: []
+      });
+      setImportReportOpen(true);
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   return (
@@ -204,8 +702,8 @@ export default function UserListPage() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Import">
-            <IconButton sx={{ mx: 2 }} aria-label="import" onClick={() => {/* Add import logic here */}}>
-              <FileDownload />
+            <IconButton sx={{ mx: 2 }} aria-label="import" onClick={() => setImportDialogOpen(true)}>
+              <GetApp />
             </IconButton>
           </Tooltip>
           <Tooltip title="Export">
@@ -253,10 +751,8 @@ export default function UserListPage() {
                     ? user.address2
                     : field === "Address3"
                     ? user.address3
-                    : field === "Address4"
-                    ? user.address4
-                    : field === "Address5"
-                    ? user.address5
+                    : field === "City"
+                    ? user.city
                     : field === "State"
                     ? user.state
                     : field === "Country"
@@ -470,10 +966,8 @@ export default function UserListPage() {
                           ? user.address2
                           : field === "Address3"
                           ? user.address3
-                          : field === "Address4"
-                          ? user.address4
-                          : field === "Address5"
-                          ? user.address5
+                          : field === "City"
+                          ? user.city
                           : field === "State"
                           ? user.state
                           : field === "Country"
@@ -952,7 +1446,7 @@ export default function UserListPage() {
               <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
                 <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Permanent Address</Typography>
                 <Grid container spacing={2}>
-                  {[1, 2, 3, 4, 5].map(n => (
+                  {[1, 2, 3].map(n => (
                     <Grid item xs={12} md={4} key={`address${n}`}>
                       <TextField
                         label={`Address ${n}`}
@@ -964,6 +1458,16 @@ export default function UserListPage() {
                       />
                     </Grid>
                   ))}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="City"
+                      value={selectedUser.city || selectedUser.City || ""}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
                   <Grid item xs={12} md={4}>
                     <TextField
                       label="State"
@@ -1316,6 +1820,343 @@ export default function UserListPage() {
             }}
           >
             Edit User
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog 
+        open={importDialogOpen} 
+        onClose={() => {
+          setImportDialogOpen(false);
+          setImportFile(null);
+          setImportLoading(false);
+        }} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>Import Users</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Import users from a CSV file. Make sure you have downloaded the template and filled it correctly.
+          </Typography>
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>Instructions:</strong>
+            </Typography>
+            <Typography variant="body2" component="ul" sx={{ pl: 2, mb: 0 }}>
+              <li>Download the template CSV file below</li>
+              <li>Fill in your user data following the template format</li>
+              <li>Required fields are marked with asterisk (*)</li>
+              <li>Active field should be "Active" or "Inactive"</li>
+              <li>Boolean fields (IsUser, IsCustomer, etc.) should be "true" or "false"</li>
+              <li>Upload the completed CSV file</li>
+            </Typography>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              onClick={downloadTemplateCSV}
+              startIcon={<FileDownload />}
+            >
+              Download Template CSV
+            </Button>
+          </Box>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(e) => setImportFile(e.target.files[0])}
+            style={{ marginBottom: '16px' }}
+          />
+          {importFile && (
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Selected file: <strong>{importFile.name}</strong>
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleImport}
+            disabled={!importFile || importLoading}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Upload & Preview'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Preview Dialog */}
+      <Dialog 
+        open={importPreviewOpen} 
+        onClose={(event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return;
+          }
+          setImportPreviewOpen(false);
+        }}
+        maxWidth="xl" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Preview and Edit Import Data</Typography>
+            <Typography variant="subtitle2" color="textSecondary">
+              {importedData.length} records to import
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Review and edit the data before finalizing the import. Click on any cell to edit directly in the table.
+          </Typography>
+          
+          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 60 }}>
+                    <Checkbox
+                      size="small"
+                      checked={importedData.length > 0 && importSelectedRows.size === importedData.length}
+                      indeterminate={importSelectedRows.size > 0 && importSelectedRows.size < importedData.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setImportSelectedRows(new Set(importedData.map((_, i) => i)));
+                        } else {
+                          setImportSelectedRows(new Set());
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
+                  {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
+                    const cleanHeader = String(header).replace(/\s*\*\s*$/g, '');
+                    const normalizedHeader = cleanHeader.toLowerCase();
+                    // Mark required fields in preview (User Code is optional)
+                    const requiredFields = ['first name', 'last name', 'mobile number', 'email', 'active'];
+                    const isRequired = requiredFields.includes(normalizedHeader);
+                    const displayHeader = isRequired ? `${cleanHeader} *` : cleanHeader;
+                    
+                    return (
+                      <TableCell key={header} sx={{ fontWeight: 'bold' }}>
+                        {displayHeader}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {importedData.map((row, rowIndex) => (
+                  <TableRow key={rowIndex} hover>
+                    <TableCell>
+                      <Checkbox
+                        size="small"
+                        checked={importSelectedRows.has(rowIndex)}
+                        onChange={(e) => {
+                          setImportSelectedRows(prev => {
+                            const s = new Set(prev);
+                            if (e.target.checked) s.add(rowIndex); else s.delete(rowIndex);
+                            return s;
+                          });
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>{rowIndex + 1}</TableCell>
+                    {Object.keys(row).map((key, cellIndex) => (
+                      <SimpleEditableCell
+                        key={`${rowIndex}-${cellIndex}`}
+                        value={row[key]}
+                        rowIndex={rowIndex}
+                        columnKey={key}
+                        onUpdate={(rowIdx, colKey, newValue) => {
+                          const updatedData = [...importedData];
+                          updatedData[rowIdx] = { ...updatedData[rowIdx], [colKey]: newValue };
+                          setImportedData(updatedData);
+                        }}
+                      />
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setImportPreviewOpen(false);
+              setImportedData([]);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleFinalImport}
+            disabled={importLoading}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Finalize Import'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Report Dialog */}
+      <Dialog 
+        open={importReportOpen} 
+        onClose={() => setImportReportOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">
+              {importReport?.type === 'validation_error' ? 'Validation Errors' : 
+               importReport?.type === 'import_failed' ? 'Import Failed' : 'Import Report'}
+            </Typography>
+            <Box display="flex" gap={2}>
+              {importReport?.type === 'import_complete' && (
+                <>
+                  <Typography variant="body2" color="success.main">
+                    ✓ {importReport.successCount} Imported
+                  </Typography>
+                  {importReport.errorCount > 0 && (
+                    <Typography variant="body2" color="error.main">
+                      ✗ {importReport.errorCount} Errors
+                    </Typography>
+                  )}
+                  {importReport.skipped > 0 && (
+                    <Typography variant="body2" color="warning.main">
+                      ⚠ {importReport.skipped} Skipped
+                    </Typography>
+                  )}
+                </>
+              )}
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {importReport && (
+            <Box>
+              {/* Summary */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle2" gutterBottom>Summary</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="textSecondary">Total Rows:</Typography>
+                    <Typography variant="h6">{importReport.totalRows}</Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="success.main">Successful:</Typography>
+                    <Typography variant="h6" color="success.main">{importReport.successCount}</Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="body2" color="error.main">Errors:</Typography>
+                    <Typography variant="h6" color="error.main">{importReport.errorCount}</Typography>
+                  </Grid>
+                  {importReport.skipped > 0 && (
+                    <Grid item xs={3}>
+                      <Typography variant="body2" color="warning.main">Skipped:</Typography>
+                      <Typography variant="h6" color="warning.main">{importReport.skipped}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
+              {/* Errors Section */}
+              {importReport.errors && importReport.errors.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="error.main" gutterBottom>
+                    Errors ({importReport.errors.length})
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Row</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>User Name</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>User Code</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Error Details</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {importReport.errors.map((error, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{error.row || 'N/A'}</TableCell>
+                            <TableCell>{error.userName || error.data?.['First Name'] + ' ' + error.data?.['Last Name'] || 'N/A'}</TableCell>
+                            <TableCell>{error.userCode || error.data?.['User Code'] || 'N/A'}</TableCell>
+                            <TableCell>
+                              <Box>
+                                {Array.isArray(error.errors) ? error.errors.map((err, i) => (
+                                  <Typography 
+                                    key={i} 
+                                    variant="body2" 
+                                    color="error.main"
+                                    sx={{ mb: 0.5 }}
+                                  >
+                                    • {err}
+                                  </Typography>
+                                )) : (
+                                  <Typography variant="body2" color="error.main">
+                                    {error.errors || 'Unknown error'}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {/* Success Message */}
+              {importReport.successCount > 0 && (
+                <Box sx={{ p: 2, bgcolor: 'success.lighter', borderRadius: 1 }}>
+                  <Typography variant="body2" color="success.main">
+                    ✓ Successfully imported {importReport.successCount} user{importReport.successCount > 1 ? 's' : ''}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              // Close report and go back to preview for editing
+              setImportReportOpen(false);
+              // If there are errors, ensure those rows are selected for easier editing
+              if (importReport?.errors && Array.isArray(importReport.errors)) {
+                const s = new Set(importSelectedRows);
+                importReport.errors.forEach(err => {
+                  const r = err?.row;
+                  if (typeof r === 'number' && r > 0) s.add(r - 1);
+                });
+                setImportSelectedRows(s);
+              }
+              setImportPreviewOpen(true);
+            }}
+            variant="outlined"
+          >
+            Edit
+          </Button>
+
+          <Button 
+            onClick={() => {
+              setImportReportOpen(false);
+              if (importReport?.successCount > 0) {
+                fetchUsers();
+              }
+            }} 
+            variant="contained" 
+            color="primary"
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>
