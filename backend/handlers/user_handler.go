@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -646,4 +648,72 @@ func ImportUsers(c *fiber.Ctx) error {
 		"imported": imported,
 		"errors":   errors,
 	})
+}
+
+// Login - simple email/password login endpoint
+// Accepts JSON: { "email": "...", "password": "..." }
+// Returns: { token: "...", user: { ... } }
+func Login(c *fiber.Ctx) error {
+	// request payload
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request payload"})
+	}
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email == "" || req.Password == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "email and password are required"})
+	}
+
+	// find user by email
+	var user models.User
+	if err := usersDB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		// don't leak whether email exists
+		return c.Status(401).JSON(fiber.Map{"error": "invalid credentials"})
+	}
+
+	// compare password (note: current app stores plain password in CreateUser)
+	if user.Password != req.Password {
+		return c.Status(401).JSON(fiber.Map{"error": "invalid credentials"})
+	}
+
+	// generate a simple random token (not a JWT). Replace with real JWT if desired.
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// fallback minimal token on RNG failure
+		b = []byte(fmt.Sprintf("%d-%s", time.Now().UnixNano(), req.Email))
+	}
+	token := base64.RawURLEncoding.EncodeToString(b)
+
+	// clear password before returning user object
+	user.Password = ""
+
+	return c.JSON(fiber.Map{
+		"token": token,
+		"user":  user,
+	})
+}
+
+// LoginDebug - small wrapper to log incoming login requests for debugging, delegates to Login
+func LoginDebug(c *fiber.Ctx) error {
+	// Log method, url
+	fmt.Println("===== LoginDebug: incoming request =====")
+	fmt.Println("Method:", c.Method(), "URL:", c.OriginalURL())
+
+	// Log headers (brief)
+	fmt.Println("Headers:")
+	hdr := c.Request().Header
+	hdr.VisitAll(func(k, v []byte) {
+		fmt.Printf("%s: %s\n", string(k), string(v))
+	})
+
+	// Log raw body (safe to print for debugging)
+	body := c.Body()
+	fmt.Println("Raw Body:", string(body))
+
+	// Delegate to the real Login handler
+	return Login(c)
 }
