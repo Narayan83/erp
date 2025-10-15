@@ -47,6 +47,7 @@ export const menuItems = [
       { title: "Product Master", path: "/ProductMaster" },
       { title: "Tag Management", path: "/ManageTag" },
       { title: "Store / Unit / Tax / HSN / Size", path: "/ManageUnitStoreTax" },
+       { title: "Terms & Conditions  Management", path: "/Managetandc" },
     ],
   },
 
