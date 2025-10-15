@@ -1,7 +1,11 @@
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete
+  Button, TextField, Autocomplete, IconButton, InputAdornment
 } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
@@ -11,6 +15,7 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
   const { control, handleSubmit, reset, setValue } = useForm();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch categories when dialog opens
   useEffect(() => {
@@ -76,7 +81,7 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{category ? "Edit Category" : "Add Category"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -100,28 +105,22 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
                   options={categoryOptions}
                   freeSolo
                   loading={loading}
-                  disablePortal={false}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
+                  value={value || ""}
+                  onChange={(_, newValue) => onChange(newValue)}
                   filterOptions={(options, params) => {
                     const filtered = options.filter(option => 
                       option.toLowerCase().includes(params.inputValue.toLowerCase())
                     );
-                    
-                    // Always add the current input value if not empty
                     if (params.inputValue !== '') {
                       if (!filtered.some(option => option.toLowerCase() === params.inputValue.toLowerCase())) {
                         filtered.push(params.inputValue);
                       }
                     }
-                    
-                    console.log('Filtered options:', filtered);
                     return filtered;
-                  }}
-                  value={value || ""}
-                  onChange={(_, newValue) => onChange(newValue)}
-                  onInputChange={(_, newInputValue, reason) => {
-                    console.log("Input changed to:", newInputValue, "Reason:", reason);
                   }}
                   renderInput={(params) => (
                     <TextField
@@ -133,6 +132,22 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {params.InputProps.endAdornment}
+                            <InputAdornment position="end">
+                              <Tooltip title={autocompleteOpen ? 'Close suggestions' : 'Open suggestions'}>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAutocompleteOpen(o => !o); }} sx={{ color: 'primary.main' }}>
+                                  {autocompleteOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+                            </InputAdornment>
+                          </>
+                        ),
+                      }}
                     />
                   )}
                 />

@@ -32,6 +32,8 @@ import {
 import EnhancedEditableCell from "../Components/EnhancedEditableCell";
 import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, ArrowBack } from "@mui/icons-material";
 import axios from "axios";
+import * as XLSX from 'xlsx';
+// exceljs will be dynamically imported inside the download function to avoid bundling issues
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../Config";
 import debounce from 'lodash/debounce';
@@ -2576,42 +2578,198 @@ export default function ProductListPage() {
     }
   };
 
-  const downloadTemplateCSV = () => {
-    // Create template CSV headers with asterisks for required fields
-    const req = new Set(['name','code','hsn code','importance','product type','category','unit','product mode','store','status','size']);
+  const downloadTemplateCSV = async () => {
+  // Create template CSV headers with asterisks for required fields
+  // Note: 'Size' is intentionally NOT required for import
+  const req = new Set(['name','code','hsn code','importance','product type','category','unit','product mode','store','status']);
     
     // Add asterisks to required fields and dropdown fields
     const headersArr = [
       'Name *', 'Code *', 'HSN Code *', 'Importance *', 'Product Type *', 'Minimum Stock',
       'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tax *',
-      'GST %', 'Description', 'Internal Notes', 'Status *', 'Size *',
+  'GST %', 'Description', 'Internal Notes', 'Status *', 'Size',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
     ];
     
     // Join headers for CSV
     const headers = headersArr.join(',');
     
-    // Create template data row with example values
+    // Create template data row with example values (Size left empty since it's optional)
     const exampleRow = [
       'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
       'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'GST',
-      '18', 'Product description', 'Internal notes', 'Active', 'Large',
+      '18', 'Product description', 'Internal notes', 'Active', '',
       'SKU001', 'BAR001', '100', '150', '20', '3'
-    ].join(',');
-    
-    // Combine headers and example row
-    const csvContent = `${headers}\n${exampleRow}`;
-    
-    // Create blob and download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'product_import_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    ];
+
+    // Allowed dropdown options (shown in a separate sheet)
+    const importanceOptions = ['Normal', 'High', 'Critical'];
+    const productTypeOptions = ['All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'];
+    const productModeOptions = ['Purchase', 'Internal Manufacturing'];
+    const statusOptions = ['Active', 'Inactive'];
+
+    // Dynamically import exceljs to avoid bundling core-js references at dev startup
+    let ExcelJS;
+    try {
+      const mod = await import('exceljs');
+      ExcelJS = mod.default || mod;
+    } catch (err) {
+      console.error('Failed to load exceljs dynamically:', err);
+      ExcelJS = null;
+    }
+
+    if (ExcelJS) {
+      // Use exceljs to create an .xlsx with embedded data validation dropdown lists
+      const workbook = new ExcelJS.Workbook();
+    const templateSheet = workbook.addWorksheet('Template');
+
+    // Add headers
+    templateSheet.addRow(headersArr);
+    // Add example row
+    templateSheet.addRow(exampleRow);
+
+    // Muted styling for the sample/example row to make it appear lower-opacity
+    try {
+      const sampleRow = templateSheet.getRow(2);
+      const sampleColor = { argb: 'FF9E9E9E' }; // muted gray
+      for (let c = 1; c <= headersArr.length; c++) {
+        const cell = sampleRow.getCell(c);
+        // Keep cell value but make it visually muted
+        cell.font = { color: sampleColor, italic: true };
+        // Slightly lighter fill so sample row doesn't clash with dropdown highlights
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF9F9F9' }
+        };
+      }
+    } catch (err) {
+      // If styling fails for any reason, continue without blocking generation
+      console.warn('Could not apply sample row styling:', err);
+    }
+
+    // Create a hidden sheet to hold lists for data validation
+    const listsSheet = workbook.addWorksheet('Lists', { state: 'hidden' });
+
+    // Fill lists into the Lists sheet
+    const importanceRow = ['Importance', ...importanceOptions];
+    const productTypeRow = ['Product Type', ...productTypeOptions];
+    const productModeRow = ['Product Mode', ...productModeOptions];
+    const statusRow = ['Status', ...statusOptions];
+    listsSheet.addRow(importanceRow);
+    listsSheet.addRow(productTypeRow);
+    listsSheet.addRow(productModeRow);
+    listsSheet.addRow(statusRow);
+
+    // (Intentionally removed unused rangeForRow helper; using makeRange instead)
+
+    // Since exceljs doesn't expose a simple to-A1 helper in browser build, compute ranges manually
+    const makeRange = (rowIndex, count) => {
+      const startCol = 2; // B
+      const endColIndex = startCol + count - 1;
+      const endColLetter = columnNumberToName(endColIndex);
+      return `Lists!$B$${rowIndex}:$${endColLetter}$${rowIndex}`;
+    };
+
+    // Convert column number to Excel column letters (1 -> A)
+    function columnNumberToName(num) {
+      let s = '';
+      while (num > 0) {
+        const mod = (num - 1) % 26;
+        s = String.fromCharCode(65 + mod) + s;
+        num = Math.floor((num - 1) / 26);
+      }
+      return s;
+    }
+
+    // Compute the ranges for each list row
+    const impRange = makeRange(1, importanceOptions.length);
+    const ptypeRange = makeRange(2, productTypeOptions.length);
+    const pmodeRange = makeRange(3, productModeOptions.length);
+    const statusRange = makeRange(4, statusOptions.length);
+
+    // Find column indices of the Template headers to apply validation
+    const headerMap = {};
+    headersArr.forEach((h, idx) => {
+      const cleaned = h.replace(/\*/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+      headerMap[cleaned] = idx + 1;
+    });
+
+    const applyValidationToColumn = (colIndex, formula) => {
+      // Apply validation from row 2 to row 1000 (arbitrary large number)
+      for (let r = 2; r <= 1000; r++) {
+        const cell = templateSheet.getCell(r, colIndex);
+        cell.dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          showErrorMessage: true,
+          formulae: [formula]
+        };
+        // Highlight the cell to indicate it's a dropdown
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF7F7E8' } // light yellow-beige
+        };
+      }
+    };
+
+    // Apply validations
+  const impCol = headerMap['importance'];
+  const ptypeCol = headerMap['product type'];
+  const pmodeCol = headerMap['product mode'];
+  const statusCol = headerMap['status'];
+
+    if (impCol) applyValidationToColumn(impCol, `=${impRange}`);
+    if (ptypeCol) applyValidationToColumn(ptypeCol, `=${ptypeRange}`);
+    if (pmodeCol) applyValidationToColumn(pmodeCol, `=${pmodeRange}`);
+    if (statusCol) applyValidationToColumn(statusCol, `=${statusRange}`);
+
+    // Highlight header cells and make them bold for dropdown columns
+    const headerRow = templateSheet.getRow(1);
+    [impCol, ptypeCol, pmodeCol, statusCol].forEach((colIndex) => {
+      if (!colIndex) return;
+      const hdrCell = headerRow.getCell(colIndex);
+      hdrCell.font = { bold: true };
+      hdrCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFEEE8BF' } // slightly stronger highlight for header
+      };
+    });
+
+      // Generate file and trigger download in browser
+      workbook.xlsx.writeBuffer().then((buffer) => {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'product_import_template.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }).catch((err) => {
+        console.error('Failed to generate XLSX template with exceljs:', err);
+        ExcelJS = null; // fallback handled below
+      });
+    }
+
+    // Fallback (or if exceljs failed to load) - create a simple XLSX with lists in AllowedValues sheet
+    if (!ExcelJS) {
+      const headersRow = headersArr;
+      const wsData = [headersRow, exampleRow];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const lists = [
+        ['Importance', ...importanceOptions],
+        ['Product Type', ...productTypeOptions],
+        ['Product Mode', ...productModeOptions],
+        ['Status', ...statusOptions]
+      ];
+      const wsLists = XLSX.utils.aoa_to_sheet(lists);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template');
+      XLSX.utils.book_append_sheet(wb, wsLists, 'AllowedValues');
+      XLSX.writeFile(wb, 'product_import_template.xlsx');
+    }
   };
 
   const handleImport = async () => {
@@ -2626,7 +2784,9 @@ export default function ProductListPage() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const csvText = e.target.result;
+          let csvText = e.target.result;
+          // Remove BOM if present
+          if (csvText.charCodeAt(0) === 0xFEFF) csvText = csvText.slice(1);
           console.log('Raw CSV data:', csvText); // Debug log
 
           if (!csvText.trim()) {
@@ -2635,17 +2795,20 @@ export default function ProductListPage() {
             return;
           }
 
-          // Parse CSV
-          let lines = csvText.split('\n').filter(line => line.trim());
+          // Parse CSV - normalize line endings (CRLF, CR, LF) and split into lines
+          const rawLines = csvText.split(/\r\n|\n|\r/);
+          // Remove lines that are completely empty or contain only delimiters/quotes
+          let lines = rawLines.filter(l => {
+            if (!l) return false;
+            // If line contains only commas/semicolons/quotes/spaces, treat as empty
+            const cleaned = l.replace(/[",;\s]/g, '');
+            return cleaned.length > 0;
+          });
+
           if (lines.length === 0) {
             alert('The CSV file appears to be empty.');
             setImportLoading(false);
             return;
-          }
-
-          // Handle different line endings (CR, LF, CRLF)
-          if (lines.length === 1 && lines[0].includes('\r')) {
-            lines = csvText.split('\r').filter(line => line.trim());
           }
 
           // Parse headers - handle CSV that might be exported from Excel 
@@ -2811,7 +2974,7 @@ export default function ProductListPage() {
     const errors = [];
     // All required fields based on importRequiredHeaders
     const requiredFields = [
-      'Name','Code','HSN Code','Importance','Product Type','Category','Unit','Product Mode','Store','Status','Size'
+      'Name','Code','HSN Code','Importance','Product Type','Category','Unit','Product Mode','Store','Status'
     ];
     
     data.forEach((row, index) => {
@@ -2859,8 +3022,8 @@ export default function ProductListPage() {
       
       // Validate Importance field
       const importanceValue = getFieldValue('Importance');
-      if (importanceValue && !['Low', 'Normal', 'High', 'Critical'].includes(importanceValue)) {
-        rowErrors.push('Importance must be "Low", "Normal", "High", or "Critical"');
+      if (importanceValue && !['Normal', 'High', 'Critical'].includes(importanceValue)) {
+        rowErrors.push('Importance must be "Normal", "High", or "Critical"');
       }
       
       // Validate Product Type
@@ -3973,7 +4136,7 @@ export default function ProductListPage() {
                     // Check if this is a required field - lowercase for case-insensitive comparison
                     const normalizedHeader = cleanHeader.toLowerCase();
                     // List of required fields - note that we keep the header normalized form for comparison
-                    const requiredFields = ['name', 'code', 'hsn code', 'importance', 'product type', 'category', 'unit', 'product mode', 'store', 'status', 'size', 'tax'];
+                    const requiredFields = ['name', 'code', 'hsn code', 'importance', 'product type', 'category', 'unit', 'product mode', 'store', 'status', 'tax'];
                     
                     // Check if this header is in our required fields list
                     const isRequired = requiredFields.includes(normalizedHeader);
@@ -4280,7 +4443,7 @@ export default function ProductListPage() {
                     <strong>Additional Checks:</strong><br/>
                     • Numeric fields (Minimum Stock, GST %, etc.) must contain valid numbers<br/>
                     • Status must be "Active" or "Inactive"<br/>
-                    • Importance must be "Low", "Normal", "High", or "Critical"<br/>
+                    • Importance must be "Normal", "High", or "Critical"<br/>
                     • Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"<br/>
                     • Product Mode must be "Purchase" or "Internal Manufacturing"<br/>
                     • <strong>Category, Subcategory, Store, HSN Code, Unit, and Size must match existing system entries (use dropdown options)</strong><br/>

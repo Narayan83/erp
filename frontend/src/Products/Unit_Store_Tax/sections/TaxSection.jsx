@@ -18,7 +18,7 @@ export default function TaxSection() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState("");
 

@@ -56,6 +56,16 @@ func main() {
 	//ADDING STATIC LINKING TO IMAGE
 	app.Static("/uploads", "./uploads")
 
+	// route registration flags for debug
+	var routeStatus = struct {
+		Login    bool `json:"/login_registered"`
+		APILogin bool `json:"/api/login_registered"`
+	}{}
+
+	// Authentication (use debug wrapper to log incoming requests)
+	app.Post("/login", handler.LoginDebug)
+	routeStatus.Login = true
+
 	// setup all routes
 	app.Get("/api", func(c *fiber.Ctx) error {
 		return c.SendString("Welcome to the ERP API!")
@@ -65,6 +75,16 @@ func main() {
 
 	// Categories
 	api := app.Group("/api")
+	// Expose login under /api/login as well to match frontend calls
+	api.Post("/login", handler.LoginDebug)
+	routeStatus.APILogin = true
+
+	// Simple GET test for /api/login to verify route is reachable
+	api.Get("/login", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true, "message": "api login endpoint reachable"})
+	})
+
+	// Categories
 	api.Get("/categories", handler.GetAllCategorie)
 	api.Get("/categories/:id", handler.GetCategorieByID)
 	api.Post("/categories", handler.CreateCategorie)
@@ -122,6 +142,7 @@ func main() {
 	api.Put("/products/:id", handler.UpdateProduct)
 	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
+	api.Post("/users/import", handler.ImportUsers)
 	api.Post("/products/fix-sequence", handler.FixProductSequence)
 
 	api.Get("/products/stats", handler.GetProductStats)
@@ -228,6 +249,14 @@ func main() {
 	api.Put("/addresses/:id", handler.UpdateAddress)
 	api.Delete("/addresses/:id", handler.DeleteAddress)
 	api.Get("/addresses-search", handler.SearchAddresses)
+
+	// Debug endpoint to inspect route registration (quick check for 404 troubleshooting)
+	api.Get("/debug/routes", func(c *fiber.Ctx) error {
+		return c.JSON(routeStatus)
+	})
+
+	// Log route registration status so startup logs show if login endpoints were registered
+	fmt.Printf("Route registration: /login=%v, /api/login=%v\n", routeStatus.Login, routeStatus.APILogin)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))

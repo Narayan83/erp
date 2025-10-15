@@ -1,7 +1,11 @@
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete
+  Button, TextField, Autocomplete, IconButton, InputAdornment
 } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
@@ -11,6 +15,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
   const { control, handleSubmit, setValue } = useForm();
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
 
   // Fetch stores when dialog opens
   useEffect(() => {
@@ -70,7 +75,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{store ? "Edit Store" : "Add Store"}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -90,10 +95,22 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
                   options={storeOptions}
                   freeSolo
                   loading={loading}
-                  openOnFocus
+                  open={autocompleteOpen}
+                  onOpen={() => setAutocompleteOpen(true)}
+                  onClose={() => setAutocompleteOpen(false)}
                   autoSelect
-                  value={value || ""}
+                  value={value ?? ""}
                   onChange={(_, newValue) => onChange(newValue)}
+                  onInputChange={(_, newInputValue) => {
+                    // keep RHF in sync and open the dropdown so filtering is visible
+                    onChange(newInputValue);
+                    setAutocompleteOpen(true);
+                  }}
+                  filterOptions={(options, { inputValue }) => {
+                    if (!inputValue) return options;
+                    const lower = inputValue.toLowerCase();
+                    return options.filter(opt => (opt || "").toLowerCase().includes(lower));
+                  }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -104,6 +121,22 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
                       margin="dense"
                       size="small"
                       required
+                      onClick={() => setAutocompleteOpen(true)}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {params.InputProps.endAdornment}
+                            <InputAdornment position="end">
+                              <Tooltip title={autocompleteOpen ? 'Close suggestions' : 'Open suggestions'}>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAutocompleteOpen(o => !o); }} sx={{ color: 'primary.main' }}>
+                                  {autocompleteOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+                            </InputAdornment>
+                          </>
+                        ),
+                      }}
                     />
                   )}
                 />

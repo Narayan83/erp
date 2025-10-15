@@ -37,12 +37,15 @@ func main() {
 		&models.Dealer{},
 		&models.Distributor{},
 
+		&models.Bank{},
+
 		//30/9/2025
 		&models.TandC{},
 		&models.Addresses{},
 		&models.QuotationTable{},
 		&models.QuotationTableItems{},
 		&models.QutationTemplates{},
+
 	)
 
 	if err != nil {

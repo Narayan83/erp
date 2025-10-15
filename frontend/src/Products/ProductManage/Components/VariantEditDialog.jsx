@@ -407,11 +407,17 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
       ? (imageFiles[mainImageIndex].original || null)
       : null;
 
+    // Generate SKU if empty - use timestamp + random number for uniqueness
+    let skuValue = data.sku;
+    if (!skuValue || skuValue.trim() === '') {
+      skuValue = `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
+
     const payload = {
       ID: variantID,
       Color: selectedColor?.value || defaultValues?.Color || '',
       Size: selectedSize?.code || '',
-      SKU: data.sku,
+      SKU: skuValue,
       Barcode: data.barcode,
       PurchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : Number(data.purchaseCost || 0),
       StdSalesPrice: typeof data.stdSalesPrice === 'number' ? data.stdSalesPrice : Number(data.stdSalesPrice || 0),
@@ -511,10 +517,11 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
 
             <Grid size={4}>
               <TextField
-                label="SKU"
+                label="SKU (Optional)"
                 fullWidth
                 size="small"
                 defaultValue={defaultValues?.sku || ""}
+                helperText="Leave empty to auto-generate"
                 {...register("sku")}
               />
             </Grid>
