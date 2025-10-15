@@ -242,8 +242,8 @@ const ralColors = [
 ];
 
 export default function ReviewStep({
-  product,
-  variants,
+  product = {},
+  variants = [],
   onBack,
   onSubmit,
   onEditVariant,
@@ -564,11 +564,13 @@ export default function ReviewStep({
           </TableRow>
         </TableHead>
         <TableBody>
-          {variants.map((v, i) => (
+          {(variants || []).map((v, i) => (
             <TableRow key={i} sx={{ opacity: v.isActive === false ? 0.5 : 1 }}>
               <TableCell>
                 {(() => {
                   const colorData = ralColors.find(c => c.value === v.color);
+                  // Safely derive the friendly color name part if available
+                  const colorFriendly = colorData?.name ? colorData.name.split(' - ')[1] : null;
                   return (
                     <Box display="flex" alignItems="center" gap={1}>
                       <Box
@@ -582,7 +584,7 @@ export default function ReviewStep({
                       />
                       <Box>
                         <Typography variant="body2">
-                          {v.color} - {colorData.name.split(' - ')[1]}
+                          {v.color}{colorFriendly ? ` - ${colorFriendly}` : ''}
                         </Typography>
                       </Box>
                     </Box>
