@@ -84,6 +84,12 @@ func CreateSubcategorie(c *fiber.Ctx) error {
 				return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 			}
 		}
+		// Server-side duplicate check: ensure no other subcategory with same name (case-insensitive) exists for the category
+		var existing models.Subcategory
+		if err := subcategoriesDB.Where("LOWER(name) = LOWER(?) AND category_id = ?", item.Name, item.CategoryID).First(&existing).Error; err == nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Subcategory with this name already exists for the selected category"})
+		}
+
 		if err := subcategoriesDB.Create(&item).Error; err != nil {
 			{
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -107,6 +113,13 @@ func UpdateSubcategorie(c *fiber.Ctx) error {
 				return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 			}
 		}
+
+		// Server-side duplicate check: ensure no other subcategory (excluding this one) has same name (case-insensitive) for the category
+		var existing models.Subcategory
+		if err := subcategoriesDB.Where("LOWER(name) = LOWER(?) AND category_id = ? AND id <> ?", item.Name, item.CategoryID, item.ID).First(&existing).Error; err == nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Another subcategory with this name already exists for the selected category"})
+		}
+
 		if err := subcategoriesDB.Save(&item).Error; err != nil {
 			{
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})

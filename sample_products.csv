@@ -1,6 +1,0 @@
-Name,Code,HSN Code,Importance,Product Type,Minimum Stock,Category,Subcategory,Unit,Product Mode,MOQ,Store,Tax,GST %,Description,Internal Notes,Status,Color Code,Size,SKU,Barcode,Purchase Cost,Sales Price,Stock,Lead Time,Images
-Organic Fertilizer,FRT001,31010000,High,Single,100,Fertilizers,Organic,Kg,Physical,10,Main Store,GST,5,High-quality organic fertilizer for all crops,For agricultural use only,Active,Green,Standard,SKU-FRT001,BAR-FRT001,20,35,500,7,
-NPK Fertilizer 20-20-20,FRT002,31051000,High,Single,50,Fertilizers,NPK,Kg,Physical,5,Main Store,GST,5,Balanced NPK fertilizer for general use,Keep away from moisture,Active,Blue,Standard,SKU-FRT002,BAR-FRT002,25,40,200,5,
-Urea Fertilizer,FRT003,31021000,Medium,Single,200,Fertilizers,Nitrogenous,Kg,Physical,20,Main Store,GST,5,High nitrogen fertilizer,Use as directed,Active,White,Standard,SKU-FRT003,BAR-FRT003,18,30,1000,3,
-Plant Growth Regulator,PGR001,38089390,Medium,Single,20,Chemicals,Growth Regulators,Liter,Physical,2,Main Store,GST,18,Promotes plant growth and development,Apply as per recommendation,Active,Purple,Standard,SKU-PGR001,BAR-PGR001,120,200,50,10,
-Potassium Sulphate,FRT004,31043000,Medium,Single,50,Fertilizers,Potassic,Kg,Physical,5,Main Store,GST,5,Potassium-rich fertilizer for flowering and fruiting,Store in cool dry place,Active,Yellow,Standard,SKU-FRT004,BAR-FRT004,30,45,150,5,

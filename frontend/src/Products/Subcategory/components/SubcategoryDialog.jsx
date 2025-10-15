@@ -93,6 +93,51 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
     if (open) loadSubcategories(categoryId);
   }, [formData?.category, formData?.category_id, open]);
   
+  // Validate and submit the form, preventing duplicate subcategory names for the same category
+  const handleSubmit = () => {
+    const name = (formData.name || "").toString().trim();
+    const categoryId = formData?.category?.ID || formData?.category_id || null;
+
+    if (!name) {
+      showSnackbar("Please enter a subcategory name", "error");
+      return;
+    }
+
+    if (!categoryId) {
+      showSnackbar("Please select a category", "error");
+      return;
+    }
+
+    // Check for duplicate: same name (case-insensitive) under the same category
+    const duplicate = Array.isArray(subcategories) && subcategories.find((s) => {
+      const sName = (s?.Name || s?.name || "").toString().trim();
+      if (!sName) return false;
+      if (sName.toLowerCase() !== name.toLowerCase()) return false;
+
+      // If editing, allow the same record
+      const sId = s?.ID || s?.id || null;
+      if (formData.id && sId && Number(sId) === Number(formData.id)) return false;
+
+      // Try to resolve category id of the existing subcategory
+      const sCatId = s?.Category?.ID || s?.category_id || s?.CategoryID || s?.category?.ID || null;
+      if (sCatId) {
+        return Number(sCatId) === Number(categoryId);
+      }
+
+      // If no category info present on the item, but subcategories were loaded filtered by category,
+      // assume it belongs to the selected category (conservative duplicate detection).
+      return true;
+    });
+
+    if (duplicate) {
+      showSnackbar("A subcategory with this name already exists for the selected category.", "error");
+      return;
+    }
+
+    // Passed validation — call parent submit
+    onSubmit();
+  };
+  
 
   
   return (
@@ -187,8 +232,8 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={onSubmit} variant="contained">Save</Button>
+  <Button onClick={onClose}>Cancel</Button>
+  <Button onClick={handleSubmit} variant="contained">Save</Button>
       </DialogActions>
     </Dialog>
   );

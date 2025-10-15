@@ -23,7 +23,7 @@ export default function CategoryPage() {
   // pagination state
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0); // 0-based for MUI
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
 
     const [filter, setFilter] = useState("");
