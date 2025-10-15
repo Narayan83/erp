@@ -65,6 +65,11 @@ func CreateSize(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
+	// If frontend doesn't provide a Name, default it to Code so DB 'not null' and 'unique' constraints are satisfied
+	if size.Name == "" {
+		size.Name = size.Code
+	}
+
 	if err := sizeDB.Create(&size).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -82,6 +87,11 @@ func UpdateSize(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&size); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	// Ensure Name remains non-empty; default to Code when missing
+	if size.Name == "" {
+		size.Name = size.Code
 	}
 
 	if err := sizeDB.Save(&size).Error; err != nil {
