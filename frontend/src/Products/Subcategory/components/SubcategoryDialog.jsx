@@ -124,7 +124,10 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
           onOpen={() => setCategoryOpen(true)}
           onClose={() => setCategoryOpen(false)}
           value={formData.category || null}
-          onChange={(_, val) => setFormData({ ...formData, category: val, category_id: val?.ID || null })}
+          onChange={(_, val) => {
+            setFormData({ ...formData, category: val, category_id: val?.ID || null });
+            setCategoryOpen(false);
+          }}
           renderInput={(params) => (
             <TextField
               {...params}
@@ -137,23 +140,12 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
                 endAdornment: (
                   <>
                     {params.InputProps.endAdornment}
-                    <InputAdornment position="end">
-                      <Tooltip title={categoryOpen ? 'Close suggestions' : 'Open suggestions'}>
-                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setCategoryOpen(o => !o); }} sx={{ color: 'primary.main' }}>
-                          {categoryOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                    </InputAdornment>
                   </>
                 ),
               }}
             />
           )}
         />
-
-
-
-       
 
         <Autocomplete
           freeSolo
@@ -164,7 +156,10 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
           onOpen={() => setSubcategoryOpen(true)}
           onClose={() => setSubcategoryOpen(false)}
           value={formData.name || ""}
-          onChange={(_, newValue) => setFormData({ ...formData, name: newValue })}
+          onChange={(_, newValue) => {
+            setFormData({ ...formData, name: newValue });
+            setSubcategoryOpen(false);
+          }}
           renderInput={(params) => (
             <TextField
               {...params}
@@ -181,11 +176,6 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
                       <Tooltip title={subcategoryOpen ? 'Close suggestions' : 'Open suggestions'}>
                         <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSubcategoryOpen(o => !o); }} sx={{ color: 'primary.main' }}>
                           {subcategoryOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Clear input">
-                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, name: '' }); setSubcategoryOpen(false); }} sx={{ bgcolor: 'error.light', color: 'error.contrastText', ml: 0.5, '&:hover': { bgcolor: 'error.main' } }}>
-                          <CloseRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </InputAdornment>
