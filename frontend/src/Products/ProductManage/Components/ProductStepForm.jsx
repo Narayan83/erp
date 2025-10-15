@@ -5,6 +5,7 @@ import {
   Grid, 
   MenuItem, 
   TextField,
+  Autocomplete,
   FormControl,
   InputLabel,
   Select,
@@ -27,6 +28,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   const [hsnCodes, setHsnCodes] = useState([]); // NEW: HSN codes list
   const [isLoading, setIsLoading] = useState(true);
   const [productCodes, setProductCodes] = useState([]); // For code uniqueness check
+  const [productsList, setProductsList] = useState([]); // full product objects for dropdowns
   const [formError, setFormError] = useState(""); // For user-friendly error
 
   // Always reset form when defaultValues change (for stepper back/forward)
@@ -83,7 +85,9 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
         setUnits(unitRes.data.data || []);
         setStores(storeRes.data.data || []);
         setTaxes(taxRes.data.data || []);
-        setProductCodes((prodRes.data.data || []).map(p => p.code || p.Code));
+  const prods = prodRes.data.data || [];
+  setProductsList(prods);
+  setProductCodes(prods.map(p => p.code || p.Code));
         setHsnCodes(hsnRes.data.data || []);
       } catch (error) {
         console.error("Error loading dropdowns/products", error);
@@ -162,13 +166,75 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
       )}
       <form onSubmit={handleSubmit(handleFormSubmit)}>
         <Grid container spacing={2}>
-          {/* Product Name */}
+          {/* Product Name (Autocomplete) */}
           <Grid item xs={12} md={4}>
-            <TextField label="Product Name" size="small" sx={{ width: '260px' }} {...register("name", { required: true })} />
+            <Autocomplete
+              freeSolo
+              options={productsList}
+              getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || option.Name || option.code || option.Code || '')}
+              value={(() => {
+                const val = getValues('name');
+                // find object for current name if exists
+                const found = productsList.find(p => (p.name || p.Name) === val || (p.code || p.Code) === val);
+                return found || (val ? val : null);
+              })()}
+              onChange={(event, newValue) => {
+                if (!newValue) {
+                  setValue('name', '');
+                  setValue('code', '');
+                  return;
+                }
+                if (typeof newValue === 'string') {
+                  setValue('name', newValue);
+                } else {
+                  const name = newValue.name || newValue.Name || '';
+                  const code = newValue.code || newValue.Code || '';
+                  setValue('name', name);
+                  setValue('code', code);
+                }
+              }}
+              onInputChange={(e, newInput) => {
+                // keep form value in sync when user types
+                setValue('name', newInput);
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Product Name" size="small" sx={{ width: '260px' }} />
+              )}
+            />
           </Grid>
-          {/* Code */}
+          {/* Code (Autocomplete) */}
           <Grid item xs={12} md={4}>
-            <TextField label="Code" size="small" sx={{ width: '260px' }} {...register("code", { required: true })} />
+            <Autocomplete
+              freeSolo
+              options={productsList}
+              getOptionLabel={(option) => (typeof option === 'string' ? option : option.code || option.Code || option.name || option.Name || '')}
+              value={(() => {
+                const val = getValues('code');
+                const found = productsList.find(p => (p.code || p.Code) === val || (p.name || p.Name) === val);
+                return found || (val ? val : null);
+              })()}
+              onChange={(event, newValue) => {
+                if (!newValue) {
+                  setValue('code', '');
+                  setValue('name', '');
+                  return;
+                }
+                if (typeof newValue === 'string') {
+                  setValue('code', newValue);
+                } else {
+                  const name = newValue.name || newValue.Name || '';
+                  const code = newValue.code || newValue.Code || '';
+                  setValue('name', name);
+                  setValue('code', code);
+                }
+              }}
+              onInputChange={(e, newInput) => {
+                setValue('code', newInput);
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Code" size="small" sx={{ width: '260px' }} />
+              )}
+            />
           </Grid>
           {/* HSN Dropdown */}
           <Grid item xs={12} md={4}>

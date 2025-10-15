@@ -1,7 +1,11 @@
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete
+  Button, TextField, Autocomplete, IconButton, InputAdornment
 } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
@@ -119,6 +123,21 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
                       size="small"
                       required
                       onClick={() => setAutocompleteOpen(true)}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {params.InputProps.endAdornment}
+                            <InputAdornment position="end">
+                              <Tooltip title={autocompleteOpen ? 'Close suggestions' : 'Open suggestions'}>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAutocompleteOpen(o => !o); }} sx={{ color: 'primary.main' }}>
+                                  {autocompleteOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+                            </InputAdornment>
+                          </>
+                        ),
+                      }}
                     />
                   )}
                 />

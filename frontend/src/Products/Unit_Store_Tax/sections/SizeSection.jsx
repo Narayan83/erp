@@ -11,7 +11,7 @@ export default function SizeSection() {
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 

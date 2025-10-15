@@ -18,7 +18,7 @@ export default function StoreSection() {
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filter, setFilter] = useState("");
 
   const loadStores = async () => {
