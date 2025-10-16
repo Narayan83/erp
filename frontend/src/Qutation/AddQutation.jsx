@@ -118,6 +118,8 @@ useEffect(()=>{
 }, [quotationData, isEditMode]);
 
 
+useEffect(()=>{console.log(customers)},[customers]);
+
 // useEffect(() => {
 //   setOpenTandCModal(open);
 // }, [open]);
@@ -129,7 +131,8 @@ useEffect(()=>{
         `${BASE_URL}/api/users/roles/customer?page=1&limit=10&filter=${query}`
       );
       const data = await response.json();
-      setCustomers(data.data || []);
+      console.log(data);
+      setCustomers(data || []);
     } catch (err) {
       console.error("Error fetching customers:", err);
     }
@@ -141,7 +144,7 @@ useEffect(()=>{
     try {
       const res = await fetch(`${BASE_URL}/api/users/roles/employee?page=1&limit=20`);
       const data = await res.json();
-      setEmployees(data.data || []);
+      setEmployees(data || []);
     } catch (err) {
       console.error("Error fetching employees:", err);
     }
