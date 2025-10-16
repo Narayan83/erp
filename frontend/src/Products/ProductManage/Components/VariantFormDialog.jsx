@@ -544,7 +544,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                 </MenuItem>
                 {!sizesLoading && sizeOptions.map((size) => (
                   <MenuItem key={size.id} value={size.code}>
-                    {size.name} {size.code ? `(${size.code})` : ""}
+                    {size.code}
                   </MenuItem>
                 ))}
               </TextField>

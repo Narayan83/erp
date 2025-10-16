@@ -25,6 +25,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   const [units, setUnits] = useState([]);
   const [stores, setStores] = useState([]);
   const [taxes, setTaxes] = useState([]);
+  const [tags, setTags] = useState([]);
   const [hsnCodes, setHsnCodes] = useState([]); // NEW: HSN codes list
   const [isLoading, setIsLoading] = useState(true);
   const [productCodes, setProductCodes] = useState([]); // For code uniqueness check
@@ -45,8 +46,9 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
         categoryID: defaultValues.categoryID || defaultValues.CategoryID || '',
         subcategoryID: defaultValues.subcategoryID || defaultValues.SubcategoryID || '',
         unitID: defaultValues.unitID || defaultValues.UnitID || '',
-        product_mode: defaultValues.product_mode || defaultValues.ProductMode || 'Purchase',
+  product_mode: defaultValues.product_mode || defaultValues.ProductMode || '',
         storeID: defaultValues.storeID || defaultValues.StoreID || '',
+    tagID: defaultValues.tagID || defaultValues.TagID || '',
         taxID: defaultValues.taxID || defaultValues.TaxID || '',
         gstPercent: defaultValues.gstPercent || defaultValues.GstPercent || '',
         description: defaultValues.description || defaultValues.Description || '',
@@ -57,8 +59,8 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
     } else {
       reset({
         name: '', code: '', hsnID: '', hsnSacCode: '', importance: 'Normal', productType: 'All', minimumStock: '',
-        categoryID: '', subcategoryID: '', unitID: '', product_mode: 'Purchase',
-        storeID: '', taxID: '', gstPercent: '', description: '', internalNotes: '',
+        categoryID: '', subcategoryID: '', unitID: '', product_mode: '',
+        storeID: '', tagID: '', taxID: '', gstPercent: '', description: '', internalNotes: '',
         isActive: true, moq: '', // Added for MOQ
       });
     }
@@ -72,13 +74,14 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [catRes, unitRes, storeRes, taxRes, prodRes, hsnRes] = await Promise.all([
+        const [catRes, unitRes, storeRes, taxRes, prodRes, hsnRes, tagRes] = await Promise.all([
           axios.get(`${BASE_URL}/api/categories`, { params: { page: 1, limit: 1000 } }),
           axios.get(`${BASE_URL}/api/units`, { params: { page: 1, limit: 1000 } }),
           axios.get(`${BASE_URL}/api/stores`, { params: { page: 1, limit: 1000 } }),
           axios.get(`${BASE_URL}/api/taxes`, { params: { page: 1, limit: 1000 } }),
           axios.get(`${BASE_URL}/api/products`, { params: { page: 1, limit: 10000 } }),
           axios.get(`${BASE_URL}/api/hsncode`, { params: { page: 1, limit: 1000 } }),
+          axios.get(`${BASE_URL}/api/tags`, { params: { page: 1, limit: 1000 } }),
         ]);
 
         setCategories(catRes.data.data || []);
@@ -89,6 +92,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   setProductsList(prods);
   setProductCodes(prods.map(p => p.code || p.Code));
         setHsnCodes(hsnRes.data.data || []);
+        setTags(tagRes.data.data || []);
       } catch (error) {
         console.error("Error loading dropdowns/products", error);
       } finally {
@@ -312,8 +316,10 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           <Grid item xs={12} md={4}>
             <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Product Mode</InputLabel>
-              <Select label="Product Mode" defaultValue="Purchase" {...register("product_mode", { required: true })} sx={{ width: '260px' }}>
-                {['Purchase','Internal Manufacturing'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
+              <Select label="Product Mode" value={watch('product_mode') || ''} {...register("product_mode")} sx={{ width: '260px' }} onChange={(e) => setValue('product_mode', e.target.value)}>
+                <MenuItem value="purchase">Purchase</MenuItem>
+                <MenuItem value="internal manufacture">Internal Manufacture</MenuItem>
+                <MenuItem value="">Purchase & Internal Manufacture</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -340,12 +346,25 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
               </Select>
             </FormControl>
           </Grid>
+          {/* Tag (after Store) */}
+          <Grid item xs={12} md={4}>
+            <FormControl size="small" InputLabelProps={{ shrink: true }}>
+              <InputLabel>Tag</InputLabel>
+              <Select label="Tag" value={watch("tagID") || ''} {...register("tagID")} sx={{ width: '260px' }}> 
+                {tags.length > 0 ? (
+                  tags.map(tag => <MenuItem key={tag.ID || tag.id} value={tag.ID || tag.id}>{tag.Name || tag.name}</MenuItem>)
+                ) : (
+                  <MenuItem disabled value="">No Tags Available</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Grid>
           {/* Tax */}
           <Grid item xs={12} md={4}>
             <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Tax</InputLabel>
               <Select label="Tax" value={watch("taxID") || ''} {...register("taxID")} sx={{ width: '260px' }}> 
-                {taxes.map(tax => <MenuItem key={tax.ID || tax.id} value={tax.ID || tax.id}>{`${tax.Name || tax.name} (${tax.Percentage ?? tax.percentage}%)`}</MenuItem>)}
+                {taxes.map(tax => <MenuItem key={tax.ID || tax.id} value={tax.ID || tax.id}>{tax.Name || tax.name}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
