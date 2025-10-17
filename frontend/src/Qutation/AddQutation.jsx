@@ -1487,6 +1487,7 @@ const prefillFormData = (data) => {
                 </div>
 
                 {sel.checked && (
+                  <div>
                   <div
                     style={{
                       display: "grid",
@@ -1577,9 +1578,14 @@ const prefillFormData = (data) => {
                       }
                     />
 
-                     <TextField
+                     
+                  </div>
+
+                  <div style={{width:"%"}}>
+                    <TextField
                       label="Description"
                       size="small"
+                      sx={{width:"100%",marginTop:"15px"}}
                       value={sel.desc}
                       onChange={(e) =>
                         setProductSelections((prev) => ({
@@ -1589,7 +1595,8 @@ const prefillFormData = (data) => {
                       }
                     />
                   </div>
-                )}
+                </div>
+                  )}
               </Box>
             );
           })}
