@@ -255,6 +255,14 @@ func main() {
 		return c.JSON(routeStatus)
 	})
 
+	// Hierarchical Users API
+
+	app.Get("/api/hierarchical-users", handler.GetAllHierarchicalUsers)
+	app.Get("/api/hierarchical-users/:id", handler.GetHierarchicalUserByID)
+	app.Post("/api/hierarchical-users", handler.CreateHierarchicalUser)
+	app.Put("/api/hierarchical-users/:id", handler.UpdateHierarchicalUser)
+	app.Delete("/api/hierarchical-users/:id", handler.DeleteHierarchicalUser)
+
 	// Log route registration status so startup logs show if login endpoints were registered
 	fmt.Printf("Route registration: /login=%v, /api/login=%v\n", routeStatus.Login, routeStatus.APILogin)
 
