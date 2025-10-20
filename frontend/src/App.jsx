@@ -44,13 +44,13 @@ import QuotationNewForm from './CRM/Pages/Quotation/QuotationForm';
 import QutationList from "./Qutation/QutationList";
 import AddQutation from "./Qutation/AddQutation";
 
-import RoleCreation from "./CAG/page/RoleCreation/RoleCreation";
-import MenuCreation from "./CAG/page/MenuCreation/MenuCreation";
-import RoleManagement from './CAG/page/RoleManagement/RoleManagement';
-import ExistingMenus from './CAG/page/ExistingMenus/ExistingMenus';
-import UserManagement from './CAG/page/UserManagement/UserManagement';
-import ExistingRoles from './CAG/page/ExistingRoles/ExistingRoles';
-import AuditLogs from "./CAG/page/AuditLogs/AuditLogs";
+import RoleCreation from "./Admin Master/page/RoleCreation/RoleCreation";
+import MenuCreation from "./Admin Master/page/MenuCreation/MenuCreation";
+import RoleManagement from './Admin Master/page/RoleManagement/RoleManagement';
+import ExistingMenus from './Admin Master/page/ExistingMenus/ExistingMenus';
+import UserManagement from './Admin Master/page/UserManagement/UserManagement';
+import ExistingRoles from './Admin Master/page/ExistingRoles/ExistingRoles';
+import AuditLogs from "./Admin Master/page/AuditLogs/AuditLogs";
 import TandCManager from "./TANDC/TandCManager";
 
 const myContext = createContext();

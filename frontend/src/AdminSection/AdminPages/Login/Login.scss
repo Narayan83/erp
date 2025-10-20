@@ -6,19 +6,35 @@ $card-bg: #ffffff;
 .login-page {
   display: flex;
   min-height: 100vh;
+  padding: 50px;
   font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* Outer combined container: gives a single border and highlight around both panels */
+  .combined-wrap {
+    display: flex;
+    width: 100%;
+    max-width: 100vw;
+    margin: 40px auto;
+    background: $card-bg;
+    border: 1px solid black;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden; /* remove inner seam */
+  }
 
   .left-panel {
     flex: 1.2;
-    padding: 0 80px;
+    padding: 60px 40px;
     display: flex;
     align-items: center;
+    background: rgb(218, 229, 231);
+    border-radius: 14px 0 0 14px;
 
     .marketing-wrap {
-      max-width: 680px;
+      max-width: 580px;
 
       .app-title {
-        font-size: 56px;
+        font-size: 35px;
         margin: 0 0 12px 0;
         color: #13283b;
         line-height: 1.02;
@@ -44,7 +60,7 @@ $card-bg: #ffffff;
 
           .feature-icon {
             color: $primary;
-            font-size: 22px;
+            font-size: 20px;
             min-width: 44px;
             min-height: 44px;
             display: flex;
@@ -56,7 +72,7 @@ $card-bg: #ffffff;
 
           h4 {
             margin: 0 0 6px 0;
-            font-size: 16px;
+            font-size: 14px;
             color: #163249;
           }
 
@@ -75,19 +91,19 @@ $card-bg: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 60px;
-    background: $card-bg;
+    padding: 40px 48px;
+    background: rgb(218, 229, 231);
+    border-radius: 0 14px 14px 0;
 
     .login-card {
       width: 100%;
       height: auto;
-      background: $card-bg;
-      /* spacing and highlight */
-      margin: 20px 0;
+      background: $light;
+      margin: 0; /* inner margin removed to match combined container */
       padding: 28px;
-      border-radius: 12px;
-      border: 1px solid rgba(30, 78, 138, 0.26);
-      box-shadow: 0 8px 20px rgba(30, 78, 138, 0.4);
+      border-radius: 10px;
+      /* subtle inner highlight for the card content */
+      box-shadow: 0 6px 18px rgba(11, 12, 12, 0.26);
       transition: box-shadow 150ms ease, transform 120ms ease;
 
       .login-header {

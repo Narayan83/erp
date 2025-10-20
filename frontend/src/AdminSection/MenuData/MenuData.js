@@ -57,6 +57,7 @@ export const menuItems = [
     icon: GiRingmaster,
     submenu: [{ title: "Users Management", path: "/users" },
       { title: "User Address", path: "/address" },
+      { title: "Bank Management", path: "/ManageBank" }
     ],
   },
 
@@ -74,7 +75,7 @@ export const menuItems = [
 
   {
     id: 7,
-    title: "CAG Masters",
+    title: "Admin",
     icon: GiRingmaster,
     submenu: [
       { title: "Role Creation", path: "/rolecreation" },
@@ -84,6 +85,7 @@ export const menuItems = [
       { title: "Existing Menus", path: "/existingmenus" },
       { title: "User Management", path: "/usermanagement" },
       { title: "Audit Logs", path: "/auditlogs" },
+      { title: "Branch Management", path: "/ManageBranch" },
     ],
   },
 
@@ -94,19 +96,6 @@ export const menuItems = [
     submenu: [{ title: "Company/Firm setups", path: "/" }],
   },
 
-  {
-    id: 8,
-    title: "Branch Master",
-    icon: GiRingmaster,
-    submenu: [{ title: "Branch Management", path: "/ManageBranch" }],
-  },
-
-  {
-    id: 9,
-    title: "Bank Master",
-    icon: GiRingmaster,
-    submenu: [{ title: "Bank Management", path: "/ManageBank" }],
-  },
   {
     id: 5,
     title: "Reports",
