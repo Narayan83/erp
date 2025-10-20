@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "../../styles/existing_menus.scss";
+import "../../styles/menu_management.scss";
 import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
 import { BASE_URL } from "../../../Config"; // Add this import
@@ -136,7 +136,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
     <div className="existing-menus-container">
       <section className="title-section">
         <div>
-          <h1 className="page-title">Existing Menus</h1>
+          <h1 className="page-title">Menu Management</h1>
           <div className="subtitle">Manage all your available menus</div>
         </div>
         <div className="actions-row">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "../../styles/user_management.scss";
+import "../../styles/user_mapping.scss";
 import { BASE_URL } from "../../../Config";
 
 const users = [
@@ -124,7 +124,7 @@ export default function UserManagement() {
 
   return (
     <div className="user-management-container">
-      <div className="user-management-header">User Management</div>
+      <div className="user-management-header">User Mapping to Roles</div>
       <div className="user-management-selectors">
         <div>
           <label>Select User</label>

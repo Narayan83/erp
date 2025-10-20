@@ -46,10 +46,14 @@ import AddQutation from "./Qutation/AddQutation";
 
 import RoleCreation from "./Admin Master/page/RoleCreation/RoleCreation";
 import MenuCreation from "./Admin Master/page/MenuCreation/MenuCreation";
-import RoleManagement from './Admin Master/page/RoleManagement/RoleManagement';
-import ExistingMenus from './Admin Master/page/ExistingMenus/ExistingMenus';
-import UserManagement from './Admin Master/page/UserManagement/UserManagement';
-import ExistingRoles from './Admin Master/page/ExistingRoles/ExistingRoles';
+// Role mapping (menus) component is in RoleMappingtoMenus/RoleMappingtoMenus.jsx
+import RoleManagement from './Admin Master/page/RoleMappingtoMenus/RoleMappingtoMenus';
+// Existing roles component actually lives in RoleManagement/RoleManagement.jsx (exports ExistingRoles)
+import ExistingRoles from './Admin Master/page/RoleManagement/RoleManagement';
+// Existing menus component is in MenuManagement/MenuManagement.jsx (exports ExistingMenus)
+import ExistingMenus from './Admin Master/page/MenuManagement/MenuManagement';
+// User management component is UserMappingtoRoles/UserMappingtoRoles.jsx
+import UserManagement from './Admin Master/page/UserMappingtoRoles/UserMappingtoRoles';
 import AuditLogs from "./Admin Master/page/AuditLogs/AuditLogs";
 import TandCManager from "./TANDC/TandCManager";
 
