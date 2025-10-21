@@ -11,6 +11,7 @@ import {
   Select,
   CircularProgress,
   Checkbox,
+  ListItemText,
   FormControlLabel
 } from "@mui/material";
 import axios from "axios";
@@ -18,6 +19,11 @@ import { BASE_URL } from "../../../Config";
 
 export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   const { register, handleSubmit, watch, setValue, reset, getValues } = useForm({});
+
+  // ensure tagID is registered since we'll control it via setValue
+  useEffect(() => {
+    register('tagIDs');
+  }, [register]);
 
   // State for dropdown options and loading
   const [categories, setCategories] = useState([]);
@@ -48,7 +54,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
         unitID: defaultValues.unitID || defaultValues.UnitID || '',
   product_mode: defaultValues.product_mode || defaultValues.ProductMode || '',
         storeID: defaultValues.storeID || defaultValues.StoreID || '',
-    tagID: defaultValues.tagID || defaultValues.TagID || '',
+        // Normalize tagID to an array so multi-select works; accept single id or array
+        // normalize to `tagIDs` (plural) because ReviewStep/backend expect tagIDs
+        tagIDs: (() => {
+          const dvTag = defaultValues.tagIDs ?? defaultValues.TagIDs ?? defaultValues.tagID ?? defaultValues.TagID;
+          if (dvTag === undefined || dvTag === null || dvTag === '') return [];
+          return Array.isArray(dvTag) ? dvTag : [dvTag];
+        })(),
         taxID: defaultValues.taxID || defaultValues.TaxID || '',
         gstPercent: defaultValues.gstPercent || defaultValues.GstPercent || '',
         description: defaultValues.description || defaultValues.Description || '',
@@ -60,7 +72,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
       reset({
         name: '', code: '', hsnID: '', hsnSacCode: '', importance: 'Normal', productType: 'All', minimumStock: '',
         categoryID: '', subcategoryID: '', unitID: '', product_mode: '',
-        storeID: '', tagID: '', taxID: '', gstPercent: '', description: '', internalNotes: '',
+  storeID: '', tagIDs: [], taxID: '', gstPercent: '', description: '', internalNotes: '',
         isActive: true, moq: '', // Added for MOQ
       });
     }
@@ -69,6 +81,9 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   const selectedCategoryID = watch("categoryID");
   const selectedTaxID = watch("taxID");
   const selectedHsnID = watch("hsnID");
+  const nameValue = watch('name');
+  const codeValue = watch('code');
+  const selectedTagIDs = watch('tagIDs');
 
   // Fetch all dropdown data on mount
   useEffect(() => {
@@ -145,6 +160,31 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
     }
   }, [selectedHsnID, hsnCodes, taxes, setValue]);
 
+  // Live-validate name/code against existing products and show message inline
+  useEffect(() => {
+    if (!productsList || productsList.length === 0) {
+      setFormError("");
+      return;
+    }
+
+    const norm = (s) => (s || "").toString().trim().toLowerCase();
+    const enteredName = norm(nameValue);
+    const enteredCode = norm(codeValue);
+
+    const nameExists = enteredName !== '' && productsList.some(p => norm(p.name || p.Name) === enteredName);
+    const codeExists = enteredCode !== '' && productsList.some(p => norm(p.code || p.Code) === enteredCode);
+
+    if (nameExists && codeExists) {
+      setFormError('A product with this name and code already exists. Please use unique values.');
+    } else if (nameExists) {
+      setFormError('A product with this name already exists.');
+    } else if (codeExists) {
+      setFormError('A product with this code already exists.');
+    } else {
+      setFormError('');
+    }
+  }, [nameValue, codeValue, productsList]);
+
   if (isLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
@@ -156,10 +196,26 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   // Custom submit handler to check code uniqueness
   const handleFormSubmit = (data) => {
     setFormError("");
-    if (productCodes.includes(data.code)) {
-      setFormError("A product with this code already exists. Please use a unique code.");
+    const norm = (s) => (s || "").toString().trim().toLowerCase();
+    const enteredName = norm(data.name);
+    const enteredCode = norm(data.code);
+
+    const nameExists = enteredName !== '' && productsList.some(p => norm(p.name || p.Name) === enteredName);
+    const codeExists = enteredCode !== '' && productsList.some(p => norm(p.code || p.Code) === enteredCode);
+
+    if (nameExists && codeExists) {
+      setFormError('A product with this name and code already exists. Please use unique values.');
       return;
     }
+    if (nameExists) {
+      setFormError('A product with this name already exists.');
+      return;
+    }
+    if (codeExists) {
+      setFormError('A product with this code already exists.');
+      return;
+    }
+
     onNext(data);
   };
 
@@ -319,7 +375,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
               <Select label="Product Mode" value={watch('product_mode') || ''} {...register("product_mode")} sx={{ width: '260px' }} onChange={(e) => setValue('product_mode', e.target.value)}>
                 <MenuItem value="purchase">Purchase</MenuItem>
                 <MenuItem value="internal manufacture">Internal Manufacture</MenuItem>
-                <MenuItem value="">Purchase & Internal Manufacture</MenuItem>
+                <MenuItem value="purchase & internal manufacture">Purchase & Internal Manufacture</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -350,9 +406,24 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           <Grid item xs={12} md={4}>
             <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Tag</InputLabel>
-              <Select label="Tag" value={watch("tagID") || ''} {...register("tagID")} sx={{ width: '260px' }}> 
+              <Select
+                label="Tag"
+                multiple
+                value={watch('tagIDs') || []}
+                onChange={(e) => setValue('tagIDs', e.target.value)}
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) return '';
+                  const names = tags.filter(t => (selected || []).includes(t.ID || t.id)).map(t => t.Name || t.name);
+                  return names.join(', ');
+                }}
+                sx={{ width: '260px' }}
+              >
                 {tags.length > 0 ? (
-                  tags.map(tag => <MenuItem key={tag.ID || tag.id} value={tag.ID || tag.id}>{tag.Name || tag.name}</MenuItem>)
+                  tags.map(tag => (
+                    <MenuItem key={tag.ID || tag.id} value={tag.ID || tag.id}>
+                      <ListItemText primary={tag.Name || tag.name} />
+                    </MenuItem>
+                  ))
                 ) : (
                   <MenuItem disabled value="">No Tags Available</MenuItem>
                 )}
