@@ -373,9 +373,9 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
             <FormControl size="small" InputLabelProps={{ shrink: true }}>
               <InputLabel>Product Mode</InputLabel>
               <Select label="Product Mode" value={watch('product_mode') || ''} {...register("product_mode")} sx={{ width: '260px' }} onChange={(e) => setValue('product_mode', e.target.value)}>
-                <MenuItem value="purchase">Purchase</MenuItem>
-                <MenuItem value="internal manufacture">Internal Manufacture</MenuItem>
-                <MenuItem value="purchase & internal manufacture">Purchase & Internal Manufacture</MenuItem>
+                <MenuItem value="Purchase">Purchase</MenuItem>
+                <MenuItem value="Internal Manufacturing">Internal Manufacturing</MenuItem>
+                <MenuItem value="Both">Both</MenuItem>
               </Select>
             </FormControl>
           </Grid>

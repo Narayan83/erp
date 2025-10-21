@@ -33,14 +33,42 @@ export default function ProductEditForm({ product, onSubmit }) {
   const navigate = useNavigate();
   // Normalize ProductMode values from backend to match Select options
   const normalizeProductMode = (val) => {
+    // Always return one of the exact Select option strings or empty string
     if (val === null || val === undefined) return '';
     const s = String(val).trim().toLowerCase();
-    // Accept common variants and map them to the Select labels
-    if (s === 'purchase' || s === 'purchasing' || s === 'buy') return 'Purchase';
-    if (s === 'internal manufacturing' || s === 'internal_manufacturing' || s === 'internalmanufacturing' || s === 'internal' || s === 'manufacturing' || s === 'im') return 'Internal Manufacturing';
-    if (s === 'purchase & internal manufacturing' || s === 'both' || s === 'purchase and internal manufacturing' || s === 'purchasing & internal manufacturing' || s === 'purchase&internal manufacturing' || s === 'purchase_and_internal_manufacturing') return 'Purchase & Internal Manufacturing';
-    // Return original value if it already matches proper casing
-    return val;
+
+    const mapping = new Map([
+      // Purchase variants
+      ['purchase', 'Purchase'],
+      ['purchasing', 'Purchase'],
+      ['buy', 'Purchase'],
+      ['p', 'Purchase'],
+      // Internal Manufacturing variants
+      ['internal manufacturing', 'Internal Manufacturing'],
+      ['internal_manufacturing', 'Internal Manufacturing'],
+      ['internalmanufacturing', 'Internal Manufacturing'],
+      ['internal', 'Internal Manufacturing'],
+      ['manufacturing', 'Internal Manufacturing'],
+      ['im', 'Internal Manufacturing'],
+      // Combined / both
+      ['purchase & internal manufacturing', 'Both'],
+      ['purchase and internal manufacturing', 'Both'],
+      ['purchasing & internal manufacturing', 'Both'],
+      ['both', 'Both'],
+      ['purchase & internal', 'Both'],
+      ['purchase/internal', 'Both'],
+    ]);
+
+    if (mapping.has(s)) return mapping.get(s);
+
+    // If the value already matches one of the Select labels (case-insensitive), return the canonical label
+  const canonicalOptions = ['Purchase', 'Internal Manufacturing', 'Both'];
+    for (const opt of canonicalOptions) {
+      if (s === opt.toLowerCase()) return opt;
+    }
+
+    // As a last resort, return empty string so Select shows no selection instead of a mismatched value
+    return '';
   };
   
   // Watch for HSN code changes
@@ -190,7 +218,8 @@ export default function ProductEditForm({ product, onSubmit }) {
         UnitID: unitID,
         StoreID: product.StoreID ? String(product.StoreID) : '',
         TaxID: product.TaxID ? String(product.TaxID) : '',
-  ProductMode: normalizeProductMode(product.ProductMode ?? product.product_mode ?? product.productMode ?? 'Purchase'),
+        // Ensure ProductMode is one of the Select option labels
+        ProductMode: normalizeProductMode(product.ProductMode ?? product.product_mode ?? product.productMode ?? ''),
         Description: product.Description || '',
         InternalNotes: product.InternalNotes || '',
         MinimumStock: product.MinimumStock ?? 0,
@@ -457,7 +486,7 @@ export default function ProductEditForm({ product, onSubmit }) {
                   onChange={e => field.onChange(e.target.value)}
                   sx={{ width: '260px' }}
                 >
-                  {["Purchase", "Internal Manufacturing", "Purchase & Internal Manufacturing"].map((level) => (
+                  {["Purchase", "Internal Manufacturing", "Both"].map((level) => (
                     <MenuItem key={level} value={level}>
                       {level}
                     </MenuItem>
@@ -522,7 +551,7 @@ export default function ProductEditForm({ product, onSubmit }) {
                 >
                   {taxes.map((tax) => (
                     <MenuItem key={tax.ID} value={String(tax.ID)}>
-                      {`${tax.Name} (${tax.Percentage}%)`}
+                      {tax.Name}
                     </MenuItem>
                   ))}
                 </Select>

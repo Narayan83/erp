@@ -1567,6 +1567,7 @@ export default function ProductListPage() {
   const [hsnCodes, setHsnCodes] = useState([]);
   const [units, setUnits] = useState([]);
   const [sizes, setSizes] = useState([]);
+  const [tags, setTags] = useState([]);
   const [taxes, setTaxes] = useState([]);
   
   // Define default filters
@@ -1809,7 +1810,7 @@ export default function ProductListPage() {
       console.log("Fetching dropdown data from backend...");
       
       // Fetch all metadata in parallel
-      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes, taxRes] = await Promise.all([
+      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes, tagRes, taxRes] = await Promise.all([
         axios.get(`${BASE_URL}/api/categories`).catch(err => {
           console.error("Error fetching categories:", err);
           return { data: [] };
@@ -1834,6 +1835,10 @@ export default function ProductListPage() {
           console.error("Error fetching sizes:", err);
           return { data: [] };
         }),
+        axios.get(`${BASE_URL}/api/tags`).catch(err => {
+          console.error("Error fetching tags:", err);
+          return { data: [] };
+        }),
         axios.get(`${BASE_URL}/api/taxes`).catch(err => {
           console.error("Error fetching taxes:", err);
           return { data: [] };
@@ -1852,8 +1857,9 @@ export default function ProductListPage() {
       const storesData = processData(storeRes);
       const hsnCodesData = processData(hsnRes);
       const unitsData = processData(unitRes);
-      const sizesData = processData(sizeRes);
-      const taxesData = processData(taxRes);
+  const sizesData = processData(sizeRes);
+  const tagsData = processData(tagRes);
+  const taxesData = processData(taxRes);
       
       // Log the first item of each type to check data structure
       console.log("Dropdown data samples:");
@@ -1903,8 +1909,9 @@ export default function ProductListPage() {
       setStores(storesData);
       setHsnCodes(standardizedHsnCodes);
       setUnits(unitsData);
-      setSizes(sizesData);
-      setTaxes(taxesData);
+  setSizes(sizesData);
+  setTags(tagsData);
+  setTaxes(taxesData);
       
       return {
         categories: categoriesData,
@@ -1912,6 +1919,7 @@ export default function ProductListPage() {
         stores: storesData,
         hsnCodes: standardizedHsnCodes,
         units: unitsData,
+        tags: tagsData,
         taxes: taxesData,
         sizes: sizesData
       };
@@ -2751,7 +2759,7 @@ export default function ProductListPage() {
     // Add asterisks to required fields and dropdown fields
     const headersArr = [
       'Name *', 'Code *', 'HSN Code *', 'Importance *', 'Product Type *', 'Minimum Stock',
-      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tax *',
+      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tag', 'Tax *',
   'GST %', 'Description', 'Internal Notes', 'Status *', 'Size',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
     ];
@@ -2762,7 +2770,7 @@ export default function ProductListPage() {
     // Create template data row with example values (Size left empty since it's optional)
     const exampleRow = [
       'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
-      'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'GST',
+      'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'Featured', 'GST',
       '18', 'Product description', 'Internal notes', 'Active', '',
       'SKU001', 'BAR001', '100', '150', '20', '3'
     ];
@@ -3563,7 +3571,7 @@ export default function ProductListPage() {
   // Full template headers for display in Import dialog
   const importTemplateHeaders = [
     'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
-    'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
+    'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tag', 'Tax',
     'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
     'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
   ];
@@ -4457,6 +4465,7 @@ export default function ProductListPage() {
                           hsnCodes={hsnCodes}
                           units={units}
                           sizes={sizes}
+                          tags={tags}
                           taxes={taxes}
                         />
                       );
