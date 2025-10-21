@@ -1337,6 +1337,52 @@ func ImportProducts(c *fiber.Ctx) error {
 
 		fmt.Printf("Row %d: Successfully created variant with ID %d\n", rowNum, variant.ID)
 
+		// Handle tags if provided in the import row (support 'Tag' or 'Tags' column names)
+		tagFieldVal := getStringValue(getFieldValue("Tag"))
+		if tagFieldVal == "" {
+			tagFieldVal = getStringValue(getFieldValue("Tags"))
+		}
+		if tagFieldVal != "" {
+			// Split by comma or semicolon and trim
+			parts := strings.FieldsFunc(tagFieldVal, func(r rune) bool { return r == ',' || r == ';' })
+			var tagNames []string
+			for _, p := range parts {
+				if t := strings.TrimSpace(p); t != "" {
+					tagNames = append(tagNames, t)
+				}
+			}
+
+			if len(tagNames) > 0 {
+				var tagsToAssoc []models.Tag
+				for _, tn := range tagNames {
+					var existing models.Tag
+					// Case-insensitive lookup
+					if err := tx.Where("LOWER(name) = LOWER(?)", tn).First(&existing).Error; err != nil {
+						if err == gorm.ErrRecordNotFound {
+							// Create new tag
+							newTag := models.Tag{Name: tn}
+							if cErr := tx.Create(&newTag).Error; cErr == nil {
+								tagsToAssoc = append(tagsToAssoc, newTag)
+							} else {
+								fmt.Printf("Row %d: Failed to create tag '%s': %v\n", rowNum, tn, cErr)
+							}
+						} else {
+							fmt.Printf("Row %d: Error finding tag '%s': %v\n", rowNum, tn, err)
+						}
+					} else {
+						// Found existing
+						tagsToAssoc = append(tagsToAssoc, existing)
+					}
+				}
+
+				if len(tagsToAssoc) > 0 {
+					if assocErr := tx.Model(&product).Association("Tags").Replace(&tagsToAssoc); assocErr != nil {
+						fmt.Printf("Row %d: Failed to associate tags for product %d: %v\n", rowNum, product.ID, assocErr)
+					}
+				}
+			}
+		}
+
 		// Commit this row's transaction
 		if err := tx.Commit().Error; err != nil {
 			errors = append(errors, fmt.Sprintf("Row %d: Failed to commit transaction: %v", rowNum, err))
