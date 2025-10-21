@@ -43,10 +43,10 @@ type QuotationTable struct {
 	ShippingCode  *string  `gorm:"type:varchar(50)" json:"shipping_code,omitempty"`
 	GSTApplicable *bool    `json:"gst_applicable,omitempty"`
 
-	BillingAddressID  uint      `gorm:"not null" json:"billing_address_id"`
-	BillingAddress    Addresses `gorm:"foreignKey:BillingAddressID" json:"billing_address"`
-	ShippingAddressID uint      `gorm:"not null" json:"shipping_address_id"`
-	ShippingAddress   Addresses `gorm:"foreignKey:ShippingAddressID" json:"shipping_address"`
+	BillingAddressID  *uint      `json:"billing_address_id,omitempty"`
+	BillingAddress    *Addresses `gorm:"foreignKey:BillingAddressID" json:"billing_address,omitempty"`
+	ShippingAddressID *uint      `json:"shipping_address_id,omitempty"`
+	ShippingAddress   *Addresses `gorm:"foreignKey:ShippingAddressID" json:"shipping_address,omitempty"`
 
 	// TandCId           uint    `json:"t_and_c_id"`
 	// TermsAndCondtions TandC   `gorm:"foreignKey:TandCId" json:"terms_and_conditions"`

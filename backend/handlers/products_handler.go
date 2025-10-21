@@ -171,6 +171,26 @@ func CreateProduct(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": errStr})
 	}
 
+	// After creating the product, check for tagIDs sent in the multipart form and associate tags
+	if tagIDsStr := c.FormValue("tagIDs"); tagIDsStr != "" {
+		var tagIDs []uint
+		if err := json.Unmarshal([]byte(tagIDsStr), &tagIDs); err == nil && len(tagIDs) > 0 {
+			var tags []models.Tag
+			if err := productsDB.Where("id IN ?", tagIDs).Find(&tags).Error; err == nil {
+				// Use GORM association replace to set many2many relationship
+				errAssoc := productsDB.Model(&product).Association("Tags").Replace(&tags)
+				if errAssoc != nil {
+					fmt.Printf("Failed to associate tags for product %d: %v\n", product.ID, errAssoc)
+				}
+			}
+		}
+	}
+
+	// Reload product with Tags preloaded to include them in response
+	if err := productsDB.Preload("Tags").Preload("Variants").First(&product, product.ID).Error; err != nil {
+		return c.JSON(product)
+	}
+
 	return c.JSON(product)
 }
 
@@ -231,6 +251,16 @@ func GetAllProducts(c *fiber.Ctx) error {
 	}
 	if importance := c.Query("importance"); importance != "" {
 		query = query.Where("importance = ?", importance)
+	}
+	if description := c.Query("description"); description != "" {
+		query = query.Where("description ILIKE ?", "%"+description+"%")
+	}
+	if tag := c.Query("tag"); tag != "" {
+		// Join with Tags table to filter by tag name
+		query = query.Joins("JOIN product_tags ON product_tags.product_id = products.id").
+			Joins("JOIN tags ON tags.id = product_tags.tag_id").
+			Where("tags.name ILIKE ?", "%"+tag+"%").
+			Distinct()
 	}
 
 	// Sorting
@@ -714,6 +744,34 @@ func GetProductAutocomplete(c *fiber.Ctx) error {
 			}
 		}
 
+	case "tags":
+		var tags []models.Tag
+		if err := productsDB.Select("DISTINCT name").
+			Where("name ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Find(&tags).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, tag := range tags {
+			if tag.Name != "" {
+				results = append(results, tag.Name)
+			}
+		}
+
+	case "descriptions":
+		var products []models.Product
+		if err := productsDB.Select("DISTINCT description").
+			Where("description ILIKE ?", "%"+query+"%").
+			Limit(limit).
+			Find(&products).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		for _, p := range products {
+			if p.Description != "" {
+				results = append(results, p.Description)
+			}
+		}
+
 	default:
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid field parameter"})
 	}
@@ -795,6 +853,16 @@ func UpdateProduct(c *fiber.Ctx) error {
 
 	if err := productsDB.Model(&product).Updates(updateData).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update product"})
+	}
+
+	// If TagIDs were provided, update the many2many association
+	if len(req.TagIDs) > 0 {
+		var tags []models.Tag
+		if err := productsDB.Where("id IN ?", req.TagIDs).Find(&tags).Error; err == nil {
+			if errAssoc := productsDB.Model(&product).Association("Tags").Replace(&tags); errAssoc != nil {
+				fmt.Printf("Failed to update tags association for product %d: %v\n", product.ID, errAssoc)
+			}
+		}
 	}
 
 	// Fetch the updated product to return
