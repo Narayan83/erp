@@ -44,13 +44,17 @@ import QuotationNewForm from './CRM/Pages/Quotation/QuotationForm';
 import QutationList from "./Qutation/QutationList";
 import AddQutation from "./Qutation/AddQutation";
 
-import RoleCreation from "./CAG/page/RoleCreation/RoleCreation";
-import MenuCreation from "./CAG/page/MenuCreation/MenuCreation";
-import RoleManagement from './CAG/page/RoleManagement/RoleManagement';
-import ExistingMenus from './CAG/page/ExistingMenus/ExistingMenus';
-import UserManagement from './CAG/page/UserManagement/UserManagement';
-import ExistingRoles from './CAG/page/ExistingRoles/ExistingRoles';
-import AuditLogs from "./CAG/page/AuditLogs/AuditLogs";
+import RoleCreation from "./Admin Master/page/RoleCreation/RoleCreation";
+import MenuCreation from "./Admin Master/page/MenuCreation/MenuCreation";
+// Role mapping (menus) component is in RoleMappingtoMenus/RoleMappingtoMenus.jsx
+import RoleManagement from './Admin Master/page/RoleMappingtoMenus/RoleMappingtoMenus';
+// Existing roles component actually lives in RoleManagement/RoleManagement.jsx (exports ExistingRoles)
+import ExistingRoles from './Admin Master/page/RoleManagement/RoleManagement';
+// Existing menus component is in MenuManagement/MenuManagement.jsx (exports ExistingMenus)
+import ExistingMenus from './Admin Master/page/MenuManagement/MenuManagement';
+// User management component is UserMappingtoRoles/UserMappingtoRoles.jsx
+import UserManagement from './Admin Master/page/UserMappingtoRoles/UserMappingtoRoles';
+import AuditLogs from "./Admin Master/page/AuditLogs/AuditLogs";
 import TandCManager from "./TANDC/TandCManager";
 
 const myContext = createContext();

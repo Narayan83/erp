@@ -270,6 +270,7 @@ export default function ReviewStep({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate(); // Add this to enable navigation
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State for display names
   const [categoryName, setCategoryName] = useState('');
@@ -277,6 +278,7 @@ export default function ReviewStep({
   const [taxName, setTaxName] = useState('');
   const [unitName, setUnitName] = useState('');
   const [storeName, setStoreName] = useState('');
+  const [tagNames, setTagNames] = useState('');
 
   // Fetch display names when product changes
   useEffect(() => {
@@ -321,6 +323,23 @@ export default function ReviewStep({
         setTaxName(taxRes.data?.name || taxRes.data?.Name || '');
         setUnitName(unitRes.data?.name || unitRes.data?.Name || '');
         setStoreName(storeRes.data?.name || storeRes.data?.Name || '');
+        // Fetch tag names if any tag IDs are present on the product
+        if (product.tagIDs && Array.isArray(product.tagIDs) && product.tagIDs.length > 0) {
+          try {
+            const tagsRes = await axios.get(`${BASE_URL}/api/tags`, { params: { page: 1, limit: 1000 } });
+            const allTags = tagsRes.data?.data || [];
+            const names = allTags
+              .filter(t => (product.tagIDs || []).includes(t.ID || t.id))
+              .map(t => t.Name || t.name)
+              .filter(Boolean);
+            setTagNames(names.join(', '));
+          } catch (e) {
+            console.warn('Failed to fetch tags for review:', e);
+            setTagNames('');
+          }
+        } else {
+          setTagNames('');
+        }
         
       } catch (error) {
         console.error('Error fetching display names:', error);
@@ -350,6 +369,8 @@ export default function ReviewStep({
   };
 
   const handleFinalSubmit = async () => {
+    if (isSubmitting) return; // prevent double submit
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
 
@@ -364,7 +385,13 @@ export default function ReviewStep({
         HsnSacCode: productData.hsnSacCode || '',
         Importance: productData.importance || '',
         ProductType: productData.productType || '',
-        MinimumStock: productData.minimumStock ? Number(productData.minimumStock) : 0,
+     MinimumStock: productData.minimumStock ? Number(productData.minimumStock) : 0,
+     // Preserve MOQ from whatever source it may be provided from (MOQ, moq, MinimumOrderQuantity)
+     MOQ: (productData.MOQ != null && productData.MOQ !== '') ? Number(productData.MOQ)
+       : (productData.moq != null && productData.moq !== '') ? Number(productData.moq)
+       : (productData.MinimumOrderQuantity != null && productData.MinimumOrderQuantity !== '') ? Number(productData.MinimumOrderQuantity)
+       : (productData.minimumOrderQuantity != null && productData.minimumOrderQuantity !== '') ? Number(productData.minimumOrderQuantity)
+       : (productData.minimumOrderQuantity ?? productData.MOQ ?? productData.moq) || 0,
         CategoryID: productData.categoryID ? Number(productData.categoryID) : null,
         SubcategoryID: productData.subcategoryID ? Number(productData.subcategoryID) : null,
         UnitID: productData.unitID ? Number(productData.unitID) : null,
@@ -382,17 +409,34 @@ export default function ReviewStep({
       // Transform variants to match backend's capitalized field names
       // Generate unique temporary IDs for variants without SKUs
       const transformedVariants = variants.map(({ images, mainImage, mainImageIndex, ...v }, index) => {
+        // Ensure MainImage is a string (filename or existing image path) or null.
+        // File objects serialize to {} in JSON which causes the backend to reject the variants JSON.
+        let serializedMainImage = null;
+        try {
+          if (typeof mainImage === 'string') {
+            serializedMainImage = mainImage;
+          } else if (mainImage instanceof File) {
+            // Use filename for the main image placeholder so backend receives a string.
+            serializedMainImage = mainImage.name || null;
+          } else {
+            serializedMainImage = null;
+          }
+        } catch (e) {
+          // In some environments File may not be defined; fallback to null or string inspection
+          serializedMainImage = (mainImage && typeof mainImage === 'object' && mainImage.name) ? mainImage.name : null;
+        }
+
         const variant = {
-          Color: v.color,
-          Size: v.size,
-          Barcode: v.barcode,
-          PurchaseCost: v.purchaseCost,
-          StdSalesPrice: v.stdSalesPrice,
-          Stock: v.stock,
-          LeadTime: v.leadTime,
-          IsActive: v.isActive,
-          // Persist main image selection if present
-          MainImage: mainImage ?? null,
+          Color: v.color || '',
+          Size: v.size || '',
+          Barcode: v.barcode || '',
+          PurchaseCost: v.purchaseCost !== undefined && v.purchaseCost !== null && v.purchaseCost !== '' ? Number(v.purchaseCost) : 0,
+          StdSalesPrice: v.stdSalesPrice !== undefined && v.stdSalesPrice !== null && v.stdSalesPrice !== '' ? Number(v.stdSalesPrice) : 0,
+          Stock: v.stock !== undefined && v.stock !== null && v.stock !== '' ? Number(v.stock) : 0,
+          LeadTime: v.leadTime !== undefined && v.leadTime !== null && v.leadTime !== '' ? Number(v.leadTime) : 0,
+          IsActive: v.isActive !== undefined ? Boolean(v.isActive) : true,
+          // Persist main image selection if present (string or null)
+          MainImage: serializedMainImage,
           MainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
           // Don't include Images here - they'll be handled separately
         };
@@ -467,9 +511,8 @@ export default function ReviewStep({
       formData.append("_debug", "true");
 
       console.log("Submitting product with FormData");
-      const res = await axios.post(`${BASE_URL}/api/products`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Let axios set the Content-Type including the proper multipart boundary.
+      const res = await axios.post(`${BASE_URL}/api/products`, formData);
 
       console.log("Submitted successfully:", res.data);
       setDialogOpen(true); // Show success dialog
@@ -477,27 +520,46 @@ export default function ReviewStep({
       console.error("Submission failed:", error);
       console.error("Error details:", error.response?.data || error.message);
 
-      // Try to provide a clearer message for unique constraint violations (Postgres 23505)
       const serverError = error.response?.data;
       let userMessage = `Product submission failed: ${error.message}`;
 
+      // More specific client-friendly messages based on common backend responses
       if (serverError) {
+        // serverError might be a string or structured object
         const errText = (typeof serverError === 'string') ? serverError : (serverError.error || serverError.message || JSON.stringify(serverError));
-        
-        if (serverError.error === 'duplicate_skus' && serverError.skus) {
-          userMessage = `Submission failed: The following SKUs already exist in the database: ${serverError.skus.join(', ')}. Please use unique SKUs for each variant.`;
-        } else if (serverError.error === 'duplicate_key' || (errText && (errText.toLowerCase().includes('unique constraint') || errText.includes('SQLSTATE 23505') || errText.toLowerCase().includes('duplicate key')))) {
+
+        // Known structured errors
+        if (serverError === 'Invalid multipart form' || errText.toLowerCase().includes('invalid multipart')) {
+          userMessage = 'Upload failed: The submitted form data is malformed. Please ensure files are attached correctly and try again.';
+        } else if (errText === 'Invalid variants JSON' || errText.toLowerCase().includes('invalid variants json')) {
+          userMessage = 'Submission failed: The variant data is invalid. Please review variant fields (SKU, numeric fields, and main image) and try again.';
+        } else if (serverError.error === 'duplicate_skus' && Array.isArray(serverError.skus)) {
+          userMessage = `Submission failed: The following SKUs already exist: ${serverError.skus.join(', ')}. Use unique SKUs or leave blank to auto-generate.`;
+        } else if (serverError.error === 'duplicate_key' || (errText && (errText.toLowerCase().includes('unique constraint') || errText.includes('sqlstate 23505') || errText.toLowerCase().includes('duplicate key')))) {
           if (errText.includes('products_pkey')) {
-            userMessage = 'Submission failed due to a database sequence issue. Please use the "Fix Database Sequence" button below and try again.';
+            userMessage = 'Submission failed due to a database sequence issue. Click "Fix Database Sequence" and try again.';
           } else {
-            userMessage = 'Submission failed because one or more SKUs already exist in the system. Please ensure each variant SKU is unique.';
+            userMessage = 'Submission failed because a unique constraint failed (likely a duplicate SKU). Please ensure SKUs are unique.';
           }
+        } else if (error.response?.status === 400) {
+          // Generic bad request: include server message if available
+          userMessage = `Submission failed (400): ${errText || 'Bad request - please check inputs.'}`;
+        } else if (error.response?.status === 409) {
+          userMessage = `Conflict: ${errText || 'A resource conflict occurred.'}`;
+        } else if (error.response?.status >= 500) {
+          userMessage = 'Server error: Please try again later or contact support.';
         } else if (errText) {
           userMessage = `Submission failed: ${errText}`;
         }
+      } else if (error.request) {
+        // No response received from server
+        userMessage = 'Network error: No response from server. Check your connection or backend server.';
       }
 
+      // Show a helpful alert to the user
       alert(userMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -517,6 +579,7 @@ export default function ReviewStep({
     {[
       { label: "Name", value: product.name },
       { label: "Code", value: product.code },
+  { label: "Tags", value: tagNames },
       { label: "HSN Code", value: product.hsnSacCode },
       { label: "Importance", value: product.importance },
       { label: "Product Type", value: product.productType },

@@ -11,6 +11,8 @@ import {
   Select,
   Checkbox,
   FormControlLabel,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
@@ -26,8 +28,48 @@ export default function ProductEditForm({ product, onSubmit }) {
   const [stores, setStores] = useState([]);
   const [taxes, setTaxes] = useState([]);
   const [hsnCodes, setHsnCodes] = useState([]);
+  const [tags, setTags] = useState([]);
 
   const navigate = useNavigate();
+  // Normalize ProductMode values from backend to match Select options
+  const normalizeProductMode = (val) => {
+    // Always return one of the exact Select option strings or empty string
+    if (val === null || val === undefined) return '';
+    const s = String(val).trim().toLowerCase();
+
+    const mapping = new Map([
+      // Purchase variants
+      ['purchase', 'Purchase'],
+      ['purchasing', 'Purchase'],
+      ['buy', 'Purchase'],
+      ['p', 'Purchase'],
+      // Internal Manufacturing variants
+      ['internal manufacturing', 'Internal Manufacturing'],
+      ['internal_manufacturing', 'Internal Manufacturing'],
+      ['internalmanufacturing', 'Internal Manufacturing'],
+      ['internal', 'Internal Manufacturing'],
+      ['manufacturing', 'Internal Manufacturing'],
+      ['im', 'Internal Manufacturing'],
+      // Combined / both
+      ['purchase & internal manufacturing', 'Both'],
+      ['purchase and internal manufacturing', 'Both'],
+      ['purchasing & internal manufacturing', 'Both'],
+      ['both', 'Both'],
+      ['purchase & internal', 'Both'],
+      ['purchase/internal', 'Both'],
+    ]);
+
+    if (mapping.has(s)) return mapping.get(s);
+
+    // If the value already matches one of the Select labels (case-insensitive), return the canonical label
+  const canonicalOptions = ['Purchase', 'Internal Manufacturing', 'Both'];
+    for (const opt of canonicalOptions) {
+      if (s === opt.toLowerCase()) return opt;
+    }
+
+    // As a last resort, return empty string so Select shows no selection instead of a mismatched value
+    return '';
+  };
   
   // Watch for HSN code changes
   const selectedHsnID = watch("HsnID");
@@ -76,7 +118,7 @@ export default function ProductEditForm({ product, onSubmit }) {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [cat, sub, unit, store, tax, hsn] = await Promise.all([
+        const [cat, sub, unit, store, tax, hsn, tag] = await Promise.all([
           axios.get(`${BASE_URL}/api/categories`),
           axios.get(`${BASE_URL}/api/subcategories`, {
             params: { category_id: product.CategoryID },
@@ -88,9 +130,11 @@ export default function ProductEditForm({ product, onSubmit }) {
           axios.get(`${BASE_URL}/api/stores`),
           axios.get(`${BASE_URL}/api/taxes`),
           axios.get(`${BASE_URL}/api/hsncode`).catch(() => ({ data: { data: [] } })),
+          axios.get(`${BASE_URL}/api/tags`).catch(() => ({ data: { data: [] } })),
         ]);
         
         console.log("Units API response:", unit.data);
+        console.log("Tags API response:", tag.data);
         
         setCategories(cat.data.data);
         setSubcategories(sub.data.data);
@@ -98,6 +142,9 @@ export default function ProductEditForm({ product, onSubmit }) {
         setStores(store.data.data);
         setTaxes(tax.data.data);
         setHsnCodes(hsn.data.data);
+        setTags(tag.data.data || tag.data || []);
+        
+        console.log("Tags set to:", tag.data.data || tag.data || []);
 
         // Return the loaded data for prefilling
         return {
@@ -106,7 +153,8 @@ export default function ProductEditForm({ product, onSubmit }) {
           units: unit.data.data,
           stores: store.data.data,
           taxes: tax.data.data,
-          hsnCodes: hsn.data.data
+          hsnCodes: hsn.data.data,
+          tags: tag.data.data || tag.data || []
         };
       } catch (err) {
         console.error("Error loading options:", err);
@@ -116,6 +164,7 @@ export default function ProductEditForm({ product, onSubmit }) {
         setStores([]);
         setTaxes([]);
         setHsnCodes([]);
+        setTags([]);
         return null;
       }
     };
@@ -150,6 +199,12 @@ export default function ProductEditForm({ product, onSubmit }) {
         }
       }
 
+      // Extract tag IDs from product.Tags array
+      let tagIDs = [];
+      if (Array.isArray(product.Tags) && product.Tags.length > 0) {
+        tagIDs = product.Tags.map(tag => String(tag.ID || tag.id)).filter(Boolean);
+      }
+
       // Pre-fill form only after options are loaded
       reset({
         Name: product.Name,
@@ -163,13 +218,15 @@ export default function ProductEditForm({ product, onSubmit }) {
         UnitID: unitID,
         StoreID: product.StoreID ? String(product.StoreID) : '',
         TaxID: product.TaxID ? String(product.TaxID) : '',
-        ProductMode: product.ProductMode || "Purchase",
+        // Ensure ProductMode is one of the Select option labels
+        ProductMode: normalizeProductMode(product.ProductMode ?? product.product_mode ?? product.productMode ?? ''),
         Description: product.Description || '',
         InternalNotes: product.InternalNotes || '',
         MinimumStock: product.MinimumStock ?? 0,
         IsActive: typeof product.IsActive !== 'undefined' ? product.IsActive : true,
         ProductType: product.ProductType || 'All',
         moq: (product.moq ?? product.MOQ ?? product.Moq ?? ''),
+        TagIDs: tagIDs,
       });
     });
   }, [product, reset]);
@@ -191,8 +248,16 @@ export default function ProductEditForm({ product, onSubmit }) {
       GstPercent: data.GstPercent ? Number(data.GstPercent) : 0,
       moq: data.moq ? Number(data.moq) : 0, // Added for MOQ
       IsActive: data.IsActive ? 1 : 0, // Convert boolean to 1/0 for backend compatibility
+      TagIDs: Array.isArray(data.TagIDs) ? data.TagIDs.map(id => Number(id)) : [],
       ID: product.ID // Make sure we include the product ID
     };
+
+    // Ensure ProductMode is normalized to the expected labels
+    if (typeof data.ProductMode !== 'undefined') {
+      formattedData.ProductMode = normalizeProductMode(data.ProductMode);
+    } else if (product.ProductMode || product.product_mode) {
+      formattedData.ProductMode = normalizeProductMode(product.ProductMode ?? product.product_mode);
+    }
 
     console.log("Formatted data being sent:", formattedData);
     console.log("IsActive in formatted data:", formattedData.IsActive);
@@ -421,7 +486,7 @@ export default function ProductEditForm({ product, onSubmit }) {
                   onChange={e => field.onChange(e.target.value)}
                   sx={{ width: '260px' }}
                 >
-                  {["Purchase", "Internal Manufacturing"].map((level) => (
+                  {["Purchase", "Internal Manufacturing", "Both"].map((level) => (
                     <MenuItem key={level} value={level}>
                       {level}
                     </MenuItem>
@@ -486,7 +551,7 @@ export default function ProductEditForm({ product, onSubmit }) {
                 >
                   {taxes.map((tax) => (
                     <MenuItem key={tax.ID} value={String(tax.ID)}>
-                      {`${tax.Name} (${tax.Percentage}%)`}
+                      {tax.Name}
                     </MenuItem>
                   ))}
                 </Select>
@@ -524,6 +589,58 @@ export default function ProductEditForm({ product, onSubmit }) {
             size="small"
             sx={{ width: '260px' }}
             {...register("InternalNotes")}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Controller
+            name="TagIDs"
+            control={control}
+            defaultValue={[]}
+            render={({ field }) => {
+              console.log("Rendering Tags field. Available tags:", tags);
+              console.log("Current TagIDs value:", field.value);
+              
+              const selectedTags = tags.filter(tag => {
+                const tagId = String(tag.ID || tag.id);
+                return (field.value || []).includes(tagId);
+              });
+              
+              return (
+                <Autocomplete
+                  multiple
+                  options={tags || []}
+                  getOptionLabel={(option) => option.Name || option.name || ''}
+                  value={selectedTags}
+                  onChange={(event, newValue) => {
+                    const ids = newValue.map(tag => String(tag.ID || tag.id));
+                    console.log("Tags changed to:", ids);
+                    field.onChange(ids);
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Tags"
+                      placeholder="Select tags"
+                      size="small"
+                      sx={{ width: '260px' }}
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        key={index}
+                        label={option.Name || option.name}
+                        {...getTagProps({ index })}
+                        size="small"
+                      />
+                    ))
+                  }
+                  isOptionEqualToValue={(option, value) => {
+                    return String(option.ID || option.id) === String(value.ID || value.id);
+                  }}
+                />
+              );
+            }}
           />
         </Grid>
         <Grid item xs={12} md={4}>

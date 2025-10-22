@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 const API_BASE = 'http://localhost:8000';
-import "../../styles/existing_roles.scss";
+import "../../styles/role_management.scss";
 import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import RoleCreation from "../RoleCreation/RoleCreation"; // Adjust the import based on your file structure
 
@@ -181,7 +181,7 @@ export default function ExistingRoles({ roles, setRoles, initialRoles, onEditRol
     <div className="existing-roles-container">
       <section className="title-section">
         <div>
-          <h1 className="page-title">Existing Roles</h1>
+          <h1 className="page-title">Role Management</h1>
           <div className="subtitle">Manage all your available roles</div>
         </div>
         <div className="actions-row">

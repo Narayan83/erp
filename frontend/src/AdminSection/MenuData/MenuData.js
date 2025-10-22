@@ -47,7 +47,7 @@ export const menuItems = [
       { title: "Product Master", path: "/ProductMaster" },
       { title: "Tag Management", path: "/ManageTag" },
       { title: "Store / Unit / Tax / HSN / Size", path: "/ManageUnitStoreTax" },
-       { title: "Terms & Conditions  Management", path: "/Managetandc" },
+      { title: "Terms & Conditions  Management", path: "/Managetandc" },
     ],
   },
 
@@ -55,8 +55,10 @@ export const menuItems = [
     id: 3,
     title: "Users Masters",
     icon: GiRingmaster,
-    submenu: [{ title: "Users Management", path: "/users" },
+    submenu: [
+      { title: "Users Management", path: "/users" },
       { title: "User Address", path: "/address" },
+      { title: "Bank Management", path: "/ManageBank" },
     ],
   },
 
@@ -74,16 +76,21 @@ export const menuItems = [
 
   {
     id: 7,
-    title: "CAG Masters",
+    title: "Admin",
     icon: GiRingmaster,
     submenu: [
       { title: "Role Creation", path: "/rolecreation" },
-      { title: "Existing Roles", path: "/existingroles" },
-      { title: "Role Management", path: "/rolemanagement" },
+      // "Role Management" here links to the list of existing roles
+      { title: "Role Management", path: "/existingroles" },
+      // "Role Mapping" is the role->menu mapping UI
+      { title: "Role Mapping", path: "/rolemanagement" },
       { title: "Menu Creation", path: "/menucreation" },
-      { title: "Existing Menus", path: "/existingmenus" },
-      { title: "User Management", path: "/usermanagement" },
+      // Menu Management route (list of menus)
+      { title: "Menu Management", path: "/existingmenus" },
+      // User Mapping route (user to role mapping)
+      { title: "User Mapping", path: "/usermanagement" },
       { title: "Audit Logs", path: "/auditlogs" },
+      { title: "Bank details", path: "/ManageBranch" },
     ],
   },
 
@@ -94,19 +101,6 @@ export const menuItems = [
     submenu: [{ title: "Company/Firm setups", path: "/" }],
   },
 
-  {
-    id: 8,
-    title: "Branch Master",
-    icon: GiRingmaster,
-    submenu: [{ title: "Branch Management", path: "/ManageBranch" }],
-  },
-
-  {
-    id: 9,
-    title: "Bank Master",
-    icon: GiRingmaster,
-    submenu: [{ title: "Bank Management", path: "/ManageBank" }],
-  },
   {
     id: 5,
     title: "Reports",

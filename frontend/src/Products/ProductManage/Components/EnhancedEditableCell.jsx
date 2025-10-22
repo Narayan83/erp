@@ -14,6 +14,7 @@ const EnhancedEditableCell = ({
   hsnCodes,
   units,
   sizes,
+  tags,
   taxes
 }) => {
   const [editing, setEditing] = useState(false);
@@ -74,6 +75,10 @@ const EnhancedEditableCell = ({
   else if (normalizedColumnKey === 'tax') {
     standardizedKey = 'tax';
   }
+  // Tag variations
+  else if (normalizedColumnKey === 'tag' || normalizedColumnKey === 'tags') {
+    standardizedKey = 'tag';
+  }
   
   console.log(`Column: "${columnKey}" → Normalized: "${normalizedColumnKey}" → Standardized: "${standardizedKey}"`);
   
@@ -87,6 +92,7 @@ const EnhancedEditableCell = ({
   const isHsnCode = standardizedKey === 'hsn';
   const isUnit = normalizedColumnKey === 'unit';
   const isProductMode = normalizedColumnKey === 'productmode';
+  const isTag = normalizedColumnKey === 'tag' || normalizedColumnKey === 'tags';
   const isSize = normalizedColumnKey === 'size';
   const isTax = normalizedColumnKey === 'tax';
   
@@ -106,6 +112,7 @@ const EnhancedEditableCell = ({
         hsnCodes: Array.isArray(hsnCodes) ? `${hsnCodes.length} items` : hsnCodes,
         units: Array.isArray(units) ? `${units.length} items` : units,
         sizes: Array.isArray(sizes) ? `${sizes.length} items` : sizes,
+        tags: Array.isArray(tags) ? `${tags.length} items` : tags,
         taxes: Array.isArray(taxes) ? `${taxes.length} items` : taxes
       });
       
@@ -128,13 +135,16 @@ const EnhancedEditableCell = ({
       if (isSize && sizes?.length > 0) {
         console.log("Sample size data:", sizes[0]);
       }
+      if (isTag && tags?.length > 0) {
+        console.log("Sample tag data:", tags[0]);
+      }
       if (isTax && taxes?.length > 0) {
         console.log("Sample tax data:", taxes[0]);
       }
     }
   }, [editing, columnKey, normalizedColumnKey, categories, allSubcategories, 
-      stores, hsnCodes, units, sizes, taxes, isCategory, isSubcategory, isStore, 
-      isProductType, isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize, isTax]);
+      stores, hsnCodes, units, sizes, tags, taxes, isCategory, isSubcategory, isStore, 
+      isProductType, isStatus, isImportance, isHsnCode, isUnit, isProductMode, isSize, isTag, isTax]);
   
   // Get dropdown options based on field type
   let options = [];
@@ -208,6 +218,14 @@ const EnhancedEditableCell = ({
         label: name 
       };
     }).filter(opt => opt.value);
+  } else if (isTag && Array.isArray(tags)) {
+    options = tags.map(tag => {
+      const name = tag.Name || tag.name || '';
+      return {
+        value: name,
+        label: name
+      };
+    }).filter(opt => opt.value);
   } else if (isProductType) {
     options = [
       { value: 'All', label: 'All' },
@@ -276,7 +294,8 @@ const EnhancedEditableCell = ({
   } else if (isProductMode) {
     options = [
       { value: 'Purchase', label: 'Purchase' },
-      { value: 'Internal Manufacturing', label: 'Internal Manufacturing' }
+      { value: 'Internal Manufacturing', label: 'Internal Manufacturing' },
+      { value: 'Both', label: 'Both' }
     ];
   } else if (isSize && Array.isArray(sizes)) {
     options = sizes.map(size => {

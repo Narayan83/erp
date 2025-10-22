@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import "../../styles/role_management.scss";
+import "../../styles/role_mapping.scss";
 
 import { BASE_URL }  from "../../../Config";
 
@@ -494,7 +494,7 @@ export default function RoleManagement() {
   return (
     <div className="role-management-container">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div className="role-management-header">Role Management</div>
+        <div className="role-management-header">Role Mapping to Menus</div>
         <button
           type="button"
           onClick={() => {

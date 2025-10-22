@@ -439,6 +439,14 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             control={<Checkbox checked={columns.importance} onChange={handleColumnToggle('importance')} />}
             label="Importance"
           />
+          <FormControlLabel
+            control={<Checkbox checked={columns.tag} onChange={handleColumnToggle('tag')} />}
+            label="Tag"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={columns.description} onChange={handleColumnToggle('description')} />}
+            label="Description"
+          />
           {/* Variant columns */}
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Variant Columns</Typography>
           <FormControlLabel
@@ -513,53 +521,72 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
               }
             />
           </TableCell>
-          <TableCell sx={{ py: 0.5, width: 60 }}>{page * limit + idx + 1}</TableCell>
-          {visibleColumns.name && <TableCell sx={{ py: 0.5, width: 150 }}>{p.Name}</TableCell>}
-          {visibleColumns.code && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Code}</TableCell>}
-          {visibleColumns.category && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Category?.Name}</TableCell>}
-          {visibleColumns.subcategory && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Subcategory?.Name || ''}</TableCell>}
-          {visibleColumns.store && <TableCell sx={{ py: 0.5, width: 120 }}>{p.Store?.Name}</TableCell>}
-          {visibleColumns.productType && <TableCell sx={{ py: 0.5, width: 120 }}>{p.ProductType || ''}</TableCell>}
-          {visibleColumns.productMode && <TableCell sx={{ py: 0.5, width: 120 }}>{p.ProductMode ?? p.product_mode ?? ''}</TableCell>}
+          <TableCell sx={{ py: 0.5, width: 60, whiteSpace: 'nowrap' }}>{page * limit + idx + 1}</TableCell>
+          {visibleColumns.name && <TableCell sx={{ py: 0.5, width: 150, whiteSpace: 'nowrap' }}>{p.Name}</TableCell>}
+          {visibleColumns.code && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.Code}</TableCell>}
+          {visibleColumns.category && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.Category?.Name}</TableCell>}
+          {visibleColumns.subcategory && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.Subcategory?.Name || ''}</TableCell>}
+          {visibleColumns.store && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.Store?.Name}</TableCell>}
+          {visibleColumns.productType && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.ProductType || ''}</TableCell>}
+          {visibleColumns.productMode && <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>{p.ProductMode ?? p.product_mode ?? ''}</TableCell>}
           {visibleColumns.stock && (
             // show common fallback fields for stock if p.Stock is not present
-            <TableCell sx={{ py: 0.5, width: 100 }}>
-              {p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? ''}
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
+              {(() => {
+                const stock = p.Stock ?? p.StockQuantity ?? p.stock ?? p.quantity ?? p.qty ?? '';
+                const minStock = p.MinimumStock ?? p.MinStock ?? p.minimum_stock ?? p.min_stock ?? 0;
+                const isLowStock = stock !== '' && minStock !== '' && Number(stock) < Number(minStock);
+                return (
+                  <span style={{ color: isLowStock ? '#d32f2f' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
+                    {stock}
+                  </span>
+                );
+              })()}
             </TableCell>
           )}
           {visibleColumns.minimumStock && (
-            <TableCell sx={{ py: 0.5, width: 100 }}>
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
               {p.MinimumStock ?? p.MinStock ?? p.minimum_stock ?? p.min_stock ?? ''}
             </TableCell>
           )}
           {visibleColumns.moq && (
-            <TableCell sx={{ py: 0.5, width: 100 }}>
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
               {p.MOQ ?? p.MinimumOrderQuantity ?? p.moq ?? ''}
             </TableCell>
           )}
           {visibleColumns.leadTime && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.LeadTime ?? p.lead_time ?? p.leadtime ?? ''}
             </TableCell>
           )}
           {visibleColumns.note && (
-            <TableCell sx={{ py: 0.5, width: 150 }}>
+            <TableCell sx={{ py: 0.5, width: 150, whiteSpace: 'nowrap' }}>
               {p.Note ?? p.note ?? p.Notes ?? p.notes ?? ''}
             </TableCell>
           )}
           {visibleColumns.status && (
-            <TableCell sx={{ py: 0.5, width: 100 }}>
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
               {p.IsActive ? 'Active' : 'Inactive'}
             </TableCell>
           )}
           {visibleColumns.importance && (
-            <TableCell sx={{ py: 0.5, width: 100 }}>
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
               {p.Importance ?? 'Normal'}
+            </TableCell>
+          )}
+          {visibleColumns.tag && (
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
+              {Array.isArray(p.Tags) && p.Tags.length > 0 ? p.Tags.map(tag => tag?.Name || '').filter(Boolean).join(', ') : ''}
+            </TableCell>
+          )}
+          {visibleColumns.description && (
+            <TableCell sx={{ py: 0.5, width: 150, whiteSpace: 'nowrap' }}>
+              {p.Description || ''}
             </TableCell>
           )}
           {/* Variant columns */}
           {visibleColumns.color && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? (
                 <Box display="flex" flexWrap="wrap" gap={0.5} alignItems="center">
                   {p.Variants.map((v, idx) => {
@@ -596,32 +623,32 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             </TableCell>
           )}
           {visibleColumns.size && (
-            <TableCell sx={{ py: 0.5, width: 100 }}>
+            <TableCell sx={{ py: 0.5, width: 100, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Size?.Name || v.Size).join(', ') : ''}
             </TableCell>
           )}
           {visibleColumns.sku && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.SKU).join(', ') : ''}
             </TableCell>
           )}
           {visibleColumns.barcode && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => v.Barcode).join(', ') : ''}
             </TableCell>
           )}
           {visibleColumns.purchaseCost && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => `₹${v.PurchaseCost || 0}`).join(', ') : ''}
             </TableCell>
           )}
           {visibleColumns.salesPrice && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {p.Variants && p.Variants.length > 0 ? p.Variants.map(v => `₹${v.StdSalesPrice || 0}`).join(', ') : ''}
             </TableCell>
           )}
           {visibleColumns.image && (
-            <TableCell sx={{ py: 0.5, width: 120 }}>
+            <TableCell sx={{ py: 0.5, width: 120, whiteSpace: 'nowrap' }}>
               {(() => {
                 const imgSrc = getMainImageForProduct(p);
                 if (imgSrc) {
@@ -647,7 +674,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
               })()}
             </TableCell>
           )}
-          <TableCell align="center" sx={{ width: 120 }}>
+          <TableCell align="center" sx={{ width: 120, whiteSpace: 'nowrap' }}>
             <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
               {/* View now uses onView callback to open read-only dialog */}
               <IconButton onClick={() => onView && onView(p.ID)}><Visibility /></IconButton>
@@ -890,7 +917,8 @@ const FiltersRow = memo(function FiltersRow({
           <Autocomplete
             options={[
               { value: 'Purchase', label: 'Purchase' },
-              { value: 'Internal Manufacturing', label: 'Internal Manufacturing' }
+              { value: 'Internal Manufacturing', label: 'Internal Manufacturing' },
+              { value: 'Both', label: 'Both' }
             ]}
             getOptionLabel={(option) => option.label}
             value={filters.productMode ? { value: filters.productMode, label: filters.productMode } : null}
@@ -1149,6 +1177,96 @@ const FiltersRow = memo(function FiltersRow({
                 size="small"
               />
             )}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.tag && (
+        <TableCell sx={{ width: 120 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.tags || []}
+            loading={autocompleteLoading.tags}
+            inputValue={inputFilters.tag || ''}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, tag: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('tags', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, tags: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, tag: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Tag"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.tags ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={(autocompleteOptions.tags && autocompleteOptions.tags.length > 0) || autocompleteLoading.tags || (inputFilters.tag && inputFilters.tag.length > 0)}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.description && (
+        <TableCell sx={{ width: 150 }}>
+          <Autocomplete
+            freeSolo
+            options={autocompleteOptions.descriptions || []}
+            loading={autocompleteLoading.descriptions}
+            inputValue={inputFilters.description || ''}
+            onInputChange={(event, newValue, reason) => {
+              setInputFilters(f => ({ ...f, description: newValue || '' }));
+              if (newValue && newValue.length >= 1) {
+                onAutocompleteInputChange('descriptions', newValue);
+              } else if (!newValue || newValue.length === 0) {
+                setAutocompleteOptions(prev => ({ ...prev, descriptions: [] }));
+              }
+            }}
+            onChange={(event, newValue, reason) => {
+              if (reason === 'selectOption' || reason === 'clear') {
+                setInputFilters(f => ({ ...f, description: newValue || '' }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Description"
+                fullWidth
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading.descriptions ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            open={(autocompleteOptions.descriptions && autocompleteOptions.descriptions.length > 0) || autocompleteLoading.descriptions || (inputFilters.description && inputFilters.description.length > 0)}
+            filterOptions={(x) => x}
+            disableClearable={false}
+            clearOnBlur={false}
+            blurOnSelect={false}
           />
         </TableCell>
       )}
@@ -1449,13 +1567,14 @@ export default function ProductListPage() {
   const [hsnCodes, setHsnCodes] = useState([]);
   const [units, setUnits] = useState([]);
   const [sizes, setSizes] = useState([]);
+  const [tags, setTags] = useState([]);
   const [taxes, setTaxes] = useState([]);
   
   // Define default filters
   const defaultFilters = { 
     name: "", code: "", categoryID: null, subcategoryID: null, storeID: null, 
     productType: "", productMode: "", stock: "", moq: "", leadTime: "", note: "", status: null, 
-    importance: null, color: "", size: "", sku: "", barcode: "", 
+    importance: null, tag: "", description: "", color: "", size: "", sku: "", barcode: "", 
     purchaseCost: "", salesPrice: "" 
   };
   
@@ -1465,7 +1584,7 @@ export default function ProductListPage() {
   // NEW: local input state to avoid re-fetch on every keystroke
   const [inputFilters, setInputFilters] = useState({ 
     name: "", code: "", productType: "", productMode: "", stock: "", minimumStock: "", moq: "", 
-    leadTime: "", note: "", color: "", size: "", sku: "", 
+    leadTime: "", note: "", tag: "", description: "", color: "", size: "", sku: "", 
     barcode: "", purchaseCost: "", salesPrice: "" 
   });
   const [page, setPage] = useState(0);
@@ -1489,17 +1608,8 @@ export default function ProductListPage() {
 
   // New state for display preferences
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    // Try to load saved preferences from localStorage
-    const savedPreferences = localStorage.getItem('productListColumns');
-    if (savedPreferences) {
-      try {
-        return JSON.parse(savedPreferences);
-      } catch (e) {
-        console.error('Error parsing saved column preferences', e);
-      }
-    }
-    // Default to all columns visible
-    return {
+    // Default columns configuration
+    const defaultColumns = {
       name: true,
       code: true,
       category: true,
@@ -1514,6 +1624,8 @@ export default function ProductListPage() {
       note: true,
       status: true,
       importance: true,
+      tag: true,
+      description: true,
       // Variant columns
       color: true,
       size: true,
@@ -1523,6 +1635,20 @@ export default function ProductListPage() {
       salesPrice: true,
       image: true
     };
+
+    // Try to load saved preferences from localStorage
+    const savedPreferences = localStorage.getItem('productListColumns');
+    if (savedPreferences) {
+      try {
+        const parsed = JSON.parse(savedPreferences);
+        // Merge saved preferences with defaults to handle new columns
+        return { ...defaultColumns, ...parsed };
+      } catch (e) {
+        console.error('Error parsing saved column preferences', e);
+      }
+    }
+    // Return default to all columns visible
+    return defaultColumns;
   });
   
   // State for display preferences popover
@@ -1547,6 +1673,8 @@ export default function ProductListPage() {
     moqs: [],
     leadTimes: [],
     notes: [],
+    tags: [],
+    descriptions: [],
     colors: [],
     sizes: [],
     skus: [],
@@ -1561,6 +1689,8 @@ export default function ProductListPage() {
     moqs: false,
     leadTimes: false,
     notes: false,
+    tags: false,
+    descriptions: false,
     colors: false,
     sizes: false,
     skus: false,
@@ -1633,7 +1763,7 @@ export default function ProductListPage() {
 
   // Sync initial values (runs once)
   useEffect(() => {
-    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, productMode: filters.productMode, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
+    setInputFilters({ name: filters.name, code: filters.code, productType: filters.productType, productMode: filters.productMode, stock: filters.stock, moq: filters.moq, leadTime: filters.leadTime, note: filters.note, tag: filters.tag, description: filters.description, color: filters.color, size: filters.size, sku: filters.sku, barcode: filters.barcode, purchaseCost: filters.purchaseCost, salesPrice: filters.salesPrice });
   }, []); 
 
   // Debounce typing (name, code, stock) before updating main filters
@@ -1649,6 +1779,8 @@ export default function ProductListPage() {
           prev.moq === inputFilters.moq &&
           prev.leadTime === inputFilters.leadTime &&
           prev.note === inputFilters.note &&
+          prev.tag === inputFilters.tag &&
+          prev.description === inputFilters.description &&
           prev.color === inputFilters.color &&
           prev.size === inputFilters.size &&
           prev.sku === inputFilters.sku &&
@@ -1657,12 +1789,12 @@ export default function ProductListPage() {
           prev.salesPrice === inputFilters.salesPrice &&
           prev.minimumStock === inputFilters.minimumStock
         ) return prev;
-        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, productMode: inputFilters.productMode, stock: inputFilters.stock, minimumStock: inputFilters.minimumStock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
+        return { ...prev, name: inputFilters.name, code: inputFilters.code, productType: inputFilters.productType, productMode: inputFilters.productMode, stock: inputFilters.stock, minimumStock: inputFilters.minimumStock, moq: inputFilters.moq, leadTime: inputFilters.leadTime, note: inputFilters.note, tag: inputFilters.tag, description: inputFilters.description, color: inputFilters.color, size: inputFilters.size, sku: inputFilters.sku, barcode: inputFilters.barcode, purchaseCost: inputFilters.purchaseCost, salesPrice: inputFilters.salesPrice };
       });
       setPage(0);
     }, 400); // typing debounce
     return () => clearTimeout(t);
-  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.productMode, inputFilters.stock, inputFilters.minimumStock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
+  }, [inputFilters.name, inputFilters.code, inputFilters.productType, inputFilters.productMode, inputFilters.stock, inputFilters.minimumStock, inputFilters.moq, inputFilters.leadTime, inputFilters.note, inputFilters.tag, inputFilters.description, inputFilters.color, inputFilters.size, inputFilters.sku, inputFilters.barcode, inputFilters.purchaseCost, inputFilters.salesPrice]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -1678,7 +1810,7 @@ export default function ProductListPage() {
       console.log("Fetching dropdown data from backend...");
       
       // Fetch all metadata in parallel
-      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes, taxRes] = await Promise.all([
+      const [catRes, subRes, storeRes, hsnRes, unitRes, sizeRes, tagRes, taxRes] = await Promise.all([
         axios.get(`${BASE_URL}/api/categories`).catch(err => {
           console.error("Error fetching categories:", err);
           return { data: [] };
@@ -1703,6 +1835,10 @@ export default function ProductListPage() {
           console.error("Error fetching sizes:", err);
           return { data: [] };
         }),
+        axios.get(`${BASE_URL}/api/tags`).catch(err => {
+          console.error("Error fetching tags:", err);
+          return { data: [] };
+        }),
         axios.get(`${BASE_URL}/api/taxes`).catch(err => {
           console.error("Error fetching taxes:", err);
           return { data: [] };
@@ -1721,8 +1857,9 @@ export default function ProductListPage() {
       const storesData = processData(storeRes);
       const hsnCodesData = processData(hsnRes);
       const unitsData = processData(unitRes);
-      const sizesData = processData(sizeRes);
-      const taxesData = processData(taxRes);
+  const sizesData = processData(sizeRes);
+  const tagsData = processData(tagRes);
+  const taxesData = processData(taxRes);
       
       // Log the first item of each type to check data structure
       console.log("Dropdown data samples:");
@@ -1772,8 +1909,9 @@ export default function ProductListPage() {
       setStores(storesData);
       setHsnCodes(standardizedHsnCodes);
       setUnits(unitsData);
-      setSizes(sizesData);
-      setTaxes(taxesData);
+  setSizes(sizesData);
+  setTags(tagsData);
+  setTaxes(taxesData);
       
       return {
         categories: categoriesData,
@@ -1781,6 +1919,7 @@ export default function ProductListPage() {
         stores: storesData,
         hsnCodes: standardizedHsnCodes,
         units: unitsData,
+        tags: tagsData,
         taxes: taxesData,
         sizes: sizesData
       };
@@ -1901,6 +2040,27 @@ export default function ProductListPage() {
         });
         break;
 
+      case 'tags':
+        products.forEach(product => {
+          if (Array.isArray(product.Tags) && product.Tags.length > 0) {
+            product.Tags.forEach(tag => {
+              if (tag && tag.Name && tag.Name.toLowerCase().includes(queryLower)) {
+                suggestions.add(tag.Name);
+              }
+            });
+          }
+        });
+        break;
+
+      case 'descriptions':
+        products.forEach(product => {
+          const description = product.Description || '';
+          if (description && typeof description === 'string' && description.toLowerCase().includes(queryLower)) {
+            suggestions.add(description);
+          }
+        });
+        break;
+
       case 'colors':
         products.forEach(product => {
           if (product.Variants && product.Variants.length > 0) {
@@ -2008,6 +2168,16 @@ export default function ProductListPage() {
     [products]
   );
 
+  const debouncedFetchTags = useCallback(
+    debounce((query) => fetchAutocompleteOptions('tags', query), 100),
+    [products]
+  );
+
+  const debouncedFetchDescriptions = useCallback(
+    debounce((query) => fetchAutocompleteOptions('descriptions', query), 100),
+    [products]
+  );
+
   // Variant field autocomplete functions
   const debouncedFetchColors = useCallback(
     debounce((query) => fetchAutocompleteOptions('colors', query), 100),
@@ -2077,6 +2247,8 @@ export default function ProductListPage() {
         note: debouncedFilters.note !== "" ? debouncedFilters.note : undefined,
         status: debouncedFilters.status != null ? debouncedFilters.status : undefined,
         importance: debouncedFilters.importance != null ? debouncedFilters.importance : undefined,
+        tag: debouncedFilters.tag !== "" ? debouncedFilters.tag : undefined,
+        description: debouncedFilters.description !== "" ? debouncedFilters.description : undefined,
         color: debouncedFilters.color !== "" ? debouncedFilters.color : undefined,
         size: debouncedFilters.size !== "" ? debouncedFilters.size : undefined,
         sku: debouncedFilters.sku !== "" ? debouncedFilters.sku : undefined,
@@ -2280,7 +2452,8 @@ export default function ProductListPage() {
       const res = await axios.get(`${BASE_URL}/api/products/${id}`);
       let product = res?.data?.data ?? res?.data ?? null;
 
-
+      console.log("Product data from API:", product);
+      console.log("Product Tags:", product?.Tags);
 
       // Helper to extract numeric stock from an object/field
       const extractStock = (obj) => {
@@ -2586,7 +2759,7 @@ export default function ProductListPage() {
     // Add asterisks to required fields and dropdown fields
     const headersArr = [
       'Name *', 'Code *', 'HSN Code *', 'Importance *', 'Product Type *', 'Minimum Stock',
-      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tax *',
+      'Category *', 'Subcategory', 'Unit *', 'Product Mode *', 'MOQ', 'Store *', 'Tag', 'Tax *',
   'GST %', 'Description', 'Internal Notes', 'Status *', 'Size',
       'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
     ];
@@ -2597,7 +2770,7 @@ export default function ProductListPage() {
     // Create template data row with example values (Size left empty since it's optional)
     const exampleRow = [
       'Sample Product', 'PRD001', 'HSN123', 'High', 'Single', '10',
-      'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'GST',
+      'Electronics', 'Mobiles', 'Piece', 'Purchase', '5', 'Main Store', 'Featured', 'GST',
       '18', 'Product description', 'Internal notes', 'Active', '',
       'SKU001', 'BAR001', '100', '150', '20', '3'
     ];
@@ -2605,7 +2778,7 @@ export default function ProductListPage() {
     // Allowed dropdown options (shown in a separate sheet)
     const importanceOptions = ['Normal', 'High', 'Critical'];
     const productTypeOptions = ['All', 'Finished Goods', 'Semi-Finished Goods', 'Raw Materials'];
-    const productModeOptions = ['Purchase', 'Internal Manufacturing'];
+    const productModeOptions = ['Purchase', 'Internal Manufacturing', 'Both'];
     const statusOptions = ['Active', 'Inactive'];
 
     // Dynamically import exceljs to avoid bundling core-js references at dev startup
@@ -3034,8 +3207,8 @@ export default function ProductListPage() {
       
       // Validate Product Mode
       const productModeValue = getFieldValue('Product Mode');
-      if (productModeValue && !['Purchase', 'Internal Manufacturing'].includes(productModeValue)) {
-        rowErrors.push('Product Mode must be "Purchase" or "Internal Manufacturing"');
+      if (productModeValue && !['Purchase', 'Internal Manufacturing', 'Both'].includes(productModeValue)) {
+        rowErrors.push('Product Mode must be "Purchase", "Internal Manufacturing", or "Both"');
       }
       
       // Validate Category - must exist in dropdown
@@ -3398,7 +3571,7 @@ export default function ProductListPage() {
   // Full template headers for display in Import dialog
   const importTemplateHeaders = [
     'Name', 'Code', 'HSN Code', 'Importance', 'Product Type', 'Minimum Stock',
-    'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tax',
+    'Category', 'Subcategory', 'Unit', 'Product Mode', 'MOQ', 'Store', 'Tag', 'Tax',
     'GST %', 'Description', 'Internal Notes', 'Status', 'Size',
     'SKU', 'Barcode', 'Purchase Cost', 'Sales Price', 'Stock', 'Lead Time'
   ];
@@ -3473,8 +3646,18 @@ export default function ProductListPage() {
           ) : selectedProduct ? (
             <Box>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Product Name" value={selectedProduct.Name ?? ''} fullWidth size="small" disabled />
+                <Grid item xs={12} md={12}>
+                  <Tooltip title={selectedProduct.Name ?? ''} placement="top-start">
+                    <TextField
+                      label="Product Name"
+                      value={selectedProduct.Name ?? ''}
+                      fullWidth
+                      size="small"
+                      disabled
+                      multiline
+                      rows={2}
+                    />
+                  </Tooltip>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Code" value={selectedProduct.Code ?? ''} fullWidth size="small" disabled />
@@ -3488,8 +3671,18 @@ export default function ProductListPage() {
                 <Grid item xs={12} md={6}>
                   <TextField label="Minimum Stock" value={selectedProduct.MinimumStock ?? selectedProduct.minimumStock ?? ''} fullWidth size="small" disabled />
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Category" value={selectedProduct.Category?.Name ?? ''} fullWidth size="small" disabled />
+                <Grid item xs={12} md={12}>
+                  <Tooltip title={selectedProduct.Category?.Name ?? ''} placement="top-start">
+                    <TextField
+                      label="Category"
+                      value={selectedProduct.Category?.Name ?? ''}
+                      fullWidth
+                      size="small"
+                      disabled
+                      multiline
+                      rows={2}
+                    />
+                  </Tooltip>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="Subcategory" value={selectedProduct.Subcategory?.Name ?? ''} fullWidth size="small" disabled />
@@ -3522,7 +3715,33 @@ export default function ProductListPage() {
                   <TextField label="Store" value={selectedProduct.Store?.Name ?? ''} fullWidth size="small" disabled />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Tax" value={selectedProduct.Tax?.Name ? `${selectedProduct.Tax.Name} (${selectedProduct.Tax.Percentage}%)` : ''} fullWidth size="small" disabled />
+                  <TextField 
+                    label="Tags" 
+                    value={(() => {
+                      console.log("Tags field - selectedProduct.Tags:", selectedProduct.Tags);
+                      if (Array.isArray(selectedProduct.Tags) && selectedProduct.Tags.length > 0) {
+                        const tagNames = selectedProduct.Tags.map(tag => tag?.Name || tag?.name || '').filter(Boolean).join(', ');
+                        console.log("Tags field - formatted:", tagNames);
+                        return tagNames;
+                      }
+                      return selectedProduct.tag || selectedProduct.Tag || 'No tags';
+                    })()} 
+                    fullWidth 
+                    size="small" 
+                    disabled 
+                    multiline 
+                    rows={2} 
+                    placeholder="No tags assigned"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Tax"
+                    value={selectedProduct.Tax?.Name ?? selectedProduct.Tax?.name ?? (selectedProduct.tax || '')}
+                    fullWidth
+                    size="small"
+                    disabled
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField label="GST %" value={selectedProduct.GstPercent ?? selectedProduct.gstPercent ?? ''} fullWidth size="small" disabled />
@@ -3841,6 +4060,8 @@ export default function ProductListPage() {
                 {visibleColumns.note && <TableCell sx={{fontWeight : "bold", width: 150}}>Note</TableCell>}
                 {visibleColumns.status && <TableCell sx={{fontWeight : "bold", width: 100}}>Status</TableCell>}
                 {visibleColumns.importance && <TableCell sx={{fontWeight : "bold", width: 100}}>Importance</TableCell>}
+                {visibleColumns.tag && <TableCell sx={{fontWeight : "bold", width: 120}}>Tag</TableCell>}
+                {visibleColumns.description && <TableCell sx={{fontWeight : "bold", width: 150}}>Description</TableCell>}
                 {/* Variant columns */}
                 {visibleColumns.color && <TableCell sx={{fontWeight : "bold", width: 120}}>Color Code</TableCell>}
                 {visibleColumns.size && <TableCell sx={{fontWeight : "bold"}}>Size</TableCell>}
@@ -3944,6 +4165,12 @@ export default function ProductListPage() {
                       break;
                     case 'notes':
                       debouncedFetchNotes(query);
+                      break;
+                    case 'tags':
+                      debouncedFetchTags(query);
+                      break;
+                    case 'descriptions':
+                      debouncedFetchDescriptions(query);
                       break;
                     case 'colors':
                       debouncedFetchColors(query);
@@ -4238,6 +4465,7 @@ export default function ProductListPage() {
                           hsnCodes={hsnCodes}
                           units={units}
                           sizes={sizes}
+                          tags={tags}
                           taxes={taxes}
                         />
                       );
@@ -4445,7 +4673,7 @@ export default function ProductListPage() {
                     • Status must be "Active" or "Inactive"<br/>
                     • Importance must be "Normal", "High", or "Critical"<br/>
                     • Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"<br/>
-                    • Product Mode must be "Purchase" or "Internal Manufacturing"<br/>
+                    • Product Mode must be "Purchase", "Internal Manufacturing", or "Both"<br/>
                     • <strong>Category, Subcategory, Store, HSN Code, Unit, and Size must match existing system entries (use dropdown options)</strong><br/>
                     • You can edit values directly in the preview table using the dropdowns, then click "Finalize Import" again
                   </Typography>
