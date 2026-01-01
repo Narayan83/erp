@@ -1,0 +1,207 @@
+$primary: #1e4e8a;
+$muted: #6b7280;
+$light: #f7f9fb;
+$card-bg: #ffffff;
+
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  padding: 50px;
+  font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* Outer combined container: gives a single border and highlight around both panels */
+  .combined-wrap {
+    display: flex;
+    width: 100%;
+    max-width: 100vw;
+    margin: 40px auto;
+    background: $card-bg;
+    border: 1px solid black;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden; /* remove inner seam */
+  }
+
+  .left-panel {
+    flex: 1.2;
+    padding: 60px 40px;
+    display: flex;
+    align-items: center;
+    background: rgb(218, 229, 231);
+    border-radius: 14px 0 0 14px;
+
+    .marketing-wrap {
+      max-width: 580px;
+
+      .app-title {
+        font-size: 35px;
+        margin: 0 0 12px 0;
+        color: #13283b;
+        line-height: 1.02;
+        font-weight: 700;
+      }
+
+      .app-sub {
+        color: $muted;
+        margin: 0 0 32px 0;
+      }
+
+      .features-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+
+        li {
+          display: flex;
+          gap: 18px;
+          align-items: flex-start;
+          padding: 18px 0;
+          border-radius: 6px;
+
+          .feature-icon {
+            color: $primary;
+            font-size: 20px;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(30, 78, 138, 0.06);
+            border-radius: 8px;
+          }
+
+          h4 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+            color: #163249;
+          }
+
+          p {
+            margin: 0;
+            color: $muted;
+            font-size: 14px;
+          }
+        }
+      }
+    }
+  }
+
+  .right-panel {
+    width: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 48px;
+    background: rgb(218, 229, 231);
+    border-radius: 0 14px 14px 0;
+
+    .login-card {
+      width: 100%;
+      height: auto;
+      background: $light;
+      margin: 0; /* inner margin removed to match combined container */
+      padding: 28px;
+      border-radius: 10px;
+      /* subtle inner highlight for the card content */
+      box-shadow: 0 6px 18px rgba(11, 12, 12, 0.26);
+      transition: box-shadow 150ms ease, transform 120ms ease;
+
+      .login-header {
+        h2 {
+          margin: 0 0 6px 0;
+          font-size: 26px;
+          color: #163249;
+        }
+        p {
+          margin: 0 0 18px 0;
+          color: $muted;
+        }
+      }
+
+      .error-message {
+        background: #ffe6e6;
+        color: #7a1111;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+      }
+
+      .login-form {
+        display: flex;
+        flex-direction: column;
+
+        .label {
+          font-size: 13px;
+          color: #2b4b5e;
+          margin: 8px 0 6px 0;
+        }
+
+        .input-with-icon {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid #e6eef6;
+          padding: 8px 12px;
+          border-radius: 6px;
+          margin-bottom: 12px;
+          background: #fbfdff;
+
+          .input-icon {
+            color: $primary;
+            font-size: 18px;
+          }
+
+          input {
+            border: 0;
+            outline: none;
+            flex: 1;
+            font-size: 14px;
+            background: transparent;
+          }
+        }
+
+        .form-actions {
+          display: flex;
+          gap: 12px;
+          margin-top: 12px;
+
+          .btn-login {
+            flex: 1;
+            background: $primary !important;
+          }
+          .btn-reset {
+            width: 140px;
+          }
+        }
+
+        .login-footer {
+          margin-top: 18px;
+          color: $muted;
+          font-size: 13px;
+          a {
+            color: $primary;
+            text-decoration: none;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .login-page {
+    flex-direction: column;
+    .left-panel {
+      padding: 36px;
+      order: 2;
+    }
+    .right-panel {
+      width: 100%;
+      padding: 40px;
+      order: 1;
+    }
+    .app-title {
+      font-size: 36px;
+    }
+  }
+}

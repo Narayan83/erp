@@ -1,0 +1,291 @@
+.bank-root {
+  margin-top: 70px;
+  padding: 0 5px;
+  font-family: var(--font-family, Inter, system-ui, sans-serif);
+  color: var(--text-color, #222);
+}
+
+.bank-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bank-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bank-search {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  min-width: 220px;
+}
+
+.btn {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  filter: brightness(0.98);
+}
+
+.btn-primary {
+  background: #2b7cff;
+  color: white;
+  border-color: #1860d8;
+}
+
+.btn-danger {
+  background: #ff4d4f;
+  color: white;
+  border-color: #d63a3a;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.btn-upload {
+  position: relative;
+  overflow: hidden;
+}
+
+.bank-table-wrap {
+  overflow: auto;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.bank-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+.bank-table th:nth-child(1),
+.bank-table td:nth-child(1) {
+  width: 15%;
+}
+
+.bank-table th:nth-child(2),
+.bank-table td:nth-child(2) {
+  width: 15%;
+}
+
+.bank-table th:nth-child(3),
+.bank-table td:nth-child(3) {
+  width: 15%;
+}
+
+.bank-table th:nth-child(4),
+.bank-table td:nth-child(4) {
+  width: 10%;
+}
+
+.bank-table th:nth-child(5),
+.bank-table td:nth-child(5) {
+  width: 15%;
+}
+
+.bank-table th:nth-child(6),
+.bank-table td:nth-child(6) {
+  width: 10%;
+}
+
+.bank-table th:nth-child(7),
+.bank-table td:nth-child(7) {
+  width: 10%;
+}
+
+.bank-table th:nth-child(8),
+.bank-table td:nth-child(8) {
+  width: 10%;
+}
+.bank-table thead th {
+  background: #fafafa;
+  position: sticky;
+  top: 0;
+}
+.bank-table .text-right {
+  text-align: right;
+}
+.bank-table .muted {
+  color: #888;
+  padding: 20px;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Action buttons in table rows */
+.action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+}
+.action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.action-btn.edit-btn {
+  background: #eef5ff;
+  color: #1860d8;
+  border: 1px solid rgba(24, 96, 216, 0.08);
+}
+.action-btn.delete-btn {
+  background: #fff6f6;
+  color: #d63a3a;
+  border: 1px solid rgba(214, 58, 58, 0.08);
+}
+.action-btn:hover {
+  filter: brightness(0.96);
+}
+
+/* Table cell spacing & alignment */
+.bank-table th,
+.bank-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f6f7f8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right-align balance column */
+.bank-table th:nth-child(7),
+.bank-table td:nth-child(7) {
+  text-align: right;
+}
+
+/* Emphasize branch name column */
+.bank-table th:nth-child(1),
+.bank-table td:nth-child(1) {
+  font-weight: 600;
+  max-width: 220px;
+}
+
+/* Modal inputs/selects full width and consistent */
+.bank-form select,
+.bank-form input {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+.bank-form label {
+  font-size: 13px;
+  color: #333;
+}
+
+/* Keep modal form grid tidy on small screens */
+@media (max-width: 840px) {
+  .bank-form {
+    width: calc(100% - 40px);
+  }
+  .bank-table {
+    min-width: 640px;
+  }
+}
+
+/* Support the JSX classes used: `btn primary` and `btn danger` */
+.btn.primary,
+.btn.primary:focus {
+  background: #2b7cff;
+  color: white;
+  border-color: #1860d8;
+}
+.btn.danger,
+.btn.danger:focus {
+  background: #ff4d4f;
+  color: white;
+  border-color: #d63a3a;
+}
+
+.bank-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+.bank-form {
+  background: white;
+  border-radius: 8px;
+  padding: 18px;
+  width: 720px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.bank-form h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+.form-grid input {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.muted {
+  color: #666;
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .bank-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}

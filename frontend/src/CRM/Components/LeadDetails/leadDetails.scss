@@ -1,0 +1,154 @@
+.lead-details-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.lead-details-modal {
+  width: 90%;
+  max-width: 1000px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.lead-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.lead-details-header h3 {
+  margin: 0;
+}
+.lead-details-header .close-btn {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.lead-details-body {
+  display: flex;
+  gap: 18px;
+  padding: 16px;
+}
+.left-col {
+  flex: 1;
+}
+.right-col {
+  width: 360px;
+}
+
+.card {
+  background: #fafafa;
+  border: 1px solid #eee;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.detail-table td {
+  padding: 6px 8px;
+  border-bottom: 1px dashed #eee;
+}
+.opportunity-text {
+  font-size: 13px;
+  color: #333;
+}
+
+.contact-value {
+  margin-right: 8px;
+}
+.contact-actions {
+  margin-left: 8px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.contact-actions .icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+.contact-actions .icon-btn.small {
+  font-size: 14px;
+}
+.contact-actions .icon-btn:hover {
+  color: #111;
+}
+.contact-actions .icon-btn[title="WhatsApp"] {
+  color: #25d366;
+}
+.contact-actions .icon-btn[title="Call"] {
+  color: #0b5ed7;
+}
+.contact-actions .icon-btn[title="Send Email"] {
+  color: #0b5ed7;
+}
+.contact-actions .icon-btn[title="Copy"] {
+  color: #6c757d;
+}
+
+.actions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btn {
+  padding: 8px 12px;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+}
+.btn.small {
+  font-size: 13px;
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+}
+.btn.green {
+  background: #1b7236;
+  color: #fff;
+  border-color: #156026;
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+}
+
+.interactions .next-appointment {
+  margin-bottom: 8px;
+  color: #444;
+}
