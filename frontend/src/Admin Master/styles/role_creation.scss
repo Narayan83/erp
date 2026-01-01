@@ -1,0 +1,92 @@
+.role-creation-bg {
+  width: 100vw;
+  max-width: 100%;
+  background: #f7f8fa;
+  height: 100%;
+  padding: 0;
+  font-family: sans-serif;
+  margin-top: 50px;
+}
+.role-creation-container {
+  background: #f8fafc;
+  width: 100vw;
+  max-width: 100%;
+  margin: 0 auto;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 20px 28px;
+}
+.role-creation-title {
+  color: #1677ff;
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+.role-creation-field {
+  margin-bottom: 10px;
+}
+.role-creation-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.role-creation-input {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  outline: none;
+  margin-bottom: 0;
+  background: #fff;
+}
+.role-creation-textarea {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  outline: none;
+  resize: vertical;
+  background: #fff;
+}
+.role-creation-permissions {
+  display: flex;
+  gap: 2rem;
+  margin: 1rem 0;
+  align-items: center;
+
+  input {
+    margin-right: 8px;
+  }
+}
+.role-creation-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+  width: 60%;
+  background: #1677ff;
+  color: #fff;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 0;
+  cursor: pointer;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
+  transition: background 0.2s;
+}
+
+.embedded {
+  margin-top: 0;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

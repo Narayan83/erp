@@ -1,0 +1,119 @@
+@use '../../Styles/variable.scss' as*;
+
+// Overlay for modal
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.2);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Modal container
+.display-pref-modal {
+  background: $primary-white;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: 10px 20px;
+  min-width: 500px;
+  max-width: 750px;
+  min-height: 45vh;
+  max-height: 60vh;
+  width: 100%;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+// Modal header
+.modal-header {
+  display: flex;
+  width: 100%;
+  padding: 0!important;
+  h2 {
+    font-size: 20px;
+    margin: 0;
+  }
+  .close-button {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #888;
+  }
+}
+
+// Checkbox grid layout
+.field-checkbox-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field-checkbox-row {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+}
+.field-checkbox-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  font-size: 15px;
+  input[type="checkbox"] {
+    accent-color: $primary-blue;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+// Save button
+.save-btn {
+  background: $primary-blue;
+  color: $primary-white;
+  border: 1px solid $primary-blue;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  margin-top: -30px;
+  transition: background 0.2s;
+}
+.save-btn:hover {
+  background: $primary-white;
+  color: $primary-blue;
+  border: 1px solid $primary-blue;
+}
+.save-icon {
+  font-size: 12px;
+}
+
+// Animation
+@keyframes slideDown {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.display-pref-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding-top: 80px;
+}

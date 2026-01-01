@@ -1,0 +1,556 @@
+@import url("https://fonts.googleapis.com/css2?family=Merriweather+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+
+@import "variables";
+@import "theme-variables";
+// Import Bootstrap source files (Required file)
+@import "../../node_modules/bootstrap/scss/bootstrap.scss";
+
+// Scrollbar style (Required file)
+@import "../../node_modules/simplebar/dist/simplebar.css";
+
+// Tabler Icons style
+@import "./icons/tabler-icons/tabler-icons.css";
+
+body {
+  margin: 0;
+  font-family: $font-family-sans-serif !important;
+  font-size: $font-size-base;
+  font-weight: $font-weight-base;
+  line-height: $line-height-base;
+  color: $body-color;
+  background-color: $body-bg;
+}
+// TOP BAR SCSS
+header {
+  background: #0072F9;
+  // background: linear-gradient(38deg,rgba(3, 29, 55, 1) 0%, rgba(8, 120, 206, 1) 77%);
+  width: 100%;
+  height: 60px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  .row {
+    margin: 0 !important;
+  }
+}
+
+header .logo {
+  padding: 5px;
+  text-decoration: none;
+}
+
+header .logo img {
+  width: $logo-width;
+}
+header .logo span {
+  font-size: map-get($font-sizes, 7);
+  font-weight: $font-weight-bold;
+  color: $white;
+  margin-left: 5px;
+}
+header .rounded-circle {
+  min-width: 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  background-color: $white !important;
+  color: $dark;
+  font-size: map-get($font-sizes, 7);
+}
+
+header .rounded-circle:hover svg {
+  color: $primary;
+  transition: all 0.3ms ease-in-out;
+}
+
+.searchbox {
+  width: $searchbar-width;
+  height: $input-height;
+  background-color: $white;
+  border-radius: $input-border-radius;
+  margin-left: 10px;
+  padding: 3px 15px;
+
+  input {
+    background: $input-bg;
+    border: none;
+    outline: none;
+    padding-left: 5px;
+    color: $dark;
+  }
+
+  svg {
+    font-size: map-get($font-sizes, 5);
+    font-weight: $font-weight-bold;
+  }
+}
+
+.my-account {
+  max-height: 40px;
+  text-align: left !important;
+  .user-image {
+    .rounded-circle {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      border: 2px solid $white;
+      img {
+        width: 100%;
+        object-fit: cover;
+      }
+    }
+  }
+
+  .user-info {
+    padding-left: 15px;
+    padding-top: 20px;
+    cursor: pointer;
+    h4 {
+      font-size: map-get($font-sizes, 3) !important;
+      font-weight: $font-weight-bold;
+      margin-bottom: 0px;
+      max-width: 150px;
+      max-height: 20px;
+      overflow: hidden;
+      color: $white;
+    }
+    p {
+      color: #f2f2f2;
+      margin-top: 0;
+      max-width: 150px;
+      max-height: 20px;
+      font-size: map-get($font-sizes, 2) !important;
+      overflow: hidden;
+    }
+  }
+}
+
+// SIDE BAR SCSS
+
+.main {
+ 
+  .main-side-bar-wraper {
+    width: 20%;
+    flex: 0 0 20%;
+    transition: all 0.3s ease-in-out;
+
+    .sidebar {
+      width: 20%;
+      height: 100vh;
+      max-height: calc(100% - 60px);
+      overflow-y: scroll;
+      overflow-x: hidden;
+      position: fixed;
+      top: 60px;
+      left: 0;
+      background: #031D37;
+      background: linear-gradient(38deg,rgba(3, 29, 55, 1) 100%, rgba(8, 120, 206, 1) 77%);
+      transition: all 0.5s ease-in-out;
+
+      ul {
+          margin-left: 0 !important;
+          margin-bottom: 0 !important;
+          padding-left: 0 !important;
+          list-style: none !important;
+          border-left: none !important;
+
+        li {
+          list-style: none;
+          button {
+            text-align: left;
+            justify-content: left;
+            color: $white;
+            align-items: center;
+            padding: 12px 15px !important;
+            text-transform: capitalize;
+            font-weight: $font-weight-bold;
+            .icon {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 25px;
+              height: 25px;
+              margin-right: 10px;
+              svg {
+                color: $white;
+                font-size: map-get($font-sizes, 6);
+              }
+            }
+
+            .arrow-right {
+              margin-left: auto;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 25px;
+              height: 25px;
+              svg {
+                color: $white;
+                font-size: map-get($font-sizes, 6);
+              }
+            }
+          }
+          button:hover {
+            background-color: #37d9eb;
+          }
+        }
+
+        .active {
+          background-color: #1b5974;
+          .icon svg {
+            color: $white;
+          }
+        }
+
+        .sub-menu-wraper {
+          .submenu {
+            opacity: 1;
+            height: auto;
+            transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
+            padding: 0px 25px !important;
+            position: relative;
+
+            li {
+              width: 100%;
+              border-left: 1px solid rgba($color: #2b8fba, $alpha: 0.7);
+              padding-left: 10px;
+              margin-left: 5px;
+
+              &:hover {
+                border-left: 1px solid rgba($color: #d9c3f0, $alpha: 0.8);
+              }
+
+              a {
+                list-style: none !important;
+                text-decoration: none;
+                color: $white !important;
+                display: block;
+                padding: 5px 0px;
+                font-size: map-get($font-sizes, 3);
+
+                &:hover {
+                  color: rgb(221, 188, 252) !important;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: transparent !important;
+    }
+
+    .colapsed {
+      height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: opacity 0.5s ease-in-out, height 0.5s ease-in-out;
+    }
+
+    .colapse {
+      height: auto;
+      opacity: 1;
+      overflow: visible;
+    }
+  }
+
+  .main-side-bar-wraper:hover {
+    .sidebar::-webkit-scrollbar {
+      background: $blue transparent !important;
+    }
+  }
+
+  .content {
+    width: 80%;
+    flex: 0 0 80%;
+    transition: all 0.3s ease-in-out;
+    background: #fff;
+    min-height: 100vh;
+
+    .right-content {
+      padding: 85px 25px;
+    }
+  }
+}
+
+.main-side-bar-wraper.toggle-menu {
+  width: 0;
+  flex: 0 0 0%;
+  .sidebar {
+    left: -100%;
+  }
+}
+
+.content.toggle-menu {
+  width: 100%;
+}
+
+// forms
+
+.form-container {
+  .form-items {
+    display: flex;
+    flex-direction: column;
+    label {
+      color: $dark;
+      font-size: map-get($font-sizes, 4);
+      font-weight: 600;
+      margin: 5px 5px;
+    }
+    input {
+      background: $white;
+      color: $gray-600;
+      width: 100%;
+      outline: none;
+      border: 1px solid $gray-500;
+      border-radius: 5px;
+      height: $input-height;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+      padding-left: 25px;
+    }
+
+    input:focus {
+      border: 2px solid #1872c3;
+    }
+    select {
+      background: $white;
+      color: $gray-600;
+      width: 100%;
+      outline: none;
+      border: 1px solid $gray-500;
+      border-radius: 5px;
+      height: $input-height;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+    }
+
+    select:focus {
+      border: 2px solid #1872c3;
+    }
+    textarea {
+      background: $white;
+      color: $gray-600;
+      width: 100%;
+      outline: none;
+      border: 1px solid $gray-500;
+      border-radius: 5px;
+      height: $input-height;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+      padding-left: 10px;
+    }
+
+    textarea:focus {
+      border: 1px solid $gray-800;
+    }
+
+    /* Style all radio buttons */
+    input[type="radio"] {
+      appearance: none; /* Remove default radio look */
+      width: 18px;
+      height: 18px;
+      border: 2px solid #333;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      vertical-align: middle;
+      margin-right: 8px;
+      transition: 0.2s;
+    }
+
+    /* Custom inner dot when checked */
+    input[type="radio"]:checked::before {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: 2px;
+      left: 2px;
+      background-color: #333;
+      border-radius: 50%;
+    }
+    input[type="radio"]:focus {
+      border: 2px solid #1c1c1c;
+    }
+    .checkbox-container {
+      label {
+        font-size: 12px;
+      }
+    }
+
+    /* Style all checkboxes */
+    input[type="checkbox"] {
+      appearance: none; /* Remove default checkbox */
+      width: 18px;
+      height: 18px;
+      border: 2px solid #333;
+      border-radius: 4px; /* Square corners, reduce or set to 0 for sharper edges */
+      position: relative;
+      cursor: pointer;
+      vertical-align: middle;
+      margin-right: 8px;
+      transition: 0.2s;
+    }
+
+    /* Custom checkmark when checked */
+    input[type="checkbox"]:checked::before {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: 2px;
+      left: 2px;
+      background-color: #333;
+      border-radius: 2px;
+    }
+
+    input[type="checkbox"]:focus {
+      border: 2px solid #1c1c1c;
+    }
+  }
+  .form-buttons {
+    display: flex;
+    align-items: center;
+    margin-top: 28px;
+    button {
+      margin-bottom: 0;
+    }
+
+    button.success {
+      background-color: $green;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+      color: $dark;
+      margin-left: 10px;
+      width: 100%;
+    }
+    button.cancel {
+      background-color: $red;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+      color: $dark;
+      margin-left: 10px;
+      width: 100%;
+    }
+
+    button .icon {
+      padding: 0px 5px;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+    }
+
+    // metrial UI
+
+    .MUI-Select {
+      background: $white !important;
+      color: $gray-600;
+      width: 100%;
+      outline: none;
+      border: 1px solid $gray-500;
+      border-radius: 5px;
+      height: $input-height;
+      font-size: map-get($font-sizes, 2);
+      font-weight: 600;
+    }
+  }
+
+  .input-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: yellow;
+    position: relative;
+
+    .input-icon {
+      position: absolute;
+      top: 2;
+      left: 4;
+      background-color: yellow;
+    }
+  }
+}
+
+.validation-errors {
+  color: $red;
+  font-size: 0.6rem;
+}
+
+// tables
+
+.table {
+  background: $white !important;
+  .thead-dark {
+    background-color: rgba($color: #b48bf3, $alpha: 0.8);
+    color: $white;
+    border-color: rgba($color: #a976f5, $alpha: 1) !important;
+    font-size: map-get($font-sizes, 3);
+  }
+
+  th {
+    padding: 0px 5px;
+  }
+  tbody {
+    tr {
+      border-color: rgba($color: #000000, $alpha: 0.2) !important;
+      td {
+        padding: 2px 2px;
+      }
+    }
+
+    .actions {
+      button {
+        min-width: 25px !important;
+        width: 25px !important;
+        height: 25px !important;
+        background-color: $gray-300;
+        margin-right: 5px;
+        margin-left: 2px;
+        svg {
+          color: #330346;
+          font-size: map-get($font-sizes, 3);
+        }
+      }
+    }
+  }
+}
+
+// buttons
+
+.gray-button-300 {
+  background-color: $gray-300 !important;
+}
+.gray-button-600 {
+  background-color: $gray-600 !important;
+}
+.gray-button-900 {
+  background-color: $gray-900 !important;
+  color: $white !important;
+}
+
+// card css
+
+.card {
+  background-color: #fff8f8;
+  padding: 10px 22px;
+}
+
+.shadow-small {
+  box-shadow: rgba(0, 0, 0, 0.02) 0px 1px 3px 0px,
+    rgba(27, 31, 35, 0.15) 0px 0px 0px 1px;
+}
+.shadow-medium {
+  box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+}
+.shadow-large {
+  box-shadow: rgba(0, 0, 0, 0.25) 0px 54px 55px,
+    rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px,
+    rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;
+}
+
+// responsive styles
