@@ -1,0 +1,119 @@
+/* Basic dialog layout */
+.print-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialog-card {
+  width: 820px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.close-btn {
+  background: #0b5fff;
+  color: #fff;
+  font-size: 14px;
+  border: none;
+  padding: 5px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.config-btn {
+  background: transparent;
+  color: #0b5fff;
+  font-size: 14px;
+  border: 1px solid #0b5fff;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dialog-body {
+  padding: 18px 20px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.print-section {
+  background: #fafafa;
+  border: 1px solid #eee;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.section-title {
+  margin: 0 0 10px 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 8px 12px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.label-text {
+  font-size: 13px;
+  color: #222;
+}
+
+/* Overlay / modal styles */
+.print-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.dialog-card {
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+}
+
+.print-dialog:focus {
+  outline: none;
+}

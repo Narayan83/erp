@@ -7,6 +7,7 @@ import industries from "../industries.json";
 import dialCodeToCountry from "../utils/dialCodeToCountry";
 import countries from "../utils/countries";
 import citiesList from "../utils/cities-name-list.json";
+import stateList from "../utils/state_list.json";
 import Cropper from "react-easy-crop";
 import "./addoredituserform.scss";
 
@@ -32,6 +33,9 @@ const accountTypes = [
   { label: "Dealer", value: "is_dealer" },
   { label: "Distributor", value: "is_distributor" },
 ];
+
+// Indian states list (used when country is India)
+const indiaStates = Object.values(stateList);
 
 const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser }) => {
   const navigate = useNavigate();

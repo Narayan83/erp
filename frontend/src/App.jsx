@@ -49,6 +49,8 @@ import Report from './CRM/Pages/Reports/Report';
 import Configuration from './CRM/Components/Configuration/Configuration';
 // import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
+import Salesconfiguration from "./SalesConfiguration/Salesconfiguration";
+
 import QutationList from "./CRM/Pages/Quotation/QuotationList";
 import AddQutation from "./CRM/Pages/Quotation/AddQutation";
 
@@ -175,6 +177,7 @@ function App() {
           <Route path="/reports" element={<Report />} />
           <Route path="/configuration" element={<Configuration />} />
           <Route path="/configuration/:type" element={<Configuration />} />
+          <Route path="/sales-configuration" element={<Salesconfiguration />} />
           
 
            {/* <Route path="/quotation" element={<QuotationNewForm />} /> */}
