@@ -27,7 +27,8 @@ import {
   SearchableSelect,
   getProductImage,
   normalizeImageUrl,
-  splitQuotationNumber
+  splitQuotationNumber,
+  doGSTsMatchState
 } from "./utils";
 
 
@@ -84,6 +85,9 @@ const AddQutation = () => {
   const [tableItems, setTableItems] = useState([]); // items in main table
   const [grandTotal , setGrandTotal] = useState(0);
 
+  const [isGSTStateMatch, setIsGSTStateMatch]  = useState(true);
+  const [branchGstNumber,setBranchGstNumber]  = useState("");
+  const [custAddressGst,setCustAddressGst]  = useState("");
 
 const [productSelections, setProductSelections] = useState({});
   // IDs of products checked in the product selection modal
@@ -153,8 +157,9 @@ const [productSelections, setProductSelections] = useState({});
       const gstPercent = Number(addServiceValues.gst) || 0;
 
       const taxable = qty * rate;
-      const halfGst = +(taxable * (gstPercent / 100) / 2).toFixed(2);
-      const amount = +(taxable + halfGst * 2).toFixed(2);
+      const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+      const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+      const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
 
       const newItem = {
         id: `service-${Date.now()}`,
@@ -165,14 +170,15 @@ const [productSelections, setProductSelections] = useState({});
         hsn: addServiceValues.hsn || '',
         rate,
         gst: gstPercent,
-        taxable: +taxable.toFixed(2),
-        cgst: halfGst,
-        sgst: halfGst,
-        amount,
+        taxable: taxRes.amount,
+        cgst: taxRes.cgst,
+        sgst: taxRes.sgst,
+        igst: taxRes.igst,
+        amount: taxRes.grandTotal,
         variantId: null,
           _isService: true,
           _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      };
+      }; 
 
       setTableItems((prev) => {
         const next = [...prev, newItem];
@@ -639,16 +645,18 @@ const handleTandCClose = () => setOpenTandCModal(false);
         const existing = { ...copy[existingIndex] };
         const newQty = (Number(existing.qty) || 0) + qtyToAdd;
         const taxable = (rate * newQty) - (existing.discount || 0);
-        const cgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
-        const sgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
-        const amount = taxable + cgst + sgst;
-        copy[existingIndex] = { ...existing, qty: newQty, rate, taxable, cgst, sgst, amount };
-      } else {
+        const gstPercent = prod.Tax?.Percentage || existing.gst || 0;
+        const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+        const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+        copy[existingIndex] = { ...existing, qty: newQty, rate, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
+      } else { 
         // either not found or forced new row -> push a new line
         const taxable = rate * qtyToAdd - discount;
-        const cgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
-        const sgst = (taxable * (prod.Tax?.Percentage || 0)) / 2 / 100;
-        const amount = taxable + cgst + sgst;
+        const gstPercent = prod.Tax?.Percentage || 0;
+        const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+        const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
 
         copy.push({
           _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
@@ -665,10 +673,12 @@ const handleTandCClose = () => setOpenTandCModal(false);
           qty: qtyToAdd,
           rate,
           discount,
-          taxable,
-          cgst,
-          sgst,
-          amount,
+          taxable: taxRes.amount,
+          cgst: taxRes.cgst,
+          sgst: taxRes.sgst,
+          igst: taxRes.igst,
+          amount: taxRes.grandTotal,
+          gst: gstPercent,
           desc: '',
           leadTime: prod.LeadTime,
         });
@@ -690,7 +700,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
       const discount = Number(prod.discount) || 0;
       const discountPercent = (qty * rate) > 0 ? (discount / (qty * rate)) * 100 : 0;
       const taxable = prod.taxable !== undefined ? Number(prod.taxable) : (qty * rate - discount);
-      const gstPercent = taxable > 0 ? (((Number(prod.cgst) || 0) + (Number(prod.sgst) || 0)) / taxable) * 100 : 0;
+      const gstAmount = (Number(prod.cgst) || 0) + (Number(prod.sgst) || 0) + (Number(prod.igst) || 0);
+      const gstPercent = taxable > 0 ? (gstAmount / taxable) * 100 : (prod.gst || prod.Tax?.Percentage || 0);
 
       // create a minimal product-like object for display
       const billingProd = {
@@ -748,9 +759,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
     }
 
     const taxable = rate * qty - discountAmount;
-    const cgst = (taxable * (Number(vals.gst) || 0)) / 2 / 100;
-    const sgst = (taxable * (Number(vals.gst) || 0)) / 2 / 100;
-    const amount = taxable + cgst + sgst;
+    const gstPercent = Number(vals.gst) || 0;
+    const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+    const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+    const cgst = taxRes.cgst;
+    const sgst = taxRes.sgst;
+    const igst = taxRes.igst;
+    const amount = taxRes.grandTotal;
 
     const newItem = {
       _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
@@ -765,6 +781,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
       taxable,
       cgst,
       sgst,
+      igst,
+      gst: gstPercent,
       amount,
       desc: vals.desc || billingModalProduct.Name,
       leadTime: vals.leadTime,
@@ -861,6 +879,31 @@ const handleTandCClose = () => setOpenTandCModal(false);
     normalized.postal_code = addr.postal_code || addr.pincode || addr.Pincode || addr.pin || addr.zipcode || addr.ZipCode || '';
     normalized.gst_in = addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || '';
     return normalized;
+  };
+
+  // GST calculation helper: returns cgst, sgst, igst, totalTax and grandTotal (rounded to 2 decimals)
+  const gstCalculation = (amount, gstPercent = 0, sellerGSTIN = '', buyerGSTIN = '') => {
+    const sellerState = (sellerGSTIN || '').toString().slice(0, 2);
+    const buyerStateRaw = (buyerGSTIN || '').toString();
+    const buyerState = (buyerStateRaw && buyerStateRaw.trim().length >= 2) ? buyerStateRaw.slice(0,2) : sellerState;
+    const pct = Number(gstPercent) || 0;
+    let cgst = 0, sgst = 0, igst = 0;
+
+    // If buyer GSTIN missing or empty, treat as same state
+    if (!buyerStateRaw || buyerStateRaw.trim() === '' || sellerState === buyerState) {
+      cgst = (amount * pct) / 100 / 2;
+      sgst = (amount * pct) / 100 / 2;
+    } else {
+      igst = (amount * pct) / 100;
+    }
+
+    cgst = Number(cgst.toFixed(2));
+    sgst = Number(sgst.toFixed(2));
+    igst = Number(igst.toFixed(2));
+    const totalTax = Number((cgst + sgst + igst).toFixed(2));
+    const grandTotal = Number((amount + totalTax).toFixed(2));
+
+    return { amount: Number((amount||0).toFixed(2)), cgst, sgst, igst, totalTax, grandTotal };
   };
 
   // Country list and Indian states for the address modal
@@ -1032,18 +1075,19 @@ const handleSaveQuotation = async () => {
   if (!selectedEmployee) return alert("Select a sales credit.");
   if (!tableItems.length) return alert("Add at least one item.");
 
-  // compute total in same manner as finalTotal effect so roundoff_amount and grand_total are correct
-  let computedTotal = Number(grandTotal) || 0;
-  extrcharges.forEach((ch) => {
-    if (ch.type === "percent") computedTotal += (grandTotal * ch.value) / 100;
-    else computedTotal += ch.value;
-  });
-  additiondiscounts.forEach((ds) => {
-    if (ds.type === "percent") computedTotal -= (grandTotal * ds.value) / 100;
-    else computedTotal -= ds.value;
-  });
-  const roundoffAmount = includeRoundOff ? Number((Math.round(computedTotal) - computedTotal).toFixed(2)) : 0;
-  const grandTotalToSend = includeRoundOff ? Number(Math.round(computedTotal)) : Number(computedTotal);
+  // compute total in same manner as the finalTotal effect so roundoff_amount and grand_total are correct
+  const base = Number(grandTotal) || 0; // grandTotal already includes tax from table items
+  const percentCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? Number(ch.value) : 0), 0);
+  const fixedCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? 0 : Number(ch.value) || 0), 0);
+  const percentDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? Number(ds.value) : 0), 0);
+  const fixedDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? 0 : Number(ds.value) || 0), 0);
+
+  let computedTotal = base + (base * (percentCharges / 100)) + fixedCharges - (base * (percentDiscounts / 100)) - fixedDiscounts;
+
+  // totalBeforeRound is the computed total after adjustments (do not add tax again - tax was already included in `base`)
+  const totalBeforeRound = computedTotal;
+  const roundoffAmount = includeRoundOff ? Number((Math.round(totalBeforeRound) - totalBeforeRound).toFixed(2)) : 0;
+  const grandTotalToSend = includeRoundOff ? Number(Math.round(totalBeforeRound)) : Number(Number(totalBeforeRound).toFixed(2));
 
   const payload = {
     quotation: {
@@ -1064,12 +1108,12 @@ const handleSaveQuotation = async () => {
       valid_until: new Date(validTill).toISOString(),
       contact_person: contactPerson,
       total_amount: Number(grandTotal) || 0,
-      tax_amount: 0,
+      tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
       roundoff_amount: roundoffAmount,
-      grand_total: Number(grandTotalToSend) || 0,
+      grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges, 
       discounts: additiondiscounts, 
-      status: "Draft",
+      status: isEditMode ? (quotationData?.status || "Open") : "Open",
       created_by: Number(selectedEmployee),
       billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : null, 
       shipping_address_id: isSameAsBilling ? (selectedBillingAddressId ? Number(selectedBillingAddressId) : null) : (selectedShippingAddressId ? Number(selectedShippingAddressId) : null), 
@@ -1089,7 +1133,7 @@ const handleSaveQuotation = async () => {
       lead_time: String(it.leadTime || ''),
       hsncode: it.hsn || '',
       gst: Number(it.gst || 0),
-      tax_amount: Number((it.cgst || 0) + (it.sgst || 0)) || 0,
+      tax_amount: Number((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) || 0,
       line_total: Number(it.amount) || 0,
     })),
   };
@@ -1279,13 +1323,13 @@ const handleSaveQuotation = async () => {
     const seriesPrefixNumber = selectedSeriesObj?.prefix_number || '';
 
     try {
-      // Use sales_credit_person_id (selectedEmployee) instead of seriesId
+      // Use seriesId to get max scp count for the selected series
       let maxCount = 0;
-      if (!selectedEmployee) {
-        console.warn('No sales credit person selected yet');
+      if (!seriesId) {
+        console.warn('No series selected yet');
         setCurrentScpCount({ max_quotation_scp_count: 0 });
       } else {
-        const res = await axios.get(`${BASE_URL}/api/quotations/max-scp-count/${selectedEmployee}`);
+        const res = await axios.get(`${BASE_URL}/api/quotations/count-scp/${seriesId}`);
         console.log(res.data);
         let result = res.data;
         setCurrentScpCount(result);
@@ -1325,38 +1369,36 @@ const handleSaveQuotation = async () => {
 
 
   useEffect(() => {
-  let total = grandTotal;
+  // compute subtotal and tax amount same way as the UI display
+  const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
+  const taxAmount = tableItems.reduce((sum, item) => {
+    if (isGSTStateMatch) return sum + (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
+    const taxable = Number(item.taxable) || 0;
+    const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+    const pct = Math.round(pctRaw);
+    const igstVal = +(taxable * (pct / 100));
+    return sum + igstVal;
+  }, 0);
 
-  // Apply all charges
-  extrcharges.forEach((ch) => {
-    if (ch.type === "percent") total += (grandTotal * ch.value) / 100;
-    else total += ch.value;
-  });
+  // base amount (subtotal + tax)
+  const base = subtotal + taxAmount;
 
+  // sum percent and fixed charges/discounts on the SAME base to avoid compounding
+  const percentCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? Number(ch.value) : 0), 0);
+  const fixedCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? 0 : Number(ch.value) || 0), 0);
+  const percentDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? Number(ds.value) : 0), 0);
+  const fixedDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? 0 : Number(ds.value) || 0), 0);
 
-
-
-  // Apply all discounts
-  additiondiscounts.forEach((ds) => {
-    if (ds.type === "percent") total -= (grandTotal * ds.value) / 100;
-    else total -= ds.value;
-  });
+  let total = base + (base * (percentCharges / 100)) + fixedCharges - (base * (percentDiscounts / 100)) - fixedDiscounts;
 
   if (includeRoundOff) {
     // Round to nearest unit (e.g., nearest rupee)
     setFinalTotal(Math.round(Number(total)));
   } else {
-    setFinalTotal(total);
+    // keep two decimals for display
+    setFinalTotal(Number(total.toFixed(2)));
   }
-}, [grandTotal, extrcharges, additiondiscounts, includeRoundOff]);
-
-
-
-
-
-
-
-
+}, [tableItems, isGSTStateMatch, extrcharges, additiondiscounts, includeRoundOff]);
 
 
 // edit mode
@@ -1455,6 +1497,22 @@ const handleSaveQuotation = async () => {
       setSelectedShippingAddress(null);
     }
   }, [selectedShippingAddressId, selectedCustomer]);
+
+  // GST state comparing: update match when billing address or branch changes
+  useEffect(()=>{
+    if (selectedBillingAddress && selectedBranch) {
+      const sellerGST = selectedBranch?.gst || selectedBranch?.GST || selectedBranch?.gst_number || selectedBranch?.gstin || '';
+      const custGst = selectedBillingAddress?.gst_in || selectedBillingAddress?.gstin || selectedBillingAddress?.GSTIN || selectedBillingAddress?.gst || '';
+      if (custGst && custGst.toString().trim() !== '') {
+        const match = doGSTsMatchState(custGst, sellerGST);
+        setIsGSTStateMatch(match);
+      } else {
+        setIsGSTStateMatch(true);
+      }
+      setBranchGstNumber(sellerGST);
+      setCustAddressGst(custGst);
+    }
+  }, [selectedBillingAddress, selectedBranch]);
 
 
 const fetchQuotationData = async () => {
@@ -2207,11 +2265,22 @@ const  prefillFormData = async (data) => {
                     <th>Rate</th>
                     <th>Discount</th>
                     <th>Taxable</th>
-                    <th>CGST</th>
-                    <th>SGST</th>
+                    {isGSTStateMatch ? (
+                      <>
+                        <th>CGST %</th>
+                        <th>CGST</th>
+                        <th>SGST %</th>
+                        <th>SGST</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>IGST %</th>
+                        <th>IGST</th>
+                      </>
+                    )}
                     <th>Amount</th>
                     <th>Lead Time</th>
-                     <th>Actions</th>
+                     <th>Actions</th> 
                   </tr>
                 </thead>
                <tbody>
@@ -2238,9 +2307,11 @@ const  prefillFormData = async (data) => {
                 if (i !== index) return it;
                 const qty = Math.max(0, (Number(it.qty) || 0) - 1);
                 const taxable = (it.rate || 0) * qty - (it.discount || 0);
-                const cgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                const sgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                return { ...it, qty, taxable, cgst, sgst, amount: taxable + cgst + sgst };
+                const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
+                const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }))
             }
           >
@@ -2257,9 +2328,11 @@ const  prefillFormData = async (data) => {
                 if (i !== index) return it;
                 const qty = newQty;
                 const taxable = (it.rate || 0) * qty - (it.discount || 0);
-                const cgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                const sgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                return { ...it, qty, taxable, cgst, sgst, amount: taxable + cgst + sgst };
+                const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
+                const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }));
             }}
           />
@@ -2272,9 +2345,11 @@ const  prefillFormData = async (data) => {
                 if (i !== index) return it;
                 const qty = (Number(it.qty) || 0) + 1;
                 const taxable = (it.rate || 0) * qty - (it.discount || 0);
-                const cgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                const sgst = (taxable * (((it.cgst || 0) + (it.sgst || 0)) / 2)) / 100;
-                return { ...it, qty, taxable, cgst, sgst, amount: taxable + cgst + sgst };
+                const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
+                const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }))
             }
           >
@@ -2306,12 +2381,16 @@ const  prefillFormData = async (data) => {
               const newItems = [...prev];
               newItems[index].rate = Number(e.target.value);
               const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
-              const cgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
-              const sgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
-              newItems[index].taxable = taxable;
-              newItems[index].cgst = cgst;
-              newItems[index].sgst = sgst;
-              newItems[index].amount = taxable + cgst + sgst;
+              const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
+              const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+              const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+              newItems[index].taxable = taxRes.amount;
+              newItems[index].cgst = taxRes.cgst;
+              newItems[index].sgst = taxRes.sgst;
+              newItems[index].igst = taxRes.igst;
+              newItems[index].amount = taxRes.grandTotal;
+              newItems[index].gst = gstPercent;
               return newItems;
             })
           }
@@ -2327,21 +2406,64 @@ const  prefillFormData = async (data) => {
               const newItems = [...prev];
               newItems[index].discount = Number(e.target.value);
               const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
-              const cgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
-              const sgst = (taxable * (item.cgst + item.sgst) / 2) / 100;
-              newItems[index].taxable = taxable;
-              newItems[index].cgst = cgst;
-              newItems[index].sgst = sgst;
-              newItems[index].amount = taxable + cgst + sgst;
+              const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
+              const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+              const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+              newItems[index].taxable = taxRes.amount;
+              newItems[index].cgst = taxRes.cgst;
+              newItems[index].sgst = taxRes.sgst;
+              newItems[index].igst = taxRes.igst;
+              newItems[index].amount = taxRes.grandTotal;
+              newItems[index].gst = gstPercent;
               return newItems;
             })
           }
         />
       </td>
-      <td>{item.taxable.toFixed(2)}</td>
-      <td>{item.cgst.toFixed(2)}</td>
-      <td>{item.sgst.toFixed(2)}</td>
-      <td>{item.amount.toFixed(2)}</td>
+      <td>{(Number(item.taxable) || 0).toFixed(2)}</td>
+      {isGSTStateMatch ? (
+        <>
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+            const cgstPct = Math.round(gstRaw / 2);
+            return `${cgstPct}%`;
+          })()}</td>
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+            const cgstPct = Math.round(gstRaw / 2);
+            const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (cgstPct / 100));
+            return cgstVal.toFixed(2);
+          })()}</td>
+
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+            const sgstPct = Math.round(gstRaw / 2);
+            const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (sgstPct / 100));
+            return sgstVal.toFixed(2);
+          })()}</td>
+        </>
+      ) : (
+        <>
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+            const pct = Math.round(pctRaw);
+            return `${pct}%`;
+          })()}</td>
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+            const pct = Math.round(pctRaw);
+            const igstVal = +(taxable * (pct / 100));
+            return igstVal.toFixed(2);
+          })()}</td>
+        </>
+      )}
+      <td>{(Number(item.amount) || 0).toFixed(2)}</td>
       <td>{item.leadTime}</td>
       <td>
         <button
@@ -2453,20 +2575,113 @@ const  prefillFormData = async (data) => {
               <>
                 <div className="row mb-2">
                   <div className="col-12 d-flex justify-content-between">
-                    <strong>Total Amount before Tax</strong> <strong>  ₹ {grandTotal.toFixed(2)}</strong>
+                    <strong>Total Amount before Tax</strong> <strong>  ₹ {(() => {
+                      const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
+                      return subtotal.toFixed(2);
+                    })()}</strong>
                   </div>
                 </div>
 
-                <div className="row mb-2 border-top pt-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Add iGST</strong> <strong>  ₹ 0.00</strong>
+                {isGSTStateMatch ? (
+                  <>
+                    <div className="row mb-2 border-top pt-2">
+                      <div className="col-12 d-flex justify-content-between">
+                        <strong>CGST {(() => {
+                          const pcts = tableItems.map(it => {
+                            const taxable = Number(it.taxable) || 0;
+                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
+                            return Math.round(gstRaw / 2);
+                          }).filter(p => p && !isNaN(p));
+                          const uniq = Array.from(new Set(pcts));
+                          if (uniq.length === 1) return `(${uniq[0]}%)`;
+                          if (uniq.length === 0) return "";
+                          return "(mixed)";
+                        })()}</strong>
+                        <strong>₹ {(() => {
+                          const cgstSum = tableItems.reduce((s, it) => {
+                            const taxable = Number(it.taxable) || 0;
+                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
+                            const cgstPct = Math.round(gstRaw / 2);
+                            const cgstVal = (Number(it.cgst) && Number(it.cgst) > 0) ? Number(it.cgst) : +(taxable * (cgstPct / 100));
+                            return s + cgstVal;
+                          }, 0);
+                          return cgstSum.toFixed(2);
+                        })()}</strong>
+                      </div>
+                    </div>
+
+                    <div className="row mb-2">
+                      <div className="col-12 d-flex justify-content-between">
+                        <strong>SGST {(() => {
+                          const pcts = tableItems.map(it => {
+                            const taxable = Number(it.taxable) || 0;
+                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
+                            return Math.round(gstRaw / 2);
+                          }).filter(p => p && !isNaN(p));
+                          const uniq = Array.from(new Set(pcts));
+                          if (uniq.length === 1) return `(${uniq[0]}%)`;
+                          if (uniq.length === 0) return "";
+                          return "(mixed)";
+                        })()}</strong>
+                        <strong>₹ {(() => {
+                          const sgstSum = tableItems.reduce((s, it) => {
+                            const taxable = Number(it.taxable) || 0;
+                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
+                            const sgstPct = Math.round(gstRaw / 2);
+                            const sgstVal = (Number(it.sgst) && Number(it.sgst) > 0) ? Number(it.sgst) : +(taxable * (sgstPct / 100));
+                            return s + sgstVal;
+                          }, 0);
+                          return sgstSum.toFixed(2);
+                        })()}</strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="row mb-2 border-top pt-2">
+                    <div className="col-12 d-flex justify-content-between">
+                      <strong>iGST {(() => {
+                        const pcts = tableItems.map(it => {
+                          const taxable = Number(it.taxable) || 0;
+                          const pctRaw = Number(it.gst) || (taxable > 0 ? ((Number(it.igst) || 0) / taxable) * 100 : 0);
+                          return Math.round(pctRaw);
+                        }).filter(p => p && !isNaN(p));
+                        const uniq = Array.from(new Set(pcts));
+                        if (uniq.length === 1) return `(${uniq[0]}%)`;
+                        if (uniq.length === 0) return "";
+                        return "(mixed)";
+                      })()}</strong>
+                      <strong>₹ {(() => {
+                        const igstSum = tableItems.reduce((s, it) => {
+                          const taxable = Number(it.taxable) || 0;
+                          const pctRaw = Number(it.gst) || (taxable > 0 ? ((Number(it.igst) || 0) / taxable) * 100 : 0);
+                          const pct = Math.round(pctRaw);
+                          const igstVal = (Number(it.igst) && Number(it.igst) > 0) ? Number(it.igst) : +(taxable * (pct / 100));
+                          return s + igstVal;
+                        }, 0);
+                        return igstSum.toFixed(2);
+                      })()}</strong>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="row mb-2">
                   <div className="col-12 d-flex justify-content-between">
-                    <strong>Tax Amount</strong> <strong>  ₹ {(() => {
-                      const taxAmount = tableItems.reduce((sum, item) => sum + (item.cgst || 0) + (item.sgst || 0), 0);
+                    <strong>Total Tax Amount</strong> <strong>  ₹ {(() => {
+                      const taxAmount = tableItems.reduce((sum, item) => {
+                        if (isGSTStateMatch) {
+                          const taxable = Number(item.taxable) || 0;
+                          const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+                          const pctHalf = Math.round(gstRaw / 2);
+                          const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
+                          const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
+                          return sum + cgstVal + sgstVal;
+                        }
+                        const taxable = Number(item.taxable) || 0;
+                        const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+                        const pct = Math.round(pctRaw);
+                        const igstVal = +(taxable * (pct / 100));
+                        return sum + igstVal;
+                      }, 0);
                       return taxAmount.toFixed(2);
                     })()}</strong>
                   </div>
@@ -2474,10 +2689,18 @@ const  prefillFormData = async (data) => {
 
                 <div className="row mb-2">
                   <div className="col-12 d-flex justify-content-between">
-                    <strong>Total</strong> <strong>₹ {(grandTotal + (() => {
-                      const taxAmount = tableItems.reduce((sum, item) => sum + (item.cgst || 0) + (item.sgst || 0), 0);
-                      return taxAmount;
-                    })()).toFixed(2)}</strong>
+                    <strong>Total</strong> <strong>₹ {(() => {
+                      const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
+                      const taxAmount = tableItems.reduce((sum, item) => {
+                        if (isGSTStateMatch) return sum + (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
+                        const taxable = Number(item.taxable) || 0;
+                        const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+                        const pct = Math.round(pctRaw);
+                        const igstVal = +(taxable * (pct / 100));
+                        return sum + igstVal;
+                      }, 0);
+                      return (subtotal + taxAmount).toFixed(2);
+                    })()}</strong>
                   </div>
                 </div>
 
@@ -2492,7 +2715,7 @@ const  prefillFormData = async (data) => {
                           <button className="btn-action btn-delete" title="Delete charge" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>
                             🗑
                           </button>
-                          <span>{c.title} ({c.type === "percent" ? `${c.value}%` : `₹${c.value}`})</span>
+                          <span>{c.title} ({c.type === "percent" ? `${Math.round(c.value)}%` : `₹${c.value}`})</span>
                         </div>
                         <span>
                           ₹{" "}
@@ -2516,7 +2739,7 @@ const  prefillFormData = async (data) => {
                           <button className="btn-action btn-delete" title="Delete discount" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>
                             🗑
                           </button>
-                          <span>{d.title} ({d.type === "percent" ? `${d.value}%` : `₹${d.value}`})</span>
+                          <span>{d.title} ({d.type === "percent" ? `${Math.round(d.value)}%` : `₹${d.value}`})</span>
                         </div>
                         <span>
                           - ₹{" "}
@@ -3071,7 +3294,7 @@ const  prefillFormData = async (data) => {
                 </div>
                 <div>
                   <label>Unit</label>
-                  <input className="form-control" value={billingModalValues.unit} onChange={(e) => setBillingModalValues(prev => ({ ...prev, unit: e.target.value }))} />
+                  <input className="form-control" value={billingModalValues.unit} readOnly />
                 </div>
                 <div>
                   <label>Rate</label>
@@ -3097,11 +3320,11 @@ const  prefillFormData = async (data) => {
               <div className="grid-2">
                 <div>
                   <label>HSN/SAC</label>
-                  <input className="form-control" value={billingModalValues.hsn} onChange={(e) => setBillingModalValues(prev => ({ ...prev, hsn: e.target.value }))} />
+                  <input className="form-control" value={billingModalValues.hsn} readOnly />
                 </div>
                 <div>
                   <label>GST (%)</label>
-                  <input type="text" className="form-control" value={billingModalValues.gst} onChange={(e) => setBillingModalValues(prev => ({ ...prev, gst: Number(e.target.value) }))} />
+                  <input type="text" className="form-control" value={billingModalValues.gst} readOnly />
                 </div>
               </div>
 
@@ -3116,9 +3339,11 @@ const  prefillFormData = async (data) => {
                     let disc = Number(billingModalValues.discount)||0;
                     if (Number(billingModalValues.discountPercent) > 0) disc = (qty*rate)*(Number(billingModalValues.discountPercent)/100);
                     const taxable = qty*rate - disc;
-                    const cgst = (taxable * (Number(billingModalValues.gst)||0))/2/100;
-                    const sgst = (taxable * (Number(billingModalValues.gst)||0))/2/100;
-                    return (taxable + cgst + sgst).toFixed(2);
+                    const gstPercent = Number(billingModalValues.gst) || 0;
+                    const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+                    const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                    return taxRes.grandTotal.toFixed(2);
                   })()}</div>
               </div>
             </div>

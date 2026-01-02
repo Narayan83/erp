@@ -42,6 +42,11 @@ func CreateQuotation(c *fiber.Ctx) error {
 	// Start DB transaction
 	tx := quotationDB.Begin()
 
+	// Ensure status has a sensible default when client didn't provide one
+	if strings.TrimSpace(string(input.Quotation.Status)) == "" {
+		input.Quotation.Status = models.Open
+	}
+
 	input.Quotation.CreatedAt = time.Now()
 	input.Quotation.UpdatedAt = time.Now()
 

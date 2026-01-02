@@ -11,6 +11,7 @@ type QuotationStatuses string
 
 const (
 	Qt_Draft     QuotationStatuses = "draft"
+	Qt_Open      QuotationStatuses = "Open"
 	Qt_Sent      QuotationStatuses = "sent"
 	Qt_Confirmed QuotationStatuses = "confirmed"
 	Qt_Cancelled QuotationStatuses = "cancelled"

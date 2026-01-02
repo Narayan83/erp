@@ -31,10 +31,12 @@ const QuotationList = () => {
   const [showPrintSettings, setShowPrintSettings] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [showQuotationDetail, setShowQuotationDetail] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // initialize visible columns from localStorage or defaults
   const columnOptions = [
     { key: 'customer', label: 'Customer' },
+    { key: 'status', label: 'Status' },
     { key: 'amount', label: 'Amount (₹)' },
     { key: 'valid_till', label: 'Valid Till' },
     { key: 'issued_on', label: 'Issued On' },
@@ -540,6 +542,30 @@ const QuotationList = () => {
     window.location.href = mailto;
   };
 
+  const handleStatusChange = async (newStatus) => {
+    if (!selectedQuotation) return;
+    const prevStatus = selectedQuotation.status;
+    const qid = selectedQuotation.quotation_id;
+
+    // Optimistically update modal and lists
+    setSelectedQuotation(prev => ({ ...(prev || {}), status: newStatus }));
+    setDisplayedQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: newStatus } : q)));
+    setQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: newStatus } : q)));
+
+    try {
+      // backend expects a PUT to /api/quotations/:id with payload { quotation: { ... } }
+      await axios.put(`${BASE_URL}/api/quotations/${qid}`, { quotation: { status: newStatus } });
+      try { window.toastr && window.toastr.success && window.toastr.success('Status updated'); } catch (e) {}
+    } catch (err) {
+      console.error('Failed to update status', err);
+      // revert changes
+      setSelectedQuotation(prev => ({ ...(prev || {}), status: prevStatus }));
+      setDisplayedQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: prevStatus } : q)));
+      setQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: prevStatus } : q)));
+      try { window.toastr && window.toastr.error && window.toastr.error('Failed to update status'); } catch (e) {}
+    }
+  };
+
   const printQuotation = (e) => {
     e.stopPropagation();
     shareAsPDF(e);
@@ -559,80 +585,80 @@ const QuotationList = () => {
     setPage(1);
   }, [searchTerm, activeDocType, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear]);
 
-  // Apply client-side filters to the fetched quotations
+  // Reusable filter function (used by listing and export)
+  const applyFiltersToList = (list) => {
+    let filtered = (list || []).slice();
+    const st = (searchTerm || '').trim().toLowerCase();
+
+    if (st) {
+      filtered = filtered.filter((q) => {
+        const company = (q.customer?.company_name || '').toLowerCase();
+        const person = (`${q.customer?.salutation || ''} ${q.customer?.firstname || ''} ${q.customer?.lastname || ''}`).toLowerCase();
+        const number = (q.quotation_number || '').toLowerCase();
+        const exec = (`${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`).toLowerCase();
+        return company.includes(st) || person.includes(st) || number.includes(st) || exec.includes(st);
+      });
+    }
+
+    if (activeDocType && activeDocType !== 'All') {
+      filtered = filtered.filter((q) => {
+        if (activeDocType === 'Quotation') {
+          return q.document_type === 'Quotation' || q.type === 'Quotation' || !q.is_proforma;
+        }
+        if (activeDocType === 'Proforma Invoices') {
+          return q.document_type === 'Proforma Invoices' || q.type === 'Proforma Invoices' || q.is_proforma;
+        }
+        return true;
+      });
+    }
+
+    if (statusFilter && statusFilter !== 'All') {
+      filtered = filtered.filter((q) => (q.status || '').toLowerCase() === statusFilter.toLowerCase());
+    }
+
+    if (monthFilter) {
+      const now = new Date();
+      filtered = filtered.filter((q) => {
+        const d = q.quotation_date ? new Date(q.quotation_date) : null;
+        if (!d) return false;
+        if (monthFilter === 'This Month') {
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        } else if (monthFilter === 'Last Month') {
+          const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          return d.getMonth() === last.getMonth() && d.getFullYear() === last.getFullYear();
+        } else if (monthFilter === 'This Year') {
+          return d.getFullYear() === now.getFullYear();
+        } else if (monthFilter === 'Other Month') {
+          if (!selectedOtherMonth) return false;
+          const [year, month] = selectedOtherMonth.split('-').map(Number);
+          return d.getMonth() === month - 1 && d.getFullYear() === year;
+        } else if (monthFilter === 'Other Year') {
+          if (!selectedOtherYear) return false;
+          return d.getFullYear() === Number(selectedOtherYear);
+        }
+        return true;
+      });
+    }
+
+    if (branchFilter && branchFilter !== 'All Branches') {
+      filtered = filtered.filter((q) => {
+        const qBranchId = q.branch_id || q.company_branch_id || (q.branch && (q.branch.id || q.branch.ID));
+        return String(qBranchId) === String(branchFilter);
+      });
+    }
+
+    if (executiveFilter && executiveFilter !== 'All Executives') {
+      filtered = filtered.filter((q) => {
+        const qExecId = q.sales_credit_person_id || (q.sales_credit_person && (q.sales_credit_person.id || q.sales_credit_person.ID));
+        return String(qExecId) === String(executiveFilter);
+      });
+    }
+
+    return filtered;
+  };
+
   useEffect(() => {
-    const applyFilters = () => {
-      let filtered = (quotations || []).slice();
-      const st = (searchTerm || '').trim().toLowerCase();
-
-      if (st) {
-        filtered = filtered.filter((q) => {
-          const company = (q.customer?.company_name || '').toLowerCase();
-          const person = (`${q.customer?.salutation || ''} ${q.customer?.firstname || ''} ${q.customer?.lastname || ''}`).toLowerCase();
-          const number = (q.quotation_number || '').toLowerCase();
-          const exec = (`${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`).toLowerCase();
-          return company.includes(st) || person.includes(st) || number.includes(st) || exec.includes(st);
-        });
-      }
-
-      if (activeDocType && activeDocType !== 'All') {
-        filtered = filtered.filter((q) => {
-          if (activeDocType === 'Quotation') {
-            return q.document_type === 'Quotation' || q.type === 'Quotation' || !q.is_proforma;
-          }
-          if (activeDocType === 'Proforma Invoices') {
-            return q.document_type === 'Proforma Invoices' || q.type === 'Proforma Invoices' || q.is_proforma;
-          }
-          return true;
-        });
-      }
-
-      if (statusFilter && statusFilter !== 'All') {
-        filtered = filtered.filter((q) => (q.status || '').toLowerCase() === statusFilter.toLowerCase());
-      }
-
-      if (monthFilter) {
-        const now = new Date();
-        filtered = filtered.filter((q) => {
-          const d = q.quotation_date ? new Date(q.quotation_date) : null;
-          if (!d) return false;
-          if (monthFilter === 'This Month') {
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-          } else if (monthFilter === 'Last Month') {
-            const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            return d.getMonth() === last.getMonth() && d.getFullYear() === last.getFullYear();
-          } else if (monthFilter === 'This Year') {
-            return d.getFullYear() === now.getFullYear();
-          } else if (monthFilter === 'Other Month') {
-            if (!selectedOtherMonth) return false;
-            const [year, month] = selectedOtherMonth.split('-').map(Number);
-            return d.getMonth() === month - 1 && d.getFullYear() === year;
-          } else if (monthFilter === 'Other Year') {
-            if (!selectedOtherYear) return false;
-            return d.getFullYear() === Number(selectedOtherYear);
-          }
-          return true;
-        });
-      }
-
-      if (branchFilter && branchFilter !== 'All Branches') {
-        filtered = filtered.filter((q) => {
-          const qBranchId = q.branch_id || q.company_branch_id || (q.branch && (q.branch.id || q.branch.ID));
-          return String(qBranchId) === String(branchFilter);
-        });
-      }
-
-      if (executiveFilter && executiveFilter !== 'All Executives') {
-        filtered = filtered.filter((q) => {
-          const qExecId = q.sales_credit_person_id || (q.sales_credit_person && (q.sales_credit_person.id || q.sales_credit_person.ID));
-          return String(qExecId) === String(executiveFilter);
-        });
-      }
-
-      setDisplayedQuotations(filtered);
-    };
-
-    applyFilters();
+    setDisplayedQuotations(applyFiltersToList(quotations));
   }, [quotations, searchTerm, activeDocType, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear]);
 
   const calculateTotals = () => {
@@ -642,27 +668,69 @@ const QuotationList = () => {
     return { preTax, total, count: list.length };
   };
 
-  const handleExport = () => {
-    const data = displayedQuotations.map((q) => {
-      const row = {};
-      if (visibleColumns.includes('quote_no')) row['Quote No.'] = q.quotation_number || '';
-      if (visibleColumns.includes('customer')) row['Customer'] = q.customer?.company_name || `${q.customer?.salutation || ''} ${q.customer?.firstname || ''} ${q.customer?.lastname || ''}`.replace(/\s+/g, ' ').trim() || '';
-      if (visibleColumns.includes('amount')) row['Amount (₹)'] = q.grand_total || 0;
-      if (visibleColumns.includes('valid_till')) row['Valid Till'] = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '';
-      if (visibleColumns.includes('issued_on')) row['Issued On'] = q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : '';
-      if (visibleColumns.includes('issued_by')) row['Issued by'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
-      if (visibleColumns.includes('type')) row['Type'] = 'Quotation';
-      if (visibleColumns.includes('executive')) row['Executive'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
-      if (visibleColumns.includes('response')) row['Response'] = '';
-      if (visibleColumns.includes('last_interaction')) row['Last Interaction'] = q.last_interaction ? new Date(q.last_interaction).toLocaleDateString('en-IN') : '';
-      if (visibleColumns.includes('next_action')) row['Next Action'] = q.next_action || '';
-      return row;
-    });
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Fetch all quotations from server (no pagination) to ensure export includes all filtered rows
+      const res = await axios.get(`${BASE_URL}/api/quotations`, { params: { page: 1, limit: 1000000 } });
+      const all = res.data && res.data.data ? res.data.data : res.data || [];
+      const filtered = applyFiltersToList(all);
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Quotations');
-    XLSX.writeFile(wb, 'quotations.xlsx');
+      const data = filtered.map((q) => {
+        const row = {};
+        if (visibleColumns.includes('quote_no')) row['Quote No.'] = q.quotation_number || '';
+        if (visibleColumns.includes('customer')) row['Customer'] = q.customer?.company_name || `${q.customer?.salutation || ''} ${q.customer?.firstname || ''} ${q.customer?.lastname || ''}`.replace(/\s+/g, ' ').trim() || '';
+        if (visibleColumns.includes('status')) row['Status'] = q.status || '';
+        if (visibleColumns.includes('amount')) row['Amount (₹)'] = q.grand_total || 0;
+        if (visibleColumns.includes('valid_till')) row['Valid Till'] = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '';
+        if (visibleColumns.includes('issued_on')) row['Issued On'] = q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : '';
+        if (visibleColumns.includes('issued_by')) row['Issued by'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
+        if (visibleColumns.includes('type')) row['Type'] = 'Quotation';
+        if (visibleColumns.includes('executive')) row['Executive'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
+        if (visibleColumns.includes('response')) row['Response'] = '';
+        if (visibleColumns.includes('last_interaction')) row['Last Interaction'] = q.last_interaction ? new Date(q.last_interaction).toLocaleDateString('en-IN') : '';
+        if (visibleColumns.includes('next_action')) row['Next Action'] = q.next_action || '';
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Quotations');
+      const filename = `quotations_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      try { window.toastr && window.toastr.success && window.toastr.success('Export completed'); } catch (e) {}
+    } catch (err) {
+      console.error('Failed to export quotations', err);
+      // Fallback: export the currently displayed page
+      try {
+        const data = displayedQuotations.map((q) => {
+          const row = {};
+          if (visibleColumns.includes('quote_no')) row['Quote No.'] = q.quotation_number || '';
+          if (visibleColumns.includes('customer')) row['Customer'] = q.customer?.company_name || `${q.customer?.salutation || ''} ${q.customer?.firstname || ''} ${q.customer?.lastname || ''}`.replace(/\s+/g, ' ').trim() || '';
+          if (visibleColumns.includes('status')) row['Status'] = q.status || '';
+          if (visibleColumns.includes('amount')) row['Amount (₹)'] = q.grand_total || 0;
+          if (visibleColumns.includes('valid_till')) row['Valid Till'] = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '';
+          if (visibleColumns.includes('issued_on')) row['Issued On'] = q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : '';
+          if (visibleColumns.includes('issued_by')) row['Issued by'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
+          if (visibleColumns.includes('type')) row['Type'] = 'Quotation';
+          if (visibleColumns.includes('executive')) row['Executive'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
+          if (visibleColumns.includes('response')) row['Response'] = '';
+          if (visibleColumns.includes('last_interaction')) row['Last Interaction'] = q.last_interaction ? new Date(q.last_interaction).toLocaleDateString('en-IN') : '';
+          if (visibleColumns.includes('next_action')) row['Next Action'] = q.next_action || '';
+          return row;
+        });
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Quotations');
+        XLSX.writeFile(wb, 'quotations.xlsx');
+        try { window.toastr && window.toastr.warning && window.toastr.warning('Exported visible page as fallback'); } catch (e) {}
+      } catch (e) {
+        console.error('Export fallback failed', e);
+        try { window.toastr && window.toastr.error && window.toastr.error('Export failed'); } catch (e2) {}
+      }
+    } finally {
+      setExporting(false);
+    }
   };
 
   const { preTax, total, count } = calculateTotals();
@@ -694,7 +762,7 @@ const QuotationList = () => {
               Print Settings
             </button>
             
-            <button className="icon-btn square" title="Export to Excel" onClick={handleExport}><FaFileExport /></button>
+            <button className="icon-btn square" title={exporting ? 'Exporting...' : 'Export to Excel'} onClick={handleExport} disabled={exporting}><FaFileExport /></button>
             <button className="icon-btn square" title="Display Preferences" onClick={() => { setTempVisibleColumns(visibleColumns); setShowDisplayPrefs(true); }}><FaBars /></button>
             <button className="icon-btn square" title="Summary"><FaChartBar /></button>
             <button className="icon-btn square settings" title="Configuration" onClick={() => navigate('/sales-configuration')}><FaCog /></button>
@@ -760,7 +828,8 @@ const QuotationList = () => {
 
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option>All</option>
-          <option>Not Expired</option>
+          <option>Open</option>
+          <option>Expired</option>
           <option>Rejected</option>
           <option>Converted</option>
           <option>Cancelled</option>
@@ -798,6 +867,7 @@ const QuotationList = () => {
               {visibleColumns.includes('issued_by') && <th>Issued by</th>}
               {visibleColumns.includes('type') && <th>Type</th>}
               {visibleColumns.includes('executive') && <th>Executive</th>}
+              {visibleColumns.includes('status') && <th>Status</th>}
               {visibleColumns.includes('response') && <th>Response</th>}
               {visibleColumns.includes('last_interaction') && <th>Last Interaction</th>}
               {visibleColumns.includes('next_action') && <th>Next Action</th>}
@@ -815,6 +885,7 @@ const QuotationList = () => {
                 {visibleColumns.includes('issued_by') && <td>{renderHighlighted(((quotation.sales_credit_person?.firstname || '') + ' ' + (quotation.sales_credit_person?.lastname || '')).trim() || '-')}</td>}
                 {visibleColumns.includes('type') && <td>Quotation</td>}
                 {visibleColumns.includes('executive') && <td>{renderHighlighted(((quotation.sales_credit_person?.firstname || '') + ' ' + (quotation.sales_credit_person?.lastname || '')).trim() || '-')}</td>}
+                {visibleColumns.includes('status') && <td>{renderHighlighted(quotation.status || '-')}</td>}
                 {visibleColumns.includes('response') && <td>-</td>}
                 {visibleColumns.includes('last_interaction') && <td>{quotation.last_interaction ? new Date(quotation.last_interaction).toLocaleDateString('en-IN') : '-'}</td>}
                 {visibleColumns.includes('next_action') && <td>{quotation.next_action || '-'}</td>}
@@ -891,10 +962,11 @@ const QuotationList = () => {
               <select
                 className="status-badge-select"
                 value={selectedQuotation.status || 'Not Expired'}
-                onChange={(e) => setSelectedQuotation(prev => ({ ...(prev || {}), status: e.target.value }))}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 style={{ background: (selectedQuotation.status === 'Open') ? '#e8f5e9' : '#fff3e0', color: (selectedQuotation.status === 'Open') ? '#2e7d32' : '#e65100' }}
               >
-                <option value="Not Expired">Not Expired</option>
+                <option value="Open">Open</option>
+                <option value="Expired">Expired</option>
                 <option value="Rejected">Rejected</option>
                 <option value="Converted">Converted</option>
                 <option value="Cancelled">Cancelled</option>

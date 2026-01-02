@@ -414,7 +414,7 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 	}
 
 	// Set defaults
-	req.Quotation.Status = models.Qt_Draft
+	req.Quotation.Status = models.Qt_Open
 	req.Quotation.QuotationNumber = "" // temporary
 
 	// STEP 1: Create quotation
@@ -596,4 +596,30 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 	tx.Commit()
 
 	return c.JSON(fiber.Map{"message": "Quotation updated successfully"})
+}
+
+// ================================
+// SCP COUNT BY SERIES
+// ================================
+func GetScpCountBySeriesID(c *fiber.Ctx) error {
+	seriesID := c.Params("series_id")
+
+	var maxScpCount uint
+
+	err := quotationTableDB.
+		Model(&models.QuotationTable{}).
+		Where("series_id = ?", seriesID).
+		Select("COALESCE(MAX(quotation_scp_count), 0)").
+		Scan(&maxScpCount).Error
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"series_id":               seriesID,
+		"max_quotation_scp_count": maxScpCount,
+	})
 }

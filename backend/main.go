@@ -220,6 +220,7 @@ func main() {
 	// api.Post("/quotations", handler.CreateQuotation)
 	// api.Put("/quotations/:id", handler.UpdateQuotation)
 
+	app.Get("/api/quotations/count-scp/:series_id", handler.GetScpCountBySeriesID)
 	app.Post("/api/quotations", handler.CreateQuotationTable)
 	app.Get("/api/quotations", handler.GetAllQuotationsTable)
 	app.Get("/api/quotations/:id", handler.GetQuotationTable)

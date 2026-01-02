@@ -11,6 +11,7 @@ const (
 	Sent     QuotationStatus = "Sent"
 	Accepted QuotationStatus = "Accepted"
 	Rejected QuotationStatus = "Rejected"
+	Open     QuotationStatus = "Open"
 )
 
 type Quotation struct {

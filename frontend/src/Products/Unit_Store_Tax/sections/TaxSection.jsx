@@ -25,11 +25,21 @@ export default function TaxSection() {
       const res = await axios.get(`${BASE_URL}/api/taxes`, {
         params: { page: page + 1, limit: rowsPerPage, filter }
       });
-      console.log(res);
-      setTaxes(res.data.data);
-      setTotal(res.data.total);
-      console.log(taxes)
-    } catch {
+
+      const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const totalRes = Number(res.data?.total ?? data.length ?? 0);
+
+      // If the current page is now beyond the last page (e.g., after deletions), reset to the last available page
+      if (page > 0 && page * rowsPerPage >= totalRes) {
+        const newPage = Math.max(0, Math.ceil(totalRes / rowsPerPage) - 1);
+        setPage(newPage);
+        return; // page state change will trigger a re-fetch
+      }
+
+      setTaxes(data);
+      setTotal(totalRes);
+    } catch (err) {
+      console.error("Failed to load taxes:", err);
       showSnackbar("Failed to load taxes", "error");
     }
   };
@@ -116,7 +126,7 @@ export default function TaxSection() {
               <option value={10}>10</option>
               <option value={25}>25</option>
             </select>
-            <span>{total > 0 ? page * rowsPerPage + 1 : 0}â€“{Math.min((page + 1) * rowsPerPage, total)} of {total}</span>
+            <span>{total > 0 ? page * rowsPerPage + 1 : 0}–{Math.min((page + 1) * rowsPerPage, total)} of {total}</span>
           </div>
           <div className="pagination-buttons">
             <button
