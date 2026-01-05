@@ -3,7 +3,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/Config" // adjust if needed
-import Cropper from 'react-easy-crop';
+import ImageEditor from '../../Products/ProductManage/Components/ImageEditor';
 import './addeditemployee.scss';
 import industries from "../../User/industries.json";
 import countries from "../../User/utils/countries";
@@ -62,6 +62,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
       usercode: "",
       aadhar_number: "",
       pan_number: "",
+      emergency_contact: "",
   }
   ,
   // Keep fields registered even when inputs unmount (e.g., tab panels)
@@ -130,7 +131,6 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
   const [uploadedDocuments, setUploadedDocuments] = React.useState([]);
   const [documentDialogOpen, setDocumentDialogOpen] = React.useState(false);
   const [currentDocument, setCurrentDocument] = React.useState(null);
-  const [croppedImage, setCroppedImage] = React.useState(null);
 
   // Password visibility state
   const [showPassword, setShowPassword] = React.useState(false);
@@ -218,6 +218,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
   const sameAsPermanent = watch("same_as_permanent");
   const activeStatus = watch("active", true);
   const permanentCountry = watch("permanent_country", "");
+  const residentialCountry = watch("residential_country", "");
 
   // User lists state
   const [distributors, setDistributors] = React.useState([]);
@@ -456,15 +457,19 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         return "";
       };
 
-      // Find permanent address from addresses array
+      // Find permanent and residential addresses from addresses array
       const permanentAddr = Array.isArray(defaultValues.addresses)
         ? defaultValues.addresses.find(addr => addr.title === "Permanent")
+        : null;
+      const residentialAddr = Array.isArray(defaultValues.addresses)
+        ? defaultValues.addresses.find(addr => addr.title === "Residential")
         : null;
 
       // Get primary bank account (first one) for primary bank fields
       const primaryBank = Array.isArray(defaultValues.bank_accounts) && defaultValues.bank_accounts.length > 0
         ? defaultValues.bank_accounts[0]
-        : null;      reset({
+        : null;
+      reset({
         ...defaultValues,
         dob: defaultValues.dob ? defaultValues.dob.split("T")[0] : "", 
         is_user: !!defaultValues.is_user,
@@ -480,6 +485,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         confirmPassword: defaultValues.plain_password || defaultValues.plainPassword || defaultValues.password || "",
         distributor_id: defaultValues.distributor_id || null,
         dealer_id: defaultValues.dealer_id || null,
+        emergency_contact: defaultValues.emergency_contact || defaultValues.emergencyContact || defaultValues.emergency_number || defaultValues.emergencyNumber || "",
         // Business Information
         business_name: defaultValues.business_name || "",
         companyname: defaultValues.company_name || "",
@@ -496,6 +502,16 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         permanent_country: getCountryName(permanentAddr?.country || defaultValues.permanent_country),
         permanent_country_code: getCountryCode(permanentAddr?.country_code || permanentAddr?.country || defaultValues.permanent_country_code),
         permanent_gstin: permanentAddr?.gstin || permanentAddr?.gstin_number || defaultValues.permanent_gstin || "",
+        // Residential address fields - same behavior as permanent
+        residential_address1: residentialAddr?.address1 || defaultValues.residential_address1 || "",
+        residential_address2: residentialAddr?.address2 || defaultValues.residential_address2 || "",
+        residential_address3: residentialAddr?.address3 || defaultValues.residential_address3 || "",
+        residential_city: residentialAddr?.city || defaultValues.residential_city || "",
+        residential_state: residentialAddr?.state || defaultValues.residential_state || "",
+        residential_pincode: residentialAddr?.pincode || defaultValues.residential_pincode || "",
+        residential_country: getCountryName(residentialAddr?.country || defaultValues.residential_country),
+        residential_country_code: getCountryCode(residentialAddr?.country_code || residentialAddr?.country || defaultValues.residential_country_code),
+        residential_gstin: residentialAddr?.gstin || residentialAddr?.gstin_number || defaultValues.residential_gstin || "",
         // Contact country - fallback to permanent if not at top level, extract name and code
         country: getCountryName(defaultValues.country || defaultValues.permanent_country || permanentAddr?.country),
         country_code: getCountryCode(defaultValues.country_code || defaultValues.country || defaultValues.permanent_country_code || permanentAddr?.country_code || permanentAddr?.country),
@@ -511,11 +527,11 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         account_number: primaryBank?.account_number || "",
         ifsc_code: primaryBank?.ifsc_code || "",
       });
-      // Prefill additionalAddresses from backend addresses (excluding "Permanent")
+      // Prefill additionalAddresses from backend addresses (excluding "Permanent" and "Residential")
       setAdditionalAddresses(
         Array.isArray(defaultValues.addresses)
           ? defaultValues.addresses
-              .filter(addr => addr.title !== "Permanent")
+              .filter(addr => addr.title !== "Permanent" && addr.title !== "Residential")
               .map(addr => ({
                 id: addr.id,
                 // keep internal field name consistent with form handlers
@@ -701,6 +717,8 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         email: data.email || "",
         aadhar_number: data.aadhar_number || undefined,
         pan_number: data.pan_number || undefined,
+        // Emergency number - map form field `emergency_contact` to backend `emergency_number`
+        emergency_number: data.emergency_contact || undefined,
         password: data.password || undefined,
         // Permanent address fields
         permanent_address1: data.address1 || undefined,
@@ -712,6 +730,16 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         permanent_pincode: data.pincode || undefined,
   // Permanent GSTIN (separate from legal/ document GSTIN)
   permanent_gstin: data.permanent_gstin || undefined,
+        // Residential address (same fields as permanent)
+        residential_address1: data.residential_address1 || undefined,
+        residential_address2: data.residential_address2 || undefined,
+        residential_address3: data.residential_address3 || undefined,
+        residential_city: data.residential_city || undefined,
+        residential_state: data.residential_state || undefined,
+        residential_country: data.residential_country || undefined,
+        residential_pincode: data.residential_pincode || undefined,
+        residential_gstin: data.residential_gstin || undefined,
+        residential_country_code: data.residential_country_code || "",
         // Primary bank information
         primary_bank_name: data.bank_name || undefined,
         primary_branch_name: data.branch_name || undefined,
@@ -1114,9 +1142,6 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
       preview: doc.preview || buildDocUrl(doc)
     };
     setCurrentDocument(docWithPreview);
-    // Reset crop/zoom for new document
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
     setDocumentDialogOpen(true);
   };
 
@@ -1188,104 +1213,44 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
     }
   };
 
-  const [crop, setCrop] = React.useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = React.useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState(null);
-
-  const onCropComplete = React.useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  const createImage = (url) =>
-    new Promise((resolve, reject) => {
-      const image = new Image();
-      image.addEventListener('load', () => resolve(image));
-      image.addEventListener('error', (error) => reject(error));
-      image.src = url;
-    });
-
-  const getCroppedImg = async (imageSrc, pixelCrop) => {
-    const image = await createImage(imageSrc);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-
-    ctx.drawImage(
-      image,
-      pixelCrop.x,
-      pixelCrop.y,
-      pixelCrop.width,
-      pixelCrop.height,
-      0,
-      0,
-      pixelCrop.width,
-      pixelCrop.height
-    );
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, 'image/jpeg');
-    });
-  };
-
-  const handleSaveDocumentChanges = async () => {
+  const handleImageEditorSave = async (result) => {
     if (!currentDocument) return;
-
-    // Validate that document type is selected
-    if (!(currentDocument.document_type || currentDocument.name) || String(currentDocument.document_type || currentDocument.name).trim() === '') {
-      alert('Please select a document type.');
-      return;
-    }
-
     try {
-  let updatedDoc = { ...currentDocument };
+      let updatedDoc = { ...currentDocument };
 
-      // Handle image cropping if it's an image
-    if (currentDocument?.type?.startsWith?.('image/')) {
-        const croppedImageBlob = await getCroppedImg(currentDocument.preview, croppedAreaPixels);
-        const croppedImageUrl = URL.createObjectURL(croppedImageBlob);
-        
-        // Create a new file from the blob
-        const croppedFile = new File([croppedImageBlob], currentDocument.name, {
-          type: currentDocument.type,
-        });
+      // If the editor returned a blob (preferred)
+      if (result && result.blob) {
+        const mime = result.mime || result.blob.type || 'image/png';
+        const name = currentDocument.name || (currentDocument.file && currentDocument.file.name) || `document.${mime.split('/')[1] || 'png'}`;
+        const file = new File([result.blob], name, { type: mime });
+        const preview = result.hi || URL.createObjectURL(result.blob);
 
-        updatedDoc = {
-          ...updatedDoc,
-          file: croppedFile,
-          preview: croppedImageUrl
-        };
-
-        // Clean up old preview
-        if (currentDocument.preview) {
+        if (currentDocument.preview && String(currentDocument.preview).startsWith('blob:')) {
           URL.revokeObjectURL(currentDocument.preview);
         }
+
+        updatedDoc = { ...updatedDoc, file, preview, type: mime };
+      } else if (result && result.css) {
+        // data URL returned as css
+        updatedDoc = { ...updatedDoc, preview: result.css };
+      } else if (typeof result === 'string') {
+        updatedDoc = { ...updatedDoc, preview: result };
       }
 
-      // Update the document in state
       // Normalize document type/number fields for backend
       updatedDoc = {
         ...updatedDoc,
         document_type: updatedDoc.name || updatedDoc.document_type || '',
         document_number: updatedDoc.documentNumber || updatedDoc.document_number || ''
       };
-
-      // Also keep legacy keys used in dialog
       if (updatedDoc.documentNumber === undefined) updatedDoc.documentNumber = updatedDoc.document_number || '';
 
-      setUploadedDocuments(prev => prev.map(doc => 
-        doc.id === currentDocument.id ? updatedDoc : doc
-      ));
-
+      setUploadedDocuments(prev => prev.map(doc => doc.id === currentDocument.id ? updatedDoc : doc));
+    } catch (e) {
+      console.error('Error saving image from editor', e);
+    } finally {
       setDocumentDialogOpen(false);
       setCurrentDocument(null);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-    } catch (e) {
-      console.error('Error saving document changes:', e);
     }
   };
 
@@ -1370,6 +1335,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         password: "",
         confirmPassword: "",
         usercode: "",
+        emergency_contact: "",
       };
       Object.entries(fields).forEach(([k, v]) => setValue(k, v, { shouldDirty: true }));
       fieldsToClear = Object.keys(fields);
@@ -1386,6 +1352,15 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         permanent_country: "",
         permanent_country_code: "",
         pincode: "",
+        residential_address1: "",
+        residential_address2: "",
+        residential_address3: "",
+        residential_city: "",
+        residential_state: "",
+        residential_country: "",
+        residential_country_code: "",
+        residential_pincode: "",
+        residential_gstin: "",
         bank_name: "",
         branch_name: "",
         branch_address: "",
@@ -1678,6 +1653,19 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
             {errors.email && <div className="error-message">{errors.email.message}</div>}
           </div>
 
+          {/* Emergency Contact */}
+          <div className="form-field">
+            <label htmlFor="emergency_contact">Emergency Contact</label>
+            <input
+              id="emergency_contact"
+              type="tel"
+              {...register("emergency_contact", { pattern: { value: /^\d{10}$/, message: "Emergency contact must be 10 digits" } })}
+              placeholder="10 digit number"
+              className={errors.emergency_contact ? 'error' : ''}
+            />
+            {errors.emergency_contact && <div className="error-message">{errors.emergency_contact.message}</div>}
+          </div>
+
           <div style={{ gridColumn: '1 / -1' }}>
             <h6>Legal Information</h6>
           </div>
@@ -1854,7 +1842,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
       <TabPanel value={tabIndex} index={1}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <h6 style={{ marginTop: 0 }}>Employee Address</h6>
+            <h6 style={{ marginTop: 0 }}>Permanent Address</h6>
           </div>
 
           {/* Address 1 */}
@@ -1890,8 +1878,8 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                       className={errors.city ? 'error' : ''}
                     >
                       <option value="">Select City</option>
-                      {citiesList.map((c) => (
-                        <option key={c} value={c}>
+                      {citiesList.map((c, idx) => (
+                        <option key={`${c}-${idx}`} value={c}>
                           {c}
                         </option>
                       ))}
@@ -1972,6 +1960,134 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
           <div className="form-field">
             <label htmlFor="pincode">Pincode</label>
             <input id="pincode" type="text" {...register("pincode")} />
+          </div>
+
+          {/* Residential Address */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6 style={{ marginTop: 0 }}>Residential Address</h6>
+          </div>
+
+          {/* Residential Address 1 */}
+          <div className="form-field">
+            <label htmlFor="residential_address1">Address 1</label>
+            <input id="residential_address1" type="text" {...register("residential_address1")} />
+          </div>
+
+          {/* Residential Address 2 */}
+          <div className="form-field">
+            <label htmlFor="residential_address2">Address 2</label>
+            <input id="residential_address2" type="text" {...register("residential_address2")} />
+          </div>
+
+          {/* Residential Address 3 */}
+          <div className="form-field">
+            <label htmlFor="residential_address3">Address 3</label>
+            <input id="residential_address3" type="text" {...register("residential_address3")} />
+          </div>
+
+          {/* Residential City */}
+          <div className="form-field">
+            <label htmlFor="residential_city">City</label>
+            {String(residentialCountry || "").toLowerCase() === "india" ? (
+              <div className="form-select-wrapper">
+                <Controller
+                  name="residential_city"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      id="residential_city"
+                      className={errors.residential_city ? 'error' : ''}
+                    >
+                      <option value="">Select City</option>
+                      {citiesList.map((c, idx) => (
+                        <option key={`${c}-${idx}`} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+              </div>
+            ) : (
+              <input id="residential_city" type="text" {...register("residential_city")} />
+            )}
+            {errors.residential_city && <div className="error-message">{errors.residential_city.message}</div>}
+          </div>
+
+          {/* Residential State */}
+          <div className="form-field">
+            <label htmlFor="residential_state">State</label>
+            {String(residentialCountry || "").toLowerCase() === "india" ? (
+              <div className="form-select-wrapper">
+                <Controller
+                  name="residential_state"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      id="residential_state"
+                      className={errors.residential_state ? 'error' : ''}
+                    >
+                      <option value="">Select State</option>
+                      {indiaStates.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+              </div>
+            ) : (
+              <input id="residential_state" type="text" {...register("residential_state")} />
+            )}
+            {errors.residential_state && <div className="error-message">{errors.residential_state.message}</div>}
+          </div>
+
+          {/* Residential Country */}
+          <div className="form-field">
+            <label htmlFor="residential_country">Country</label>
+            <Controller
+              name="residential_country"
+              control={control}
+              render={({ field }) => (
+                <div className="form-select-wrapper">
+                  <select
+                    id="residential_country"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val);
+                      const selected = countries.find(c => c.name === val);
+                      setValue("residential_country_code", selected?.code || "");
+                    }}
+                  >
+                    <option value="">Select Country</option>
+                    {countries.map((c, idx) => (
+                      <option key={`${c.name}-res-${idx}`} value={c.name}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            />
+            
+            <Controller name="residential_country_code" control={control} render={({ field }) => <input type="hidden" {...field} />} />
+          </div>
+
+          {/* Residential Pincode */}
+          <div className="form-field">
+            <label htmlFor="residential_pincode">Pincode</label>
+            <input id="residential_pincode" type="text" {...register("residential_pincode")} />
+          </div>
+
+          {/* Residential GSTIN */}
+          <div className="form-field">
+            <label htmlFor="residential_gstin">GSTIN</label>
+            <input id="residential_gstin" type="text" {...register("residential_gstin")} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -2208,56 +2324,14 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
       )}
 
       {/* Document Edit Dialog */}
-      {documentDialogOpen && currentDocument && (
-      <div className="dialog-overlay open" onClick={() => { setDocumentDialogOpen(false); setCurrentDocument(null); }}>
-        <div className="dialog-content lg" onClick={(e) => e.stopPropagation()}>
-          <div className="dialog-header">Edit Document</div>
-          <div className="dialog-body">
-            {/* Document type/number are edited on the document card now. Dialog only offers preview/crop. */}
-            <h6 style={{ marginTop: 0 }}>Preview / Crop</h6>
-            {currentDocument && (
-              <>
-                {currentDocument?.type?.startsWith?.('image/') || currentDocument?.file_url ? (
-                  <>
-                    <div className="cropper-wrapper">
-                      <Cropper
-                        image={currentDocument.preview || buildDocUrl(currentDocument)}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={4 / 3}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={onCropComplete}
-                      />
-                    </div>
-                    <div className="slider-wrapper">
-                      <label>Zoom</label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="3"
-                        step="0.1"
-                        value={zoom}
-                        onChange={(e) => setZoom(Number(e.target.value))}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ padding: '16px', backgroundColor: '#f5f5f5', textAlign: 'center', borderRadius: '4px' }}>
-                    <p style={{ color: '#999', margin: 0 }}>
-                      This document type cannot be cropped. View or download to see the full document.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          <div className="dialog-footer">
-            <button type="button" className="btn btn-outline" onClick={() => { setDocumentDialogOpen(false); setCurrentDocument(null); }}>Cancel</button>
-            <button type="button" className="btn btn-primary" onClick={handleSaveDocumentChanges}>Save</button>
-          </div>
-        </div>
-      </div>
+      {documentDialogOpen && currentDocument && currentDocument?.type?.startsWith?.('image/') && (
+        <ImageEditor
+          open={true}
+          initialSrc={currentDocument.preview || buildDocUrl(currentDocument)}
+          onSave={handleImageEditorSave}
+          onClose={() => { setDocumentDialogOpen(false); setCurrentDocument(null); }}
+          aspect={4/3}
+        />
       )}
     </>
   );

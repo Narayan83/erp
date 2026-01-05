@@ -353,14 +353,14 @@ const EnhancedEditableCell = ({
     console.log("Generated Tax options:", options.length > 0 ? options.slice(0, 5) : "No options");
   }
   
-  // Debugging for empty options (but not warning for Category/Subcategory/Size as they support free text)
-  if ((isStore || isHsnCode || isUnit || isTax) && options.length === 0) {
+  // Debugging for empty options (but not warning for fields that support free text like Category/Subcategory/HSN/Tax/Size)
+  if ((isStore || isUnit) && options.length === 0) {
     console.warn(`No options found for dropdown field: ${columnKey} (${normalizedColumnKey})`);
   }
   
-  // Category, Subcategory, and Size are ALWAYS treated as dropdowns (text input with datalist)
-  // even when options.length === 0, to allow users to enter new values
-  const isDropdown = (isCategory || isSubcategory || isSize) || options.length > 0;
+  // Category, Subcategory, Size, HSN and Tax are ALWAYS treated as combo-boxes (free-text + suggestions)
+  // so users can either pick an existing value or enter a new one
+  const isDropdown = (isCategory || isSubcategory || isSize || isHsnCode || isTax) || options.length > 0;
   
   const handleSave = () => {
     onUpdate(rowIndex, columnKey, editValue);
@@ -405,7 +405,7 @@ const EnhancedEditableCell = ({
         isDropdown ? (
           <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
             {/* For Category, Subcategory, and Size, use Autocomplete (combo box: dropdown + free text) */}
-              {(isCategory || isSubcategory || isSize) ? (
+              {(isCategory || isSubcategory || isSize || isHsnCode || isTax) ? (
               <Autocomplete
                 freeSolo
                 autoFocus
@@ -424,8 +424,8 @@ const EnhancedEditableCell = ({
                     {...params}
                     inputProps={{ ...(params.inputProps || {}), style: { textAlign: isCenterAligned ? 'center' : 'left' } }}
                     placeholder={options.length > 0 
-                      ? `Type new or select ${isCategory ? 'category' : isSubcategory ? 'subcategory' : 'size'}` 
-                      : `Type ${isCategory ? 'category' : isSubcategory ? 'subcategory' : 'size'} name`}
+                      ? `Type new or select ${isCategory ? 'category' : isSubcategory ? 'subcategory' : isHsnCode ? 'HSN code' : isTax ? 'tax' : 'size'}` 
+                      : `Type ${isCategory ? 'category' : isSubcategory ? 'subcategory' : isHsnCode ? 'HSN code' : isTax ? 'tax' : 'size'} name`}
                     variant="outlined"
                     size="small"
                     sx={{

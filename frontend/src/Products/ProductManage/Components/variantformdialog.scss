@@ -1,10 +1,37 @@
 .variant-form-dialog {
+  position: relative;
+
   .form-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     padding: 10px;
     margin: 0;
+  }
+
+  /* Editor modal overlay centered inside the form dialog */
+  .editor-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 2500;
+  }
+
+  .editor-wrapper {
+    max-width: 520px;
+    width: 100%;
+    max-height: 80vh;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: transparent;
   }
 
   .form-field {
@@ -395,184 +422,7 @@
     }
   }
 
-  .crop-dialog-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1300;
-
-    .crop-dialog {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-      max-width: 600px;
-      width: 90%;
-      max-height: 80vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-
-      .crop-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px;
-        border-bottom: 1px solid #e0e0e0;
-        background-color: #f5f5f5;
-
-        .crop-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #333;
-        }
-
-        .close-btn {
-          background: none;
-          border: none;
-          font-size: 24px;
-          color: #666;
-          cursor: pointer;
-          padding: 0;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: color 0.2s ease;
-
-          &:hover {
-            color: #333;
-          }
-        }
-      }
-
-      .reactEasyCrop_Container {
-        background-color: #929292 !important;
-      }
-
-      .reactEasyCrop_CropArea {
-        height: 200px !important;
-        width: 200px !important;
-      }
-
-
-      .crop-content {
-        flex: 1;
-        overflow: auto;
-        background-color: #111;
-        position: relative;
-        min-height: 300px;
-      }
-
-      .crop-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding: 16px;
-        border-top: 1px solid #e0e0e0;
-        background-color: #f5f5f5;
-
-        .zoom-slider {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          gap: 12px;
-
-          label {
-            font-size: 13px;
-            font-weight: 500;
-            color: #333;
-            white-space: nowrap;
-          }
-
-          input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: #ddd;
-            outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-
-            &::-webkit-slider-thumb {
-              -webkit-appearance: none;
-              appearance: none;
-              width: 18px;
-              height: 18px;
-              border-radius: 50%;
-              background: #1976d2;
-              cursor: pointer;
-              transition: all 0.2s ease;
-
-              &:hover {
-                background: #1565c0;
-                box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
-              }
-            }
-
-            &::-moz-range-thumb {
-              width: 18px;
-              height: 18px;
-              border-radius: 50%;
-              background: #1976d2;
-              cursor: pointer;
-              border: none;
-              transition: all 0.2s ease;
-
-              &:hover {
-                background: #1565c0;
-                box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
-              }
-            }
-          }
-        }
-
-        .button-group {
-          display: flex;
-          gap: 8px;
-          justify-content: flex-end;
-
-          button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-
-            &.cancel-btn {
-              background-color: #9a9a9a;
-              color: white;
-
-              &:hover {
-                background-color: #808080;
-              }
-            }
-
-            &.apply-btn {
-              background-color: #229954;
-              color: white;
-
-              &:hover {
-                background-color: #1e8449;
-              }
-
-              &:active {
-                transform: translateY(1px);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  /* crop dialog styles removed */
 
   .error-message {
     padding: 12px 16px;
@@ -675,6 +525,19 @@
         padding: 12px 16px;
       }
     }
+  }
+
+  .dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1300;
   }
 
   .size-error {

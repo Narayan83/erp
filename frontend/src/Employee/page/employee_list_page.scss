@@ -1,5 +1,451 @@
 // Employee List Page Styles
 
+// ============================================================================
+// FILTERS SECTION
+// ============================================================================
+
+.filters-section {
+  padding: 16px;
+  margin-bottom: 16px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e0e0e0;
+}
+
+// ============================================================================
+// TABLE STYLES
+// ============================================================================
+
+// Table wrapper with horizontal scrolling on mobile
+.employee-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin: 0 0 24px 0;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  // Smooth scrollbar styling
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+
+    &:hover {
+      background: #555;
+    }
+  }
+}
+
+// Main table styles
+.employee-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background-color: white;
+
+  // TABLE HEAD
+  thead {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+
+    tr {
+      border-bottom: 2px solid #1565c0;
+    }
+
+    th {
+      padding: 16px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: white;
+      white-space: nowrap;
+      user-select: none;
+
+      &.checkbox-col {
+        width: 50px;
+        text-align: center;
+        padding: 12px;
+
+        input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+          accent-color: #1976d2;
+        }
+      }
+
+      &.sno-col {
+        width: 80px;
+        min-width: 80px;
+        text-align: center;
+      }
+
+      &.data-col {
+        padding: 16px 14px;
+        font-weight: 600;
+      }
+
+      &.actions-col {
+        width: 200px;
+        min-width: 200px;
+        text-align: center;
+      }
+    }
+  }
+
+  // TABLE BODY
+  tbody {
+    tr {
+      border-bottom: 1px solid #e8e8e8;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: #d0e2f5;
+        cursor: pointer;
+      }
+
+      &.selected {
+        background-color: #e3f2fd;
+
+        td {
+          font-weight: 500;
+        }
+      }
+
+      &.loading-row,
+      &.empty-row {
+        &:hover {
+          background-color: transparent;
+          box-shadow: none;
+        }
+      }
+
+      td {
+        padding: 14px 12px;
+        vertical-align: middle;
+        color: #333;
+        transition: color 0.2s ease;
+        word-break: break-word;
+
+        &.checkbox-col {
+          text-align: center;
+          padding: 12px;
+          width: 50px;
+
+          input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #1976d2;
+          }
+        }
+
+        &.sno-col {
+          text-align: center;
+          font-weight: 500;
+          color: #666;
+          width: 80px;
+          min-width: 80px;
+        }
+
+        &.data-col {
+          padding: 14px 14px;
+        }
+
+        &.actions-col {
+          text-align: center;
+          width: 200px;
+          min-width: 200px;
+          padding: 10px 12px;
+        }
+
+        &.center-cell {
+          text-align: center;
+          color: #666;
+          padding: 40px 12px;
+        }
+      }
+    }
+  }
+}
+
+// Cell content styling
+.cell-content {
+  font-size: 0.85rem;
+  line-height: 1.5;
+
+  .bank-item,
+  .doc-item {
+    margin-bottom: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    div {
+      font-size: 0.85rem;
+      margin: 2px 0;
+
+      b {
+        color: #1565c0;
+        font-weight: 600;
+        min-width: 60px;
+      }
+    }
+  }
+
+  .doc-link {
+    color: #1976d2;
+    text-decoration: none;
+    font-weight: 500;
+    word-break: break-all;
+
+    &:hover {
+      text-decoration: underline;
+      color: #1565c0;
+    }
+  }
+}
+
+// Status badge
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+  transition: all 0.2s ease;
+
+  &.active {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+  }
+
+  &.inactive {
+    background-color: #f5f5f5;
+    color: #757575;
+    border: 1px solid #e0e0e0;
+  }
+}
+
+// Action buttons
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+
+  &:hover {
+    background-color: #f0f0f0;
+    transform: scale(1.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &.view-btn {
+    &:hover {
+      background-color: rgba(25, 118, 210, 0.1);
+    }
+  }
+
+  &.edit-btn {
+    &:hover {
+      background-color: rgba(33, 150, 243, 0.1);
+    }
+  }
+
+  &.delete-btn {
+    &:hover {
+      background-color: rgba(244, 67, 54, 0.1);
+    }
+  }
+}
+
+// PAGINATION
+.table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+  background-color: white;
+  border-radius: 0 0 8px 8px;
+}
+
+.pagination-info {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rows-per-page {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background-color: white;
+  color: #333;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #1976d2;
+    background-color: #f8f9fa;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #1976d2;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+  }
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #1976d2;
+    color: white;
+    border-color: #1976d2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.page-number {
+  padding: 0 8px;
+  font-weight: 500;
+  color: #333;
+  min-width: 120px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+// ============================================================================
+// RESPONSIVE DESIGN
+// ============================================================================
+
+@media (max-width: 1200px) {
+  .employee-table {
+    font-size: 0.85rem;
+
+    thead th,
+    tbody td {
+      padding: 12px 10px;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .employee-table-wrapper {
+    margin: 0 -12px 24px -12px;
+    border-radius: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .employee-table {
+    font-size: 0.8rem;
+
+    thead th {
+      padding: 12px 8px;
+
+      &:nth-child(4),
+      &:nth-child(5) {
+        display: none;
+      }
+    }
+
+    tbody td {
+      padding: 10px 8px;
+
+      &:nth-child(4),
+      &:nth-child(5) {
+        display: none;
+      }
+    }
+  }
+
+  .table-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pagination-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pagination-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 // Dialog Styles
 .employee-view-dialog {
   display: none;
@@ -528,7 +974,9 @@
     color: white;
 
     &:hover {
-      background-color: #616161;
+      background-color: #616161 !important;
+      box-shadow: none !important;
+      transform: none !important;
     }
   }
 
@@ -581,292 +1029,91 @@
   }
 }
 
-// Responsive adjustments
-@media (max-width: 1200px) {
-  .form-grid {
-    &.col-4 {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    &.col-3 {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
+/* Column class-based min-width helpers (class names follow normalized keys) */
+.col-photo {
+  min-width: 80px;
 }
-
-@media (max-width: 768px) {
-  .employee-view-dialog-content {
-    width: 98%;
-    max-height: 95vh;
-  }
-
-  .employee-view-dialog-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .documents-grid {
-    grid-template-columns: 1fr;
-  }
+.col-employeecode {
+  min-width: 100px;
 }
-
-// Import Preview Table Column Widths
-.MuiTable-root {
-  th,
-  td {
-    // Default table cell styles
-    &:nth-child(1) {
-      // Checkbox column
-      min-width: 40px;
-      width: 40px;
-    }
-
-    // Employee Code
-    &:nth-child(2) {
-      min-width: 150px;
-    }
-
-    // Salutation
-    &:nth-child(3) {
-      min-width: 90px;
-    }
-
-    // First Name
-    &:nth-child(4) {
-      min-width: 130px;
-    }
-
-    // Last Name
-    &:nth-child(5) {
-      min-width: 130px;
-    }
-
-    // Date of Birth
-    &:nth-child(6) {
-      min-width: 120px;
-    }
-
-    // Gender
-    &:nth-child(7) {
-      min-width: 100px;
-    }
-
-    // Country
-    &:nth-child(8) {
-      min-width: 140px;
-    }
-
-    // Mobile Number
-    &:nth-child(9) {
-      min-width: 150px;
-    }
-
-    // Email
-    &:nth-child(10) {
-      min-width: 180px;
-    }
-
-    // Aadhaar
-    &:nth-child(11) {
-      min-width: 130px;
-    }
-
-    // PAN
-    &:nth-child(12) {
-      min-width: 110px;
-    }
-
-    // Address 1
-    &:nth-child(13) {
-      min-width: 140px;
-    }
-
-    // Address 2
-    &:nth-child(14) {
-      min-width: 140px;
-    }
-
-    // Address 3
-    &:nth-child(15) {
-      min-width: 140px;
-    }
-
-    // City
-    &:nth-child(16) {
-      min-width: 110px;
-    }
-
-    // State
-    &:nth-child(17) {
-      min-width: 140px;
-    }
-
-    // Add. Country
-    &:nth-child(18) {
-      min-width: 140px;
-    }
-
-    // Pincode
-    &:nth-child(19) {
-      min-width: 100px;
-    }
-
-    // Bank Name
-    &:nth-child(20) {
-      min-width: 140px;
-    }
-
-    // Branch Name
-    &:nth-child(21) {
-      min-width: 120px;
-    }
-
-    // Branch Address
-    &:nth-child(22) {
-      min-width: 160px;
-    }
-
-    // Account Number
-    &:nth-child(23) {
-      min-width: 150px;
-    }
-
-    // IFSC Code
-    &:nth-child(24) {
-      min-width: 110px;
-    }
-
-    // Active
-    &:nth-child(25) {
-      min-width: 90px;
-    }
-  }
+.col-name {
+  min-width: 200px;
 }
-
-// Employee List Table Column Widths (Main Table)
-.right-content {
-  .MuiTable-root {
-    th,
-    td {
-      // Checkbox column
-      &:nth-child(1) {
-        min-width: 40px;
-        width: 40px;
-      }
-
-      // S.No column
-      &:nth-child(2) {
-        min-width: 80px;
-      }
-
-      // Photo column
-      &:nth-child(3) {
-        min-width: 100px;
-      }
-
-      // Employee Code column
-      &:nth-child(4) {
-        min-width: 150px;
-      }
-
-      // Name column
-      &:nth-child(5) {
-        min-width: 200px;
-      }
-
-      // DOB column
-      &:nth-child(6) {
-        min-width: 120px;
-      }
-
-      // Gender column
-      &:nth-child(7) {
-        min-width: 100px;
-      }
-
-      // Country column
-      &:nth-child(8) {
-        min-width: 160px;
-      }
-
-      // Mobile Number column
-      &:nth-child(9) {
-        min-width: 140px;
-      }
-
-      // Email column
-      &:nth-child(10) {
-        min-width: 220px;
-      }
-
-      // Aadhaar column
-      &:nth-child(11) {
-        min-width: 150px;
-      }
-
-      // PAN column
-      &:nth-child(12) {
-        min-width: 120px;
-      }
-
-      // Address 1 column
-      &:nth-child(13) {
-        min-width: 150px;
-      }
-
-      // Address 2 column
-      &:nth-child(14) {
-        min-width: 150px;
-      }
-
-      // Address 3 column
-      &:nth-child(15) {
-        min-width: 150px;
-      }
-
-      // City column
-      &:nth-child(16) {
-        min-width: 120px;
-      }
-
-      // State column
-      &:nth-child(17) {
-        min-width: 140px;
-      }
-
-      // Add. Country column
-      &:nth-child(18) {
-        min-width: 140px;
-      }
-
-      // Pincode column
-      &:nth-child(19) {
-        min-width: 100px;
-      }
-
-      // Bank Info column
-      &:nth-child(20) {
-        min-width: 260px;
-      }
-
-      // Documents column
-      &:nth-child(21) {
-        min-width: 300px;
-      }
-
-      // Status column
-      &:nth-child(22) {
-        width: 60px;
-      }
-
-      // Actions column (last)
-      &:nth-child(23) {
-        width: 120px;
-      }
-    }
-  }
+.col-dob {
+  min-width: 110px;
+}
+.col-gender {
+  min-width: 100px;
+}
+.col-country {
+  min-width: 160px;
+}
+.col-mobilenumber {
+  min-width: 140px;
+}
+.col-email {
+  min-width: 220px;
+}
+.col-emergencynumber {
+  min-width: 140px;
+}
+.col-aadhaar {
+  min-width: 150px;
+}
+.col-pan {
+  min-width: 150px;
+}
+.col-address1 {
+  min-width: 220px;
+}
+.col-address2 {
+  min-width: 220px;
+}
+.col-address3 {
+  min-width: 220px;
+}
+.col-city {
+  min-width: 140px;
+}
+.col-state {
+  min-width: 180px;
+}
+.col-addcountry {
+  min-width: 180px;
+}
+.col-pincode {
+  min-width: 100px;
+}
+.col-resaddress1 {
+  min-width: 220px;
+}
+.col-resaddress2 {
+  min-width: 220px;
+}
+.col-resaddress3 {
+  min-width: 220px;
+}
+.col-rescity {
+  min-width: 140px;
+}
+.col-resstate {
+  min-width: 140px;
+}
+.col-rescountry {
+  min-width: 160px;
+}
+.col-respincode {
+  min-width: 120px;
+}
+.col-bankinfo {
+  min-width: 260px;
+}
+.col-documents {
+  min-width: 400px;
+}
+.col-status {
+  min-width: 100px;
+}
+.col-actions {
+  min-width: 180px;
 }

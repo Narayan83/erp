@@ -14,12 +14,12 @@ const SubcategoryTable = ({
     <>
     <TableContainer component={Paper}>
       <Table>
-        <TableHead>
+        <TableHead sx={{ '& .MuiTableCell-root': { textAlign: 'center' } }}>
           <TableRow>
-            <TableCell>S No.</TableCell>
-            <TableCell>Cat. Name</TableCell>
-            <TableCell>Sub. Name</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell>No.</TableCell>
+            <TableCell>Category Name</TableCell>
+            <TableCell>Subcategory Name</TableCell>
+            <TableCell sx={{ width: 140 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -27,11 +27,11 @@ const SubcategoryTable = ({
             <TableRow key={sub.ID}>
         {/* page is 1-based in the parent; convert to zero-based for calculation
           guard against undefined/zero values to avoid NaN */}
-        <TableCell>{((page || 1) - 1) * (limit || 1) + i + 1}</TableCell>
+        <TableCell align="center">{((page || 1) - 1) * (limit || 1) + i + 1}</TableCell>
              
-              <TableCell>{sub.Category.Name}</TableCell>
-               <TableCell>{sub.Name}</TableCell>
-              <TableCell align="right">
+              <TableCell align="center">{sub.Category.Name}</TableCell>
+               <TableCell align="center">{sub.Name}</TableCell>
+              <TableCell align="center">
                 <IconButton size="small" onClick={() => onEdit(sub)}><EditIcon fontSize="small" /></IconButton>
                 <IconButton size="small" onClick={() => onDelete(sub.ID)}><DeleteIcon fontSize="small" /></IconButton>
               </TableCell>

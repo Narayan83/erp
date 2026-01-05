@@ -56,10 +56,17 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
   useEffect(() => {
     if (tax) {
       setValue("name", tax.Name || tax.name || "");
-      setValue("percentage", (tax.Percentage ?? tax.percentage ?? "") !== "" ? parseFloat(tax.Percentage ?? tax.percentage) : "");
-      setValue("igst", (tax.IGST ?? tax.igst ?? "") !== "" ? parseFloat(tax.IGST ?? tax.igst) : "");
-      setValue("cgst", (tax.CGST ?? tax.cgst ?? "") !== "" ? parseFloat(tax.CGST ?? tax.cgst) : "");
-      setValue("sgst", (tax.SGST ?? tax.sgst ?? "") !== "" ? parseFloat(tax.SGST ?? tax.sgst) : "");
+      const perc = (tax.Percentage ?? tax.percentage ?? "") !== "" ? parseFloat(tax.Percentage ?? tax.percentage) : "";
+      setValue("percentage", perc);
+      if (perc !== "") {
+        setValue("igst", perc);
+        setValue("cgst", perc / 2);
+        setValue("sgst", perc / 2);
+      } else {
+        setValue("igst", "");
+        setValue("cgst", "");
+        setValue("sgst", "");
+      }
     } else {
       setValue("name", "");
       setValue("percentage", "");
@@ -77,10 +84,13 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
         percentage: Number(data.percentage),
       };
 
-      // Optional split values
-      if (data.igst !== "" && data.igst != null) payload.igst = Number(data.igst);
-      if (data.cgst !== "" && data.cgst != null) payload.cgst = Number(data.cgst);
-      if (data.sgst !== "" && data.sgst != null) payload.sgst = Number(data.sgst);
+      // Compute and include split values so they are persisted.
+      const perc = Number(data.percentage);
+      if (Number.isFinite(perc)) {
+        payload.igst = Number.isFinite(Number(data.igst)) ? Number(data.igst) : perc;
+        payload.cgst = Number.isFinite(Number(data.cgst)) ? Number(data.cgst) : perc / 2;
+        payload.sgst = Number.isFinite(Number(data.sgst)) ? Number(data.sgst) : perc / 2;
+      }
 
       if (tax?.ID) {
         await axios.put(`${BASE_URL}/api/taxes/${tax.ID}`, payload);
@@ -168,59 +178,68 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
                 margin="dense"
                 size="small"
                 required
+                onChange={(e) => {
+                  const v = e.target.value;
+                  field.onChange(v);
+                  const num = v === "" ? "" : parseFloat(v);
+                  if (num === "") {
+                    setValue("igst", "");
+                    setValue("cgst", "");
+                    setValue("sgst", "");
+                  } else {
+                    setValue("igst", num);
+                    setValue("cgst", num / 2);
+                    setValue("sgst", num / 2);
+                  }
+                }}
               />
             )}
           />
-          <Grid container spacing={1}>
-            <Grid item xs={4}>
-              <Controller
-                name="igst"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="IGST (%)"
-                    type="number"
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                )}
+          <Controller
+            name="igst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="IGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
               />
-            </Grid>
-            <Grid item xs={4}>
-              <Controller
-                name="cgst"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="CGST (%)"
-                    type="number"
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                )}
+            )}
+          />
+          <Controller
+            name="cgst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="CGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
               />
-            </Grid>
-            <Grid item xs={4}>
-              <Controller
-                name="sgst"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="SGST (%)"
-                    type="number"
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                )}
+            )}
+          />
+          <Controller
+            name="sgst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="SGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
               />
-            </Grid>
-          </Grid>
+            )}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>

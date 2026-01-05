@@ -8,7 +8,7 @@ import dialCodeToCountry from "../utils/dialCodeToCountry";
 import countries from "../utils/countries";
 import citiesList from "../utils/cities-name-list.json";
 import stateList from "../utils/state_list.json";
-import Cropper from "react-easy-crop";
+import ImageEditor from '../../Products/ProductManage/Components/ImageEditor';
 import "./addoredituserform.scss";
 
 const salutations = ["Mr", "Mrs", "Miss", "Dr", "Prof"];
@@ -157,14 +157,9 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
   // Documents state
   const [uploadedDocuments, setUploadedDocuments] = React.useState([]);
   
-  // Image crop dialog state
+  // Image editor dialog state (uses shared ImageEditor component)
   const [cropDialogOpen, setCropDialogOpen] = React.useState(false);
-  const [cropImage, setCropImage] = React.useState(null);
-  const [cropImageId, setCropImageId] = React.useState(null);
-  const [crop, setCrop] = React.useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = React.useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState(null);
-  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [currentCropDocument, setCurrentCropDocument] = React.useState(null);
 
   // Password visibility state
   const [showPassword, setShowPassword] = React.useState(false);
@@ -1682,119 +1677,47 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
   };
 
   const handleEditDocument = (doc) => {
-    // Open crop dialog for image editing
+    // Use shared ImageEditor for image editing — don't preload here
     const src = doc.preview || (doc.file_url ? BASE_URL + doc.file_url : null);
     if (!src) return;
-    setImageLoaded(false);
-    // Preload image to avoid cropper computing NaN sizes before image is ready
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      setCropImage(src);
-      setCropImageId(doc.id);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setCroppedAreaPixels(null);
-      setImageLoaded(true);
-      setCropDialogOpen(true);
-      console.log('AddOrEditUserForm: crop dialog opening (onload) for doc id=', doc.id, 'src=', src);
-    };
-    img.onerror = () => {
-      // fallback — still open dialog but mark as loaded so cropper can try
-      setCropImage(src);
-      setCropImageId(doc.id);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setCroppedAreaPixels(null);
-      setImageLoaded(true);
-      setCropDialogOpen(true);
-      console.log('AddOrEditUserForm: crop dialog opening (onerror) for doc id=', doc.id, 'src=', src);
-    };
-    img.src = src;
+    const docWithPreview = { ...doc, preview: src };
+    setCurrentCropDocument(docWithPreview);
+    setCropDialogOpen(true);
   };
 
-  React.useEffect(() => {
-    console.log('AddOrEditUserForm: cropDialogOpen=', cropDialogOpen, 'imageLoaded=', imageLoaded, 'cropImage=', !!cropImage);
-  }, [cropDialogOpen, imageLoaded, cropImage]);
 
-  const onCropComplete = (croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  };
 
-  const createImage = (url) => 
-    new Promise((resolve, reject) => {
-      const image = new Image();
-      image.addEventListener('load', () => resolve(image));
-      image.addEventListener('error', (err) => reject(err));
-      image.setAttribute('crossOrigin', 'anonymous');
-      image.src = url;
-    });
-
-  const getCroppedImg = async (imageSrc, pixelCrop) => {
-    const image = await createImage(imageSrc);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    // Create a canvas exactly the size of the crop so the resulting blob
-    // contains only the cropped pixels (no extra transparent padding).
-    canvas.width = Math.max(1, Math.round(pixelCrop.width));
-    canvas.height = Math.max(1, Math.round(pixelCrop.height));
-
-    ctx.drawImage(
-      image,
-      Math.round(pixelCrop.x),
-      Math.round(pixelCrop.y),
-      Math.round(pixelCrop.width),
-      Math.round(pixelCrop.height),
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, 'image/jpeg');
-    });
-  };
-
-  const handleCropSave = async () => {
-    if (!croppedAreaPixels || !cropImage) return;
-
+  const handleImageEditorSave = async (result) => {
+    if (!currentCropDocument) return;
     try {
-      const croppedImage = await getCroppedImg(cropImage, croppedAreaPixels);
-      
-      // Update the document with the cropped image
-      const croppedFile = new File([croppedImage], 'cropped-image.jpg', { type: 'image/jpeg' });
-      const newPreview = URL.createObjectURL(croppedFile);
+      let updatedDoc = { ...currentCropDocument };
 
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === cropImageId 
-            ? { 
-                ...doc, 
-                file: croppedFile, 
-                preview: newPreview, 
-                name: 'cropped-image.jpg'
-              }
-            : doc
-        )
-      );
+      // If the editor returned a blob (preferred)
+      if (result && result.blob) {
+        const mime = result.mime || result.blob.type || 'image/png';
+        const name = currentCropDocument.name || (currentCropDocument.file && currentCropDocument.file.name) || `document.${mime.split('/')[1] || 'png'}`;
+        const file = new File([result.blob], name, { type: mime });
+        const preview = result.hi || URL.createObjectURL(result.blob);
 
+        if (currentCropDocument.preview && String(currentCropDocument.preview).startsWith('blob:')) {
+          URL.revokeObjectURL(currentCropDocument.preview);
+        }
+
+        updatedDoc = { ...updatedDoc, file, preview, type: mime };
+      } else if (result && result.css) {
+        // data URL returned as css
+        updatedDoc = { ...updatedDoc, preview: result.css };
+      } else if (typeof result === 'string') {
+        updatedDoc = { ...updatedDoc, preview: result };
+      }
+
+      setUploadedDocuments(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
+    } catch (e) {
+      console.error('Error saving image from editor', e);
+    } finally {
       setCropDialogOpen(false);
-      setCropImage(null);
-      setCropImageId(null);
-    } catch (error) {
-      console.error('Error cropping image:', error);
-      alert('Failed to crop image. Please try again.');
+      setCurrentCropDocument(null);
     }
-  };
-
-  const handleCropCancel = () => {
-    setCropDialogOpen(false);
-    setCropImage(null);
-    setCropImageId(null);
   };
 
   // Build a full URL to the document file (handles preview, relative paths saved by backend)
@@ -2184,9 +2107,10 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
       return;
     }
     // If valid, proceed with submit
-    console.log('Form validation passed, calling handleSubmit');
-    const result = await handleSubmit(onSubmit)();
-    console.log('handleSubmit result:', result);
+    console.log('Form validation passed, submitting form data directly');
+    const data = getValues();
+    const result = await onSubmit(data);
+    console.log('onSubmit result:', result);
     // Defensive: if performSave returned created user object, ensure dialog opens
     if (result) {
       try {
@@ -3726,69 +3650,15 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
         </div>
 
-      {/* Image Crop Dialog */}
-      {cropDialogOpen && (
-        <div className="modal-overlay" style={{ display: 'flex' }}>
-          <div className="modal">
-            <div className="modal-header">
-              <h2 className="modal-title">Crop Image</h2>
-              <button 
-                type="button" 
-                className="modal-close" 
-                onClick={handleCropCancel}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-content">
-              <div className="cropper-wrapper">
-                <div className="cropper-container">
-                  {cropImage && imageLoaded && (
-                    <Cropper
-                      image={cropImage}
-                      crop={crop}
-                      zoom={zoom}
-                      cropShape="rect"
-                      showGrid={true}
-                      onCropChange={setCrop}
-                      onCropComplete={onCropComplete}
-                      onZoomChange={setZoom}
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="zoom-slider-container" style={{ marginTop: '12px' }}>
-                <label>Zoom: </label>
-                <input
-                  type="range"
-                  value={zoom}
-                  min={0.1}
-                  max={3}
-                  step={0.1}
-                  aria-labelledby="Zoom"
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                  className="zoom-slider"
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                onClick={handleCropCancel}
-              >
-                Cancel
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                onClick={handleCropSave}
-              >
-                Save Crop
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Image Crop Dialog (now uses shared ImageEditor) */}
+      {cropDialogOpen && currentCropDocument && currentCropDocument?.type?.startsWith?.('image/') && (
+        <ImageEditor
+          open={true}
+          initialSrc={currentCropDocument.preview || buildDocUrl(currentCropDocument)}
+          onSave={handleImageEditorSave}
+          onClose={() => { setCropDialogOpen(false); setCurrentCropDocument(null); }}
+          aspect={4/3}
+        />
       )}
       
       </>

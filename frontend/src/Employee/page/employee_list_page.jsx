@@ -1,13 +1,6 @@
 // EmployeeListPage.jsx
 import React, { useState, useEffect, useCallback, memo, useRef } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Button,
   TextField,
   Box,
@@ -19,14 +12,18 @@ import {
   DialogActions,
   Snackbar,
   Alert,
-  TablePagination,
-  Chip,
-  InputAdornment,
   Tooltip,
   Checkbox,
   CircularProgress,
   Grid,
   Avatar,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -81,8 +78,8 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error = fals
     if (normalizedKey === 'gender') return { options: ['Male','Female','Other','Prefer not to say'], multiple: false };
     if (normalizedKey === 'active') return { options: ['Yes','No'], multiple: false };
     if (normalizedKey.includes('country')) return { options: IMPORT_COUNTRY_OPTIONS, multiple: false };
-    if (normalizedKey === 'city') return { options: citiesList, multiple: false };
-    if (normalizedKey === 'state') return { options: IMPORT_STATE_OPTIONS, multiple: false };
+    if (normalizedKey.includes('city')) return { options: citiesList, multiple: false };
+    if (normalizedKey.includes('state')) return { options: IMPORT_STATE_OPTIONS, multiple: false };
     return null;
   };
 
@@ -169,6 +166,7 @@ export default function EmployeeListPage() {
     "Country",
     "MobileNumber",
     "Email",
+    "Emergency Number",
     "Aadhaar",
     "PAN",
     "Address 1",
@@ -178,6 +176,13 @@ export default function EmployeeListPage() {
     "State",
     "Add. Country",
     "Pincode",
+    "Res Address 1",
+    "Res Address 2",
+    "Res Address 3",
+    "Res City",
+    "Res State",
+    "Res Country",
+    "Res Pincode",
     "Bank Info",
     "Documents",
     "Status",
@@ -197,10 +202,24 @@ export default function EmployeeListPage() {
         return 100;
       case 'Country':
         return 160;
+      case 'Res Address 1':
+      case 'Res Address 2':
+      case 'Res Address 3':
+        return 180;
+      case 'Res City':
+        return 140;
+      case 'Res State':
+        return 140;
+      case 'Res Country':
+        return 160;
+      case 'Res Pincode':
+        return 120;
       case 'MobileNumber':
         return 140;
       case 'Email':
         return 220;
+      case 'Emergency Number':
+        return 140;
       case 'Aadhaar':
         return 150;
       case 'PAN':
@@ -259,6 +278,32 @@ export default function EmployeeListPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Photo preview state (hover to preview)
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoHoverTimer, setPhotoHoverTimer] = useState(null);
+
+  const handlePhotoMouseEnter = (imgSrc) => {
+    // small delay to avoid accidental popups (match product behaviour)
+    const timer = setTimeout(() => setPhotoPreview(imgSrc), 500);
+    setPhotoHoverTimer(timer);
+  };
+
+  const handlePhotoMouseLeave = () => {
+    // only clear pending timer; do NOT close an already-open preview so the dialog behaves like in products
+    if (photoHoverTimer) {
+      clearTimeout(photoHoverTimer);
+      setPhotoHoverTimer(null);
+    }
+  };
+
+  const handleClosePhotoPreview = () => {
+    if (photoHoverTimer) {
+      clearTimeout(photoHoverTimer);
+      setPhotoHoverTimer(null);
+    }
+    setPhotoPreview(null);
+  };
 
   // Selection state for table rows
   const [selectedIds, setSelectedIds] = useState([]);
@@ -390,6 +435,7 @@ export default function EmployeeListPage() {
       'Country *',
       'Mobile Number *',
       'Email *',
+      'Emergency Number',
       'Aadhaar',
       'PAN',
       'Address 1',
@@ -399,6 +445,14 @@ export default function EmployeeListPage() {
       'State',
       'Add. Country',
       'Pincode',
+      // Residential address fields
+      'Res Address 1',
+      'Res Address 2',
+      'Res Address 3',
+      'Res City',
+      'Res State',
+      'Res Country',
+      'Res Pincode',
       'Bank Name',
       'Branch Name',
       'Branch Address',
@@ -421,8 +475,17 @@ export default function EmployeeListPage() {
       'India (+91)',
       '9876543210',
       'john.doe@example.com',
+      '9876500000',
       '123456789012',
       'ABCDE1234F',
+      '123 Main St',
+      'Suite 4B',
+      '',
+      'Mumbai',
+      'Maharashtra',
+      'India',
+      '400001',
+      // Residential sample (same as permanent here)
       '123 Main St',
       'Suite 4B',
       '',
@@ -474,18 +537,21 @@ export default function EmployeeListPage() {
     // Hide the Lists sheet
     listsSheet.state = 'veryHidden';
 
-    // Apply data validation for select columns:
-    // Columns (1-based): 2=Salutation, 6=Gender, 7=Country(Name+Code), 15=City, 16=State, 17=Country(Name), 24=Active
+    // Apply data validation for select columns (1-based indices may change with added residential fields):
+    // Columns: 2=Salutation, 6=Gender, 7=Country(Name+Code), 15=City (permanent), 16=State (permanent), 17=Country (permanent name),
+    // 22=Residential City, 23=Residential State, 24=Residential Country, 31=Active
     const validationMap = {
       2: { sheetCol: 'A', length: salutations.length }, // Salutation
       6: { sheetCol: 'B', length: genders.length }, // Gender
       7: { sheetCol: 'D', length: countryWithCode.length }, // Country (Name + Code)
-      15: { sheetCol: 'G', length: cities.length }, // City
-      16: { sheetCol: 'F', length: stateList.length }, // State
-      17: { sheetCol: 'E', length: countryNames.length }, // Country (name)
-      24: { sheetCol: 'C', length: activeOptions.length } // Active
+      16: { sheetCol: 'G', length: cities.length }, // City (permanent) (shifted)
+      17: { sheetCol: 'F', length: stateList.length }, // State (permanent) (shifted)
+      18: { sheetCol: 'E', length: countryNames.length }, // Country (permanent name) (shifted)
+      23: { sheetCol: 'G', length: cities.length }, // Residential City (shifted)
+      24: { sheetCol: 'F', length: stateList.length }, // Residential State (shifted)
+      25: { sheetCol: 'E', length: countryNames.length }, // Residential Country (shifted)
+      32: { sheetCol: 'C', length: activeOptions.length } // Active (shifted)
     };
-
     Object.keys(validationMap).forEach(targetColStr => {
       const targetCol = parseInt(targetColStr, 10);
       const { sheetCol, length } = validationMap[targetCol];
@@ -658,6 +724,10 @@ export default function EmployeeListPage() {
       if (!row['Email'] || String(row['Email']).trim() === '') {
         rowErrors['Email'] = ['Email is required'];
       }
+      // Emergency Number optional, but if provided must be 10 digits
+      if (row['Emergency Number'] && String(row['Emergency Number']).trim() !== '' && !/^\d{10}$/.test(String(row['Emergency Number']).trim())) {
+        rowErrors['Emergency Number'] = ['Emergency number must be 10 digits'];
+      }
       if (!row['Gender'] || String(row['Gender']).trim() === '') {
         rowErrors['Gender'] = ['Gender is required'];
       }
@@ -791,6 +861,26 @@ export default function EmployeeListPage() {
           country_name = countryCombined || employee['Country'] || '';
         }
 
+        const getField = (...aliases) => {
+          // normalize helper
+          const normalize = k => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normalizedAliases = aliases.map(a => normalize(a));
+          // search keys in the row and match by normalized form
+          for (const key of Object.keys(employee)) {
+            const nk = normalize(key);
+            if (normalizedAliases.includes(nk)) {
+              const v = employee[key];
+              if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+            }
+          }
+          // fallback: try literal aliases
+          for (const a of aliases) {
+            const v = employee[a];
+            if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+          }
+          return '';
+        };
+
         const addresses = [];
         const hasAnyAddress = (employee['Address 1'] || employee['Address 2'] || employee['Address 3'] || employee['City'] || employee['State'] || employee['Country'] || employee['Pincode']);
         if (hasAnyAddress) {
@@ -805,6 +895,36 @@ export default function EmployeeListPage() {
           });
         }
 
+        // Residential address (optional) - accept multiple header aliases like "Res Address 1" or "Residential Address 1"
+        const resAddr1 = getField('Residential Address 1', 'Res Address 1', 'Res Address1', 'ResAddress1');
+        const resAddr2 = getField('Residential Address 2', 'Res Address 2', 'Res Address2', 'ResAddress2');
+        const resAddr3 = getField('Residential Address 3', 'Res Address 3', 'Res Address3', 'ResAddress3');
+        const resCity = getField('Residential City', 'Res City', 'ResCity');
+        const resState = getField('Residential State', 'Res State', 'ResState');
+        const resCountryRaw = getField('Residential Country', 'Res Country', 'ResCountry');
+        let resCountry = resCountryRaw || '';
+        if (resCountry && String(resCountry).includes('(')) {
+          const m2 = String(resCountry).match(/^\s*(.*?)\s*\(([^)]+)\)\s*$/);
+          if (m2) {
+            resCountry = m2[1] || resCountry;
+          }
+        }
+        const resPincode = getField('Residential Pincode', 'Res Pincode', 'ResPincode');
+
+        const hasResidential = (resAddr1 || resAddr2 || resAddr3 || resCity || resState || resCountry || resPincode);
+        if (hasResidential) {
+          addresses.push({
+            title: 'Residential',
+            address1: resAddr1 || '',
+            address2: resAddr2 || '',
+            address3: resAddr3 || '',
+            city: resCity || '',
+            state: resState || '',
+            country: resCountry || '',
+            pincode: resPincode || ''
+          });
+        }
+
         const bank_accounts = [];
         if (employee['Bank Name'] || employee['Account Number']) {
           bank_accounts.push({
@@ -816,10 +936,22 @@ export default function EmployeeListPage() {
           });
         }
 
+        // Generate username and password for backend requirement
+        // Username: lowercase firstname.lastname or email prefix if needed
+        const fname = (employee['First Name'] || '').toLowerCase().replace(/\s+/g, '');
+        const lname = (employee['Last Name'] || '').toLowerCase().replace(/\s+/g, '');
+        const generatedUsername = fname && lname ? `${fname}.${lname}` : (employee['Email'] || '').split('@')[0] || 'user';
+        // Password: combine empcode + mobile or use default temporary
+        const empcode = (employee['Employee Code'] || '').toString().trim();
+        const mobile = (employee['Mobile Number'] || '').toString().trim();
+        const generatedPassword = (empcode && mobile) ? `${empcode}@${mobile.slice(-4)}` : `Temp@${Date.now().toString().slice(-6)}`;
+
         const employeeData = {
           salutation: employee['Salutation'] || null,
           firstname: employee['First Name'],
           lastname: employee['Last Name'] || '',
+          username: generatedUsername,
+          password: generatedPassword,
           dob: parseDateToIso(employee['Date of Birth']),
           gender: employee['Gender'],
           country: country_name || null,
@@ -835,21 +967,66 @@ export default function EmployeeListPage() {
           active: String(employee['Active'] || '').toLowerCase() === 'yes'
         };
 
+        // Map emergency number if provided
+        if (employee['Emergency Number'] && String(employee['Emergency Number']).trim() !== '') {
+          employeeData.emergency_number = String(employee['Emergency Number']).trim();
+        }
+
         // Only include empcode when provided (do not send null/empty so backend can generate one)
         if (employee['Employee Code'] && String(employee['Employee Code']).trim() !== '') {
           employeeData.empcode = employee['Employee Code'];
         }
 
-        // Map first address to the backend's expected permanent address fields
+        // Map permanent address - only use an explicit permanent entry (no title) or title='Permanent'.
+        // Do NOT fallback to the first address, because that could be residential only.
         if (addresses && addresses.length > 0) {
-          const a = addresses[0];
-          if (a.address1) employeeData.permanent_address1 = a.address1;
-          if (a.address2) employeeData.permanent_address2 = a.address2;
-          if (a.address3) employeeData.permanent_address3 = a.address3;
-          if (a.city) employeeData.permanent_city = a.city;
-          if (a.state) employeeData.permanent_state = a.state;
-          if (a.country) employeeData.permanent_country = a.country;
-          if (a.pincode) employeeData.permanent_pincode = a.pincode;
+          // Prefer an explicit Permanent address; if none exists, fall back to an unlabeled address
+          // BUT only use an unlabeled address as Permanent if there is no Residential entry present
+          const explicitPermanent = addresses.find(a => (a.title && String(a.title).toLowerCase() === 'permanent'));
+          const unlabeled = addresses.find(a => !a.title);
+          const hasResidentialEntry = addresses.some(a => (a.title && String(a.title).toLowerCase() === 'residential'));
+          const permanentAddr = explicitPermanent || (unlabeled && !hasResidentialEntry ? unlabeled : null);
+
+          if (permanentAddr) {
+            // Map all permanent address fields if ANY field has data
+            if (permanentAddr.address1 || permanentAddr.address2 || permanentAddr.address3 || permanentAddr.city || permanentAddr.state || permanentAddr.country || permanentAddr.pincode) {
+              if (permanentAddr.address1) employeeData.permanent_address1 = permanentAddr.address1;
+              if (permanentAddr.address2) employeeData.permanent_address2 = permanentAddr.address2;
+              if (permanentAddr.address3) employeeData.permanent_address3 = permanentAddr.address3;
+              if (permanentAddr.city) employeeData.permanent_city = permanentAddr.city;
+              if (permanentAddr.state) employeeData.permanent_state = permanentAddr.state;
+              if (permanentAddr.country) employeeData.permanent_country = permanentAddr.country;
+              if (permanentAddr.pincode) employeeData.permanent_pincode = permanentAddr.pincode;
+            }
+          }
+        }
+
+        // Map residential address - if provided, set top-level residential_* fields for backend compatibility
+        if (hasResidential) {
+          const residentialAddr = addresses.find(a => a.title === 'Residential');
+          if (residentialAddr) {
+            // Map all residential address fields if ANY field has data
+            if (residentialAddr.address1 || residentialAddr.address2 || residentialAddr.address3 || residentialAddr.city || residentialAddr.state || residentialAddr.country || residentialAddr.pincode) {
+              if (residentialAddr.address1) employeeData.residential_address1 = residentialAddr.address1;
+              if (residentialAddr.address2) employeeData.residential_address2 = residentialAddr.address2;
+              if (residentialAddr.address3) employeeData.residential_address3 = residentialAddr.address3;
+              if (residentialAddr.city) employeeData.residential_city = residentialAddr.city;
+              if (residentialAddr.state) employeeData.residential_state = residentialAddr.state;
+              if (residentialAddr.country) employeeData.residential_country = residentialAddr.country;
+              if (residentialAddr.pincode) employeeData.residential_pincode = residentialAddr.pincode;
+            }
+          }
+        }
+
+        // DEBUG: show addresses array and which addresses were selected for permanent/residential
+        try {
+          console.log('Import addresses array:', JSON.parse(JSON.stringify(addresses)));
+          const _perm = (addresses && addresses.length > 0) ? (addresses.find(a => !a.title) || addresses.find(a => (a.title && String(a.title).toLowerCase() === 'permanent'))) : null;
+          const _res = (addresses && addresses.length > 0) ? addresses.find(a => a.title === 'Residential') : null;
+          console.log('Selected permanentAddr:', _perm);
+          console.log('Selected residentialAddr:', _res);
+        } catch (e) {
+          console.log('Failed to stringify addresses for debug', e);
         }
 
         // Map first bank account to the backend's expected primary bank fields
@@ -862,7 +1039,10 @@ export default function EmployeeListPage() {
           if (b.ifsc_code) employeeData.primary_ifsc_code = b.ifsc_code;
         }
 
+        // DEBUG: log payload for troubleshooting residential address import
+        console.log('Import payload:', employeeData);
         const response = await axios.post(`${BASE_URL}/api/employees`, employeeData);
+        console.log('Import response:', response && response.data);
         return response.data;
       });
 
@@ -937,15 +1117,16 @@ export default function EmployeeListPage() {
     if (val === null || val === undefined || val === '') return null;
     // Date object
     if (val instanceof Date) {
-      return isNaN(val.getTime()) ? null : val.toISOString();
+      if (isNaN(val.getTime())) return null;
+      return val.toISOString().split('T')[0]; // Return YYYY-MM-DD format
     }
     // Number - could be timestamp (ms) or Excel serial
     if (typeof val === 'number') {
       const asDate = new Date(val);
-      if (!isNaN(asDate.getTime())) return asDate.toISOString();
+      if (!isNaN(asDate.getTime())) return asDate.toISOString().split('T')[0]; // Return YYYY-MM-DD format
       // Try Excel serial (days since 1899-12-31)
       const excelDate = new Date(Math.round((val - 25569) * 86400 * 1000));
-      return !isNaN(excelDate.getTime()) ? excelDate.toISOString() : null;
+      return !isNaN(excelDate.getTime()) ? excelDate.toISOString().split('T')[0] : null; // Return YYYY-MM-DD format
     }
     // String
     if (typeof val === 'string') {
@@ -953,28 +1134,28 @@ export default function EmployeeListPage() {
       if (s === '') return null;
       // Try native parse (ISO, RFC etc.)
       const direct = new Date(s);
-      if (!isNaN(direct.getTime())) return direct.toISOString();
+      if (!isNaN(direct.getTime())) return direct.toISOString().split('T')[0]; // Return YYYY-MM-DD format
       // dd/mm/yyyy or dd-mm-yyyy
       let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
       if (m) {
         const day = parseInt(m[1], 10), month = parseInt(m[2], 10) - 1, year = parseInt(m[3], 10);
         const dt = new Date(year, month, day);
-        if (!isNaN(dt.getTime())) return dt.toISOString();
+        if (!isNaN(dt.getTime())) return dt.toISOString().split('T')[0]; // Return YYYY-MM-DD format
       }
       // yyyy/mm/dd or yyyy-mm-dd
       m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
       if (m) {
         const year = parseInt(m[1], 10), month = parseInt(m[2], 10) - 1, day = parseInt(m[3], 10);
         const dt = new Date(year, month, day);
-        if (!isNaN(dt.getTime())) return dt.toISOString();
+        if (!isNaN(dt.getTime())) return dt.toISOString().split('T')[0]; // Return YYYY-MM-DD format
       }
       // Numeric string - try as ms timestamp or excel serial
       if (!isNaN(Number(s))) {
         const num = Number(s);
         const asDate2 = new Date(num);
-        if (!isNaN(asDate2.getTime())) return asDate2.toISOString();
+        if (!isNaN(asDate2.getTime())) return asDate2.toISOString().split('T')[0]; // Return YYYY-MM-DD format
         const excelDate2 = new Date(Math.round((num - 25569) * 86400 * 1000));
-        if (!isNaN(excelDate2.getTime())) return excelDate2.toISOString();
+        if (!isNaN(excelDate2.getTime())) return excelDate2.toISOString().split('T')[0]; // Return YYYY-MM-DD format
       }
       return null;
     }
@@ -997,15 +1178,25 @@ export default function EmployeeListPage() {
       }
       if (field === 'MobileNumber') return employee.mobile_number || '';
       if (field === 'Email') return employee.email || '';
-      if (field === 'Aadhaar') return employee.aadhar_number || '';
+      if (field === 'Emergency Number') return employee.emergency_contact || employee.emergency_number || '';
+      if (field === 'Aadhaar') return employee.aadhar_number || ''; 
       if (field === 'PAN') return employee.pan_number || '';
       if (field === 'Address 1') return employee.addresses && employee.addresses[0] ? employee.addresses[0].address1 || '' : '';
       if (field === 'Address 2') return employee.addresses && employee.addresses[0] ? employee.addresses[0].address2 || '' : '';
       if (field === 'Address 3') return employee.addresses && employee.addresses[0] ? employee.addresses[0].address3 || '' : '';
       if (field === 'City') return employee.addresses && employee.addresses[0] ? employee.addresses[0].city || '' : '';
       if (field === 'State') return employee.addresses && employee.addresses[0] ? employee.addresses[0].state || '' : '';
-      if (field === 'Address Country') return employee.addresses && employee.addresses[0] ? employee.addresses[0].country || '' : '';
+      if (field === 'Address Country' || field === 'Add. Country') return employee.addresses && employee.addresses[0] ? employee.addresses[0].country || '' : '';
       if (field === 'Pincode') return employee.addresses && employee.addresses[0] ? employee.addresses[0].pincode || '' : '';
+      // Residential address export helpers: prefer address with title 'Residential', else fallback to second address, then any unlabeled address
+      const resAddr = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || (employee.addresses[1] || null) || employee.addresses.find(a => !a.title) || null)) || null;
+      if (field === 'Residential Address 1' || field === 'Res Address 1') return resAddr ? resAddr.address1 || '' : '';
+      if (field === 'Residential Address 2' || field === 'Res Address 2') return resAddr ? resAddr.address2 || '' : '';
+      if (field === 'Residential Address 3' || field === 'Res Address 3') return resAddr ? resAddr.address3 || '' : '';
+      if (field === 'Residential City' || field === 'Res City') return resAddr ? resAddr.city || '' : '';
+      if (field === 'Residential State' || field === 'Res State') return resAddr ? resAddr.state || '' : '';
+      if (field === 'Residential Country' || field === 'Res Country') return resAddr ? (resAddr.country && resAddr.country_code ? `${resAddr.country} (${resAddr.country_code})` : (resAddr.country || resAddr.country_code || '')) : '';
+      if (field === 'Residential Pincode' || field === 'Res Pincode') return resAddr ? resAddr.pincode || '' : '';
       if (field === 'Bank Info') {
         if (!Array.isArray(employee.bank_accounts) || employee.bank_accounts.length === 0) return '';
         return employee.bank_accounts.map(bank => {
@@ -1168,7 +1359,7 @@ export default function EmployeeListPage() {
       <Box sx={{ p: 1, mt: 1 }}>
         <Typography variant="h5" gutterBottom>All Employees List</Typography>
         {/* Filters */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        <div className="filters-section">
           <Box display="flex" alignItems="center" width="100%" className="list-toolbar">
             <Box display="flex" alignItems="center">
               <div className="search-wrap" style={{ marginRight: 16 }}>
@@ -1215,61 +1406,66 @@ export default function EmployeeListPage() {
               Add Employee
             </Button>
           </Box>
-        </Paper>
+        </div>
 
         {/* Table */}
-        <TableContainer component={Paper}>
-          <Table sx={{ width: '100%', tableLayout: 'auto' }}>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox" sx={{ minWidth: 56 }}>
-                  <Checkbox
+        <div className="employee-table-wrapper">
+          <table className="employee-table">
+            <thead>
+              <tr>
+                <th className="checkbox-col">
+                  <input
+                    type="checkbox"
                     checked={employees.length > 0 && selectedIds.length === employees.length}
-                    indeterminate={selectedIds.length > 0 && selectedIds.length < employees.length}
                     onChange={handleToggleSelectAll}
-                    size="small"
+                    aria-label="Select all employees"
                   />
-                </TableCell>
-                <TableCell sx={{ minWidth: 80 }}>S.No</TableCell>
-                {displayedFields.map((field) => (
-                  <TableCell key={field} sx={{ minWidth: getMinWidth(field) }}>{field}</TableCell>
-                ))}
-                <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+                </th>
+                <th className="sno-col">S.No</th>
+                {displayedFields.map((field) => {
+                  const headerLabel = field === 'Employee Code' ? 'Emp Code' : (field === 'Emergency Number' ? 'Emergency No.' : field);
+                  const colClass = `col-${_normalizeKey(field)}`;
+                  return (
+                    <th key={field} className={`data-col ${colClass}`}>
+                      {headerLabel}
+                    </th>
+                  );
+                })}
+                <th className="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={displayedFields.length + 3} align="center">
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
+                <tr className="loading-row">
+                  <td colSpan={displayedFields.length + 3} className="center-cell">
+                    <CircularProgress size={40} />
+                  </td>
+                </tr>
               ) : employees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={displayedFields.length + 3} align="center">
-                    No employees found
-                  </TableCell>
-                </TableRow>
+                <tr className="empty-row">
+                  <td colSpan={displayedFields.length + 3} className="center-cell">
+                    <Typography variant="body1">No employees found</Typography>
+                  </td>
+                </tr>
               ) : (
                 employees.map((employee, index) => (
-                  <TableRow
+                  <tr
                     key={employee.id}
-                    selected={selectedIds.includes(employee.id)}
-                    hover
-                    sx={{ cursor: 'pointer', '& td': { borderBottom: '1px solid rgba(224,224,224,1)', verticalAlign: 'middle' } }}
+                    className={`employee-row ${selectedIds.includes(employee.id) ? 'selected' : ''}`}
                     onClick={() => { setSelectedEmployee(employee); setViewDialogOpen(true); }}
                   >
-                    <TableCell padding="checkbox" sx={{ minWidth: 56 }}>
-                      <Checkbox
+                    <td className="checkbox-col">
+                      <input
+                        type="checkbox"
                         checked={selectedIds.includes(employee.id)}
                         onChange={() => handleToggleSelect(employee.id)}
                         onClick={(e) => e.stopPropagation()}
-                        size="small"
+                        aria-label={`Select ${employee.firstname}`}
                       />
-                    </TableCell>
-                    <TableCell sx={{ minWidth: 80 }}>{page * limit + index + 1}</TableCell>
+                    </td>
+                    <td className="sno-col">{page * limit + index + 1}</td>
                     {displayedFields.map((field) => (
-                      <TableCell key={field} sx={{ minWidth: getMinWidth(field), whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      <td key={field} className={`data-col col-${_normalizeKey(field)}`}>
                         {field === 'Photo' && (() => {
                           const photoDoc = employee.documents?.find(d => 
                             d.doc_type?.toLowerCase() === 'photo' || 
@@ -1283,6 +1479,9 @@ export default function EmployeeListPage() {
                               alt="Photo"
                               variant="square"
                               sx={{ width: 80, height: 80, cursor: photoUrl ? 'pointer' : 'default' }}
+                              title={photoUrl ? 'Hover to preview, click to open' : 'No photo available'}
+                              onMouseEnter={() => { if (photoUrl) handlePhotoMouseEnter(photoUrl); }}
+                              onMouseLeave={handlePhotoMouseLeave}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (photoUrl && photoDoc) {
@@ -1305,6 +1504,7 @@ export default function EmployeeListPage() {
                         {field === 'Country' && renderHighlighted(formatCountry(employee))}
                         {field === 'MobileNumber' && renderHighlighted(employee.mobile_number)}
                         {field === 'Email' && renderHighlighted(employee.email)}
+                        {field === 'Emergency Number' && renderHighlighted(employee.emergency_contact || employee.emergency_number || '')}
                         {field === 'Aadhaar' && renderHighlighted(employee.aadhar_number)}
                         {field === 'PAN' && renderHighlighted(employee.pan_number)}
                         {field === 'Address 1' && renderHighlighted(employee.addresses && employee.addresses[0] ? employee.addresses[0].address1 || '' : '')}
@@ -1314,81 +1514,172 @@ export default function EmployeeListPage() {
                         {field === 'State' && renderHighlighted(employee.addresses && employee.addresses[0] ? employee.addresses[0].state || '' : '')}
                         {field === 'Add. Country' && renderHighlighted(employee.addresses && employee.addresses[0] ? (employee.addresses[0].country && employee.addresses[0].country_code ? `${employee.addresses[0].country} (${employee.addresses[0].country_code})` : (employee.addresses[0].country || employee.addresses[0].country_code || '')) : '')}
                         {field === 'Pincode' && renderHighlighted(employee.addresses && employee.addresses[0] ? employee.addresses[0].pincode || '' : '')}
+                        {(field === 'Residential Address 1' || field === 'Res Address 1') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.address1 || '' : '');
+                        })()}
+                        {(field === 'Residential Address 2' || field === 'Res Address 2') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.address2 || '' : '');
+                        })()}
+                        {(field === 'Residential Address 3' || field === 'Res Address 3') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.address3 || '' : '');
+                        })()}
+                        {(field === 'Residential City' || field === 'Res City') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.city || '' : '');
+                        })()}
+                        {(field === 'Residential State' || field === 'Res State') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.state || '' : '');
+                        })()}
+                        {(field === 'Residential Country' || field === 'Res Country') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? (r.country && r.country_code ? `${r.country} (${r.country_code})` : (r.country || r.country_code || '')) : '');
+                        })()}
+                        {(field === 'Residential Pincode' || field === 'Res Pincode') && (() => {
+                          const r = (employee.addresses && (employee.addresses.find(a => (a.title || '').toLowerCase() === 'residential') || employee.addresses[1] || employee.addresses.find(a => !a.title))) || null;
+                          return renderHighlighted(r ? r.pincode || '' : '');
+                        })()}
                         {field === 'Bank Info' && (
-                          Array.isArray(employee.bank_accounts) && employee.bank_accounts.length > 0 ? (
-                            employee.bank_accounts.map((bank, idx) => (
-                              <div key={idx} style={{ marginBottom: 8 }}>
-                                {bank.bank_name && <div><b>Bank:</b> {bank.bank_name}</div>}
-                                {bank.branch_name && <div><b>Branch:</b> {bank.branch_name}</div>}
-                                {bank.branch_address && <div><b>Address:</b> {bank.branch_address}</div>}
-                                {bank.account_number && <div><b>Account:</b> {bank.account_number}</div>}
-                                {bank.ifsc_code && <div><b>IFSC:</b> {bank.ifsc_code}</div>}
-                              </div>
-                            ))
-                          ) : ''
+                          <div className="cell-content">
+                            {Array.isArray(employee.bank_accounts) && employee.bank_accounts.length > 0 ? (
+                              employee.bank_accounts.map((bank, idx) => (
+                                <div key={idx} className="bank-item">
+                                  {bank.bank_name && <div><b>Bank:</b> {bank.bank_name}</div>}
+                                  {bank.branch_name && <div><b>Branch:</b> {bank.branch_name}</div>}
+                                  {bank.branch_address && <div><b>Address:</b> {bank.branch_address}</div>}
+                                  {bank.account_number && <div><b>Account:</b> {bank.account_number}</div>}
+                                  {bank.ifsc_code && <div><b>IFSC:</b> {bank.ifsc_code}</div>}
+                                </div>
+                              ))
+                            ) : ''}
+                          </div>
                         )}
                         {field === 'Documents' && (
-                          Array.isArray(employee.documents) && employee.documents.length > 0 ? (
-                            employee.documents.map((d, idx) => (
-                              <div key={idx} style={{ marginBottom: 8 }}>
-                                <div><b>Type:</b> {d.doc_type || d.type}</div>
-                                {d.doc_number && <div><b>No:</b> {d.doc_number}</div>}
-                                <div>{d.file_name || d.file_url}</div>
-                              </div>
-                            ))
-                          ) : ''
+                          <div className="cell-content">
+                            {Array.isArray(employee.documents) && employee.documents.length > 0 ? (
+                              employee.documents.map((d, idx) => {
+                                const url = buildDocUrl(d);
+                                return (
+                                  <div key={idx} className="doc-item">
+                                    <div><b>Type:</b> {d.doc_type || d.type}</div>
+                                    {d.doc_number && <div><b>No:</b> {d.doc_number}</div>}
+                                    <div>
+                                      {url ? (
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => { e.stopPropagation(); }}
+                                          title="Open document in new tab"
+                                          className="doc-link"
+                                        >
+                                          {d.file_name || d.file_url}
+                                        </a>
+                                      ) : (
+                                        <span>{d.file_name || d.file_url || 'No file'}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : ''}
+                          </div>
                         )}
                         {field === 'Status' && (
                           (() => {
                             const val = (employee.is_active !== undefined) ? employee.is_active : (employee.active !== undefined ? employee.active : (employee.status !== undefined ? employee.status : employee.isActive));
                             const isActive = (typeof val === 'boolean') ? val : (typeof val === 'string' ? (val.toLowerCase() === 'active' || val.toLowerCase() === 'true') : !!val);
                             return (
-                              <Chip
-                                label={isActive ? 'Active' : 'Inactive'}
-                                color={isActive ? 'success' : 'default'}
-                                size="small"
-                              />
+                              <span className={`status-badge ${isActive ? 'active' : 'inactive'}`}>
+                                {isActive ? 'Active' : 'Inactive'}
+                              </span>
                             );
                           })()
                         )}
-                      </TableCell>
+                      </td>
                     ))}
-                    <TableCell sx={{ minWidth: 220, verticalAlign: 'middle', textAlign: 'center', py: 1.25 }}>
-                      <Box sx={{ display: 'inline-flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <td className="actions-col">
+                      <div className="action-buttons">
                         <Tooltip title="View">
-                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleViewEmployee(employee); }} sx={{ p: 0.5 }}>
-                            <VisibilityIcon />
-                          </IconButton>
+                          <button 
+                            type="button"
+                            className="action-btn view-btn"
+                            onClick={(e) => { e.stopPropagation(); handleViewEmployee(employee); }}
+                            aria-label="View employee"
+                          >
+                            👁️
+                          </button>
                         </Tooltip>
                         <Tooltip title="Edit">
-                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditEmployee(employee); }} sx={{ p: 0.5 }}>
-                            <EditIcon />
-                          </IconButton>
+                          <button 
+                            type="button"
+                            className="action-btn edit-btn"
+                            onClick={(e) => { e.stopPropagation(); handleEditEmployee(employee); }}
+                            aria-label="Edit employee"
+                          >
+                            ✏️
+                          </button>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(employee); }} sx={{ p: 0.5 }}>
-                            <DeleteIcon />
-                          </IconButton>
+                          <button 
+                            type="button"
+                            className="action-btn delete-btn"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(employee); }}
+                            aria-label="Delete employee"
+                          >
+                            🗑️
+                          </button>
                         </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                      </div>
+                    </td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={totalItems}
-          page={page}
-          onPageChange={handlePageChange}
-          rowsPerPage={limit}
-          onRowsPerPageChange={handleLimitChange}
-          rowsPerPageOptions={[5, 10, 25, 50]}
-        />
+        <div className="table-pagination">
+          <div className="pagination-info">
+            Showing {employees.length === 0 ? 0 : page * limit + 1} to {Math.min((page + 1) * limit, totalItems)} of {totalItems} employees
+          </div>
+          <div className="pagination-controls">
+            <select 
+              value={limit} 
+              onChange={handleLimitChange}
+              className="rows-per-page"
+              aria-label="Select rows per page"
+            >
+              <option value={5}>5 per page</option>
+              <option value={10}>10 per page</option>
+              <option value={25}>25 per page</option>
+              <option value={50}>50 per page</option>
+            </select>
+            <div className="pagination-buttons">
+              <button
+                className="pagination-btn"
+                onClick={() => handlePageChange(null, page - 1)}
+                disabled={page === 0}
+                aria-label="Previous page"
+              >
+                ← Previous
+              </button>
+              <span className="page-number">Page {page + 1} of {Math.ceil(totalItems / limit)}</span>
+              <button
+                className="pagination-btn"
+                onClick={() => handlePageChange(null, page + 1)}
+                disabled={page >= Math.ceil(totalItems / limit) - 1}
+                aria-label="Next page"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
@@ -1567,9 +1858,10 @@ export default function EmployeeListPage() {
                           const requiredSet = new Set(['salutation','firstname','gender','countrynamecode','mobilenumber','email','active']);
                           const normalized = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                           const isRequired = requiredSet.has(normalized);
+                          const displayKey = key === 'Employee Code' ? 'Emp Code' : key;
                           return (
                             <TableCell key={key} sx={{ fontWeight: 600 }}>
-                              {key}{isRequired ? <span style={{ color: 'red', marginLeft: 6 }}>*</span> : null}
+                              {displayKey}{isRequired ? <span style={{ color: 'red', marginLeft: 6 }}>*</span> : null}
                             </TableCell>
                           );
                         })}
@@ -1803,6 +2095,31 @@ export default function EmployeeListPage() {
           </DialogActions>
         </Dialog>
 
+        {/* Photo Preview Dialog */}
+        <Dialog
+          open={!!photoPreview}
+          onClose={handleClosePhotoPreview}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { backgroundColor: 'rgba(0,0,0,0.9)', boxShadow: 'none' } }}
+        >
+          <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2, backgroundColor: 'rgba(0,0,0,0.9)' }}>
+            {photoPreview && (
+              <img
+                src={photoPreview}
+                alt="Photo Preview"
+                style={{ width: 800, height: 600, maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 4 }}
+                onClick={() => window.open(photoPreview, '_blank', 'noopener,noreferrer')}
+                title="Click to open in new tab"
+              />
+            )}
+          </DialogContent>
+          <DialogActions sx={{ backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center' }}>
+            <Button onClick={handleClosePhotoPreview} sx={{ color: 'white' }}>Close</Button>
+            <Button onClick={() => window.open(photoPreview, '_blank', 'noopener,noreferrer')} sx={{ color: 'white' }}>Open in New Tab</Button>
+          </DialogActions>
+        </Dialog>
+
         {/* View Employee Dialog */}
         {/* Employee View Dialog */}
         <div className={`employee-view-dialog ${viewDialogOpen ? 'open' : ''}`}>
@@ -1859,9 +2176,13 @@ export default function EmployeeListPage() {
                         <label>Mobile Number</label>
                         <input type="text" value={selectedEmployee.mobile_number || ""} disabled />
                       </div>
-                      <div className="form-field" style={{ gridColumn: '1 / 3' }}>
+                      <div className="form-field">
                         <label>Email</label>
                         <input type="text" value={selectedEmployee.email || ""} disabled />
+                      </div>
+                      <div className="form-field">
+                        <label>Emergency Number</label>
+                        <input type="text" value={selectedEmployee.emergency_contact || selectedEmployee.emergency_number || ""} disabled />
                       </div>
                     </div>
                   </div>

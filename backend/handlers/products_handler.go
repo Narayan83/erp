@@ -1383,6 +1383,80 @@ func ImportProducts(c *fiber.Ctx) error {
 			product.TaxID = &tax.ID
 		}
 
+		// Handle HSN Code - auto-create HSN master if it doesn't exist
+		if hsnCode != "" {
+			var hsn models.HsnCode
+			if err := tx.Where("LOWER(code) = LOWER(?)", hsnCode).First(&hsn).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					fmt.Printf("Row %d: HSN '%s' not found, creating automatically\n", rowNum, hsnCode)
+
+					// Determine TaxID to associate with HSN
+					var taxForHsnID uint
+					if product.TaxID != nil {
+						taxForHsnID = *product.TaxID
+					} else if taxName != "" {
+						// Try to find or create tax by name
+						var txTax models.Tax
+						if err2 := tx.Where("name = ?", taxName).First(&txTax).Error; err2 != nil {
+							if err2 == gorm.ErrRecordNotFound {
+								txTax = models.Tax{Name: taxName, Percentage: gstPercent}
+								if createErr := tx.Create(&txTax).Error; createErr != nil {
+									fmt.Printf("Row %d: Failed to auto-create tax '%s' for HSN: %v\n", rowNum, taxName, createErr)
+									errors = append(errors, fmt.Sprintf("Row %d: Failed to create tax '%s' for HSN: %v", rowNum, taxName, createErr))
+									tx.Rollback()
+									continue
+								}
+							}
+							taxForHsnID = txTax.ID
+						} else {
+							fmt.Printf("Row %d: Tax lookup error for '%s' while preparing HSN: %v\n", rowNum, taxName, err2)
+							errors = append(errors, fmt.Sprintf("Row %d: Database error looking up tax '%s' for HSN: %v", rowNum, taxName, err2))
+							tx.Rollback()
+							continue
+						}
+					} else {
+						// No tax info provided - ensure a default GST 0% exists and use it
+						var zeroTax models.Tax
+						if err3 := tx.Where("percentage = ?", 0).First(&zeroTax).Error; err3 != nil {
+							if err3 == gorm.ErrRecordNotFound {
+								zeroTax = models.Tax{Name: "GST 0%", Percentage: 0}
+								if createErr := tx.Create(&zeroTax).Error; createErr != nil {
+									fmt.Printf("Row %d: Failed to create default 0%% tax for HSN creation: %v\n", rowNum, createErr)
+									errors = append(errors, fmt.Sprintf("Row %d: Failed to create default tax for HSN: %v", rowNum, createErr))
+									tx.Rollback()
+									continue
+								}
+							}
+							taxForHsnID = zeroTax.ID
+						} else {
+							fmt.Printf("Row %d: Error looking up default 0%% tax for HSN: %v\n", rowNum, err3)
+							errors = append(errors, fmt.Sprintf("Row %d: Database error looking up default tax for HSN: %v", rowNum, err3))
+							tx.Rollback()
+							continue
+						}
+					}
+
+					// Create HSN record
+					hsn = models.HsnCode{Code: hsnCode, TaxID: taxForHsnID}
+					if createErr := tx.Create(&hsn).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create HSN '%s': %v\n", rowNum, hsnCode, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create HSN '%s': %v", rowNum, hsnCode, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created HSN '%s' with TaxID %d\n", rowNum, hsnCode, taxForHsnID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: HSN lookup error for '%s': %v\n", rowNum, hsnCode, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up HSN '%s': %v", rowNum, hsnCode, err))
+					tx.Rollback()
+					continue
+				}
+			} else {
+				fmt.Printf("Row %d: HSN '%s' found with ID %d\n", rowNum, hsnCode, hsn.ID)
+			}
+		}
+
 		// Create the product
 		if err := tx.Create(&product).Error; err != nil {
 			errors = append(errors, fmt.Sprintf("Row %d: Failed to create product: %v", rowNum, err))

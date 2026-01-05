@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"erp.local/backend/models"
@@ -31,6 +32,11 @@ type CreateEmployeeRequest struct {
 	Email        string  `json:"email"`
 	Password     string  `json:"password"`
 	Active       bool    `json:"active"`
+	// Contact information
+	EmergencyNumber *string `json:"emergency_number"`
+	// Legal/Document fields
+	AadharNumber *string `json:"aadhar_number"`
+	PANNumber    *string `json:"pan_number"`
 	// Permanent address
 	PermanentAddress1 *string `json:"permanent_address1"`
 	PermanentAddress2 *string `json:"permanent_address2"`
@@ -39,6 +45,14 @@ type CreateEmployeeRequest struct {
 	PermanentState    *string `json:"permanent_state"`
 	PermanentCountry  *string `json:"permanent_country"`
 	PermanentPincode  *string `json:"permanent_pincode"`
+	// Residential address
+	ResidentialAddress1 *string `json:"residential_address1"`
+	ResidentialAddress2 *string `json:"residential_address2"`
+	ResidentialAddress3 *string `json:"residential_address3"`
+	ResidentialCity     *string `json:"residential_city"`
+	ResidentialState    *string `json:"residential_state"`
+	ResidentialCountry  *string `json:"residential_country"`
+	ResidentialPincode  *string `json:"residential_pincode"`
 	// Primary bank
 	PrimaryBankName      *string `json:"primary_bank_name"`
 	PrimaryBranchName    *string `json:"primary_branch_name"`
@@ -60,6 +74,11 @@ type UpdateEmployeeRequest struct {
 	Country      *string `json:"country"`
 	CountryCode  *string `json:"country_code"`
 	Designation  *string `json:"designation"`
+	// Contact information
+	EmergencyNumber *string `json:"emergency_number"`
+	// Legal/Document fields
+	AadharNumber *string `json:"aadhar_number"`
+	PANNumber    *string `json:"pan_number"`
 
 	// Permanent Address fields
 	PermanentAddress1    *string `json:"permanent_address1"`
@@ -71,6 +90,15 @@ type UpdateEmployeeRequest struct {
 	PermanentCountryCode *string `json:"permanent_country_code"`
 	PermanentPincode     *string `json:"permanent_pincode"`
 	PermanentGSTIN       *string `json:"permanent_gstin"`
+
+	// Residential Address fields
+	ResidentialAddress1 *string `json:"residential_address1"`
+	ResidentialAddress2 *string `json:"residential_address2"`
+	ResidentialAddress3 *string `json:"residential_address3"`
+	ResidentialCity     *string `json:"residential_city"`
+	ResidentialState    *string `json:"residential_state"`
+	ResidentialCountry  *string `json:"residential_country"`
+	ResidentialPincode  *string `json:"residential_pincode"`
 
 	// Primary Bank Information
 	PrimaryBankName      *string `json:"primary_bank_name"`
@@ -101,6 +129,12 @@ func CreateEmployee(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
+	// DEBUG: log parsed permanent and residential fields to diagnose import issue
+	fmt.Printf("CreateEmployee parsed permanent fields: perm1=%v perm2=%v perm3=%v city=%v state=%v country=%v pincode=%v\n",
+		body.PermanentAddress1, body.PermanentAddress2, body.PermanentAddress3, body.PermanentCity, body.PermanentState, body.PermanentCountry, body.PermanentPincode)
+	fmt.Printf("CreateEmployee parsed residential fields: res1=%v res2=%v res3=%v city=%v state=%v country=%v pincode=%v\n",
+		body.ResidentialAddress1, body.ResidentialAddress2, body.ResidentialAddress3, body.ResidentialCity, body.ResidentialState, body.ResidentialCountry, body.ResidentialPincode)
+
 	hashedPassword, err := hashEmployeePassword(body.Password)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Password encryption failed"})
@@ -116,21 +150,24 @@ func CreateEmployee(c *fiber.Ctx) error {
 
 	// Create a User record with IsEmployee flag set to true
 	user := models.User{
-		Usercode:      body.Empcode,
-		Username:      getString(body.Username),
-		Salutation:    body.Salutation,
-		Firstname:     body.Firstname,
-		Lastname:      body.Lastname,
-		DOB:           dob,
-		Gender:        models.Gender(body.Gender),
-		Country:       getString(body.Country),
-		CountryCode:   body.CountryCode,
-		MobileNumber:  body.MobileNumber,
-		Email:         body.Email,
-		Password:      hashedPassword,
-		PlainPassword: body.Password,
-		Active:        body.Active,
-		IsEmployee:    true, // Mark this user as an employee
+		Usercode:        body.Empcode,
+		Username:        getString(body.Username),
+		Salutation:      body.Salutation,
+		Firstname:       body.Firstname,
+		Lastname:        body.Lastname,
+		DOB:             dob,
+		Gender:          models.Gender(body.Gender),
+		Country:         getString(body.Country),
+		CountryCode:     body.CountryCode,
+		MobileNumber:    body.MobileNumber,
+		Email:           body.Email,
+		Password:        hashedPassword,
+		PlainPassword:   body.Password,
+		Active:          body.Active,
+		EmergencyNumber: body.EmergencyNumber,
+		AadharNumber:    getString(body.AadharNumber),
+		PANNumber:       getString(body.PANNumber),
+		IsEmployee:      true, // Mark this user as an employee
 	}
 
 	// Use transaction so that user and related records are created atomically
@@ -144,8 +181,8 @@ func CreateEmployee(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Create permanent address if provided
-	if body.PermanentAddress1 != nil || body.PermanentCity != nil || body.PermanentState != nil || body.PermanentCountry != nil || body.PermanentPincode != nil {
+	// Create permanent address if provided (check all fields)
+	if body.PermanentAddress1 != nil || body.PermanentAddress2 != nil || body.PermanentAddress3 != nil || body.PermanentCity != nil || body.PermanentState != nil || body.PermanentCountry != nil || body.PermanentPincode != nil {
 		addr := models.UserAddress{
 			UserID:   user.ID,
 			Title:    "Permanent",
@@ -158,6 +195,25 @@ func CreateEmployee(c *fiber.Ctx) error {
 			Pincode:  getString(body.PermanentPincode),
 		}
 		if err := tx.Create(&addr).Error; err != nil {
+			tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+
+	// Create residential address if provided (check all fields)
+	if body.ResidentialAddress1 != nil || body.ResidentialAddress2 != nil || body.ResidentialAddress3 != nil || body.ResidentialCity != nil || body.ResidentialState != nil || body.ResidentialCountry != nil || body.ResidentialPincode != nil {
+		resAddr := models.UserAddress{
+			UserID:   user.ID,
+			Title:    "Residential",
+			Address1: getString(body.ResidentialAddress1),
+			Address2: getString(body.ResidentialAddress2),
+			Address3: getString(body.ResidentialAddress3),
+			City:     getString(body.ResidentialCity),
+			State:    getString(body.ResidentialState),
+			Country:  getString(body.ResidentialCountry),
+			Pincode:  getString(body.ResidentialPincode),
+		}
+		if err := tx.Create(&resAddr).Error; err != nil {
 			tx.Rollback()
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -289,6 +345,15 @@ func UpdateEmployee(c *fiber.Ctx) error {
 	if body.Active != nil {
 		updateData["active"] = *body.Active
 	}
+	if body.EmergencyNumber != nil {
+		updateData["emergency_number"] = *body.EmergencyNumber
+	}
+	if body.AadharNumber != nil {
+		updateData["aadhar_number"] = *body.AadharNumber
+	}
+	if body.PANNumber != nil {
+		updateData["pan_number"] = *body.PANNumber
+	}
 
 	if body.DOB != nil {
 		if parsed, err := time.Parse("2006-01-02", *body.DOB); err == nil {
@@ -328,8 +393,8 @@ func UpdateEmployee(c *fiber.Ctx) error {
 		employeeDB.Model(&employee).Update("username", *body.Username)
 	}
 
-	// Handle permanent address update/create
-	if body.PermanentAddress1 != nil || body.PermanentCity != nil || body.PermanentState != nil || body.PermanentCountry != nil {
+	// Handle permanent address update/create (check all fields)
+	if body.PermanentAddress1 != nil || body.PermanentAddress2 != nil || body.PermanentAddress3 != nil || body.PermanentCity != nil || body.PermanentState != nil || body.PermanentCountry != nil || body.PermanentPincode != nil {
 		// Check if permanent address exists
 		var permanentAddr models.UserAddress
 		err := employeeDB.Where("user_id = ? AND title = ?", employee.ID, "Permanent").First(&permanentAddr).Error
@@ -384,6 +449,58 @@ func UpdateEmployee(c *fiber.Ctx) error {
 			}
 			if err := employeeDB.Create(&newPermanentAddr).Error; err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": "Failed to create permanent address", "details": err.Error()})
+			}
+		}
+	}
+
+	// Handle residential address update/create (check all fields)
+	if body.ResidentialAddress1 != nil || body.ResidentialAddress2 != nil || body.ResidentialAddress3 != nil || body.ResidentialCity != nil || body.ResidentialState != nil || body.ResidentialCountry != nil || body.ResidentialPincode != nil {
+		// Check if residential address exists
+		var residentialAddr models.UserAddress
+		err := employeeDB.Where("user_id = ? AND title = ?", employee.ID, "Residential").First(&residentialAddr).Error
+
+		if err == nil {
+			// Update existing residential address
+			addrUpdate := map[string]interface{}{}
+			if body.ResidentialAddress1 != nil {
+				addrUpdate["address1"] = *body.ResidentialAddress1
+			}
+			if body.ResidentialAddress2 != nil {
+				addrUpdate["address2"] = *body.ResidentialAddress2
+			}
+			if body.ResidentialAddress3 != nil {
+				addrUpdate["address3"] = *body.ResidentialAddress3
+			}
+			if body.ResidentialCity != nil {
+				addrUpdate["city"] = *body.ResidentialCity
+			}
+			if body.ResidentialState != nil {
+				addrUpdate["state"] = *body.ResidentialState
+			}
+			if body.ResidentialCountry != nil {
+				addrUpdate["country"] = *body.ResidentialCountry
+			}
+			if body.ResidentialPincode != nil {
+				addrUpdate["pincode"] = *body.ResidentialPincode
+			}
+			if len(addrUpdate) > 0 {
+				employeeDB.Model(&residentialAddr).Updates(addrUpdate)
+			}
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create new residential address
+			newResidentialAddr := models.UserAddress{
+				UserID:   employee.ID,
+				Title:    "Residential",
+				Address1: stringPtrToString(body.ResidentialAddress1),
+				Address2: stringPtrToString(body.ResidentialAddress2),
+				Address3: stringPtrToString(body.ResidentialAddress3),
+				City:     stringPtrToString(body.ResidentialCity),
+				State:    stringPtrToString(body.ResidentialState),
+				Country:  stringPtrToString(body.ResidentialCountry),
+				Pincode:  stringPtrToString(body.ResidentialPincode),
+			}
+			if err := employeeDB.Create(&newResidentialAddr).Error; err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to create residential address", "details": err.Error()})
 			}
 		}
 	}

@@ -195,7 +195,7 @@ const [tandc,setTandc]=useState([]);
 const [openTandCModal, setOpenTandCModal] = useState(false);
 const [tandcSearch, setTandcSearch] = useState('');
 const [tandcSelections, setTandcSelections] = useState([]); 
-const [qutationNo,setQutationNo] = useState([]);
+const [qutationNo,setQutationNo] = useState('');
 const [prevQutationNo, setPrevQutationNo] = useState('');
 // Editable middle sequence and year-range parts
 const [seqNumber, setSeqNumber] = useState('');
@@ -906,6 +906,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
     return { amount: Number((amount||0).toFixed(2)), cgst, sgst, igst, totalTax, grandTotal };
   };
 
+  // Helper to sanitize numeric values (strip non-numeric chars and return number or empty string)
+  const sanitizeNumericValue = (v) => {
+    if (v === '' || v === null || v === undefined) return '';
+    const s = String(v).replace(/[^0-9\.\-]/g, '');
+    const n = parseFloat(s);
+    return isNaN(n) ? '' : n;
+  };
+
   // Country list and Indian states for the address modal
   const countries = [
     "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan",
@@ -1089,6 +1097,9 @@ const handleSaveQuotation = async () => {
   const roundoffAmount = includeRoundOff ? Number((Math.round(totalBeforeRound) - totalBeforeRound).toFixed(2)) : 0;
   const grandTotalToSend = includeRoundOff ? Number(Math.round(totalBeforeRound)) : Number(Number(totalBeforeRound).toFixed(2));
 
+  // Sum up per-item tax amounts (cgst+sgst+igst) so we can send an accurate total tax amount
+  const computedTaxAmount = tableItems.reduce((s, it) => s + (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0)), 0);
+
   const payload = {
     quotation: {
       // series_id is required by the backend quotation table endpoint
@@ -1097,7 +1108,7 @@ const handleSaveQuotation = async () => {
       company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : null,
       company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : null,
       company_branch_bank_id:selectedBankId,
-      quotation_number: qutationNo,
+      quotation_number: isEditMode ? (qutationNo || quotationData?.quotation_number || '') : qutationNo,
       quotation_date: new Date(quotationDate).toISOString(),
       customer_id: Number(selectedCustomer.id),
       sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : null,
@@ -1309,6 +1320,13 @@ const handleSaveQuotation = async () => {
   const handleOnChangeSeriesSelect = async (e) => {
     const seriesId = e.target.value;
     setSelectedSeries(seriesId);
+
+    // When editing an existing quotation, do NOT auto-generate or overwrite the existing
+    // quotation number. Preserve the original `qutationNo` unless the user explicitly
+    // chooses to change it via the UI.
+    if (isEditMode) {
+      return;
+    }
     
     if (!seriesId) {
       // When no series is selected, show only the normal number (seqNumber)
@@ -1691,17 +1709,17 @@ const  prefillFormData = async (data) => {
       // Extract product image from various possible sources
       let productImage = null;
       
-      // Try to get image from product's variants
-      if (item.product?.Variants && item.product.Variants.length > 0) {
+      // Use helper to pick a normalized product image (handles variants too)
+      if (item.product) {
+        productImage = getProductImage(item.product);
+      }
+
+      // If helper didn't find a URL but variant has an image object/string, try that (normalizeImageUrl will handle objects)
+      if (!productImage && item.product?.Variants && item.product.Variants.length > 0) {
         const variant = item.product.Variants[0];
         if (variant?.Images && variant.Images.length > 0) {
           productImage = variant.Images[0];
         }
-      }
-      
-      // Fallback to product's main image
-      if (!productImage && item.product) {
-        productImage = getProductImage(item.product);
       }
 
       // Calculate discount: taxable amount = rate * qty - discount
@@ -1762,12 +1780,20 @@ const  prefillFormData = async (data) => {
   if (data.extra_charges || data.ExtraCharges) {
     const charges = data.extra_charges || data.ExtraCharges;
     if (Array.isArray(charges)) {
-      setExtraCharges(charges);
+      setExtraCharges(charges.map(c => ({
+        title: c.title || c.name || '',
+        type: (c.type || c.Type || (String(c.value||'').includes('%') ? 'percent' : 'item')).toString().toLowerCase() === 'percent' ? 'percent' : 'item',
+        value: sanitizeNumericValue(c.value ?? c.Value ?? '')
+      })));
     } else if (typeof charges === 'string') {
       try {
         const parsed = JSON.parse(charges);
         if (Array.isArray(parsed)) {
-          setExtraCharges(parsed);
+          setExtraCharges(parsed.map(c => ({
+            title: c.title || c.name || '',
+            type: (c.type || c.Type || (String(c.value||'').includes('%') ? 'percent' : 'item')).toString().toLowerCase() === 'percent' ? 'percent' : 'item',
+            value: sanitizeNumericValue(c.value ?? c.Value ?? '')
+          })));
         }
       } catch (e) {
         console.error('Failed to parse extra charges:', e);
@@ -1778,12 +1804,20 @@ const  prefillFormData = async (data) => {
   if (data.discounts || data.Discounts) {
     const discounts = data.discounts || data.Discounts;
     if (Array.isArray(discounts)) {
-      setAdditiondiscounts(discounts);
+      setAdditiondiscounts(discounts.map(d => ({
+        title: d.title || d.name || '',
+        type: (d.type || d.Type || (String(d.value||'').includes('%') ? 'percent' : 'item')).toString().toLowerCase() === 'percent' ? 'percent' : 'item',
+        value: sanitizeNumericValue(d.value ?? d.Value ?? '')
+      })));
     } else if (typeof discounts === 'string') {
       try {
         const parsed = JSON.parse(discounts);
         if (Array.isArray(parsed)) {
-          setAdditiondiscounts(parsed);
+          setAdditiondiscounts(parsed.map(d => ({
+            title: d.title || d.name || '',
+            type: (d.type || d.Type || (String(d.value||'').includes('%') ? 'percent' : 'item')).toString().toLowerCase() === 'percent' ? 'percent' : 'item',
+            value: sanitizeNumericValue(d.value ?? d.Value ?? '')
+          })));
         }
       } catch (e) {
         console.error('Failed to parse discounts:', e);
@@ -1836,7 +1870,7 @@ const  prefillFormData = async (data) => {
         <div className="form-row">
           <div className="form-group left-start">
             <label htmlFor="customer">Customer :</label>
-            <div className="input-with-actions">
+            <div className="input-with-actions search-and-add-customer">
               <input
                 id="customer"
                 type="text"
@@ -1849,11 +1883,11 @@ const  prefillFormData = async (data) => {
                 onClick={() => openSearch()}
                 readOnly
               />
-              {/* search button removed per request */}
-              <button onClick={() => addUserNavigate()} className="btn-icon btn-add">
+              <button type="button" className="btn btn-customer" title="Create Customer" onClick={addUserNavigate}>
                 <IoMdAdd />
               </button>
             </div>
+
           </div>
 
           <div className="form-group">
@@ -1881,11 +1915,18 @@ const  prefillFormData = async (data) => {
         <div className="form-row">
           <div className="form-group left-start">
             <label htmlFor="copyFrom">Copy from :</label>
-            <select id="copyFrom" className="form-control">
-              <option value="none">None</option>
-              <option value="earlier">Earlier Quotations</option>
-              <option value="templates">Saved Templates</option>
-            </select>
+            {isEditMode ? (
+              // read-only in edit mode
+              <div className="form-control" style={{ background: '#f5f5f5', cursor: 'not-allowed' }}>
+                None
+              </div>
+            ) : (
+              <select id="copyFrom" className="form-control">
+                <option value="none">None</option>
+                <option value="earlier">Earlier Quotations</option>
+                <option value="templates">Saved Templates</option>
+              </select>
+            )}
           </div>
 
           <div className="form-group">
@@ -1895,6 +1936,8 @@ const  prefillFormData = async (data) => {
               className="form-control"
               value={selectedSeries}
               onChange={(e) => handleOnChangeSeriesSelect(e)}
+              disabled={isEditMode}
+              title={isEditMode ? 'Series cannot be changed in edit mode' : ''}
             >
               <option value="">Select</option>
               {seriesList && seriesList.length > 0 && seriesList.map(s => (
@@ -2120,66 +2163,77 @@ const  prefillFormData = async (data) => {
             
             <div className="form-field-vertical">
               <label>Quotation No. :</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ color: '#333' }}>{/* prefix and series */}
-                  {selectedSeries ? (() => {
-                    const s = seriesList.find(x => String(x.id) === String(selectedSeries));
-                    const p = s?.prefix || 'QTN';
-                    const pn = s?.prefix_number || '';
-                    return `${p}/${pn}`;
-                  })() : null}
-                </div>
-
-                {/* If series selected show prefix / seq / year, else show only the number input */}
-                {selectedSeries ? (
-                  <>
-                    <div>/</div>
-                    <input
-                      id="quotationSeq"
-                      type="text"
-                      className="form-control"
-                      style={{ width: '80px' }}
-                      value={seqNumber}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '');
-                        setSeqNumber(v);
-                        // rebuild full qutationNo
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {!isEditMode && (
+                    <div style={{ color: '#333' }}>{/* prefix and series */}
+                      {selectedSeries ? (() => {
                         const s = seriesList.find(x => String(x.id) === String(selectedSeries));
                         const p = s?.prefix || 'QTN';
                         const pn = s?.prefix_number || '';
-                        const yr = yearRange || (() => {
-                          const d = new Date(); const y = d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}`;
-                        })();
-                        setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
-                      }}
-                      placeholder="###"
-                    />
-                    <div>/</div>
-                    <div style={{ color: '#333' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      id="quotationSeq"
-                      type="text"
-                      className="form-control"
-                      style={{ width: '160px' }}
-                      value={seqNumber}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '');
-                        setSeqNumber(v);
-                        setQutationNo(v);
-                      }}
-                      placeholder="Quotation No."
-                    />
-                  </>
+                        return `${p}/${pn}`;
+                      })() : null}
+                    </div>
+                  )}
+
+                  {/* If editing, show full quotation number as read-only; otherwise render inputs */}
+                  {isEditMode ? (
+                    <div style={{ padding: '6px 8px', background: '#f5f5f5', borderRadius: 4, fontWeight: 600}}>
+                      {qutationNo || quotationData?.quotation_number || ''}
+                    </div>
+                  ) : (
+                    // render interactive inputs when creating
+                    selectedSeries ? (
+                      <>
+                        <input
+                          id="quotationSeq"
+                          type="text"
+                          className="form-control"
+                          style={{ width: '48px' }}
+                          value={seqNumber}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9]/g, '');
+                            setSeqNumber(v);
+                            // rebuild full qutationNo
+                            const s = seriesList.find(x => String(x.id) === String(selectedSeries));
+                            const p = s?.prefix || 'QTN';
+                            const pn = s?.prefix_number || '';
+                            const yr = yearRange || (() => {
+                              const d = new Date(); const y = d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}`;
+                            })();
+                            setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
+                          }}
+                          placeholder="###"
+                        />
+                        <div>/</div>
+                        <div style={{ color: '#333' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          id="quotationSeq"
+                          type="text"
+                          className="form-control"
+                          style={{ width: '60px' }}
+                          value={seqNumber}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9]/g, '');
+                            setSeqNumber(v);
+                            setQutationNo(v);
+                          }}
+                          placeholder="Quotation No."
+                        />
+                      </>
+                    )
+                  )}
+                </div>
+
+                {prevQutationNo && (
+                  <small style={{ color: '#666', fontSize: '12px', marginTop: '2px', display: 'block' }}>
+                    Prev: {prevQutationNo}
+                  </small>
                 )}
               </div>
-              {prevQutationNo && (
-                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                  Prev: {prevQutationNo}
-                </small>
-              )}
             </div>
 
             <div className="form-field-vertical">
@@ -2358,18 +2412,7 @@ const  prefillFormData = async (data) => {
         </div>
       </td>
       <td>
-        <input
-          type="text"
-          className="form-control input-small"
-          value={item.unit}
-          onChange={(e) =>
-            setTableItems((prev) => {
-              const newItems = [...prev];
-              newItems[index].unit = e.target.value;
-              return newItems;
-            })
-          }
-        />
+        <span>{item.unit || '-'}</span>
       </td>
       <td>
         <input
@@ -2715,13 +2758,13 @@ const  prefillFormData = async (data) => {
                           <button className="btn-action btn-delete" title="Delete charge" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>
                             🗑
                           </button>
-                          <span>{c.title} ({c.type === "percent" ? `${Math.round(c.value)}%` : `₹${c.value}`})</span>
+                          <span>{c.title} ({c.type === "percent" ? `${Math.round(Number(c.value) || 0)}%` : `₹${Number(c.value) || 0}`})</span>
                         </div>
                         <span>
                           ₹{" "}
                           {c.type === "percent"
-                            ? ((grandTotal * c.value) / 100).toFixed(2)
-                            : c.value.toFixed(2)}
+                            ? ((grandTotal * (Number(c.value) || 0)) / 100).toFixed(2)
+                            : (Number(c.value) || 0).toFixed(2)}
                         </span>
                       </div>
                     ))}
@@ -2739,13 +2782,13 @@ const  prefillFormData = async (data) => {
                           <button className="btn-action btn-delete" title="Delete discount" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>
                             🗑
                           </button>
-                          <span>{d.title} ({d.type === "percent" ? `${Math.round(d.value)}%` : `₹${d.value}`})</span>
+                          <span>{d.title} ({d.type === "percent" ? `${Math.round(Number(d.value) || 0)}%` : `₹${Number(d.value) || 0}`})</span>
                         </div>
                         <span>
                           - ₹{" "}
                           {d.type === "percent"
-                            ? ((grandTotal * d.value) / 100).toFixed(2)
-                            : d.value.toFixed(2)}
+                            ? ((grandTotal * (Number(d.value) || 0)) / 100).toFixed(2)
+                            : (Number(d.value) || 0).toFixed(2)}
                         </span>
                       </div>
                     ))}
@@ -3448,11 +3491,11 @@ const  prefillFormData = async (data) => {
       {additiondiscounts.map((ds, i) => (
         <div key={i} className="flex-gap-8">
           <input className="form-control" placeholder="Title" value={ds.title} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, title: e.target.value } : d))} />
-          <select className="form-control select-width-120" value={ds.type} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, type: e.target.value } : d))}>
+          <select className="form-control select-width-120" value={ds.type} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, type: e.target.value, value: sanitizeNumericValue(d.value) } : d))}>
             <option value="percent">%</option>
             <option value="item">₹</option>
           </select>
-          <input className="form-control" type="number" placeholder="Amount" value={ds.value} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, value: Number(e.target.value) } : d))} />
+          <input className="form-control" type="number" placeholder="Amount" value={ds.value} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, value: e.target.value === '' ? '' : Number(e.target.value) } : d))} />
           <button className="btn btn-danger" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
         </div>
       ))}

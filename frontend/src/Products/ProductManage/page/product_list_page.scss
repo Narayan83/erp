@@ -31,6 +31,31 @@ td.MuiTableCell-root.sl-filter {
   white-space: nowrap !important;
 }
 
+.MuiTable-root th:nth-child(4), .MuiTable-root td:nth-child(4) {
+    min-width: 160px !important; /* Code column */
+}
+
+.MuiTable-root th:nth-child(3), .MuiTable-root td:nth-child(3) {
+    min-width: 280px !important; /* Name column */
+}
+
+.MuiTable-root th:nth-child(11), .MuiTable-root td:nth-child(11) {
+    min-width: 140px !important; /* minimum stock column */
+}
+
+.MuiTable-root th:nth-child(13), .MuiTable-root td:nth-child(13) {
+    min-width: 160px !important; /* lead time column */
+}
+
+.MuiTable-root th:nth-child(23), .MuiTable-root td:nth-child(23) {
+    min-width: 180px !important; /* purchase column */
+}
+
+.MuiTable-root th:nth-child(24), .MuiTable-root td:nth-child(24) {
+    min-width: 160px !important; /* sales column */
+}
+
+
 /* stronger header bottom and row separators for clarity */
 table thead th,
 table thead td,
@@ -168,6 +193,31 @@ table tbody tr td {
     overflow-y: auto;
     border-radius: 6px;
     padding: 6px 4px;
+    /* Use a thin, subtle scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  }
+
+  /* WebKit scrollbar styling */
+  .filter-dropdown::-webkit-scrollbar,
+  .MuiAutocomplete-listbox::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .filter-dropdown::-webkit-scrollbar-thumb,
+  .MuiAutocomplete-listbox::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 3px;
+  }
+  .filter-dropdown::-webkit-scrollbar-track,
+  .MuiAutocomplete-listbox::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Firefox scrollbar hint */
+  .MuiAutocomplete-listbox {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
   }
 
   .filter-dropdown-item {
@@ -500,15 +550,18 @@ table tbody tr td {
       }
       thead th:nth-child(3),
       tbody td:nth-child(3) {
-        width: 170px;
+        /* Name column: slightly wider to give more space */
+        width: 220px;
       }
       thead th:nth-child(4),
       tbody td:nth-child(4) {
-        width: 140px;
+        /* Code column: increased width to avoid truncation */
+        width: 240px;
       }
       thead th:nth-child(5),
       tbody td:nth-child(5) {
-        width: 100px;
+        /* Category column adjusted to balance layout */
+        width: 160px;
       }
       thead th:nth-child(6),
       tbody td:nth-child(6) {
@@ -532,7 +585,7 @@ table tbody tr td {
       }
       thead th:nth-child(11),
       tbody td:nth-child(11) {
-        width: 110px;
+        width: 150px !important;
       }
 
       tbody {

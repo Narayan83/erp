@@ -1,8 +1,8 @@
 import { useForm } from "react-hook-form";
 import { useEffect, useState, useCallback, useRef } from "react";
-import Cropper from 'react-easy-crop';
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config"; // adjust if needed
+import ImageEditor from "./ImageEditor";
 import "./variantformdialog.scss";
 
 export default function VariantFormDialog({ open, onClose, onSave, initialData = null, sizes = [] }) {
@@ -29,15 +29,79 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
   const colorWrapperRef = useRef(null);
   const [selectedSize, setSelectedSize] = useState('');
-  const [cropDialogOpen, setCropDialogOpen] = useState(false);
-  const [cropSrc, setCropSrc] = useState(null);
-  const [cropIndex, setCropIndex] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [mainImageIndex, setMainImageIndex] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // Image editor integration
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingSrc, setEditingSrc] = useState(null);
+  const [originalEditSrc, setOriginalEditSrc] = useState(null);
+
+  const openEditorForImage = (index) => {
+    setEditingIndex(index);
+    const src = imageFiles[index]?.preview || null;
+    setEditingSrc(src);
+    setOriginalEditSrc(src);
+    setEditorOpen(true);
+  };
+
+  const dataURLtoFile = async (dataUrl, filename) => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: blob.type });
+  };
+
+  const handleEditedSave = async (payload) => {
+    if (editingIndex == null) return;
+    const idx = editingIndex;
+    const filename = imageFiles[idx]?.name ? `edited_${imageFiles[idx].name}` : `edited_${Date.now()}.png`;
+
+    // payload may be a string (legacy) or object { css, hi }
+    const previewDataUrl = typeof payload === 'string' ? payload : (payload && payload.css) ? payload.css : null;
+    const uploadDataUrl = typeof payload === 'string' ? payload : (payload && payload.hi) ? payload.hi : previewDataUrl;
+
+    try {
+      const file = await dataURLtoFile(uploadDataUrl, filename);
+      setImageFiles(prev => {
+        const copy = [...prev];
+        const prevEntry = copy[idx];
+        if (prevEntry && prevEntry.file && prevEntry.preview) {
+          try { URL.revokeObjectURL(prevEntry.preview); } catch(e) {}
+        }
+        copy[idx] = { file, preview: previewDataUrl || uploadDataUrl, original: originalEditSrc, name: file.name };
+        setImagesPreview(prev => {
+          const newPrev = [...prev];
+          newPrev[idx] = previewDataUrl || uploadDataUrl;
+          return newPrev;
+        });
+        return copy;
+      });
+    } catch (e) {
+      console.error("Failed to convert edited image", e);
+    } finally {
+      setEditorOpen(false);
+      setEditingIndex(null);
+      setEditingSrc(null);
+      setOriginalEditSrc(null);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    handleImageUpload(e);
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
+    setImageFiles(prev => {
+      const result = [...prev, ...newFiles];
+      if (mainImageIndex == null && result.length > 0) setMainImageIndex(0);
+      return result;
+    });
+    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
+  }; 
 
   useEffect(() => {
     if (!open) return;
@@ -71,9 +135,11 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const initFiles = (initialData.images || []).map(img => {
         if (typeof img === 'string') {
           const normalized = img.replace(/\\/g, '/');
-          const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
+          let displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
             ? normalized
             : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+          // Add cache-busting query so edits immediately reflect in the UI
+          displayUrl = displayUrl.includes('?') ? `${displayUrl}&t=${Date.now()}` : `${displayUrl}?t=${Date.now()}`;
           return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
         }
         return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
@@ -138,124 +204,8 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
     const generateSku = () => `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     const skuValue = data.sku && String(data.sku).trim() !== '' ? data.sku : generateSku();
     
-    const formData = {
-      // keep raw data but normalize a few fields
-      sku: skuValue,
-      barcode: data.barcode || '',
-      purchaseCost: sanitizeNumber(data.purchaseCost),
-      stdSalesPrice: sanitizeNumber(data.stdSalesPrice),
-      stock: sanitizeNumber(data.stock),
-      leadTime: sanitizeNumber(data.leadTime),
-      size: selectedSize || '',
-      color: selectedColor?.value || '',
-      images, // mixture of strings (existing) and File objects (new)
-      files, // only File objects for convenience
-      mainImage: mainImageIndex != null ? images[mainImageIndex] : null,
-      mainImageIndex: mainImageIndex,
-      isActive: !!data.isActive,
-    };
-
-    try {
-      onSave(formData);
-      
-      // cleanup object URLs
-      imageFiles.forEach(entry => {
-        try { if (entry.preview && entry.file) URL.revokeObjectURL(entry.preview); } catch (e) {}
-      });
-      reset();
-      setImageFiles([]);
-      setImagesPreview([]);
-      setSelectedColor(null);
-      setSelectedSize('');
-    } catch (error) {
-      console.error("Error saving variant:", error);
-      setErrorMessage("Failed to save variant. Please try again.");
-      setSnackbarOpen(true);
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    // Create entries: always store file; preview is an object URL (useful for images) for all files
-    const newFiles = files.map((file) => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
-    setImageFiles(prev => {
-      const result = [...prev, ...newFiles];
-      // if no main image selected yet, set first uploaded as main
-      if (mainImageIndex == null && result.length > 0) {
-        setMainImageIndex(0);
-      }
-      return result;
-    });
-    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
-  };
-
-  const openCropDialog = (index) => {
-    const entry = imageFiles[index];
-    if (!entry) return;
-    // Allow cropping for both newly uploaded File entries and existing image URLs
-    const isImage = entry.preview && (entry.file ? (entry.file.type && entry.file.type.startsWith('image/')) : (/\.(jpg|jpeg|png|gif|webp)$/i.test(entry.preview) || entry.preview.startsWith('data:')));
-    if (!isImage) return;
-    setCropIndex(index);
-    setCropSrc(entry.preview);
-    setCropDialogOpen(true);
-  };
-
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  // helper to create a cropped file from image and area
-  const getCroppedImg = async (imageSrc, pixelCrop) => {
-    try {
-      // fetch image as blob (works for object URLs, data URLs, and remote URLs)
-      const resp = await fetch(imageSrc);
-      const blob = await resp.blob();
-      const imageBitmap = await createImageBitmap(blob);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(pixelCrop.width));
-      canvas.height = Math.max(1, Math.round(pixelCrop.height));
-      const ctx = canvas.getContext('2d');
-
-      ctx.drawImage(
-        imageBitmap,
-        Math.round(pixelCrop.x),
-        Math.round(pixelCrop.y),
-        Math.round(pixelCrop.width),
-        Math.round(pixelCrop.height),
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      return await new Promise((resolve) => {
-        canvas.toBlob((outBlob) => {
-          if (!outBlob) return resolve(null);
-          const file = new File([outBlob], `cropped_${Date.now()}.png`, { type: outBlob.type });
-          resolve(file);
-        }, 'image/png');
-      });
-    } catch (err) {
-      console.error('getCroppedImg error', err);
-      return null;
-    }
-  };
-
-  const applyCrop = async () => {
-    if (cropIndex == null || !croppedAreaPixels) return;
-    const src = imageFiles[cropIndex].preview;
-    const croppedFile = await getCroppedImg(src, croppedAreaPixels);
-    if (croppedFile) {
-      const newEntry = { file: croppedFile, preview: URL.createObjectURL(croppedFile) };
-      setImageFiles(prev => prev.map((it, idx) => idx === cropIndex ? newEntry : it));
-      setImagesPreview(prev => prev.map((p, idx) => idx === cropIndex ? newEntry.preview : p));
-    }
-    setCropDialogOpen(false);
-    setCropIndex(null);
-    setCropSrc(null);
-    setZoom(1);
-  };
+  
+  
 
   const removeImage = (index) => {
     // revoke objectURL if present and was a File
@@ -503,7 +453,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
     <div className="variant-form-dialog">
       {/* Dialog Overlay and Background */}
       {open && (
-        <div className="crop-dialog-overlay" onClick={onClose}>
+        <div className="dialog-overlay" onClick={onClose}>
           <div className="dialog-wrapper" onClick={(e) => e.stopPropagation()}>
             <div className="dialog-header">
               <h2>{initialData ? "Edit Variant" : "Add Variant"}</h2>
@@ -659,15 +609,13 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                           )}
 
                           <div className="image-actions">
-                            {isImage && entry.file && (
-                              <button
-                                type="button"
-                                className="image-action-btn edit-btn"
-                                onClick={() => openCropDialog(i)}
-                              >
-                                Edit
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="image-action-btn edit-btn"
+                              onClick={() => openEditorForImage(i)}
+                            >
+                              Edit
+                            </button>
                             <button
                               type="button"
                               className="image-action-btn remove-btn"
@@ -675,7 +623,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                             >
                               Remove
                             </button>
-                          </div>
+                          </div> 
                           <div className="image-name">
                             {entry.name || (entry.file && entry.file.name)}
                           </div>
@@ -685,70 +633,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                   </div>
                 </div>
 
-                {/* Crop dialog */}
-                {cropDialogOpen && (
-                  <div className="crop-dialog-overlay" onClick={() => setCropDialogOpen(false)}>
-                    <div className="crop-dialog" onClick={(e) => e.stopPropagation()}>
-                      <div className="crop-header">
-                        <div className="crop-title">Edit Image</div>
-                        <button
-                          type="button"
-                          className="close-btn"
-                          onClick={() => setCropDialogOpen(false)}
-                          aria-label="close"
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <div className="crop-content">
-                          {cropSrc && (
-                            <div style={{ position: 'relative', width: '100%', height: '60vh', maxHeight: 600 }}>
-                              <Cropper
-                                image={cropSrc}
-                                crop={crop}
-                                zoom={zoom}
-                                aspect={1}
-                                minZoom={0.1}
-                                maxZoom={3}
-                                onCropChange={setCrop}
-                                onZoomChange={setZoom}
-                                onCropComplete={onCropComplete}
-                              />
-                            </div>
-                          )}
-                      </div>
-                      <div className="crop-actions">
-                        <div className="zoom-slider">
-                          <label>Zoom</label>
-                          <input
-                            type="range"
-                            min="0.1"
-                            max="3"
-                            step="0.1"
-                            value={zoom}
-                            onChange={(e) => setZoom(parseFloat(e.target.value))}
-                          />
-                        </div>
-                        <div className="button-group">
-                          <button
-                            type="button"
-                            className="cancel-btn"
-                            onClick={() => setCropDialogOpen(false)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="apply-btn"
-                            onClick={applyCrop}
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                
 
                 <div className="form-field col-33">
                   <div className="checkbox-wrapper">
@@ -779,11 +664,14 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
                 </button>
               </div>
             </form>
-            
+
+            {/* Image editor modal */}
+            <ImageEditor open={editorOpen} initialSrc={editingSrc} onSave={handleEditedSave} onClose={() => setEditorOpen(false)} />
+
           </div>
         </div>
       )}
     </div>
   );
 }
-
+}

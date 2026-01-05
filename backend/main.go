@@ -61,8 +61,28 @@ func main() {
 	// set up fiber
 	app := fiber.New()
 
-	// Enable CORS
+	// Enable CORS (default)
 	app.Use(cors.New())
+
+	// Ensure CORS headers are present on ALL responses (including 304 responses from static files)
+	app.Use(func(c *fiber.Ctx) error {
+		// Handle preflight immediately
+		if c.Method() == "OPTIONS" {
+			c.Set("Access-Control-Allow-Origin", "*")
+			c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+			c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+
+		// Proceed to next handler
+		err := c.Next()
+
+		// Ensure the headers are always set on the response (covers static 304 responses)
+		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+		return err
+	})
 
 	//ADDING STATIC LINKING TO IMAGE
 	app.Static("/uploads", "./uploads")

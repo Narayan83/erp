@@ -6,16 +6,9 @@ import {
   Grid,
   TextField,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   IconButton,
   CircularProgress,
-  TablePagination,
   
   Tooltip,
   Dialog,
@@ -142,65 +135,65 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
     };
 
     return (
-    <TableCell 
-      onClick={() => !editing && setEditing(true)}
-      sx={{ ...baseSx, ...cellSx }}
-    >
-      {editing ? (
-        options ? (
-          <Select
-            autoFocus
-            fullWidth
-            size="small"
-            multiple={isMultiple}
-            value={editValue || (isMultiple ? [] : "")}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={() => {
-              // For multiple, convert array to comma-separated string before saving
-              if (isMultiple && Array.isArray(editValue)) {
-                onUpdate(rowIndex, columnKey, editValue.join(','));
-              } else {
-                onUpdate(rowIndex, columnKey, editValue);
-              }
-              setEditing(false);
-            }}
-            renderValue={(selected) => {
-              if (isMultiple && Array.isArray(selected)) return selected.join(', ');
-              return selected;
-            }}
-            sx={{ margin: '-8px 0' }}
-          >
-            {options.map((option) => (
-              <MenuItem key={option} value={option}>
-                {isMultiple ? (
-                  <>
-                    <Checkbox checked={Array.isArray(editValue) ? editValue.indexOf(option) > -1 : false} />
-                    <ListItemText primary={option} />
-                  </>
-                ) : (
-                  option
-                )}
-              </MenuItem>
-            ))}
-          </Select>
+      <td
+        className={`editable-cell ${columnClass || ''} ${error ? 'has-error' : ''}`}
+        onClick={() => !editing && setEditing(true)}
+      >
+        {editing ? (
+          options ? (
+            <Select
+              autoFocus
+              fullWidth
+              size="small"
+              multiple={isMultiple}
+              value={editValue || (isMultiple ? [] : "")}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={() => {
+                // For multiple, convert array to comma-separated string before saving
+                if (isMultiple && Array.isArray(editValue)) {
+                  onUpdate(rowIndex, columnKey, editValue.join(','));
+                } else {
+                  onUpdate(rowIndex, columnKey, editValue);
+                }
+                setEditing(false);
+              }}
+              renderValue={(selected) => {
+                if (isMultiple && Array.isArray(selected)) return selected.join(', ');
+                return selected;
+              }}
+              sx={{ margin: '-8px 0' }}
+            >
+              {options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {isMultiple ? (
+                    <>
+                      <Checkbox checked={Array.isArray(editValue) ? editValue.indexOf(option) > -1 : false} />
+                      <ListItemText primary={option} />
+                    </>
+                  ) : (
+                    option
+                  )}
+                </MenuItem>
+              ))}
+            </Select>
+          ) : (
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              variant="outlined"
+              value={editValue || ""}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleSave}
+              sx={{ margin: '-8px 0' }}
+            />
+          )
         ) : (
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            variant="outlined"
-            value={editValue || ""}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleSave}
-            sx={{ margin: '-8px 0' }}
-          />
-        )
-      ) : (
-        value
-      )}
-    </TableCell>
-  );
+          value
+        )}
+      </td>
+    );
 };
 
 export default function UserListPage() {
@@ -239,7 +232,7 @@ export default function UserListPage() {
     "Address3",
     "City",
     "State",
-    "Country",
+    "Permanent Country",
     "Pincode",
     // Business Information
     "BusinessName",
@@ -1761,25 +1754,27 @@ const getUserDisplayName = (u) => {
 
       <Paper>
         {loading ? (
-          <Box p={3} textAlign="center">
-            <CircularProgress />
-          </Box>
+          <div className="loading-container">
+            <CircularProgress size={40} />
+          </div>
         ) : users.length === 0 ? (
-          <Box p={3} textAlign="center">No users found.</Box>
+          <div className="empty-container">
+            <Typography variant="body1">No users found.</Typography>
+          </div>
         ) : (
-          <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
-            <Table size="small" sx={{ width: '100%', tableLayout: 'auto' }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
+          <div className="user-table-wrapper">
+            <table className="user-table">
+              <thead>
+                <tr>
+                  <th className="checkbox-col">
+                    <input
+                      type="checkbox"
                       checked={users.length > 0 && selectedIds.length === users.length}
-                      indeterminate={selectedIds.length > 0 && selectedIds.length < users.length}
                       onChange={handleToggleSelectAll}
-                      size="small"
+                      aria-label="Select all users"
                     />
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>S.No</TableCell>
+                  </th>
+                  <th className="sno-col">S.No</th>
                   {(() => {
                     const visibleFields = userFields.filter(field => checkedFields.includes(field));
                     const accountTypeFields = ['IsCustomer', 'IsSupplier', 'IsDealer', 'IsDistributor'];
@@ -1787,38 +1782,38 @@ const getUserDisplayName = (u) => {
                     const headerFields = visibleFields.filter(f => !accountTypeFields.includes(f));
                     return (
                       <>
-                        {headerFields.map((field) => (
-                          <TableCell key={field} sx={{ fontWeight: 'bold', minWidth: getMinWidth(field) }}>{field}</TableCell>
-                        ))}
+                        {headerFields.map((field) => {
+                          const colClass = `col-${_normalizeKey(field)}`;
+                          return <th key={field} className={`data-col ${colClass}`}>{field}</th>;
+                        })}
                         {showAccountType && (
-                          <TableCell key="AccountType" sx={{ fontWeight: 'bold', minWidth: 160 }}>Account Type</TableCell>
-                        )}
+                          <th key="AccountType" className={`data-col col-accounttype`}>Account Type</th>
+                        )} 
                       </>
                     );
                   })()}
                   {checkedFields.length > 0 && (
-                    <TableCell sx={{ fontWeight: 'bold', minWidth: 140 }} align="center">Actions</TableCell>
+                    <th className="actions-col">Actions</th>
                   )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
+                </tr>
+              </thead>
+              <tbody>
                 {users.map((user, index) => (
-                  <TableRow
+                  <tr
                     key={user.id}
-                    selected={selectedIds.includes(user.id)}
-                    hover
-                    sx={{ cursor: 'pointer' }}
+                    className={`user-row ${selectedIds.includes(user.id) ? 'selected' : ''}`}
                     onClick={() => { setSelectedUser(user); setViewDialogOpen(true); }}
                   >
-                    <TableCell padding="checkbox">
-                      <Checkbox
+                    <td className="checkbox-col">
+                      <input
+                        type="checkbox"
                         checked={selectedIds.includes(user.id)}
                         onChange={() => handleToggleSelect(user.id)}
                         onClick={(e) => e.stopPropagation()}
-                        size="small"
+                        aria-label={`Select ${user.firstname}`}
                       />
-                    </TableCell>
-                    <TableCell>{page * limit + index + 1}</TableCell>
+                    </td>
+                    <td className="sno-col">{page * limit + index + 1}</td>
                     {(() => {
                       const visibleFields = userFields.filter(field => checkedFields.includes(field));
                       const accountTypeFields = ['IsCustomer', 'IsSupplier', 'IsDealer', 'IsDistributor'];
@@ -1827,14 +1822,9 @@ const getUserDisplayName = (u) => {
                       return (
                         <>
                           {headerFields.map((field, hfIndex) => (
-                            <TableCell
+                            <td
                               key={`${field}-${hfIndex}`}
-                              sx={{
-                                minWidth: getMinWidth(field),
-                                whiteSpace: ['Name', 'User Code', 'Email', 'MobileNumber', 'Country', 'Permanent Country', 'Pincode'].includes(field) ? 'nowrap' : 'normal',
-                                overflow: ['Name', 'User Code', 'Email', 'MobileNumber', 'Country', 'Permanent Country', 'Pincode'].includes(field) ? 'hidden' : 'visible',
-                                textOverflow: ['Name', 'User Code', 'Email', 'MobileNumber', 'Country', 'Permanent Country', 'Pincode'].includes(field) ? 'ellipsis' : 'clip'
-                              }}
+                              className={`data-col col-${_normalizeKey(field)}`}
                             >
                               {renderHighlighted(
                                 field === 'User Code'
@@ -1902,11 +1892,27 @@ const getUserDisplayName = (u) => {
                                     return docs.map((d, idx) => {
                                       const type = d.doc_type || d.type || '';
                                       const docNo = d.doc_number || d.number || d.doc_no || '';
-                                      const file = d.file_name || d.file_url || d.url || d.file_path || '';
+                                      const rawUrl = d.file_url || d.url || d.file_path || d.file || d.filePath || d.path || null;
+                                      const fileName = d.file_name || d.fileName || d.name || (rawUrl ? String(rawUrl).split('/').pop() : '');
+                                      const url = rawUrl ? (String(rawUrl).startsWith('http') ? rawUrl : `${BASE_URL.replace(/\/$/, '')}/${String(rawUrl).replace(/^\.\//, '').replace(/^\/+/, '')}`) : null;
                                       return (
                                         <div key={idx} style={{ marginBottom: 8 }}>
                                           <div><b>Type:</b> {type}{docNo ? (<span style={{ marginLeft: 8 }}><b>No:</b> {docNo}</span>) : null}</div>
-                                          <div style={{ whiteSpace: 'pre-wrap' }}>{file}</div>
+                                          <div>
+                                            {url ? (
+                                              <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => { e.stopPropagation(); }}
+                                                title="Open document in new tab"
+                                              >
+                                                {fileName || rawUrl}
+                                              </a>
+                                            ) : (
+                                              <span style={{ whiteSpace: 'pre-wrap' }}>{fileName || rawUrl || ''}</span>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     });
@@ -1979,10 +1985,10 @@ const getUserDisplayName = (u) => {
                                   )
                                 : ''
                               )}
-                            </TableCell>
+                            </td>
                           ))}
                           {showAccountType && (
-                            <TableCell sx={{ minWidth: 160 }}>
+                            <td className="data-col" style={{ minWidth: '160px' }}>
                               {(() => {
                                 const types = [];
                                 if (user.is_customer) types.push('Customer');
@@ -1991,13 +1997,17 @@ const getUserDisplayName = (u) => {
                                 if (user.is_distributor) types.push('Distributor');
                                 return types.length > 0 ? types.join(', ') : 'No';
                               })()}
-                            </TableCell>
+                            </td>
                           )}
                           {checkedFields.length > 0 && (
-                            <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                            <td className="actions-col">
+                              <div className="action-buttons">
                               <Tooltip title="View">
-                                <IconButton
-                                  onClick={async () => {
+                                <button
+                                  type="button"
+                                  className="action-btn view-btn"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
                                     setViewDialogOpen(true);
                                     try {
                                       const res = await axios.get(`${BASE_URL}/api/users/${user.id}`);
@@ -2010,79 +2020,89 @@ const getUserDisplayName = (u) => {
                                       setSelectedUser(user);
                                     }
                                   }}
+                                  aria-label="View user"
                                 >
                                   <Visibility />
-                                </IconButton>
+                                </button>
                               </Tooltip>
-                              <Tooltip title="Edit"><IconButton onClick={() => navigate(`/users/${user.id}/edit`)}><Edit /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }}><Delete /></IconButton></Tooltip>
+                              <Tooltip title="Edit"><button type="button" className="action-btn edit-btn" onClick={(e) => { e.stopPropagation(); navigate(`/users/${user.id}/edit`); }} aria-label="Edit user"><Edit /></button></Tooltip>
+                              <Tooltip title="Delete"><button type="button" className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }} aria-label="Delete user"><Delete /></button></Tooltip>
                               {/* WhatsApp: prefer whatsapp_number, fallback to mobile_number. Use wa.me with digits-only number */}
                               {((user.whatsapp_number || user.mobile_number) && (user.whatsapp_number || user.mobile_number).toString().trim() !== '') ? (
                                 <Tooltip title="WhatsApp">
-                                  <IconButton
-                                    component="a"
+                                  <a
                                     href={`https://wa.me/${String(user.whatsapp_number || user.mobile_number).replace(/\D/g, '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    className="action-btn whatsapp-btn"
                                   >
                                     <WhatsApp />
-                                  </IconButton>
+                                  </a>
                                 </Tooltip>
-                              ) : (
-                                // Tooltip does not show on disabled elements, so wrap in a span
-                                <Tooltip title="WhatsApp">
-                                  <span style={{ display: 'inline-block' }}>
-                                    <IconButton disabled>
-                                      <WhatsApp />
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              )}
+                              ) : null}
 
                               {/* Mail: use mailto: if email exists */}
                               {user.email ? (
                                 <Tooltip title="Mail">
-                                  <IconButton
-                                    component="a"
+                                  <a
                                     href={`mailto:${user.email}`}
+                                    className="action-btn mail-btn"
                                   >
                                     <Mail />
-                                  </IconButton>
+                                  </a>
                                 </Tooltip>
-                              ) : (
-                                <Tooltip title="Mail">
-                                  <span style={{ display: 'inline-block' }}>
-                                    <IconButton disabled>
-                                      <Mail />
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              )}
-                            </TableCell>
+                              ) : null}
+                              </div>
+                            </td>
                           )}
                         </>
                       );
                     })()}
-                  </TableRow>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </tbody>
+            </table>
+          </div>
         )}
-        <Box p={2} display="flex" justifyContent="flex-end" alignItems="center">
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            rowsPerPage={limit}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            rowsPerPageOptions={[5, 10, 25]}
-          />
-        </Box>
+        <div className="table-pagination">
+          <div className="pagination-info">
+            Showing {users.length === 0 ? 0 : page * limit + 1} to {Math.min((page + 1) * limit, totalItems)} of {totalItems} users
+          </div>
+          <div className="pagination-controls">
+            <select 
+              value={limit} 
+              onChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              className="rows-per-page"
+              aria-label="Select rows per page"
+            >
+              <option value={5}>5 per page</option>
+              <option value={10}>10 per page</option>
+              <option value={25}>25 per page</option>
+            </select>
+            <div className="pagination-buttons">
+              <button
+                className="pagination-btn"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 0}
+                aria-label="Previous page"
+              >
+                ← Previous
+              </button>
+              <span className="page-number">Page {page + 1} of {Math.ceil(totalItems / limit)}</span>
+              <button
+                className="pagination-btn"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= Math.ceil(totalItems / limit) - 1}
+                aria-label="Next page"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
       </Paper>
     {/* Display Preferences Dialog */}
   <Dialog open={displayPrefOpen} onClose={handleDisplayPrefClose} maxWidth="lg" fullWidth sx={{ '& .MuiDialog-paper': { width: '90%', maxWidth: 1200 } }}>
@@ -2556,8 +2576,9 @@ const getUserDisplayName = (u) => {
                 <div className="user-details-section">
                   <h3 className="section-title">Additional Addresses</h3>
                   {Array.isArray(selectedUser.addresses) && selectedUser.addresses.filter(a => a.title !== 'Permanent').length > 0 ? (
-                    selectedUser.addresses.filter(a => a.title !== 'Permanent').map((addr, idx) => (
-                      <div key={idx} className="address-block">
+                    <div className="addresses-horizontal-container">
+                      {selectedUser.addresses.filter(a => a.title !== 'Permanent').map((addr, idx) => (
+                        <div key={idx} className="address-block">
                         <h4 className="address-title">
                           Additional Address {String(idx + 1).padStart(2, '0')}
                         </h4>
@@ -2613,7 +2634,8 @@ const getUserDisplayName = (u) => {
                           })()}
                         </div>
                       </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
                     <p className="no-data-message">No additional addresses</p>
                   )}
@@ -2741,7 +2763,7 @@ const getUserDisplayName = (u) => {
                                 <>
                                   <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
                                     <button type="button" title={`View ${docType}`}>
-                                      👁️
+                                      <Visibility />
                                     </button>
                                   </a>
                                   <button type="button" title={`Download ${docType}`} onClick={(e) => {
@@ -2754,12 +2776,12 @@ const getUserDisplayName = (u) => {
                                     a.click();
                                     a.remove();
                                   }}>
-                                    ⬇️
+                                    <FileDownload />
                                   </button>
                                 </>
                               ) : (
                                 <button type="button" disabled title="No file available">
-                                  👁️
+                                  <Visibility />
                                 </button>
                               )}
                             </div>
@@ -2794,7 +2816,7 @@ const getUserDisplayName = (u) => {
                           onClick={() => setShowPassword(!showPassword)}
                           title={showPassword ? "Hide password" : "Show password"}
                         >
-                          {showPassword ? '🙈' : '👁️'}
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
                         </button>
                       )}
                       {!selectedUser.plain_password && (
@@ -2926,11 +2948,11 @@ const getUserDisplayName = (u) => {
             Review and edit the data before finalizing the import. Click on any cell to edit directly in the table.
           </Typography>
           
-          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ width: 60 }}>
+          <div className="import-preview-table-wrapper">
+            <table className="import-preview-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '60px' }}>
                     <Checkbox
                       size="small"
                       checked={importedData.length > 0 && importSelectedRows.size === importedData.length}
@@ -2943,8 +2965,8 @@ const getUserDisplayName = (u) => {
                         }
                       }}
                     />
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
+                  </th>
+                  <th style={{ fontWeight: 'bold' }}>No.</th>
                   {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
                     const cleanHeader = String(header).replace(/\s*\*\s*$/g, '');
                     const normalizedHeader = cleanHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2958,17 +2980,17 @@ const getUserDisplayName = (u) => {
                     const displayHeader = isRequired ? `${displayName} *` : displayName;
 
                     return (
-                      <TableCell key={header} sx={{ fontWeight: 'bold', minWidth: getMinWidth(displayName) }}>
+                      <th key={header} className={`col-${_normalizeKey(displayName)}`}>
                         {displayHeader}
-                      </TableCell>
+                      </th>
                     );
                   })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
+                </tr>
+              </thead>
+              <tbody>
                 {importedData.map((row, rowIndex) => (
-                  <TableRow key={rowIndex} hover>
-                    <TableCell>
+                  <tr key={rowIndex} className="import-preview-row">
+                    <td>
                       <Checkbox
                         size="small"
                         checked={importSelectedRows.has(rowIndex)}
@@ -2980,13 +3002,13 @@ const getUserDisplayName = (u) => {
                           });
                         }}
                       />
-                    </TableCell>
-                    <TableCell>{rowIndex + 1}</TableCell>
+                    </td>
+                    <td>{rowIndex + 1}</td>
                     {Object.keys(row).map((key, cellIndex) => {
                       const errMsgs = (importFieldErrors && importFieldErrors[rowIndex]) ? importFieldErrors[rowIndex][key] : undefined;
                       const fieldName = (key === 'Permanent Country') ? 'Country' : key;
                       const cleanFieldName = String(fieldName).replace(/\s*\*\s*$/g, '');
-                      const cellSx = { minWidth: getMinWidth(cleanFieldName), whiteSpace: 'normal', wordBreak: 'break-word' };
+                      const columnClass = `col-${_normalizeKey(cleanFieldName)}`;
                       return (
                         <SimpleEditableCell
                           key={`${rowIndex}-${cellIndex}`}
@@ -2995,7 +3017,7 @@ const getUserDisplayName = (u) => {
                           columnKey={key}
                           error={!!errMsgs}
                           errorMessages={errMsgs}
-                          cellSx={cellSx}
+                          columnClass={columnClass}
                           row={row}
                           onUpdate={(rowIdx, colKey, newValue) => {
                             const updatedData = [...importedData];
@@ -3014,11 +3036,11 @@ const getUserDisplayName = (u) => {
                         />
                       );
                     })}
-                  </TableRow>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </tbody>
+            </table>
+          </div>
         </DialogContent>
         <DialogActions>
           <Button 
@@ -3108,28 +3130,28 @@ const getUserDisplayName = (u) => {
                   <Typography variant="subtitle2" color="error.main" gutterBottom>
                     Errors ({importReport.errors.length})
                   </Typography>
-                  <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Row</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>User Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>User Code</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Error Details</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
+                  <div className="import-errors-table-wrapper">
+                    <table className="import-errors-table">
+                      <thead>
+                        <tr>
+                          <th style={{ fontWeight: 'bold' }}>Row</th>
+                          <th style={{ fontWeight: 'bold' }}>User Name</th>
+                          <th style={{ fontWeight: 'bold' }}>User Code</th>
+                          <th style={{ fontWeight: 'bold' }}>Error Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
                         {importReport.errors.map((error, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{error.row || 'N/A'}</TableCell>
-                            <TableCell>{
+                          <tr key={index}>
+                            <td>{error.row || 'N/A'}</td>
+                            <td>{
                               error.userName ||
                               error.data?.['Name'] ||
                               (error.data?.['First Name'] ? ((error.data['First Name'] || '') + ' ' + (error.data['Last Name'] || '')) : null) ||
                               'N/A'
-                            }</TableCell>
-                            <TableCell>{error.userCode || error.data?.['User Code'] || 'N/A'}</TableCell>
-                            <TableCell>
+                            }</td>
+                            <td>{error.userCode || error.data?.['User Code'] || 'N/A'}</td>
+                            <td>
                               <Box>
                                 {Array.isArray(error.errors) ? error.errors.map((err, i) => (
                                   <Typography 
@@ -3146,12 +3168,12 @@ const getUserDisplayName = (u) => {
                                   </Typography>
                                 )}
                               </Box>
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                      </tbody>
+                    </table>
+                  </div>
                 </Box>
               )}
 

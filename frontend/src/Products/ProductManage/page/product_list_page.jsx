@@ -830,12 +830,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             <img
               src={previewImage}
               alt="Preview"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                borderRadius: 4
-              }}
+              style={{ width: 800, height: 600, maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 4 }}
               onClick={() => window.open(previewImage, '_blank', 'noopener,noreferrer')}
               title="Click to open in new tab"
             />
@@ -977,7 +972,11 @@ const FiltersRow = memo(function FiltersRow({
             value={filters.categoryID ?? ''}
             onChange={(e) => {
               const val = e.target.value ? Number(e.target.value) : null;
-              setFilters({ ...filters, categoryID: val, subcategoryID: null });
+              setFilters(prev => {
+                const next = { ...prev, categoryID: val, subcategoryID: null };
+                setDebouncedFilters(next);
+                return next;
+              });
               setPage(0);
             }}
           >
@@ -993,7 +992,11 @@ const FiltersRow = memo(function FiltersRow({
             value={filters.subcategoryID ?? ''}
             onChange={(e) => {
               const val = e.target.value ? Number(e.target.value) : null;
-              setFilters({ ...filters, subcategoryID: val });
+              setFilters(prev => {
+                const next = { ...prev, subcategoryID: val };
+                setDebouncedFilters(next);
+                return next;
+              });
               setPage(0);
             }}
             disabled={!filters.categoryID}
@@ -1015,7 +1018,11 @@ const FiltersRow = memo(function FiltersRow({
             value={filters.storeID ?? ''}
             onChange={(e) => {
               const val = e.target.value ? Number(e.target.value) : null;
-              setFilters({ ...filters, storeID: val });
+              setFilters(prev => {
+                const next = { ...prev, storeID: val };
+                setDebouncedFilters(next);
+                return next;
+              });
               setPage(0);
             }}
           >
@@ -1026,7 +1033,7 @@ const FiltersRow = memo(function FiltersRow({
       )}
       {visibleColumns.productType && (
         <TableCell className="filter-cell" sx={{ width: 120 }}>
-          <select className="filter-select" value={filters.productType ?? ''} onChange={(e) => { setFilters({ ...filters, productType: e.target.value }); setPage(0); }}>
+          <select className="filter-select" value={filters.productType ?? ''} onChange={(e) => { const val = e.target.value; setFilters(prev => { const next = { ...prev, productType: val }; setDebouncedFilters(next); return next; }); setPage(0); }}>
             <option value="">All</option>
             <option value="Finished Goods">Finished Goods</option>
             <option value="Semi-Finished Goods">Semi-Finished Goods</option>
@@ -1036,7 +1043,7 @@ const FiltersRow = memo(function FiltersRow({
       )}
       {visibleColumns.productMode && (
         <TableCell className="filter-cell" sx={{ width: 120 }}>
-          <select className="filter-select" value={filters.productMode ?? ''} onChange={(e) => { setFilters({ ...filters, productMode: e.target.value }); setPage(0); }}>
+          <select className="filter-select" value={filters.productMode ?? ''} onChange={(e) => { const val = e.target.value; setFilters(prev => { const next = { ...prev, productMode: val }; setDebouncedFilters(next); return next; }); setPage(0); }}>
             <option value="">All</option>
             <option value="Purchase">Purchase</option>
             <option value="Internal Manufacturing">Internal Manufacturing</option>
@@ -1192,7 +1199,7 @@ const FiltersRow = memo(function FiltersRow({
       )}
       {visibleColumns.status && (
         <TableCell className="filter-cell" sx={{ width: 120 }}>
-          <select className="filter-select" value={filters.status ?? ''} onChange={(e) => { setFilters({ ...filters, status: e.target.value || null }); setPage(0); }}>
+          <select className="filter-select" value={filters.status ?? ''} onChange={(e) => { const val = e.target.value || null; setFilters(prev => { const next = { ...prev, status: val }; setDebouncedFilters(next); return next; }); setPage(0); }}>
             <option value="">All</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -1201,7 +1208,7 @@ const FiltersRow = memo(function FiltersRow({
       )}
       {visibleColumns.importance && (
         <TableCell className="filter-cell" sx={{ width: 120 }}>
-          <select className="filter-select" value={filters.importance ?? ''} onChange={(e) => { setFilters({ ...filters, importance: e.target.value || null }); setPage(0); }}>
+          <select className="filter-select" value={filters.importance ?? ''} onChange={(e) => { const val = e.target.value || null; setFilters(prev => { const next = { ...prev, importance: val }; setDebouncedFilters(next); return next; }); setPage(0); }}>
             <option value="">All</option>
             <option value="Normal">Normal</option>
             <option value="High">High</option>
@@ -1263,7 +1270,7 @@ const FiltersRow = memo(function FiltersRow({
                 else { setAutocompleteOptions(prev => ({ ...prev, descriptions: [] })); if (v === '') { setFilters(prev => ({ ...prev, description: '' })); setPage(0); } }
               }}
               onFocus={() => setAutocompleteOpen(prev => ({ ...prev, descriptions: true }))}
-              onBlur={() => { setTimeout(() => setAutocompleteOpen(prev => ({ ...prev, descriptions: false })), 120); }}
+              onBlur={() => { setTimeout(() => { setAutocompleteOpen(prev => ({ ...prev, descriptions: false })); if (inputFilters.description && inputFilters.description.trim() !== '') { setFilters(prev => ({ ...prev, description: inputFilters.description.trim() })); setPage(0); } }, 120); }}
               onKeyDown={(e) => { if (e.key === 'Enter') { setFilters(prev => ({ ...prev, description: e.target.value })); setPage(0); } }}
             />
             {autocompleteLoading.descriptions && <span className="filter-loading">Loading...</span>}
@@ -1822,32 +1829,29 @@ export default function ProductListPage() {
     return () => clearTimeout(t);
   }, [inputFilters.productType, inputFilters.productMode, inputFilters.minimumStock]);
 
-  // Apply common search (debounced) to multiple filter fields (name, code, tag, description, sku, barcode, category, subcategory, store)
+  // Apply common search to multiple filter fields (name, code, tag, description, sku, barcode, category, subcategory, store)
+  // Update filters immediately when `commonSearch` changes (no debounce) so results reflect user input promptly.
   useEffect(() => {
-    const id = setTimeout(() => {
-      const val = commonSearch && commonSearch.trim() !== '' ? commonSearch.trim() : '';
-      const lower = val.toLowerCase();
-      setFilters(prev => {
-        const updated = { ...prev };
-        // Use a single global filter string so backend can perform an OR-search across fields
-        updated.filter = val;
-        // Clear individual text fields so they don't AND with the global filter
-        updated.name = '';
-        updated.code = '';
-        updated.tag = '';
-        updated.description = '';
-        updated.sku = '';
-        updated.barcode = '';
-        // Do not set categoryID/subcategoryID/storeID here; backend global filter will match by names too
-        updated.categoryID = null;
-        updated.subcategoryID = null;
-        updated.storeID = null;
-        return updated;
-      });
-      setPage(0);
-    }, 400);
-    return () => clearTimeout(id);
-  }, [commonSearch, categories, allSubcategories, stores]);
+    const val = commonSearch && commonSearch.trim() !== '' ? commonSearch.trim() : '';
+    setFilters(prev => {
+      const updated = { ...prev };
+      // Use a single global filter string so backend can perform an OR-search across fields
+      updated.filter = val;
+      // Clear individual text fields so they don't AND with the global filter
+      updated.name = '';
+      updated.code = '';
+      updated.tag = '';
+      updated.description = '';
+      updated.sku = '';
+      updated.barcode = '';
+      // Do not set categoryID/subcategoryID/storeID here; backend global filter will match by names too
+      updated.categoryID = null;
+      updated.subcategoryID = null;
+      updated.storeID = null;
+      return updated;
+    });
+    setPage(0);
+  }, [commonSearch]);
 
   // FIXED: Use the correct debounce implementation
   useEffect(() => {
@@ -2380,9 +2384,147 @@ export default function ProductListPage() {
         })();
 
         console.log('Setting products to:', apiProducts.length, 'items');
-        setProducts(apiProducts);
-        setTotalItems(res?.data?.total || 0);
-        setTotalCost(res?.data?.totalCost || 0);
+        // If a global filter is active, attempt to also fetch products matching several fields
+        // (product_type, product_mode, importance, status, and description) when the user has
+        // NOT explicitly selected those individual filters. This covers backends that don't
+        // include those fields in the global `filter` search.
+        if (debouncedFilters && debouncedFilters.filter) {
+          const extraFetches = [];
+
+          // Only query product_type/product_mode when user hasn't selected them explicitly
+          if (!debouncedFilters.productType) {
+            extraFetches.push(
+              axios.get(`${BASE_URL}/api/products`, {
+                params: { page: 1, limit: 1000, product_type: debouncedFilters.filter },
+                timeout: 15000
+              }).catch(() => ({ data: { data: [] } }))
+            );
+          }
+          if (!debouncedFilters.productMode) {
+            extraFetches.push(
+              axios.get(`${BASE_URL}/api/products`, {
+                params: { page: 1, limit: 1000, product_mode: debouncedFilters.filter },
+                timeout: 15000
+              }).catch(() => ({ data: { data: [] } }))
+            );
+          }
+
+          // Importance/status/description - include when they are not explicitly set
+          if (debouncedFilters.importance == null) {
+            extraFetches.push(
+              axios.get(`${BASE_URL}/api/products`, {
+                params: { page: 1, limit: 1000, importance: debouncedFilters.filter },
+                timeout: 15000
+              }).catch(() => ({ data: { data: [] } }))
+            );
+          }
+          if (debouncedFilters.status == null) {
+            extraFetches.push(
+              axios.get(`${BASE_URL}/api/products`, {
+                params: { page: 1, limit: 1000, status: debouncedFilters.filter },
+                timeout: 15000
+              }).catch(() => ({ data: { data: [] } }))
+            );
+          }
+          if (!debouncedFilters.description) {
+            extraFetches.push(
+              axios.get(`${BASE_URL}/api/products`, {
+                params: { page: 1, limit: 1000, description: debouncedFilters.filter },
+                timeout: 15000
+              }).catch(() => ({ data: { data: [] } }))
+            );
+          }
+
+          if (extraFetches.length === 0) {
+            // Nothing extra to fetch; use API response
+            setProducts(apiProducts);
+            setTotalItems(res?.data?.total || 0);
+            setTotalCost(res?.data?.totalCost || 0);
+          } else {
+            try {
+              const results = await Promise.all(extraFetches);
+              const extraProducts = results.flatMap(r => (r && r.data && Array.isArray(r.data.data)) ? r.data.data : []);
+
+              // Merge results, deduplicate by ID (or Code as fallback)
+              const mergedMap = new Map();
+              const pushToMap = (p) => {
+                const key = p.ID != null ? String(p.ID) : (p.Code ? `code:${p.Code}` : JSON.stringify(p));
+                if (!mergedMap.has(key)) mergedMap.set(key, p);
+              };
+              apiProducts.forEach(pushToMap);
+              extraProducts.forEach(pushToMap);
+
+              const merged = Array.from(mergedMap.values());
+              console.log('Merged products count (including extra field searches):', merged.length);
+
+              // Client-side filtering for global filter across fields that backend may not search.
+              if (debouncedFilters && debouncedFilters.filter) {
+                const q = String(debouncedFilters.filter).trim().toLowerCase();
+                const filtered = merged.filter(p => {
+                  const check = (v) => v !== null && v !== undefined && String(v).toLowerCase().includes(q);
+                  // Status can be stored as boolean or IsActive flag
+                  const statusText = (p.IsActive === true || p.IsActive === 1) ? 'active' : (p.IsActive === false || p.IsActive === 0 ? 'inactive' : '');
+
+                  // Tags can be an array of objects with Name, or a string field
+                  const tagsMatch = Array.isArray(p.Tags) && p.Tags.some(t => {
+                    if (!t) return false;
+                    if (typeof t === 'string') return t.toLowerCase().includes(q);
+                    return (t.Name && String(t.Name).toLowerCase().includes(q));
+                  });
+                  const tagFieldMatch = check(p.Tag);
+
+                  // Colors & Sizes may exist on product or on variants
+                  const colorMatch = (check(p.Color) || (Array.isArray(p.Variants) && p.Variants.some(v => {
+                    if (check(v.Color)) return true;
+                    const cd = getColorInfo(v.Color);
+                    if (cd && (cd.value && cd.value.toLowerCase().includes(q) || cd.name && cd.name.toLowerCase().includes(q))) return true;
+                    return false;
+                  })));
+
+                  const sizeMatch = (check(p.Size) || (Array.isArray(p.Variants) && p.Variants.some(v => {
+                    const sizeVal = v.Size?.Name || v.Size;
+                    return check(sizeVal);
+                  })));
+
+                  return (
+                    check(p.Importance) ||
+                    check(p.Description) ||
+                    (statusText && statusText.includes(q)) ||
+                    check(p.ProductType) ||
+                    check(p.ProductMode) ||
+                    check(p.Name) ||
+                    check(p.Code) ||
+                    check(p.Category?.Name) ||
+                    check(p.Subcategory?.Name) ||
+                    check(p.Store?.Name) ||
+                    check(p.InternalNotes) ||
+                    tagsMatch ||
+                    tagFieldMatch ||
+                    colorMatch ||
+                    sizeMatch
+                  );
+                });
+                console.log('After client-side filtering, products count:', filtered.length);
+                setProducts(filtered);
+                setTotalItems(filtered.length);
+                setTotalCost(res?.data?.totalCost || 0);
+              } else {
+                setProducts(merged);
+                setTotalItems(merged.length);
+                setTotalCost(res?.data?.totalCost || 0);
+              }
+            } catch (mergeErr) {
+              console.error('Error fetching extra-field matches for common filter:', mergeErr);
+              setProducts(apiProducts);
+              setTotalItems(res?.data?.total || 0);
+              setTotalCost(res?.data?.totalCost || 0);
+            }
+          }
+        } else {
+          setProducts(apiProducts);
+          setTotalItems(res?.data?.total || 0);
+          setTotalCost(res?.data?.totalCost || 0);
+        }
       } catch (apiError) {
         console.error('API request failed:', apiError);
         setProducts([]);
@@ -3534,17 +3676,9 @@ export default function ProductListPage() {
       // Tax validation - ALLOW new taxes to be created during import
       // No validation needed - will be auto-created if it doesn't exist
       
-      // Validate HSN Code - must exist in dropdown
-      const hsnValue = getFieldValue('HSN Code');
-      if (hsnValue) {
-        const hsnExists = hsnCodes.some(hsn => 
-          String(hsn.Code || hsn.code || '').trim() === String(hsnValue).trim()
-        );
-        if (!hsnExists) {
-          const availableHsn = hsnCodes.map(h => h.Code || h.code).filter(Boolean).slice(0, 10).join(', ');
-          rowErrors.push(`HSN Code "${hsnValue}" does not exist. Available options include: ${availableHsn || 'None'}...`);
-        }
-      }
+// HSN Code: will be auto-created during import if it doesn't exist in the system.
+		// No validation error is added here; the backend will create missing HSN master records as needed.
+		// (Tax will also be auto-created above if provided in the import row.)
       
       if (rowErrors.length > 0) {
         errors.push({
@@ -4439,9 +4573,6 @@ export default function ProductListPage() {
                 value={commonSearch}
                 onChange={(e) => setCommonSearch(e.target.value)}
               />
-              {commonSearch ? (
-                <button type="button" className="search-clear" onClick={() => setCommonSearch('')}>Clear</button>
-              ) : null}
             </div>
             <Box display="flex" alignItems="center" gap={1} ml={2}>
               <Button
@@ -5271,7 +5402,7 @@ export default function ProductListPage() {
                     • Importance must be "Normal", "High", or "Critical"<br/>
                     • Product Type must be "All", "Finished Goods", "Semi-Finished Goods", or "Raw Materials"<br/>
                     • Product Mode must be "Purchase", "Internal Manufacturing", or "Both"<br/>
-                    • <strong>Category, Subcategory, Store, HSN Code, Unit, and Size must match existing system entries (use dropdown options)</strong><br/>
+                    • <strong>Category, Subcategory, Store, Unit, and Size should match existing system entries (use dropdown options)</strong> — HSN Codes and Taxes will be auto-created during import if they do not already exist.<br/>
                     • You can edit values directly in the preview table using the dropdowns, then click "Finalize Import" again
                   </Typography>
                 </Box>

@@ -305,6 +305,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"erp.local/backend/models"
 
@@ -415,22 +416,40 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 
 	// Set defaults
 	req.Quotation.Status = models.Qt_Open
-	req.Quotation.QuotationNumber = "" // temporary
 
-	// STEP 1: Create quotation
-	if err := tx.Create(&req.Quotation).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
+	// If client provided a quotation number, validate uniqueness and use it.
+	providedQNo := strings.TrimSpace(req.Quotation.QuotationNumber)
+	if providedQNo != "" {
+		// ensure uniqueness
+		var exists int64
+		if err := tx.Model(&models.QuotationTable{}).Where("quotation_number = ?", providedQNo).Count(&exists).Error; err != nil {
+			tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		if exists > 0 {
+			tx.Rollback()
+			return c.Status(400).JSON(fiber.Map{"error": "quotation_number already exists"})
+		}
 
-	// STEP 2: Generate quotation number using ID
-	quotationNo := generateQuotationNumber(&series, req.Quotation.QuotationID)
+		// Keep the provided quotation number and create the record
+		if err := tx.Create(&req.Quotation).Error; err != nil {
+			tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+	} else {
+		// No quotation number provided — generate one based on series and created ID
+		req.Quotation.QuotationNumber = "" // temporary
+		if err := tx.Create(&req.Quotation).Error; err != nil {
+			tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 
-	// STEP 3: Update quotation number
-	if err := tx.Model(&req.Quotation).
-		Update("quotation_number", quotationNo).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		quotationNo := generateQuotationNumber(&series, req.Quotation.QuotationID)
+		if err := tx.Model(&req.Quotation).
+			Update("quotation_number", quotationNo).Error; err != nil {
+			tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 	}
 
 	// STEP 4: Insert quotation items
