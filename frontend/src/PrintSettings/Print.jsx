@@ -41,6 +41,7 @@ const sections = [
 			"GST Amounts / Tax",
 			"Lead Time",
 			"Qty in Services",
+			"Item Fixed Rate",
 			"Item Rate",
 			"Non-Stock Item Code",
 			"Auto-pad small docs",

@@ -20,6 +20,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 import { BASE_URL } from "../../../config/Config";
 import TermsConditionSelector from "./TermsConditionModal";
+import PrintSettingsDialog from "../../../PrintSettings/Print";
 import { useParams } from "react-router-dom"; 
 
 import {
@@ -158,7 +159,7 @@ const [productSelections, setProductSelections] = useState({});
 
       const taxable = qty * rate;
       const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-      const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+      const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
       const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
 
       const newItem = {
@@ -650,7 +651,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         const taxable = (rate * newQty) - (existing.discount || 0);
         const gstPercent = prod.Tax?.Percentage || existing.gst || 0;
         const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-        const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+        const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
         const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
         copy[existingIndex] = { ...existing, qty: newQty, rate, fixedRate: (existing.fixedRate !== undefined ? existing.fixedRate : rate), taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
       } else { 
@@ -658,7 +659,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         const taxable = rate * qtyToAdd - discount;
         const gstPercent = prod.Tax?.Percentage || 0;
         const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-        const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+        const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
         const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
 
         copy.push({
@@ -768,7 +769,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const taxable = rate * qty - discountAmount;
     const gstPercent = Number(vals.gst) || 0;
     const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-    const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+    const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
     const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
     const cgst = taxRes.cgst;
     const sgst = taxRes.sgst;
@@ -861,6 +862,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
   const [addressForm, setAddressForm] = useState({
     title: "",
     show_title_in_shipping: false,
+    // whether to show this address title on printed documents
+    show_title_on_print: false,
     address1: "",
     address2: "",
     city: "",
@@ -887,7 +890,37 @@ const handleTandCClose = () => setOpenTandCModal(false);
     normalized.country = addr.country || addr.Country || 'India';
     normalized.postal_code = addr.postal_code || addr.pincode || addr.Pincode || addr.pin || addr.zipcode || addr.ZipCode || '';
     normalized.gst_in = addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || '';
+    // persistent flag: whether to show title when printing documents
+    normalized.show_title_on_print = addr.show_title_on_print || false;
     return normalized;
+  };
+
+  // Helper: return customer's legal GSTIN (check common top-level fields, legal object and documents)
+  const getCustomerLegalGstin = (cust) => {
+    if (!cust) return '';
+    // Check common top-level fields
+    const top = cust.gst_in || cust.gstin || cust.GSTIN || cust.gst || cust.gstin_number || cust.gstinNumber || cust.tax_id || '';
+    if (top && String(top).trim() !== '') return top;
+    // Check legal object
+    if (cust.legal && (cust.legal.gstin || cust.legal.gst)) return cust.legal.gstin || cust.legal.gst;
+    // Check documents array for a GST document
+    if (Array.isArray(cust.documents)) {
+      const doc = cust.documents.find(d => {
+        const k = (d.type || d.name || d.doc_type || '').toString().toLowerCase();
+        return k.includes('gst');
+      });
+      if (doc) return doc.doc_number || doc.number || doc.docNumber || '';
+    }
+    return '';
+  };
+
+  // Helper: determine which GST to display for an address — use customer's legal GST for "permanent" addresses
+  const gstForAddr = (addr) => {
+    if (!addr) return '';
+    if (addr.title && /perman/i.test(String(addr.title))) {
+      return getCustomerLegalGstin(selectedCustomer);
+    }
+    return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || '';
   };
 
   // GST calculation helper: returns cgst, sgst, igst, totalTax and grandTotal (rounded to 2 decimals)
@@ -990,6 +1023,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
     setAddressForm({
       title: addr.title || "",
       show_title_in_shipping: addr.show_title_in_shipping || false,
+      // support existing saved flag if present
+      show_title_on_print: addr.show_title_on_print || false,
       address1: addr.address1 || "",
       address2: addr.address2 || "",
       city: addr.city || "",
@@ -1022,6 +1057,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       country: addressForm.country,
       postal_code: addressForm.postal_code,
       gst_in: addressForm.gst_in,
+      show_title_on_print: !!addressForm.show_title_on_print,
       extra: extraObj,
     };
 
@@ -1544,7 +1580,7 @@ const handleSaveQuotation = async () => {
   useEffect(()=>{
     if (selectedBillingAddress && selectedBranch) {
       const sellerGST = selectedBranch?.gst || selectedBranch?.GST || selectedBranch?.gst_number || selectedBranch?.gstin || '';
-      const custGst = selectedBillingAddress?.gst_in || selectedBillingAddress?.gstin || selectedBillingAddress?.GSTIN || selectedBillingAddress?.gst || '';
+      const custGst = gstForAddr(selectedBillingAddress);
       if (custGst && custGst.toString().trim() !== '') {
         const match = doGSTsMatchState(custGst, sellerGST);
         setIsGSTStateMatch(match);
@@ -2082,12 +2118,14 @@ const  prefillFormData = async (data) => {
                         onChange={handleBillingAddressChange}
                       >
                         <option value="">--Select--</option>
-                        {(selectedCustomer.addresses || []).map((addr) => (
-                          <option key={addr.id} value={addr.id}>
-                            {addr.title ? addr.title + " - " : ""}
-                            {addr.address1 || ''}{addr.city ? ', ' + addr.city : ''}{addr.state ? ', ' + addr.state : ''}
-                          </option>
-                        ))}
+                        {(selectedCustomer.addresses || []).map((addr) => {
+                          const gst = gstForAddr(addr);
+                          return (
+                            <option key={addr.id} value={addr.id}>
+                              {(addr.title ? addr.title : (addr.address1 || ''))}{gst ? ' - ' + gst : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                       <button
                         type="button"
@@ -2109,7 +2147,7 @@ const  prefillFormData = async (data) => {
                 {selectedBillingAddress && (
                   <div className="address-display-box">
                     <div className="address-display-header">
-                      <h6 className="address-title">{selectedBillingAddress.title || 'Address'}</h6>
+                      <h6 className="address-title">{(selectedBillingAddress.title || selectedBillingAddress.address1 || 'Address')}{gstForAddr(selectedBillingAddress) ? ' - ' + gstForAddr(selectedBillingAddress) : ''}</h6>
                       <button
                         type="button"
                         className="btn-edit-address"
@@ -2120,24 +2158,26 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="address-content">
-                      <p>
-                        <strong>{selectedBillingAddress.address1}</strong>
-                        {selectedBillingAddress.address2 && <> , {selectedBillingAddress.address2}</>}
-                        {selectedBillingAddress.city && <> , {selectedBillingAddress.city}</>}
-                        {selectedBillingAddress.state && <> , {selectedBillingAddress.state}</>}
-                        {selectedBillingAddress.postal_code && <> - {selectedBillingAddress.postal_code}</>}
-                        {selectedBillingAddress.country && <> , {selectedBillingAddress.country}</>}
-                      </p>
-                      {selectedBillingAddress.gst_in && (
-                        <p><strong>GSTIN :</strong> {selectedBillingAddress.gst_in}</p>
+                      {/* Requested layout: AddressLine1, AddressLine2, AddressLine3, city, pincode, state, country, gstin */}
+                      {selectedBillingAddress.address1 && <div>{selectedBillingAddress.address1},</div>}
+                      {selectedBillingAddress.address2 && <div>{selectedBillingAddress.address2},</div>}
+                      {selectedBillingAddress.address3 && <div>{selectedBillingAddress.address3},</div>}
+                      {(selectedBillingAddress.city || selectedBillingAddress.postal_code) && (
+                        <div>{selectedBillingAddress.city ? selectedBillingAddress.city : ''}{selectedBillingAddress.postal_code ? ' , ' + selectedBillingAddress.postal_code : ''}</div>
+                      )}
+                      {(selectedBillingAddress.state || selectedBillingAddress.country) && (
+                        <div>{selectedBillingAddress.state ? selectedBillingAddress.state : ''}{selectedBillingAddress.country ? ', ' + selectedBillingAddress.country : ''}</div>
+                      )}
+                      {gstForAddr(selectedBillingAddress) && (
+                        <div><strong>GSTIN :</strong> {gstForAddr(selectedBillingAddress)}</div>
                       )}
                       {selectedBillingAddress.extra && (
                         typeof selectedBillingAddress.extra === 'object' ? (
                           Object.entries(selectedBillingAddress.extra).map(([k, v]) => (
-                            <p key={k}><strong>{k} :</strong> {v}</p>
+                            <div key={k}><strong>{k} :</strong> {v}</div>
                           ))
                         ) : (
-                          <p><strong>Extra:</strong> {selectedBillingAddress.extra}</p>
+                          <div><strong>Extra:</strong> {selectedBillingAddress.extra}</div>
                         )
                       )}
                     </div>
@@ -2174,12 +2214,14 @@ const  prefillFormData = async (data) => {
                       >
                         <option value="">--Select--</option>
                         <option value="none">None</option>
-                        {(selectedCustomer.addresses || []).map((addr) => (
-                          <option key={addr.id} value={addr.id}>
-                            {addr.title ? addr.title + " - " : ""}
-                            {addr.address1 || ''}{addr.city ? ', ' + addr.city : ''}{addr.state ? ', ' + addr.state : ''}
-                          </option>
-                        ))}
+                        {(selectedCustomer.addresses || []).map((addr) => {
+                          const gst = gstForAddr(addr);
+                          return (
+                            <option key={addr.id} value={addr.id}>
+                              {(addr.title ? addr.title : (addr.address1 || ''))}{gst ? ' - ' + gst : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                       <button
                         type="button"
@@ -2197,7 +2239,7 @@ const  prefillFormData = async (data) => {
                 {selectedShippingAddress && (
                   <div className="address-display-box">
                     <div className="address-display-header">
-                      <h6 className="address-title">{selectedShippingAddress.title || 'Address'}</h6>
+                      <h6 className="address-title">{(selectedShippingAddress.title || selectedShippingAddress.address1 || 'Address')}{gstForAddr(selectedShippingAddress) ? ' - ' + gstForAddr(selectedShippingAddress) : ''}</h6>
                       <button
                         type="button"
                         className="btn-edit-address"
@@ -2208,24 +2250,26 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="address-content">
-                      <p>
-                        <strong>{selectedShippingAddress.address1}</strong>
-                        {selectedShippingAddress.address2 && <> , {selectedShippingAddress.address2}</>}
-                        {selectedShippingAddress.city && <> , {selectedShippingAddress.city}</>}
-                        {selectedShippingAddress.state && <> , {selectedShippingAddress.state}</>}
-                        {selectedShippingAddress.postal_code && <> - {selectedShippingAddress.postal_code}</>}
-                        {selectedShippingAddress.country && <> , {selectedShippingAddress.country}</>}
-                      </p>
-                      {selectedShippingAddress.gst_in && (
-                        <p><strong>GSTIN :</strong> {selectedShippingAddress.gst_in}</p>
+                      {/* Requested layout: AddressLine1, AddressLine2, AddressLine3, city, pincode, state, country, gstin */}
+                      {selectedShippingAddress.address1 && <div>{selectedShippingAddress.address1},</div>}
+                      {selectedShippingAddress.address2 && <div>{selectedShippingAddress.address2},</div>}
+                      {selectedShippingAddress.address3 && <div>{selectedShippingAddress.address3},</div>}
+                      {(selectedShippingAddress.city || selectedShippingAddress.postal_code) && (
+                        <div>{selectedShippingAddress.city ? selectedShippingAddress.city : ''}{selectedShippingAddress.postal_code ? ' , ' + selectedShippingAddress.postal_code : ''}</div>
+                      )}
+                      {(selectedShippingAddress.state || selectedShippingAddress.country) && (
+                        <div>{selectedShippingAddress.state ? selectedShippingAddress.state : ''}{selectedShippingAddress.country ? ', ' + selectedShippingAddress.country : ''}</div>
+                      )}
+                      {gstForAddr(selectedShippingAddress) && (
+                        <div><strong>GSTIN :</strong> {gstForAddr(selectedShippingAddress)}</div>
                       )}
                       {selectedShippingAddress.extra && (
                         typeof selectedShippingAddress.extra === 'object' ? (
                           Object.entries(selectedShippingAddress.extra).map(([k, v]) => (
-                            <p key={k}><strong>{k} :</strong> {v}</p>
+                            <div key={k}><strong>{k} :</strong> {v}</div>
                           ))
                         ) : (
-                          <p><strong>Extra:</strong> {selectedShippingAddress.extra}</p>
+                          <div><strong>Extra:</strong> {selectedShippingAddress.extra}</div>
                         )
                       )}
                     </div>
@@ -2446,7 +2490,7 @@ const  prefillFormData = async (data) => {
                 const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }))
@@ -2471,7 +2515,7 @@ const  prefillFormData = async (data) => {
                 const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }));
@@ -2492,7 +2536,7 @@ const  prefillFormData = async (data) => {
                 const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-                const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }))
@@ -2525,7 +2569,7 @@ const  prefillFormData = async (data) => {
               const taxable = total - discountAmt;
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-              const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+              const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
               const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
               newItems[index].taxable = taxRes.amount;
               newItems[index].cgst = taxRes.cgst;
@@ -2557,7 +2601,7 @@ const  prefillFormData = async (data) => {
               const taxable = total - discountAmt;
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-              const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+              const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
               const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
               newItems[index].taxable = taxRes.amount;
               newItems[index].cgst = taxRes.cgst;
@@ -2969,7 +3013,7 @@ const  prefillFormData = async (data) => {
                       {bankDetails && bankDetails.length > 0 ? (
                         bankDetails.map((bank) => (
                           <option key={bank.id} value={bank.id}>
-                            {bank.title ? bank.title : bank.bankName}
+                            {`${bank.branch ? '  ' + bank.branch : ''}${bank.accountNo ? ' - ' + bank.accountNo : ''}`}
                           </option>
                         ))
                       ) : null}
@@ -3177,7 +3221,17 @@ const  prefillFormData = async (data) => {
               <div className="mb-8">
                 <label>Title</label>
                 <input className="form-control" value={addressForm.title} onChange={(e) => setAddressForm(prev => ({ ...prev, title: e.target.value }))} />
-              </div>
+                <div style={{ marginTop: 8 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!addressForm.show_title_on_print}
+                      onChange={(e) => setAddressForm(prev => ({ ...prev, show_title_on_print: e.target.checked }))}
+                    />
+                    <span>show title on print</span>
+                  </label>
+                </div>
+              </div> 
 
               <div className="mb-8">
                 <label>Address</label>
@@ -3249,6 +3303,10 @@ const  prefillFormData = async (data) => {
         </div>
       )}
       {/* modal  */}
+
+      {openPrintConfig && (
+        <PrintSettingsDialog onClose={handleClosePrintConfig} />
+      )}
 
       {/* Modal for search + table */}
       {open && (
@@ -3550,7 +3608,7 @@ const  prefillFormData = async (data) => {
                     const taxable = qty*rate - disc;
                     const gstPercent = Number(billingModalValues.gst) || 0;
                     const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-                    const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
+                    const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
                     const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
                     return taxRes.grandTotal.toFixed(2);
                   })()}</div>
@@ -3794,91 +3852,6 @@ const  prefillFormData = async (data) => {
         >
           Save
         </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* Print Configuration modal */}
-{openPrintConfig && (
-  <div className="custom-modal print-config-modal">
-    <div className="modal-box modal-width-800 modal-scroll">
-      <div className="modal-header">
-        <h5>Print Configuration</h5>
-        <div>
-          <button className="btn" onClick={handleClosePrintConfig} style={{border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer'}}>✕</button>
-        </div>
-      </div>
-      <div style={{display: 'flex', gap: 12}}>
-        <div style={{width: 220, borderRight: '1px solid #e6e9ef', paddingRight: 8}}>
-          <ul style={{listStyle: 'none', padding: 8, margin: 0}}>
-            <li className="print-nav-item active" style={{padding: '10px 8px', fontWeight: 700, borderLeft: '3px solid #1e7b5a', background: '#fff'}}>Basic Elements</li>
-            <li className="print-nav-item" style={{padding: '10px 8px', marginTop: 8}}>Party Information</li>
-            <li className="print-nav-item" style={{padding: '10px 8px', marginTop: 8}}>Item List</li>
-          </ul>
-        </div>
-
-        <div style={{flex: 1}}>
-          <div className="section-card" style={{padding: 12}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <div>
-                <h6 style={{margin: 0}}>Basic Elements</h6>
-                <div className="muted" style={{marginTop: 8}}>Tick the items you want to include in print.</div>
-              </div>
-              <div style={{display: 'flex', gap: 8}}>
-                <button className="btn--print" style={{background: '#ffffff', border: '1px solid #e0e7ea', padding: '6px 10px', borderRadius: 6}}>Sales Configuration</button>
-              </div>
-            </div>
-
-            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12}}>
-              <div style={{background: '#f8f9fa', padding: 12, borderRadius: 4}}>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.header} onChange={() => togglePrintOption('header')} /> <span style={{marginLeft:8}}>Header</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.footer} onChange={() => togglePrintOption('footer')} /> <span style={{marginLeft:8}}>Footer</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.digitalSignature} onChange={() => togglePrintOption('digitalSignature')} /> <span style={{marginLeft:8}}>Digital Signature</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.orgDupTrip} onChange={() => togglePrintOption('orgDupTrip')} /> <span style={{marginLeft:8}}>Org. / Dup. / Trip.</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.partyInformation} onChange={() => togglePrintOption('partyInformation')} /> <span style={{marginLeft:8}}>Party Information</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.gstin} onChange={() => togglePrintOption('gstin')} /> <span style={{marginLeft:8}}>GSTIN</span></label>
-              </div>
-
-              <div style={{background: '#f8f9fa', padding: 12, borderRadius: 4}}>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.branch} onChange={() => togglePrintOption('branch')} /> <span style={{marginLeft:8}}>Branch</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.bankDetails} onChange={() => togglePrintOption('bankDetails')} /> <span style={{marginLeft:8}}>Bank Details</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.disclaimer} onChange={() => togglePrintOption('disclaimer')} /> <span style={{marginLeft:8}}>Disclaimer</span></label>
-                <label className="label-checkbox" style={{display:'block', marginTop:8}}><input type="checkbox" checked={!!printConfig.totalBeforeRoundOff} onChange={() => togglePrintOption('totalBeforeRoundOff')} /> <span style={{marginLeft:8}}>Total before Round off</span></label>
-              </div>
-            </div>
-
-            <div style={{marginTop: 14}}>
-              <h6 style={{margin: '6px 0'}}>Party Information</h6>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8}}>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.mobile} onChange={() => togglePrintOption('mobile')} /> <span style={{marginLeft:8}}>Mobile</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.email} onChange={() => togglePrintOption('email')} /> <span style={{marginLeft:8}}>Email</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.contactPersonName} onChange={() => togglePrintOption('contactPersonName')} /> <span style={{marginLeft:8}}>Contact Person Name</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.companyBeforePOC} onChange={() => togglePrintOption('companyBeforePOC')} /> <span style={{marginLeft:8}}>Company before POC</span></label>
-              </div>
-            </div>
-
-            <div style={{marginTop: 14}}>
-              <h6 style={{margin: '6px 0'}}>Item List</h6>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8}}>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.itemCode} onChange={() => togglePrintOption('itemCode')} /> <span style={{marginLeft:8}}>Item Code</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.notes} onChange={() => togglePrintOption('notes')} /> <span style={{marginLeft:8}}>Notes</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.discountRate} onChange={() => togglePrintOption('discountRate')} /> <span style={{marginLeft:8}}>Discount Rate</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.discountAmt} onChange={() => togglePrintOption('discountAmt')} /> <span style={{marginLeft:8}}>Discount Amt</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.taxableAmt} onChange={() => togglePrintOption('taxableAmt')} /> <span style={{marginLeft:8}}>Taxable Amt</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.hsnSac} onChange={() => togglePrintOption('hsnSac')} /> <span style={{marginLeft:8}}>HSN / SAC</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.gstAmounts} onChange={() => togglePrintOption('gstAmounts')} /> <span style={{marginLeft:8}}>GST Amounts / Tax</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.leadTime} onChange={() => togglePrintOption('leadTime')} /> <span style={{marginLeft:8}}>Lead Time</span></label>
-                <label className="label-checkbox"><input type="checkbox" checked={!!printConfig.itemRate} onChange={() => togglePrintOption('itemRate')} /> <span style={{marginLeft:8}}>Item Rate</span></label>
-              </div>
-            </div>
-
-            <div className="modal-footer" style={{marginTop: 14}}>
-              <button className="btn" onClick={handleClosePrintConfig} style={{background: '#f8f9fa', color: '#333', border: '1px solid #e6eef0', padding: '8px 16px', borderRadius: '4px'}}>Cancel</button>
-              <button className="btn btn--save" onClick={handleSavePrintConfig} style={{background: '#1e7b5a', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px'}}>Save</button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
