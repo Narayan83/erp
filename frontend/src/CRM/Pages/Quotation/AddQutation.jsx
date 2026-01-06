@@ -16,7 +16,7 @@ import { MdDeleteOutline } from "react-icons/md";
 import './add_quotation.scss';
 // Replaced MUI components with native HTML elements and small helpers
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { BASE_URL } from "../../../config/Config";
 import TermsConditionSelector from "./TermsConditionModal";
@@ -296,7 +296,9 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
   };
 
   const { id } = useParams(); 
+  const location = useLocation();
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isReviseMode, setIsReviseMode] = useState(false);
   const [quotationData, setQuotationData] = useState(null);
 
 useEffect(()=>{
@@ -623,7 +625,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
   const handleSelectProduct = (prod, forceNewRow = false) => {
     const qtyToAdd = 1; // default quantity when selecting
     const selectedVariant = prod.Variants?.[0] || null;
-    const rate = selectedVariant?.PurchaseCost || 0;
+    // Prefer variant sales price (StdSalesPrice) as the default rate; fall back to other fields if not present
+    const rate = Number((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0);
     const discount = 0;
 
     setTableItems((prev) => {
@@ -649,7 +652,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
         const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
         const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
-        copy[existingIndex] = { ...existing, qty: newQty, rate, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
+        copy[existingIndex] = { ...existing, qty: newQty, rate, fixedRate: (existing.fixedRate !== undefined ? existing.fixedRate : rate), taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
       } else { 
         // either not found or forced new row -> push a new line
         const taxable = rate * qtyToAdd - discount;
@@ -672,7 +675,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
           variantId: selectedVariant?.ID || null,
           qty: qtyToAdd,
           rate,
-          discount,
+          fixedRate: rate,
+          discount: discount,
+          discountPercent: 0,
           taxable: taxRes.amount,
           cgst: taxRes.cgst,
           sgst: taxRes.sgst,
@@ -714,6 +719,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       setBillingModalValues({
         qty,
         rate,
+        fixedRate: Number(prod.fixedRate ?? prod.fixed_rate ?? prod.fixed_price ?? prod.fixedPrice ?? rate),
         discount,
         discountPercent: Math.round(discountPercent * 100) / 100,
         hsn: prod.hsn || prod.HsnSacCode || "",
@@ -733,7 +739,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
     setBillingModalProduct(prod);
     setBillingModalValues({
       qty: 1,
-      rate: selectedVariant?.PurchaseCost || 0,
+      // default billing modal rate should reflect sales price
+      rate: Number((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0),
       discount: 0,
       discountPercent: 0,
       hsn: prod.HsnSacCode || "",
@@ -777,7 +784,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
       variantId: vals.variantId,
       qty,
       rate,
+      fixedRate: Number(vals.fixedRate ?? vals.fixed_rate ?? rate),
       discount: discountAmount,
+      discountPercent: Number(vals.discountPercent) || 0,
       taxable,
       cgst,
       sgst,
@@ -1228,7 +1237,13 @@ const handleSaveQuotation = async () => {
   //go to add user
 
   const addUserNavigate = () => {
-    navigate("/users/add");
+    try {
+      const url = `${window.location.origin}/users/add`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      // fallback to in-app navigation if window.open fails
+      navigate("/users/add");
+    }
   };
 
   const openSearch = () => {
@@ -1424,6 +1439,15 @@ const handleSaveQuotation = async () => {
 
   useEffect(() => {
     const isValidId = /^\d+$/.test(String(id || ""));
+    // detect revise param (e.g. ?revise=1)
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const revise = params.get('revise');
+      setIsReviseMode(Boolean(revise && String(revise) !== '0' && String(revise).toLowerCase() !== 'false'));
+    } catch (err) {
+      setIsReviseMode(false);
+    }
+
     if (isValidId) {
       setIsEditMode(true);
       fetchQuotationData();
@@ -1432,7 +1456,7 @@ const handleSaveQuotation = async () => {
       alert("Invalid quotation ID in URL. Returning to list.");
       navigate('/quotation-list');
     }
-  }, [id]);
+  }, [id, location.search]);
 
   // Set branch when branches are loaded and we have quotation data with branch_id
   useEffect(() => {
@@ -1706,6 +1730,16 @@ const  prefillFormData = async (data) => {
   // Pre-fill table items with ALL fields from QuotationTableItems
   if (data.quotation_items && data.quotation_items.length > 0) {
     const items = data.quotation_items.map(item => {
+      // Debug: Log what product data we're receiving
+      console.log('Prefill item:', {
+        item_id: item.id,
+        product_id: item.product_id,
+        has_product: !!item.product,
+        product_variants: item.product?.Variants?.length || 0,
+        product_image: item.product?.image || item.product?.Image,
+        first_variant: item.product?.Variants?.[0],
+      });
+
       // Extract product image from various possible sources
       let productImage = null;
       
@@ -1726,29 +1760,72 @@ const  prefillFormData = async (data) => {
       // We have: line_total = taxable + tax_amount
       // So: taxable = line_total - tax_amount
       // And: discount = (rate * qty) - taxable
-      const qty = item.quantity || 0;
+        const qty = item.quantity || 0;
       const rate = item.rate || 0;
-      const lineTotal = item.line_total || 0;
-      const taxAmount = item.tax_amount || 0;
+      const lineTotal = item.line_total || item.amount || 0;
+      const taxAmount = item.tax_amount || item.tax || 0;
       const taxable = lineTotal - taxAmount;
       const discount = (rate * qty) - taxable;
 
+      // Robust product image extraction from multiple possible locations
+      let resolvedImage = productImage || item.image || item.product_image || item.product_image_url || item.image_url || item.product?.image || item.product?.Image || null;
+      if (!resolvedImage && item.product?.Images && item.product.Images.length) resolvedImage = item.product.Images[0];
+      if (!resolvedImage && item.product?.Variants && item.product.Variants.length && item.product.Variants[0].Images && item.product.Variants[0].Images.length) resolvedImage = item.product.Variants[0].Images[0];
+      if (!resolvedImage && item.variant && (item.variant.Images || item.variant.Image)) resolvedImage = (item.variant.Images && item.variant.Images[0]) || item.variant.Image || null;
+
+      // Variant id could be present on item or nested inside product/variant
+      const resolvedVariantId = item.variant_id || item.variant?.id || item.product?.Variants?.[0]?.ID || null;
+
+      // Determine GST percent: direct fields or derived from taxAmount/taxable
+      let gstPercent = 0;
+      if (item.gst_percent || item.gst) gstPercent = Number(item.gst_percent ?? item.gst);
+      else if (item.tax_percentage) gstPercent = Number(item.tax_percentage);
+      else if (item.Tax && item.Tax.Percentage) gstPercent = Number(item.Tax.Percentage);
+      else if (item.product && item.product.Tax && item.product.Tax.Percentage) gstPercent = Number(item.product.Tax.Percentage);
+      else if (taxable && taxAmount) gstPercent = Number(((taxAmount / taxable) * 100).toFixed(2));
+
+      // Compute CGST/SGST amounts from taxable and gstPercent when tax_amount not provided
+      const computedTaxTotal = Number(((taxable * (gstPercent || 0)) / 100).toFixed(2));
+      const cgstAmt = (taxAmount ? Number((taxAmount / 2).toFixed(2)) : Number((computedTaxTotal / 2).toFixed(2)));
+      const sgstAmt = (taxAmount ? Number((taxAmount / 2).toFixed(2)) : Number((computedTaxTotal / 2).toFixed(2)));
+
+      // Normalize image into a URL string when possible (handles object shapes)
+      let normalizedImage = null;
+      if (typeof resolvedImage === 'string') {
+        normalizedImage = normalizeImageUrl(resolvedImage) || resolvedImage;
+      } else if (resolvedImage && typeof resolvedImage === 'object') {
+        const candidate = resolvedImage.url || resolvedImage.path || resolvedImage.src || resolvedImage.thumbnail || resolvedImage.image;
+        normalizedImage = candidate ? (normalizeImageUrl(candidate) || candidate) : null;
+      }
+
+      // Determine fixedRate (use stored fixed rate if present, otherwise prefer product/variant StdSalesPrice or the saved rate)
+      const resolvedFixedRate = Number(item.fixed_rate ?? item.fixedRate ?? item.fixed_price ?? item.fixedPrice ?? item.rate ?? (item.product?.Variants?.[0]?.StdSalesPrice ?? item.product?.StdSalesPrice ?? 0));
+
+      // Derive discount percent if not directly stored
+      const baseLine = Number((rate * qty) || 0);
+      const computedDiscount = discount > 0 ? discount : 0;
+      const computedDiscountPercent = baseLine > 0 ? Number(Math.max(0, Math.min(100, ((computedDiscount / baseLine) * 100))).toFixed(4)) : 0;
+
       return {
         _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-        id: item.product_id,
-        name: item.description || item.product?.Name || '',
-        image: productImage,
-        hsn: item.hsncode || item.product?.HsnSacCode || item.product?.hsn_sac_code || '',
+        id: item.product_id || item.product?.ID || item.product?.id || null,
+        name: item.description || item.product?.Name || item.product?.name || '',
+        image: normalizedImage,
+        hsn: item.hsncode || item.hsn || item.hsn_code || item.product?.HsnSacCode || item.product?.hsn_sac_code || '',
         unit: item.unit || item.product?.Unit?.name || item.product?.unit?.name || '',
-        variantId: item.product?.Variants?.[0]?.ID || null,
-        qty: item.quantity,
-        rate: item.rate,
-        discount: discount > 0 ? discount : 0,
-        taxable: taxable,
-        cgst: taxAmount / 2,
-        sgst: taxAmount / 2,
-        amount: lineTotal,
-        desc: item.description || item.product?.Name || '',
+        variantId: resolvedVariantId,
+        qty: item.quantity || 0,
+        rate: item.rate || 0,
+        fixedRate: resolvedFixedRate,
+        gst: gstPercent || 0,
+        discount: computedDiscount,
+        discountPercent: Number(item.discount_percent ?? item.discountPercent ?? computedDiscountPercent) || 0,
+        taxable: Number((taxable || 0).toFixed(2)),
+        cgst: cgstAmt,
+        sgst: sgstAmt,
+        igst: 0,
+        amount: lineTotal || 0,
+        desc: item.description || item.product?.Name || item.product?.name || '',
         leadTime: item.lead_time || item.product?.LeadTime || item.product?.lead_time || '',
         // keep both `sku` and `code`/`Code` normalized for downstream UI and payloads
         sku: item.product_code || item.product?.Sku || item.product?.SKU || item.product?.Code || item.product?.code || '',
@@ -1865,7 +1942,7 @@ const  prefillFormData = async (data) => {
           </button>
         </div>
       </div>
-      <div className="section-card basic-info-card">
+      <div className={`section-card basic-info-card ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
         <h5 className="section-title">Basic Information</h5>
         <div className="form-row">
           <div className="form-group left-start">
@@ -1950,7 +2027,7 @@ const  prefillFormData = async (data) => {
         </div>
       </div>
 
-      <div className="section-card party-details-wrapper">
+      <div className={`section-card party-details-wrapper ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
         <div className="party-details-container">
           <div className="party-details-left">
             <h5 className="section-title">Party Details</h5>
@@ -2254,6 +2331,7 @@ const  prefillFormData = async (data) => {
                 type="date"
                 className="form-control"
                 value={quotationDate}
+                readOnly={isEditMode && !isReviseMode}
                 onChange={(e) => setQuotationDate(e.target.value)}
               />
             </div>
@@ -2316,8 +2394,9 @@ const  prefillFormData = async (data) => {
                     <th>HSN/SAC</th>
                     <th>Qty</th>
                     <th>Unit</th>
+                    <th>Fixed Rate</th>
                     <th>Rate</th>
-                    <th>Discount</th>
+                    <th>Discount %</th>
                     <th>Taxable</th>
                     {isGSTStateMatch ? (
                       <>
@@ -2360,12 +2439,16 @@ const  prefillFormData = async (data) => {
               setTableItems((prev) => prev.map((it, i) => {
                 if (i !== index) return it;
                 const qty = Math.max(0, (Number(it.qty) || 0) - 1);
-                const taxable = (it.rate || 0) * qty - (it.discount || 0);
+                const total = (it.rate || 0) * qty;
+                const prevTotal = (it.rate || 0) * (Number(it.qty) || 0);
+                const discPct = Number(it.discountPercent) || (prevTotal > 0 ? ((it.discount || 0) / prevTotal) * 100 : 0);
+                const discountAmt = (discPct / 100) * total;
+                const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
-                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
+                return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }))
             }
           >
@@ -2381,12 +2464,16 @@ const  prefillFormData = async (data) => {
               setTableItems((prev) => prev.map((it, i) => {
                 if (i !== index) return it;
                 const qty = newQty;
-                const taxable = (it.rate || 0) * qty - (it.discount || 0);
+                const total = (it.rate || 0) * qty;
+                const prevTotal = (it.rate || 0) * (Number(it.qty) || 0);
+                const discPct = Number(it.discountPercent) || (prevTotal > 0 ? ((it.discount || 0) / prevTotal) * 100 : 0);
+                const discountAmt = (discPct / 100) * total;
+                const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
-                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
+                return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }));
             }}
           />
@@ -2398,12 +2485,16 @@ const  prefillFormData = async (data) => {
               setTableItems((prev) => prev.map((it, i) => {
                 if (i !== index) return it;
                 const qty = (Number(it.qty) || 0) + 1;
-                const taxable = (it.rate || 0) * qty - (it.discount || 0);
+                const total = (it.rate || 0) * qty;
+                const prevTotal = (it.rate || 0) * (Number(it.qty) || 0);
+                const discPct = Number(it.discountPercent) || (prevTotal > 0 ? ((it.discount || 0) / prevTotal) * 100 : 0);
+                const discountAmt = (discPct / 100) * total;
+                const taxable = total - discountAmt;
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
                 const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
-                return { ...it, qty, taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
+                return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }))
             }
           >
@@ -2415,6 +2506,10 @@ const  prefillFormData = async (data) => {
         <span>{item.unit || '-'}</span>
       </td>
       <td>
+        <span>{item.fixedRate !== undefined ? Number(item.fixedRate).toFixed(2) : '-'}</span>
+      </td>
+
+      <td>
         <input
           type="text"
           className="form-control input-small"
@@ -2423,7 +2518,11 @@ const  prefillFormData = async (data) => {
             setTableItems((prev) => {
               const newItems = [...prev];
               newItems[index].rate = Number(e.target.value);
-              const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
+              const total = newItems[index].rate * newItems[index].qty;
+              const prevTotal = (Number(e.target.value) * newItems[index].qty) || ((newItems[index].rate || 0) * (newItems[index].qty || 0));
+              const discPct = Number(newItems[index].discountPercent) || (prevTotal > 0 ? ((newItems[index].discount || 0) / prevTotal) * 100 : 0);
+              const discountAmt = (discPct / 100) * total;
+              const taxable = total - discountAmt;
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
               const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
@@ -2434,6 +2533,8 @@ const  prefillFormData = async (data) => {
               newItems[index].igst = taxRes.igst;
               newItems[index].amount = taxRes.grandTotal;
               newItems[index].gst = gstPercent;
+              newItems[index].discount = discountAmt;
+              newItems[index].discountPercent = discPct;
               return newItems;
             })
           }
@@ -2443,12 +2544,17 @@ const  prefillFormData = async (data) => {
         <input
           type="text"
           className="form-control input-small"
-          value={item.discount}
+          value={item.discountPercent !== undefined ? item.discountPercent : ''}
           onChange={(e) =>
             setTableItems((prev) => {
               const newItems = [...prev];
-              newItems[index].discount = Number(e.target.value);
-              const taxable = newItems[index].rate * newItems[index].qty - newItems[index].discount;
+              let pct = Number(e.target.value) || 0;
+              pct = Math.max(0, Math.min(100, pct));
+              newItems[index].discountPercent = pct;
+              const total = newItems[index].rate * newItems[index].qty;
+              const discountAmt = (pct / 100) * total;
+              newItems[index].discount = discountAmt;
+              const taxable = total - discountAmt;
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
               const buyerGSTIN = (selectedShippingAddress?.gst_in) || (selectedBillingAddress?.gst_in) || '';
@@ -2479,6 +2585,13 @@ const  prefillFormData = async (data) => {
             const cgstPct = Math.round(gstRaw / 2);
             const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (cgstPct / 100));
             return cgstVal.toFixed(2);
+          })()}</td>
+
+          <td>{(() => {
+            const taxable = Number(item.taxable) || 0;
+            const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+            const sgstPct = Math.round(gstRaw / 2);
+            return `${sgstPct}%`;
           })()}</td>
 
           <td>{(() => {
@@ -2957,6 +3070,22 @@ const  prefillFormData = async (data) => {
               {selectedFile && (
                 <div style={{ marginTop: '8px', fontSize: '12px', color: '#28a745' }}>
                   New file selected: {selectedFile.name}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    style={{
+                      marginLeft: '10px',
+                      fontSize: '12px',
+                      padding: '2px 6px',
+                      backgroundColor: '#dc3545',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear
+                  </button>
                 </div>
               )}
             </div>
@@ -3281,7 +3410,7 @@ const  prefillFormData = async (data) => {
                 className="btn btn-success add-another"
                 onClick={() => {
                   handleProdClose();
-                  navigate("/ManageProduct?productType=Stock");
+                  window.open(`${window.location.origin}/ManageProduct?productType=Stock`, '_blank');
                 }}
               >
                 + Add Stock Item
@@ -3333,7 +3462,17 @@ const  prefillFormData = async (data) => {
               <div className="grid-3">
                 <div>
                   <label>Qty</label>
-                  <input type="text" className="form-control" value={billingModalValues.qty} onChange={(e) => setBillingModalValues(prev => ({ ...prev, qty: Number(e.target.value) }))} />
+                  <input type="text" className="form-control" value={billingModalValues.qty} onChange={(e) => setBillingModalValues(prev => {
+                    const qty = Number(e.target.value) || 0;
+                    const rate = Number(prev.rate) || 0;
+                    const total = rate * qty;
+                    const prevTotal = (Number(prev.rate) || 0) * (Number(prev.qty) || 0);
+                    const prevDiscount = Number(prev.discount) || 0;
+                    const prevPct = Number(prev.discountPercent);
+                    const pct = (Number.isFinite(prevPct) && prevPct > 0) ? prevPct : (prevTotal > 0 ? (prevDiscount / prevTotal) * 100 : 0);
+                    const discountAmt = (pct / 100) * total;
+                    return { ...prev, qty, discount: Number(discountAmt.toFixed(2)), discountPercent: Number(((total > 0) ? (discountAmt / total) * 100 : 0).toFixed(2)) };
+                  })} />
                 </div>
                 <div>
                   <label>Unit</label>
@@ -3341,18 +3480,45 @@ const  prefillFormData = async (data) => {
                 </div>
                 <div>
                   <label>Rate</label>
-                  <input type="text" className="form-control" value={billingModalValues.rate} onChange={(e) => setBillingModalValues(prev => ({ ...prev, rate: Number(e.target.value) }))} />
+                  <input type="text" className="form-control" value={billingModalValues.rate} onChange={(e) => setBillingModalValues(prev => {
+                    const rate = Number(e.target.value) || 0;
+                    const qty = Number(prev.qty) || 0;
+                    const total = rate * qty;
+                    const prevTotal = (Number(prev.rate) || 0) * (Number(prev.qty) || 0);
+                    const prevDiscount = Number(prev.discount) || 0;
+                    const prevPct = Number(prev.discountPercent);
+                    const pct = (Number.isFinite(prevPct) && prevPct > 0) ? prevPct : (prevTotal > 0 ? (prevDiscount / prevTotal) * 100 : 0);
+                    const discountAmt = (pct / 100) * total;
+                    return { ...prev, rate, discount: Number(discountAmt.toFixed(2)), discountPercent: Number(((total > 0) ? (discountAmt / total) * 100 : 0).toFixed(2)) };
+                  })} />
                 </div>
               </div>
 
               <div className="grid-3">
                 <div>
                   <label>Discount (₹)</label>
-                  <input type="text" className="form-control" value={billingModalValues.discount} onChange={(e) => setBillingModalValues(prev => ({ ...prev, discount: Number(e.target.value) }))} />
+                  <input type="text" className="form-control" value={billingModalValues.discount} onChange={(e) => {
+                    let val = Number(e.target.value) || 0;
+                    setBillingModalValues(prev => {
+                      const total = (Number(prev.rate) || 0) * (Number(prev.qty) || 0);
+                      if (val < 0) val = 0;
+                      if (val > total) val = total;
+                      const pct = total > 0 ? Number(((val / total) * 100).toFixed(2)) : 0;
+                      return { ...prev, discount: val, discountPercent: pct };
+                    });
+                  }} />
                 </div>
                 <div>
                   <label>Discount (%)</label>
-                  <input type="text" className="form-control" value={billingModalValues.discountPercent} onChange={(e) => setBillingModalValues(prev => ({ ...prev, discountPercent: Number(e.target.value) }))} />
+                  <input type="text" className="form-control" value={billingModalValues.discountPercent} onChange={(e) => {
+                    let pct = Number(e.target.value) || 0;
+                    pct = Math.max(0, Math.min(100, pct));
+                    setBillingModalValues(prev => {
+                      const total = (Number(prev.rate) || 0) * (Number(prev.qty) || 0);
+                      const discountAmt = (pct / 100) * total;
+                      return { ...prev, discountPercent: pct, discount: Number(discountAmt.toFixed(2)) };
+                    });
+                  }} />
                 </div>
                 <div>
                   <label>Lead Time</label>

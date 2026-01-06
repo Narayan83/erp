@@ -877,17 +877,17 @@ $danger: #dc3545;
   }
 }
 
- .btn-customer {
-      color: #1b7e28;
-      border: 1px solid #71b179 !important;
-      padding: 6px 10px;
-      height: 36px;
-      border-radius: 6px;
+.btn-customer {
+  color: #1b7e28;
+  border: 1px solid #71b179 !important;
+  padding: 6px 10px;
+  height: 36px;
+  border-radius: 6px;
 
-      &:hover {
-        transform: none !important;
-      }
-    }
+  &:hover {
+    transform: none !important;
+  }
+}
 
 .searchable-select {
   position: relative;
@@ -2437,16 +2437,15 @@ input[type="number"] {
   border-radius: 6px;
 }
 
-/* small responsive tweaks */
-@media (max-width: 720px) {
-  .print-config-modal .modal-box {
-    width: 96%;
-    padding: 12px;
-  }
-  .print-config-modal .modal-header {
-    padding: 6px 0;
-  }
-  .print-config-modal .print-nav-item {
-    font-size: 13px;
-  }
+/* Edit disabled styles for edit mode */
+.edit-disabled {
+  cursor: not-allowed;
+}
+
+.edit-disabled input,
+.edit-disabled select,
+.edit-disabled button,
+.edit-disabled textarea {
+  pointer-events: none;
+  opacity: 0.6;
 }

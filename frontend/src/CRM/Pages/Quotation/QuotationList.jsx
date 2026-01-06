@@ -7,7 +7,7 @@ import { debounce } from "lodash";
 import * as XLSX from 'xlsx';
 import "./quotationlist.scss";
 
-import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaFileInvoiceDollar, FaShoppingCart } from 'react-icons/fa';
+import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt } from 'react-icons/fa';
 
 const QuotationList = () => {
   const navigate = useNavigate();
@@ -19,7 +19,6 @@ const QuotationList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [activeDocType, setActiveDocType] = useState("All");
   const [monthFilter, setMonthFilter] = useState("This Month");
   const [statusFilter, setStatusFilter] = useState("All");
   const [branchFilter, setBranchFilter] = useState("All Branches");
@@ -32,6 +31,7 @@ const QuotationList = () => {
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [showQuotationDetail, setShowQuotationDetail] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
 
   // initialize visible columns from localStorage or defaults
   const columnOptions = [
@@ -56,6 +56,7 @@ const QuotationList = () => {
   const [selectedOtherYear, setSelectedOtherYear] = useState(new Date().getFullYear());
   const [showMonthSelector, setShowMonthSelector] = useState(false);
   const [showYearSelector, setShowYearSelector] = useState(false);
+  const [selectedFinancialYear, setSelectedFinancialYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     fetchQuotations();
@@ -583,7 +584,7 @@ const QuotationList = () => {
   // Reset to first page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, activeDocType, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear]);
+  }, [searchTerm, typeFilter, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear, selectedFinancialYear]);
 
   // Reusable filter function (used by listing and export)
   const applyFiltersToList = (list) => {
@@ -600,13 +601,19 @@ const QuotationList = () => {
       });
     }
 
-    if (activeDocType && activeDocType !== 'All') {
+    if (typeFilter && typeFilter !== 'All') {
       filtered = filtered.filter((q) => {
-        if (activeDocType === 'Quotation') {
+        if (typeFilter === 'Quotation') {
           return q.document_type === 'Quotation' || q.type === 'Quotation' || !q.is_proforma;
         }
-        if (activeDocType === 'Proforma Invoices') {
-          return q.document_type === 'Proforma Invoices' || q.type === 'Proforma Invoices' || q.is_proforma;
+        if (typeFilter === 'Proforma') {
+          return q.document_type === 'Proforma' || q.type === 'Proforma' || q.is_proforma;
+        }
+        if (typeFilter === 'Sales Order') {
+          return q.document_type === 'Sales Order' || q.type === 'Sales Order';
+        }
+        if (typeFilter === 'Transfer Order') {
+          return q.document_type === 'Transfer Order' || q.type === 'Transfer Order';
         }
         return true;
       });
@@ -621,20 +628,29 @@ const QuotationList = () => {
       filtered = filtered.filter((q) => {
         const d = q.quotation_date ? new Date(q.quotation_date) : null;
         if (!d) return false;
-        if (monthFilter === 'This Month') {
+        if (monthFilter === 'Month') {
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         } else if (monthFilter === 'Last Month') {
           const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           return d.getMonth() === last.getMonth() && d.getFullYear() === last.getFullYear();
-        } else if (monthFilter === 'This Year') {
-          return d.getFullYear() === now.getFullYear();
         } else if (monthFilter === 'Other Month') {
           if (!selectedOtherMonth) return false;
           const [year, month] = selectedOtherMonth.split('-').map(Number);
           return d.getMonth() === month - 1 && d.getFullYear() === year;
-        } else if (monthFilter === 'Other Year') {
-          if (!selectedOtherYear) return false;
-          return d.getFullYear() === Number(selectedOtherYear);
+        } else if (monthFilter === 'Financial Year') {
+          let fyStart, fyEnd;
+          if (now.getMonth() >= 3) { // April is 3
+            fyStart = new Date(now.getFullYear(), 3, 1);
+            fyEnd = new Date(now.getFullYear() + 1, 2, 31);
+          } else {
+            fyStart = new Date(now.getFullYear() - 1, 3, 1);
+            fyEnd = new Date(now.getFullYear(), 2, 31);
+          }
+          return d >= fyStart && d <= fyEnd;
+        } else if (monthFilter === 'Other Financial Year') {
+          const fyStart = new Date(selectedFinancialYear, 3, 1);
+          const fyEnd = new Date(selectedFinancialYear + 1, 2, 31);
+          return d >= fyStart && d <= fyEnd;
         }
         return true;
       });
@@ -659,12 +675,65 @@ const QuotationList = () => {
 
   useEffect(() => {
     setDisplayedQuotations(applyFiltersToList(quotations));
-  }, [quotations, searchTerm, activeDocType, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear]);
+  }, [quotations, searchTerm, typeFilter, monthFilter, statusFilter, branchFilter, executiveFilter, selectedOtherMonth, selectedOtherYear, selectedFinancialYear]);
+
+  const getCreateButtonText = () => {
+    if (typeFilter === 'Quotation') return '+ Create Quotation';
+    if (typeFilter === 'Proforma') return '+ Create Proforma';
+    if (typeFilter === 'Sales Order') return '+ Create Sales Order';
+    if (typeFilter === 'Transfer Order') return '+ Create Transfer Order';
+    return '+ Create Quotation'; // default for All
+  };
+
+  // Compute pre-tax (product amount without tax) for a single quotation
+  const calculatePreTaxForQuotation = (q) => {
+    if (!q) return 0;
+    const grand = Number(q.grand_total) || 0;
+
+    // 1) explicit pre_tax_amount if provided
+    if (q.pre_tax_amount !== undefined && q.pre_tax_amount !== null) {
+      return Number(q.pre_tax_amount) || 0;
+    }
+
+    // 2) derive from line items if available
+    const items = q.quotation_items || q.items || [];
+    if (Array.isArray(items) && items.length) {
+      const sum = items.reduce((s, item) => {
+        const qty = Number(item.quantity) || 0;
+        const rate = Number(item.rate) || 0;
+        const discountPct = Number(item.discount_percentage) || 0;
+        const line = qty * rate;
+        const discount = line * (discountPct / 100);
+        const taxable = line - discount;
+        return s + taxable;
+      }, 0);
+      return sum;
+    }
+
+    // 3) subtract explicit tax amounts if present
+    const taxes = (Number(q.cgst_amount) || 0) + (Number(q.sgst_amount) || 0) + (Number(q.igst_amount) || 0);
+    if (taxes > 0) {
+      return Math.max(0, grand - taxes);
+    }
+
+    // 4) if tax percentage is provided, derive pre-tax as grand / (1 + tax_percentage/100)
+    if (q.tax_percentage !== undefined && q.tax_percentage !== null) {
+      const tp = Number(q.tax_percentage) || 0;
+      if (tp > 0) {
+        return grand / (1 + tp / 100);
+      }
+    }
+
+    // fallback: assume grand is pre-tax
+    return grand;
+  };
 
   const calculateTotals = () => {
     const list = displayedQuotations.length ? displayedQuotations : quotations;
-    const preTax = list.reduce((sum, q) => sum + (q.grand_total || 0), 0);
-    const total = preTax; // Adjust if you have tax calculation
+
+    const preTax = list.reduce((sum, q) => sum + (calculatePreTaxForQuotation(q) || 0), 0);
+    const total = list.reduce((sum, q) => sum + (Number(q.grand_total) || 0), 0);
+
     return { preTax, total, count: list.length };
   };
 
@@ -773,18 +842,20 @@ const QuotationList = () => {
       </div>
 
       <div className="filters-row">
-        <div className="doc-type-buttons">
-          <button className={activeDocType === "All" ? "active" : ""} onClick={() => setActiveDocType("All")}>All</button>
-          <button className={activeDocType === "Quotation" ? "active" : ""} onClick={() => setActiveDocType("Quotation")}>Quotation</button>
-          <button className={activeDocType === "Proforma Invoices" ? "active" : ""} onClick={() => setActiveDocType("Proforma Invoices")}>Proforma Invoices</button>
-        </div>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <option>All Type</option>
+          <option>Quotation</option>
+          <option>Proforma</option>
+          <option>Sales Order</option>
+          <option>Transfer Order</option>
+        </select>
 
         <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
-          <option>This Month</option>
+          <option>Month</option>
           <option>Last Month</option>
-          <option>This Year</option>
           <option>Other Month</option>
-          <option>Other Year</option>
+          <option>Financial Year</option>
+          <option>Other Financial Year</option>
         </select>
 
         {monthFilter === 'Other Month' && (
@@ -826,6 +897,22 @@ const QuotationList = () => {
           </select>
         )}
 
+        {monthFilter === 'Other Financial Year' && (
+          <select 
+            value={selectedFinancialYear} 
+            onChange={(e) => setSelectedFinancialYear(Number(e.target.value))}
+            style={{ minWidth: '120px' }}
+          >
+            {(() => {
+              const now = new Date();
+              const currentFYStart = (now.getMonth() >= 3) ? now.getFullYear() : now.getFullYear() - 1;
+              return Array.from({ length: 10 }, (_, i) => currentFYStart - i).map((year) => (
+                <option key={year} value={year}>{year}-{year + 1}</option>
+              ));
+            })()}
+          </select>
+        )}
+
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option>All</option>
           <option>Open</option>
@@ -851,7 +938,7 @@ const QuotationList = () => {
           })}
         </select>
         <div className="filters-right">
-          <button className="btn-create" onClick={() => navigate('/quotation')}>+ Create Quotation</button>
+          <button className="btn-create" onClick={() => navigate('/quotation')}>{getCreateButtonText()}</button>
         </div>
       </div>
 
@@ -1021,7 +1108,7 @@ const QuotationList = () => {
                 <h4>Financials</h4>
                 <div className="detail-row">
                   <span className="label">Pre-Tax ₹:</span>
-                  <span className="value">{((selectedQuotation.grand_total || 0) * (1 - (selectedQuotation.tax_percentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="value">{(calculatePreTaxForQuotation(selectedQuotation) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="detail-row total">
                   <span className="label">Amount ₹:</span>
@@ -1041,19 +1128,14 @@ const QuotationList = () => {
                 <span>Delete</span>
               </button>
 
-              <button className="action-btn review" title="Review">
-                <FaCheckCircle />
-                <span>Review</span>
+              <button className="action-btn revise" title="Revise" onClick={() => { navigate(`/quotation/${selectedQuotation.quotation_id}?revise=1`); setShowQuotationDetail(false); }}>
+                <FaRedo />
+                <span>Revise</span>
               </button>
 
-              <button className="action-btn invoice" title="Invoice">
-                <FaFileInvoiceDollar />
-                <span>Invoice</span>
-              </button>
-
-              <button className="action-btn order" title="Create Order">
-                <FaShoppingCart />
-                <span>Order</span>
+              <button className="action-btn convert" title="Convert" onClick={() => setShowConvertModal(true)}>
+                <FaExchangeAlt />
+                <span>Convert</span>
               </button>
             </div>
 
@@ -1065,6 +1147,48 @@ const QuotationList = () => {
                 <button className="share-btn email" onClick={(e) => shareViaEmail(e)}>Email</button>
                 <button className="share-btn print" onClick={(e) => printQuotation(e)}>Print</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConvertModal && selectedQuotation && (
+        <div className="convert-modal-overlay">
+          <div className="convert-modal">
+            <button className="close-btn" onClick={() => setShowConvertModal(false)}>×</button>
+            <h3>Convert Quotation</h3>
+            <p>Select the type of order to convert to:</p>
+            <div className="convert-options">
+              <button 
+                className="convert-option" 
+                onClick={() => { 
+                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/transfer-order`); 
+                  setShowConvertModal(false); 
+                  setShowQuotationDetail(false); 
+                }}
+              >
+                Transfer Order
+              </button>
+              <button 
+                className="convert-option" 
+                onClick={() => { 
+                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/sales-order`); 
+                  setShowConvertModal(false); 
+                  setShowQuotationDetail(false); 
+                }}
+              >
+                Sales Order
+              </button>
+              <button 
+                className="convert-option" 
+                onClick={() => { 
+                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/purchase-order`); 
+                  setShowConvertModal(false); 
+                  setShowQuotationDetail(false); 
+                }}
+              >
+                Purchase Order
+              </button>
             </div>
           </div>
         </div>

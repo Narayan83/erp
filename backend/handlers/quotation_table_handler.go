@@ -490,6 +490,7 @@ func GetAllQuotationsTable(c *fiber.Ctx) error {
 		Preload("SalesCreditPerson").
 		Preload("BillingAddress").
 		Preload("ShippingAddress").
+		Preload("QuotationTableItems.Product.Variants").
 		Preload("QuotationTableItems.Product").
 		Order("created_at desc").
 		Offset(offset).
@@ -520,6 +521,7 @@ func GetQuotationTable(c *fiber.Ctx) error {
 		Preload("SalesCreditPerson").
 		Preload("BillingAddress").
 		Preload("ShippingAddress").
+		Preload("QuotationTableItems.Product.Variants").
 		Preload("QuotationTableItems.Product").
 		First(&quotation, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Quotation not found"})

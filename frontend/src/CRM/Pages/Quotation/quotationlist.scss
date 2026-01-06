@@ -133,31 +133,6 @@
       }
     }
 
-    .doc-type-buttons {
-      display: flex;
-      gap: 5px;
-
-      button {
-        padding: 6px 12px;
-        border: 1px solid #ddd;
-        background: #fff;
-        border-radius: 4px;
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &.active {
-          background: $primary-blue;
-          color: #fff;
-          border-color: $primary-blue;
-        }
-
-        &:hover:not(.active) {
-          background: #f5f5f5;
-        }
-      }
-    }
-
     .filters-right {
       margin-left: auto;
       display: flex;
@@ -590,6 +565,81 @@
           background: #fff3e0;
           color: #e65100;
           border-color: #ffe0b2;
+        }
+      }
+    }
+  }
+
+  /* Convert Modal */
+  .convert-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1400;
+  }
+
+  .convert-modal {
+    background: #fff;
+    border-radius: 8px;
+    width: 400px;
+    max-width: 95vw;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    position: relative;
+
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      font-size: 28px;
+      color: #999;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &:hover {
+        color: #333;
+      }
+    }
+
+    h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #333;
+    }
+
+    p {
+      margin: 0 0 20px 0;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .convert-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      .convert-option {
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #f5f5f5;
+          border-color: #999;
         }
       }
     }

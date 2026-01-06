@@ -200,12 +200,35 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const s = String(v).trim();
       return s === '' ? null : Number(s);
     };
+    
     // generate SKU when not provided by user
     const generateSku = () => `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     const skuValue = data.sku && String(data.sku).trim() !== '' ? data.sku : generateSku();
     
-  
-  
+    // Compute main image string based on current selection
+    const mainImgStr = (typeof mainImageIndex === 'number' && imageFiles[mainImageIndex])
+      ? (imageFiles[mainImageIndex].original || images[mainImageIndex])
+      : null;
+    
+    const payload = {
+      color: selectedColor?.value || '',
+      size: selectedSize || '',
+      sku: skuValue,
+      barcode: data.barcode,
+      purchaseCost: sanitizeNumber(data.purchaseCost),
+      stdSalesPrice: sanitizeNumber(data.stdSalesPrice),
+      stock: sanitizeNumber(data.stock),
+      leadTime: sanitizeNumber(data.leadTime),
+      isActive: Boolean(data.isActive),
+      images: images,
+      Files: files,
+      mainImage: mainImgStr,
+      mainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
+    };
+    
+    onSave(payload);
+    onClose();
+  };
 
   const removeImage = (index) => {
     // revoke objectURL if present and was a File
@@ -673,5 +696,4 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       )}
     </div>
   );
-}
 }
