@@ -1,28 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaEdit, FaCheck } from 'react-icons/fa';
 import './updateStatusModal.scss';
 
 const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) => {
   const [changeStageDropdown, setChangeStageDropdown] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  const [rejectionReasons, setRejectionReasons] = useState([]);
+  // Store rejection reasons as objects {id, name} so they can be edited and saved to localStorage
+  const [rejectionReasonsList, setRejectionReasonsList] = useState([]);
+  const [editingReasonId, setEditingReasonId] = useState(null); // -1 indicates adding a new reason
+  const [editingText, setEditingText] = useState('');
 
   const stages = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
 
-  // Load saved rejection reasons from localStorage
+  // Load saved rejection reasons from localStorage as objects [{id,name}]
   useEffect(() => {
     if (isOpen) {
       try {
         const saved = JSON.parse(localStorage.getItem('leadRejectionReasons') || '[]');
         if (Array.isArray(saved) && saved.length > 0) {
-          setRejectionReasons(saved.map(r => r.name));
+          // support older format where saved could be an array of strings
+          if (typeof saved[0] === 'string') {
+            setRejectionReasonsList(saved.map((name, idx) => ({ id: idx + 1, name })));
+          } else {
+            setRejectionReasonsList(saved);
+          }
         } else {
           // fallback to default if none saved
-          setRejectionReasons(['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other']);
+          const defaults = ['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other'].map((name, idx) => ({ id: idx + 1, name }));
+          setRejectionReasonsList(defaults);
         }
       } catch (e) {
-        setRejectionReasons(['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other']);
+        const defaults = ['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other'].map((name, idx) => ({ id: idx + 1, name }));
+        setRejectionReasonsList(defaults);
       }
+    }
+  }, [isOpen]);
+
+  // Reset editing state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setEditingReasonId(null);
+      setEditingText('');
     }
   }, [isOpen]);
 
@@ -50,6 +68,59 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
       reason: rejectReason
     });
     setRejectReason('');
+  };
+
+  // Inline edit handlers for rejection reasons
+  const handleStartEdit = () => {
+    // If a reason is selected, start editing that reason; otherwise start a new entry
+    const found = rejectionReasonsList.find(r => r.name === rejectReason);
+    if (found) {
+      setEditingReasonId(found.id);
+      setEditingText(found.name);
+    } else {
+      setEditingReasonId(-1); // adding new
+      setEditingText(rejectReason || '');
+    }
+  };
+
+  const handleSaveEdit = () => {
+    const trimmed = (editingText || '').trim();
+    if (!trimmed) {
+      alert('Please enter a reason');
+      return;
+    }
+
+    const listCopy = Array.isArray(rejectionReasonsList) ? [...rejectionReasonsList] : [];
+
+    if (editingReasonId === -1) {
+      // add new reason
+      const newItem = { id: Date.now(), name: trimmed };
+      listCopy.push(newItem);
+      setRejectionReasonsList(listCopy);
+      try { localStorage.setItem('leadRejectionReasons', JSON.stringify(listCopy)); } catch (e) {}
+      setRejectReason(newItem.name);
+    } else {
+      // update existing
+      const idx = listCopy.findIndex(x => x.id === editingReasonId);
+      if (idx !== -1) {
+        listCopy[idx] = { ...listCopy[idx], name: trimmed };
+      } else {
+        // fallback: add new
+        listCopy.push({ id: Date.now(), name: trimmed });
+      }
+      setRejectionReasonsList(listCopy);
+      try { localStorage.setItem('leadRejectionReasons', JSON.stringify(listCopy)); } catch (e) {}
+      setRejectReason(trimmed);
+    }
+
+    // exit edit mode
+    setEditingReasonId(null);
+    setEditingText('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReasonId(null);
+    setEditingText('');
   };
 
   return (
@@ -90,12 +161,25 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
               Reject with Reason
             </label>
             <div className="option-content">
-              <select value={rejectReason} onChange={e => setRejectReason(e.target.value)}>
-                <option value="">Select</option>
-                {rejectionReasons.map(reason => (
-                  <option key={reason} value={reason}>{reason}</option>
-                ))}
-              </select>
+              <div className="reason-inline">
+                {editingReasonId !== null ? (
+                  <div className="inline-edit" style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
+                    <input value={editingText} onChange={e => setEditingText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); }} placeholder="Enter reason" />
+                    <button type="button" className="btn save-btn" title="Save reason" onClick={handleSaveEdit}><FaCheck /></button>
+                    <button type="button" className="btn cancel-btn" title="Cancel" onClick={handleCancelEdit}><FaTimes /></button>
+                  </div>
+                ) : (
+                  <>
+                    <select value={rejectReason} onChange={e => setRejectReason(e.target.value)}>
+                      <option value="">Select</option>
+                      {(rejectionReasonsList || []).map(r => (
+                        <option key={r.id} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                    <button className="edit-btn" title="Edit/Add Reason" onClick={(e) => { e.stopPropagation(); handleStartEdit(); }}><FaEdit /></button>
+                  </>
+                )}
+              </div>
               <button className="btn reject-btn" onClick={handleReject}>✕ Reject</button>
             </div>
           </div>

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { FaTimes, FaPhone, FaEnvelope, FaRegCalendarAlt, FaClipboardList, FaWhatsapp, FaCopy } from 'react-icons/fa';
 import { BASE_URL } from '../../../config/Config';
 import UpdateStatusModal from './UpdateStatusModal/UpdateStatusModal';
+import InteractionModal from './InteractionModal/InteractionModal';
 import './leadDetails.scss';
 
 const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
   const [showUpdateStatus, setShowUpdateStatus] = useState(false);
+  const [showInteraction, setShowInteraction] = useState(false);
 
   if (!isOpen || !lead) return null;
 
@@ -84,6 +86,27 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     }
   };
 
+  // Open the Add Quotation page in a new tab and prefill using lead data passed as query params
+  const openQuoteFromLead = () => {
+    try {
+      const params = new URLSearchParams();
+      if (lead?.id) params.set('lead_id', String(lead.id));
+      const company = lead?.business || lead?.businessName || lead?.company || '';
+      if (company) params.set('lead_company', company);
+      const contact = lead?.name || lead?.contact || [lead?.prefix, lead?.firstName, lead?.lastName].filter(Boolean).join(' ').trim();
+      if (contact) params.set('lead_contact', contact);
+      if (lead?.mobile) params.set('lead_mobile', lead.mobile);
+      if (lead?.email) params.set('lead_email', lead.email);
+      const product = lead?.productName || lead?.product || lead?.requirements || '';
+      if (product) params.set('lead_product', product);
+      const url = `/quotation?${params.toString()}`;
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Failed to open quotation page from lead', err);
+      window.open('/quotation', '_blank');
+    }
+  };
+
   return (
     <div className="lead-details-overlay" onClick={onClose}>
       <div className="lead-details-modal" onClick={e => e.stopPropagation()}>
@@ -143,8 +166,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
                 <div className="actions-list">
                 <button className="btn small" onClick={() => { if (onEdit) onEdit(lead); }}>Reassign</button>
                 <button className="btn small" onClick={() => setShowUpdateStatus(true)}>Update Status</button>
-                <button className="btn small green">+ Quote</button>
-                <button className="btn small green">+ Order</button>
+                <button className="btn small green" onClick={() => openQuoteFromLead()}>+ Quote</button>
                 <button className="btn small">Business History</button>
               </div>
             </div>
@@ -153,7 +175,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
               <div className="card-title">Business Interactions</div>
               <div className="interactions">
                 <div className="next-appointment">{lead.nextTalk || 'No appointment scheduled'}</div>
-                <button className="btn small green">+ Enter Interaction</button>
+                <button className="btn small green" onClick={() => setShowInteraction(true)}>+ Enter Interaction</button>
               </div>
             </div>
           </div>
@@ -162,6 +184,16 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
       </div>
 
       {/* Update Status Modal */}
+      <InteractionModal
+        isOpen={showInteraction}
+        onClose={() => setShowInteraction(false)}
+        lead={lead}
+        onSaved={() => {
+          if (onStatusUpdate) onStatusUpdate();
+          setShowInteraction(false);
+        }}
+      />
+
       <UpdateStatusModal
         isOpen={showUpdateStatus}
         onClose={() => setShowUpdateStatus(false)}

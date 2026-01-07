@@ -148,7 +148,12 @@ func main() {
 				log.Println("Adding and populating series_id column...")
 				initializers.DB.Exec(`ALTER TABLE quotation_tables ADD COLUMN series_id bigint`)
 				initializers.DB.Exec(`UPDATE quotation_tables SET series_id = ? WHERE series_id IS NULL`, defaultSeriesID)
+				// keep it not null for newly created column to not break older code paths
 				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN series_id SET NOT NULL`)
+			} else if seriesColExists {
+				// If column exists and is NOT NULL, allow NULLs now so series becomes optional going forward
+				log.Println("Ensuring series_id column is nullable (DROP NOT NULL)")
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN series_id DROP NOT NULL`)
 			}
 
 			// Handle company_id column
@@ -333,7 +338,49 @@ func main() {
 	if typoStillExists {
 		log.Println("Dropping typo column qutation_scp_count from quotation_tables...")
 		initializers.DB.Exec(`ALTER TABLE quotation_tables DROP COLUMN IF EXISTS qutation_scp_count`)
-		log.Println("Typo column dropped successfully.")
+	}
+
+	// Ensure quotation_table_items.product_id is nullable (allow service/non-stock items)
+	var quotationItemsTableExists bool
+	initializers.DB.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables 
+			WHERE table_name = 'quotation_table_items'
+		)
+	`).Scan(&quotationItemsTableExists)
+
+	if quotationItemsTableExists {
+		var productColExists bool
+		initializers.DB.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name = 'quotation_table_items' AND column_name = 'product_id'
+			)
+		`).Scan(&productColExists)
+
+		if productColExists {
+			var isNullable string
+			initializers.DB.Raw(`SELECT is_nullable FROM information_schema.columns WHERE table_name = 'quotation_table_items' AND column_name = 'product_id'`).Scan(&isNullable)
+			if isNullable == "NO" {
+				log.Println("Making product_id nullable in quotation_table_items...")
+				initializers.DB.Exec(`ALTER TABLE quotation_table_items ALTER COLUMN product_id DROP NOT NULL`)
+			}
+		}
+
+		// Add is_service column if missing (default false)
+		var isServiceColExists bool
+		initializers.DB.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name = 'quotation_table_items' AND column_name = 'is_service'
+			)
+		`).Scan(&isServiceColExists)
+
+		if !isServiceColExists {
+			log.Println("Adding is_service column to quotation_table_items...")
+			initializers.DB.Exec(`ALTER TABLE quotation_table_items ADD COLUMN is_service boolean DEFAULT false`)
+			initializers.DB.Exec(`ALTER TABLE quotation_table_items ALTER COLUMN is_service SET NOT NULL`)
+		}
 	}
 
 	// Ensure ON DELETE CASCADE for product_variants.product_id -> products.id

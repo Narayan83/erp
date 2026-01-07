@@ -276,6 +276,8 @@ header .rounded-circle:hover svg {
     .right-content {
       padding: 5px;
       margin-top: 50px;
+      width: 100vw;
+      max-width: 100%;
     }
   }
 }

@@ -1,9 +1,12 @@
 package models
 
+// QuotationTableItems represents individual line items on a quotation table.
+// ProductID is nullable to allow service/non-stock lines that don't reference a product.
 type QuotationTableItems struct {
-	ID          uint `gorm:"primaryKey" json:"id"`
-	QuotationID uint `gorm:"not null" json:"quotation_id"` // FK to Quotation
-	ProductID   uint `gorm:"not null" json:"product_id"`   // FK to Product
+	ID          uint  `gorm:"primaryKey" json:"id"`
+	QuotationID uint  `gorm:"not null" json:"quotation_id"` // FK to Quotation
+	ProductID   *uint `json:"product_id,omitempty"`         // Nullable FK to Product
+	IsService   bool  `gorm:"default:false" json:"is_service"`
 
 	ProductCode string  `gorm:"type:text" json:"product_code"`
 	Description string  `gorm:"type:text" json:"description"`
@@ -17,5 +20,5 @@ type QuotationTableItems struct {
 	TaxAmount float64 `gorm:"not null" json:"tax_amount"`
 	LineTotal float64 `gorm:"not null" json:"line_total"`
 
-	Product Product `gorm:"foreignKey:ProductID" json:"product"`
+	Product *Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }

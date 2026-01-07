@@ -298,6 +298,20 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
 
   const { id } = useParams(); 
   const location = useLocation();
+
+  // derive document type from query param (default to Quotation)
+  const urlType = (() => {
+    try {
+      const params = new URLSearchParams(location?.search || '');
+      const t = params.get('type');
+      return t ? t : '';
+    } catch (e) {
+      return '';
+    }
+  })();
+  // local state for UI-selected document type (initialized from query param)
+  const [docType, setDocType] = useState(urlType || 'Quotation');
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [isReviseMode, setIsReviseMode] = useState(false);
   const [quotationData, setQuotationData] = useState(null);
@@ -436,7 +450,21 @@ useEffect(()=>{console.log(customers)},[customers]);
         id: s.id || s.ID,
         name: s.name || s.Name || '',
         prefix: s.prefix || s.Prefix || '',
-        prefix_number: s.prefix_number || s.prefixNumber || s.prefix_number || ''
+        prefix_number: s.prefix_number || s.prefixNumber || s.prefix_number || '',
+        // preserve document_type and branch restrictions so UI can filter
+        document_type: s.document_type || s.DocumentType || s.type || '',
+        // company_branch_ids may be stored as JSON string or an array
+        company_branch_ids: (() => {
+          try {
+            if (!s.company_branch_ids && s.company_branch_id) return [s.company_branch_id];
+            if (!s.company_branch_ids) return [];
+            if (typeof s.company_branch_ids === 'string') return JSON.parse(s.company_branch_ids || '[]');
+            if (Array.isArray(s.company_branch_ids)) return s.company_branch_ids;
+            return [];
+          } catch (e) {
+            return [];
+          }
+        })(),
       })) : [];
       setSeriesList(list);
     } catch (err) {
@@ -622,12 +650,65 @@ const handleTandCClose = () => setOpenTandCModal(false);
      setGrandTotal(grandTotal);
    },[tableItems])
 
+  // When document type (or branch/address) changes we need to refresh rates/fixedRates and recompute taxes
+  useEffect(() => {
+    if (!tableItems || tableItems.length === 0) return;
+
+    setTableItems(prev => prev.map((item) => {
+      // skip services/non-product rows
+      if (item._isService) return item;
+
+      // try to resolve product/variant from current state or the item itself
+      const prodFromList = products.find(p => String(p.ID) === String(item.id)) || item.product || null;
+      const variantFromList = prodFromList?.Variants ? (prodFromList.Variants.find(v => String(v.ID) === String(item.variantId)) || prodFromList.Variants[0]) : null;
+
+      // If we can't find product/variant, leave the row as-is
+      if (!prodFromList && !variantFromList) return item;
+
+      const purchaseCost = Number(variantFromList?.PurchaseCost ?? prodFromList?.PurchaseCost ?? prodFromList?.Purchase_Cost ?? 0);
+      const salesPrice = Number(variantFromList?.StdSalesPrice ?? variantFromList?.SalePrice ?? variantFromList?.SellingPrice ?? prodFromList?.StdSalesPrice ?? prodFromList?.SalePrice ?? 0);
+
+      const newRate = docType === 'Purchase Order' ? purchaseCost : (salesPrice || Number(item.rate || 0));
+      const qty = Number(item.qty) || 0;
+      const discountAmount = Number(item.discount || 0);
+      const gstPercent = Number(item.gst ?? item.gst_percent ?? item.gstPercent ?? (prodFromList?.Tax?.Percentage ?? 0)) || 0;
+      const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+      const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
+
+      const taxable = (newRate * qty) - discountAmount;
+      const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+
+      return {
+        ...item,
+        rate: Number(newRate),
+        fixedRate: Number(newRate),
+        taxable: taxRes.amount,
+        cgst: taxRes.cgst,
+        sgst: taxRes.sgst,
+        igst: taxRes.igst,
+        amount: taxRes.grandTotal,
+        gst: gstPercent,
+      };
+    }));
+
+    // also update the billing modal values (if open) so user sees the change immediately when editing an item
+    if (billingModalOpen && billingModalProduct) {
+      const prodFromList = products.find(p => String(p.ID) === String(billingModalProduct.ID)) || billingModalProduct;
+      const variantFromList = prodFromList?.Variants?.[0] || null;
+      const purchaseCost = Number(variantFromList?.PurchaseCost ?? prodFromList?.PurchaseCost ?? 0);
+      const salesPrice = Number(variantFromList?.StdSalesPrice ?? variantFromList?.SalePrice ?? prodFromList?.StdSalesPrice ?? 0);
+      const newRate = docType === 'Purchase Order' ? purchaseCost : (salesPrice || Number(billingModalValues.rate || 0));
+      setBillingModalValues(prev => ({ ...prev, rate: Number(newRate), fixedRate: Number(newRate) }));
+    }
+
+  }, [docType, selectedBranch, selectedShippingAddress, selectedBillingAddress]);
+
   // Add product to table with calculations
   const handleSelectProduct = (prod, forceNewRow = false) => {
     const qtyToAdd = 1; // default quantity when selecting
     const selectedVariant = prod.Variants?.[0] || null;
-    // Prefer variant sales price (StdSalesPrice) as the default rate; fall back to other fields if not present
-    const rate = Number((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0);
+    // Prefer purchase cost for Purchase Orders; otherwise prefer variant sales price (StdSalesPrice) or other sale fields
+    const rate = Number(docType === 'Purchase Order' ? (selectedVariant?.PurchaseCost ?? prod.PurchaseCost ?? selectedVariant?.StdSalesPrice ?? 0) : ((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0));
     const discount = 0;
 
     setTableItems((prev) => {
@@ -720,7 +801,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       setBillingModalValues({
         qty,
         rate,
-        fixedRate: Number(prod.fixedRate ?? prod.fixed_rate ?? prod.fixed_price ?? prod.fixedPrice ?? rate),
+        fixedRate: Number(docType === 'Purchase Order' ? (prod.fixedRate ?? prod.fixed_rate ?? prod.fixed_price ?? prod.fixedPrice ?? prod.PurchaseCost ?? prod.Purchase_Cost ?? rate) : (prod.fixedRate ?? prod.fixed_rate ?? prod.fixed_price ?? prod.fixedPrice ?? rate)),
         discount,
         discountPercent: Math.round(discountPercent * 100) / 100,
         hsn: prod.hsn || prod.HsnSacCode || "",
@@ -740,8 +821,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
     setBillingModalProduct(prod);
     setBillingModalValues({
       qty: 1,
-      // default billing modal rate should reflect sales price
-      rate: Number((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0),
+      // default billing modal rate: use PurchaseCost for Purchase Orders, otherwise sales price
+      rate: Number(docType === 'Purchase Order' ? (selectedVariant?.PurchaseCost ?? prod.PurchaseCost ?? (selectedVariant?.StdSalesPrice ?? 0)) : ((selectedVariant?.StdSalesPrice ?? selectedVariant?.SalePrice ?? selectedVariant?.SellingPrice ?? selectedVariant?.PurchaseCost) ?? 0)),
       discount: 0,
       discountPercent: 0,
       hsn: prod.HsnSacCode || "",
@@ -1147,13 +1228,14 @@ const handleSaveQuotation = async () => {
 
   const payload = {
     quotation: {
-      // series_id is required by the backend quotation table endpoint
+      // series_id is optional — allow creating a quotation without selecting a series
       series_id: selectedSeries ? Number(selectedSeries) : null,
       // include company/branch context when available
       company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : null,
       company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : null,
       company_branch_bank_id:selectedBankId,
-      quotation_number: isEditMode ? (qutationNo || quotationData?.quotation_number || '') : qutationNo,
+      // If no quotation number provided on create, send null so backend can assign one if desired
+      quotation_number: isEditMode ? (qutationNo || quotationData?.quotation_number || '') : (qutationNo && qutationNo.toString().trim() !== '' ? qutationNo : null),
       quotation_date: new Date(quotationDate).toISOString(),
       customer_id: Number(selectedCustomer.id),
       sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : null,
@@ -1179,19 +1261,27 @@ const handleSaveQuotation = async () => {
       end_customer_name: endcustomer,
       end_dealer_name: enddealer,
     },
-    quotation_items: tableItems.map((it) => ({
-      product_id: Number(it.id) || 0,
-      product_code: it.sku || '',
-      description: it.desc || it.name || '',
-      quantity: Number(it.qty) || 0,
-      unit: it.unit || '',
-      rate: Number(it.rate) || 0,
-      lead_time: String(it.leadTime || ''),
-      hsncode: it.hsn || '',
-      gst: Number(it.gst || 0),
-      tax_amount: Number((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) || 0,
-      line_total: Number(it.amount) || 0,
-    })),
+    quotation_items: tableItems.map((it) => {
+      // product_id should be null for non-product rows (e.g. services) to avoid FK violation
+      const pid = Number(it.id);
+      const product_id = (Number.isFinite(pid) && pid > 0) ? pid : null;
+
+      return {
+        product_id,
+        product_code: it.sku || '',
+        description: it.desc || it.name || '',
+        quantity: Number(it.qty) || 0,
+        unit: it.unit || '',
+        rate: Number(it.rate) || 0,
+        lead_time: String(it.leadTime || ''),
+        hsncode: it.hsn || '',
+        gst: Number(it.gst || 0),
+        tax_amount: Number((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) || 0,
+        line_total: Number(it.amount) || 0,
+        // helpful for backend to distinguish service/non-stock lines
+        is_service: !!it._isService,
+      };
+    }),
   };
 
   // Log payload for debugging
@@ -1368,17 +1458,13 @@ const handleSaveQuotation = async () => {
     console.log(qutationNo);
   },[qutationNo])
 
-  const handleOnChangeSeriesSelect = async (e) => {
-    const seriesId = e.target.value;
-    setSelectedSeries(seriesId);
-
+  // generate next sequence and quotation number for a given series id
+  const generateSequenceForSeries = async (seriesId) => {
     // When editing an existing quotation, do NOT auto-generate or overwrite the existing
     // quotation number. Preserve the original `qutationNo` unless the user explicitly
     // chooses to change it via the UI.
-    if (isEditMode) {
-      return;
-    }
-    
+    if (isEditMode) return;
+
     if (!seriesId) {
       // When no series is selected, show only the normal number (seqNumber)
       setQutationNo(seqNumber || '');
@@ -1394,17 +1480,11 @@ const handleSaveQuotation = async () => {
     try {
       // Use seriesId to get max scp count for the selected series
       let maxCount = 0;
-      if (!seriesId) {
-        console.warn('No series selected yet');
-        setCurrentScpCount({ max_quotation_scp_count: 0 });
-      } else {
-        const res = await axios.get(`${BASE_URL}/api/quotations/count-scp/${seriesId}`);
-        console.log(res.data);
-        let result = res.data;
-        setCurrentScpCount(result);
-        maxCount = result.max_quotation_scp_count || 0;
-      }
-      
+      const res = await axios.get(`${BASE_URL}/api/quotations/count-scp/${seriesId}`);
+      let result = res.data;
+      setCurrentScpCount(result || {});
+      maxCount = (result && (result.max_quotation_scp_count || 0)) || 0;
+
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const nextYear = currentYear + 1;
@@ -1412,8 +1492,8 @@ const handleSaveQuotation = async () => {
       setYearRange(yrRange);
 
       // Generate next number (editable middle part)
-      const nextNumber = maxCount + 1;
-      const prevNumber = maxCount;
+      const nextNumber = Number(maxCount) + 1;
+      const prevNumber = Number(maxCount);
       setSeqNumber(String(nextNumber));
 
       // Build full quotation string and previous
@@ -1430,6 +1510,24 @@ const handleSaveQuotation = async () => {
       console.error('Failed to generate quotation number:', error);
     }
   };
+
+  const handleOnChangeSeriesSelect = (e) => {
+    const seriesId = e.target.value;
+    setSelectedSeries(seriesId);
+  };
+
+  // whenever selectedSeries changes (programmatic or user selection), compute sequence
+  useEffect(() => {
+    if (!selectedSeries) {
+      // reset when no series
+      setQutationNo(seqNumber || '');
+      setPrevQutationNo('');
+      return;
+    }
+
+    // generate sequence for the newly selected series
+    generateSequenceForSeries(selectedSeries);
+  }, [selectedSeries]);
 
   const handleOnchabgeSalesCredit = async (e) => {
     setSelectedEmployee(e.target.value);
@@ -1493,6 +1591,133 @@ const handleSaveQuotation = async () => {
       navigate('/quotation-list');
     }
   }, [id, location.search]);
+
+  // If ?copy_from=<quotation_id> is present, fetch that quotation and prefill the form (create mode)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const copyFrom = params.get('copy_from');
+      if (copyFrom && !/\d+/.test(String(id || ""))) {
+        // only treat as a copy when we're NOT in edit mode (no path id)
+        (async () => {
+          try {
+            const resp = await axios.get(`${BASE_URL}/api/quotations/${copyFrom}`);
+            const data = resp.data;
+            if (data) {
+              // prefill but keep it as a new document
+              await prefillFormData(data);
+              setIsEditMode(false);
+              setIsReviseMode(false);
+              // ensure sequence/number fields are cleared so a new number is generated
+              setQutationNo('');
+              setPrevQutationNo('');
+              setSeqNumber('');
+            }
+          } catch (err) {
+            console.error("Failed to fetch quotation for copy:", err);
+            // Don't block the user; show a warning
+            alert('Could not load the quotation to copy.');
+          }
+        })();
+      }
+    } catch (err) {
+      // ignore
+    }
+
+    // If ?lead_id=<lead_id> is present, fetch the lead and prefill customer, contact and product fields
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const leadId = params.get('lead_id') || params.get('from_lead');
+      if (leadId && !isEditMode) {
+        (async () => {
+          try {
+            const resp = await axios.get(`${BASE_URL}/api/leads/${leadId}`);
+            const lead = resp.data;
+            if (lead) {
+              // Do not prefill addresses from lead — users requested addresses NOT to be prefilled
+              setContactPerson(lead.contact || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || '');
+              setNote(lead.requirement || lead.requirements || lead.notes || '');
+
+              // Try to match an existing customer (by email / mobile / company) so saving the form will work
+              let foundUser = null;
+              try {
+                const q = lead.email || lead.mobile || lead.business || lead.contact || '';
+                if (q) {
+                  const uResp = await axios.get(`${BASE_URL}/api/users?page=1&limit=10&filter=${encodeURIComponent(q)}`);
+                  const users = (uResp.data && (uResp.data.data || uResp.data)) || [];
+                  if (Array.isArray(users) && users.length > 0) {
+                    // prefer exact matches on email/mobile
+                    foundUser = users.find(u => (lead.email && ((u.email || '').toString().toLowerCase() === (lead.email || '').toString().toLowerCase())) || (lead.mobile && ((u.mobile || '').toString() === (lead.mobile || '').toString())) );
+                    if (!foundUser) foundUser = users[0];
+                  }
+                }
+              } catch (e) {
+                console.error('Customer lookup failed for lead prefill', e);
+              }
+
+              // If no existing user found, try to create a minimal customer record so the quotation can be saved
+              if (!foundUser) {
+                try {
+                  const createPayload = {
+                    business: lead.business || lead.businessName || '',
+                    firstname: lead.firstName || lead.first_name || lead.contact || '',
+                    lastname: lead.lastName || lead.last_name || '',
+                    email: lead.email || '',
+                    mobile: lead.mobile || '',
+                    user_type: 'customer'
+                  };
+                  const cResp = await axios.post(`${BASE_URL}/api/users`, createPayload);
+                  foundUser = cResp.data;
+                } catch (e) {
+                  // If create failed, fall back to a display-only prefill (no id) and notify in console
+                  console.error('Failed to create customer from lead', e);
+                }
+              }
+
+              if (foundUser) {
+                setSelectedCustomer(foundUser);
+                // ensure customers list includes the created/found user
+                try { setCustomers(prev => { const cur = Array.isArray(prev) ? prev.slice() : []; if (!cur.find(c => String(c.id || c.ID) === String(foundUser.id || foundUser.ID))) cur.unshift(foundUser); return cur; }); } catch(e){}
+              } else {
+                // keep selectedCustomer minimal (no id) so user can choose/create a real customer manually
+                setSelectedCustomer({ company_name: lead.business || '', firstname: lead.firstName || '', lastname: lead.lastName || '' });
+              }
+
+              // Prefill product if provided — but avoid adding the same product twice
+              const productHint = params.get('lead_product') || lead.productName || lead.product || '';
+              if (productHint) {
+                try {
+                  const pResp = await axios.get(`${BASE_URL}/api/products`, { params: { search: productHint, page: 1, limit: 10 } });
+                  const prods = (pResp.data && (pResp.data.data || pResp.data)) || [];
+                  // find the best match
+                  let match = null;
+                  if (prods.length === 1) match = prods[0];
+                  else match = prods.find(p => (p.Name || p.name || '').toLowerCase().includes(String(productHint).toLowerCase()));
+                  if (match) {
+                    // prevent duplicate add (check id or sku/code)
+                    const exists = (tableItems || []).some(it => {
+                      const sameId = (it.id || it.ID) && (match.id || match.ID) && String(it.id || it.ID) === String(match.id || match.ID);
+                      const sameSku = (it.sku || it.Code || it.code || '').toString().trim() !== '' && ((match.Sku || match.SKU || match.Code || match.code || '') && String(it.sku || it.Code || it.code).toString().trim() === String(match.Sku || match.SKU || match.Code || match.code).toString().trim());
+                      return sameId || sameSku;
+                    });
+                    if (!exists) {
+                      handleSelectProduct(match, true);
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to lookup product for lead prefill', err);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Failed to load lead for prefill:', err);
+          }
+        })();
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [location.search]);
 
   // Set branch when branches are loaded and we have quotation data with branch_id
   useEffect(() => {
@@ -1763,6 +1988,18 @@ const  prefillFormData = async (data) => {
     setAttachmentPath(data.attachment_path);
   }
 
+  // Pre-fill round off flag: if server sent non-zero roundoff_amount or explicit flags
+  if (data.roundoff_amount !== undefined && data.roundoff_amount !== null) {
+    try {
+      const rn = Number(data.roundoff_amount) || 0;
+      setIncludeRoundOff(Boolean(rn !== 0));
+    } catch (e) {
+      // ignore
+    }
+  } else if (data.include_roundoff === true || data.includeRoundOff === true || data.include_round_off === true || data.total_before_roundoff === true) {
+    setIncludeRoundOff(true);
+  }
+
   // Pre-fill table items with ALL fields from QuotationTableItems
   if (data.quotation_items && data.quotation_items.length > 0) {
     const items = data.quotation_items.map(item => {
@@ -1834,8 +2071,8 @@ const  prefillFormData = async (data) => {
         normalizedImage = candidate ? (normalizeImageUrl(candidate) || candidate) : null;
       }
 
-      // Determine fixedRate (use stored fixed rate if present, otherwise prefer product/variant StdSalesPrice or the saved rate)
-      const resolvedFixedRate = Number(item.fixed_rate ?? item.fixedRate ?? item.fixed_price ?? item.fixedPrice ?? item.rate ?? (item.product?.Variants?.[0]?.StdSalesPrice ?? item.product?.StdSalesPrice ?? 0));
+      // Determine fixedRate (use stored fixed rate if present, otherwise prefer purchase cost for Purchase Orders or sales price for others)
+      const resolvedFixedRate = Number(item.fixed_rate ?? item.fixedRate ?? item.fixed_price ?? item.fixedPrice ?? item.rate ?? (docType === 'Purchase Order' ? (item.product?.Variants?.[0]?.PurchaseCost ?? item.product?.PurchaseCost ?? 0) : (item.product?.Variants?.[0]?.StdSalesPrice ?? item.product?.StdSalesPrice ?? 0)) );
 
       // Derive discount percent if not directly stored
       const baseLine = Number((rate * qty) || 0);
@@ -1851,7 +2088,7 @@ const  prefillFormData = async (data) => {
         unit: item.unit || item.product?.Unit?.name || item.product?.unit?.name || '',
         variantId: resolvedVariantId,
         qty: item.quantity || 0,
-        rate: item.rate || 0,
+        rate: Number(item.rate ?? (docType === 'Purchase Order' ? (item.product?.Variants?.[0]?.PurchaseCost ?? item.product?.PurchaseCost ?? 0) : (item.product?.Variants?.[0]?.StdSalesPrice ?? item.product?.StdSalesPrice ?? 0))),
         fixedRate: resolvedFixedRate,
         gst: gstPercent || 0,
         discount: computedDiscount,
@@ -1875,16 +2112,19 @@ const  prefillFormData = async (data) => {
   // Pre-fill terms and conditions
   if (data.terms_and_conditions) {
     if (Array.isArray(data.terms_and_conditions)) {
-      setTandcSelections(data.terms_and_conditions);
+      // normalize: convert primitive IDs to objects { ID: value }
+      const normalized = data.terms_and_conditions.map(v => (v && typeof v === 'object') ? v : { ID: v });
+      setTandcSelections(normalized);
     } else if (typeof data.terms_and_conditions === 'string') {
       try {
         const parsed = JSON.parse(data.terms_and_conditions);
         if (Array.isArray(parsed)) {
-          setTandcSelections(parsed);
+          const normalized = parsed.map(v => (v && typeof v === 'object') ? v : { ID: v });
+          setTandcSelections(normalized);
         }
       } catch (e) {
-        // If it's a plain string, wrap it in an array
-        setTandcSelections([data.terms_and_conditions]);
+        // If it's a plain string, wrap it in an array of objects
+        setTandcSelections([{ ID: data.terms_and_conditions }]);
       }
     }
   }
@@ -1955,11 +2195,102 @@ const  prefillFormData = async (data) => {
 };
 
 
+
+
+  const titleBase = (docType === 'All' || docType === 'All Type' || !docType) ? 'Quotation' : docType;
+  const formTitle = isEditMode ? (isReviseMode ? `Revise ${titleBase}` : `Edit ${titleBase}`) : `Create ${titleBase}`;
+
+  const handleDocTypeChange = (value) => {
+    setDocType(value);
+    try {
+      const params = new URLSearchParams(location.search);
+      if (value && value !== 'Quotation') params.set('type', value);
+      else params.delete('type');
+      const qs = params.toString();
+      navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // derive a small list of document types (static + any discovered from series)
+  const docTypes = useMemo(() => {
+    const base = ['Quotation', 'Proforma Invoice', 'Sales Order', 'Transfer Order', 'Purchase Order'];
+    try {
+      const s = new Set(base);
+      (seriesList || []).forEach(sr => {
+        if (sr && sr.document_type) s.add(sr.document_type);
+      });
+      return Array.from(s);
+    } catch (e) {
+      return base;
+    }
+  }, [seriesList]);
+
+  // derive filtered series list based on document type and selected branch
+  const filteredSeries = useMemo(() => {
+    const t = (docType || '').toString().trim();
+    const tLow = t.toLowerCase();
+    const branchId = selectedBranch && (selectedBranch.id || selectedBranch);
+
+    return (seriesList || []).filter(s => {
+      const dt = (s.document_type || '').toString().toLowerCase();
+      // match document type: allow series with empty document_type (global) or matching type
+      let typeMatch = false;
+      if (!t || tLow === 'all' || tLow === 'all type') {
+        typeMatch = true;
+      } else if (tLow === 'proforma') {
+        typeMatch = dt.includes('proforma') || dt === 'proforma invoice';
+      } else {
+        typeMatch = dt === tLow || dt === '';
+      }
+
+      if (!typeMatch) return false;
+
+      // match branch: if branch is selected then series must be global (no branch restrictions)
+      // or include the selected branch id. If no branch selected, accept all.
+      if (!branchId) return true;
+      const ids = Array.isArray(s.company_branch_ids) ? s.company_branch_ids.map(String) : [];
+      if (ids.length === 0) return true; // global series
+      return ids.includes(String(branchId));
+    });
+  }, [seriesList, docType, selectedBranch]);
+
+  // auto-select series when single match and not in edit mode
+  useEffect(() => {
+    if (isEditMode) return; // don't overwrite existing selection in edit
+    try {
+      if ((!selectedSeries || selectedSeries === '') && filteredSeries && filteredSeries.length === 1) {
+        setSelectedSeries(String(filteredSeries[0].id));
+      }
+      // if current selectedSeries no longer exists in filtered list, reset it
+      if (selectedSeries && filteredSeries && !filteredSeries.find(s => String(s.id) === String(selectedSeries))) {
+        setSelectedSeries('');
+      }
+    } catch (e) {
+      console.warn('Failed to auto-select series', e);
+    }
+  }, [filteredSeries, isEditMode]);
+
   return (
     <section className="right-content create-quotation">
       <div className="top-bar">
-        <div className="title">Create Quotation</div>
+        <div className="title">{formTitle}</div>
         <div className="actions">
+          <select
+            className="form-control doc-type-select select-width-160"
+            value={docType}
+            onChange={(e) => handleDocTypeChange(e.target.value)}
+            aria-label="Document type"
+            disabled={isEditMode}
+            title={isEditMode ? 'Document type cannot be changed in edit mode' : 'Document type'}
+            style={{ cursor: isEditMode ? 'not-allowed' : 'pointer' }}
+          >
+            {docTypes.map(dt => (
+              <option key={dt} value={dt}>{dt}</option>
+            ))}
+          </select>
+
           <button className="btn btn--print" onClick={handleOpenPrintConfig}>
             <span><IoMdPrint /></span>
             Print Settings
@@ -2053,11 +2384,15 @@ const  prefillFormData = async (data) => {
               title={isEditMode ? 'Series cannot be changed in edit mode' : ''}
             >
               <option value="">Select</option>
-              {seriesList && seriesList.length > 0 && seriesList.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
+              {filteredSeries && filteredSeries.length > 0 ? (
+                filteredSeries.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>No series available for selected type/branch</option>
+              )}
             </select>
           </div>
         </div>
@@ -2283,7 +2618,7 @@ const  prefillFormData = async (data) => {
             <h5 className="section-title">Document Details</h5>
             
             <div className="form-field-vertical">
-              <label>Quotation No. :</label>
+              <label>{(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma No.' : 'Quotation No.'} :</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {!isEditMode && (
@@ -2324,7 +2659,6 @@ const  prefillFormData = async (data) => {
                             })();
                             setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
                           }}
-                          placeholder="###"
                         />
                         <div>/</div>
                         <div style={{ color: '#333' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
@@ -2342,7 +2676,7 @@ const  prefillFormData = async (data) => {
                             setSeqNumber(v);
                             setQutationNo(v);
                           }}
-                          placeholder="Quotation No."
+                          placeholder={(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma No.' : 'Quotation No.'}
                         />
                       </>
                     )
@@ -2369,13 +2703,13 @@ const  prefillFormData = async (data) => {
             </div>
 
             <div className="form-field-vertical">
-              <label htmlFor="quotationDate">Quotation Date :</label>
+              <label htmlFor="quotationDate">{(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma Date' : 'Quotation Date'} :</label>
               <input
                 id="quotationDate"
                 type="date"
                 className="form-control"
                 value={quotationDate}
-                readOnly={isEditMode && !isReviseMode}
+                readOnly= {true}
                 onChange={(e) => setQuotationDate(e.target.value)}
               />
             </div>

@@ -506,6 +506,20 @@ const QuotationList = () => {
     }
   };
 
+  // derive a user-facing document type from a quotation object
+  const getDocType = (q) => {
+    if (!q) return 'Quotation';
+    // Explicit document_type (preferred)
+    if (q.document_type) return q.document_type;
+    // Legacy 'type' field
+    if (q.type) return q.type;
+    // If series is preloaded, prefer its configured document type
+    if (q.series && (q.series.document_type || q.series.DocumentType)) return q.series.document_type || q.series.DocumentType;
+    // Some endpoints use a boolean flag for proforma
+    if (q.is_proforma) return 'Proforma Invoice';
+    return 'Quotation';
+  };
+
   const shareViaWhatsApp = (e) => {
     e.stopPropagation();
     if (!selectedQuotation) return;
@@ -572,6 +586,27 @@ const QuotationList = () => {
     shareAsPDF(e);
   };
 
+  // Mark quotation as Converted and navigate to the create form with copy
+  const handleConvert = async (qid, type) => {
+    if (!qid) return;
+    // optimistic update in UI
+    setSelectedQuotation(prev => (prev && String(prev.quotation_id) === String(qid)) ? { ...prev, status: 'Converted' } : prev);
+    setDisplayedQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: 'Converted' } : q)));
+    setQuotations(prev => (prev || []).map(q => (String(q.quotation_id) === String(qid) ? { ...q, status: 'Converted' } : q)));
+
+    try {
+      await axios.put(`${BASE_URL}/api/quotations/${qid}`, { quotation: { status: 'Converted' } });
+      try { window.toastr && window.toastr.success && window.toastr.success('Quotation marked Converted'); } catch (e) {}
+    } catch (err) {
+      console.error('Failed to mark quotation as Converted', err);
+      try { window.toastr && window.toastr.error && window.toastr.error('Failed to update quotation status'); } catch (e) {}
+    } finally {
+      setShowConvertModal(false);
+      setShowQuotationDetail(false);
+      navigate(`/quotation?type=${encodeURIComponent(type)}&copy_from=${qid}`);
+    }
+  };
+
   // Debounce the search input so we don't re-filter on every keystroke
   useEffect(() => {
     const handler = debounce(() => {
@@ -606,14 +641,17 @@ const QuotationList = () => {
         if (typeFilter === 'Quotation') {
           return q.document_type === 'Quotation' || q.type === 'Quotation' || !q.is_proforma;
         }
-        if (typeFilter === 'Proforma') {
-          return q.document_type === 'Proforma' || q.type === 'Proforma' || q.is_proforma;
+        if (typeFilter === 'Proforma Invoice') {
+          return q.document_type === 'Proforma Invoice' || q.type === 'Proforma Invoice' || q.is_proforma;
         }
         if (typeFilter === 'Sales Order') {
           return q.document_type === 'Sales Order' || q.type === 'Sales Order';
         }
         if (typeFilter === 'Transfer Order') {
           return q.document_type === 'Transfer Order' || q.type === 'Transfer Order';
+        }
+        if (typeFilter === 'Purchase Order') {
+          return q.document_type === 'Purchase Order' || q.type === 'Purchase Order';
         }
         return true;
       });
@@ -679,9 +717,10 @@ const QuotationList = () => {
 
   const getCreateButtonText = () => {
     if (typeFilter === 'Quotation') return '+ Create Quotation';
-    if (typeFilter === 'Proforma') return '+ Create Proforma';
+    if (typeFilter === 'Proforma Invoice') return '+ Create Proforma Invoice';
     if (typeFilter === 'Sales Order') return '+ Create Sales Order';
     if (typeFilter === 'Transfer Order') return '+ Create Transfer Order';
+    if (typeFilter === 'Purchase Order') return '+ Create Purchase Order';
     return '+ Create Quotation'; // default for All
   };
 
@@ -754,7 +793,7 @@ const QuotationList = () => {
         if (visibleColumns.includes('valid_till')) row['Valid Till'] = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '';
         if (visibleColumns.includes('issued_on')) row['Issued On'] = q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : '';
         if (visibleColumns.includes('issued_by')) row['Issued by'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
-        if (visibleColumns.includes('type')) row['Type'] = 'Quotation';
+        if (visibleColumns.includes('type')) row['Type'] = getDocType(q);
         if (visibleColumns.includes('executive')) row['Executive'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
         if (visibleColumns.includes('response')) row['Response'] = '';
         if (visibleColumns.includes('last_interaction')) row['Last Interaction'] = q.last_interaction ? new Date(q.last_interaction).toLocaleDateString('en-IN') : '';
@@ -781,7 +820,7 @@ const QuotationList = () => {
           if (visibleColumns.includes('valid_till')) row['Valid Till'] = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '';
           if (visibleColumns.includes('issued_on')) row['Issued On'] = q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : '';
           if (visibleColumns.includes('issued_by')) row['Issued by'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
-          if (visibleColumns.includes('type')) row['Type'] = 'Quotation';
+          if (visibleColumns.includes('type')) row['Type'] = getDocType(q);
           if (visibleColumns.includes('executive')) row['Executive'] = `${q.sales_credit_person?.firstname || ''} ${q.sales_credit_person?.lastname || ''}`.trim() || '';
           if (visibleColumns.includes('response')) row['Response'] = '';
           if (visibleColumns.includes('last_interaction')) row['Last Interaction'] = q.last_interaction ? new Date(q.last_interaction).toLocaleDateString('en-IN') : '';
@@ -845,9 +884,10 @@ const QuotationList = () => {
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option>All Type</option>
           <option>Quotation</option>
-          <option>Proforma</option>
+          <option>Proforma Invoice</option>
           <option>Sales Order</option>
           <option>Transfer Order</option>
+          <option>Purchase Order</option>
         </select>
 
         <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
@@ -938,7 +978,12 @@ const QuotationList = () => {
           })}
         </select>
         <div className="filters-right">
-          <button className="btn-create" onClick={() => navigate('/quotation')}>{getCreateButtonText()}</button>
+          <button
+            className="btn-create"
+            onClick={() => navigate(`/quotation?type=${encodeURIComponent(typeFilter === 'All' ? 'Quotation' : typeFilter)}`)}
+          >
+            {getCreateButtonText()}
+          </button>
         </div>
       </div>
 
@@ -970,7 +1015,7 @@ const QuotationList = () => {
                 {visibleColumns.includes('valid_till') && <td>{quotation.valid_until ? new Date(quotation.valid_until).toLocaleDateString('en-IN') : '-'}</td>}
                 {visibleColumns.includes('issued_on') && <td>{quotation.quotation_date ? new Date(quotation.quotation_date).toLocaleDateString('en-IN') : '-'}</td>}
                 {visibleColumns.includes('issued_by') && <td>{renderHighlighted(((quotation.sales_credit_person?.firstname || '') + ' ' + (quotation.sales_credit_person?.lastname || '')).trim() || '-')}</td>}
-                {visibleColumns.includes('type') && <td>Quotation</td>}
+                {visibleColumns.includes('type') && <td>{renderHighlighted(getDocType(quotation))}</td>}
                 {visibleColumns.includes('executive') && <td>{renderHighlighted(((quotation.sales_credit_person?.firstname || '') + ' ' + (quotation.sales_credit_person?.lastname || '')).trim() || '-')}</td>}
                 {visibleColumns.includes('status') && <td>{renderHighlighted(quotation.status || '-')}</td>}
                 {visibleColumns.includes('response') && <td>-</td>}
@@ -1161,31 +1206,19 @@ const QuotationList = () => {
             <div className="convert-options">
               <button 
                 className="convert-option" 
-                onClick={() => { 
-                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/transfer-order`); 
-                  setShowConvertModal(false); 
-                  setShowQuotationDetail(false); 
-                }}
+                onClick={() => handleConvert(selectedQuotation.quotation_id, 'Transfer Order')}
               >
                 Transfer Order
               </button>
               <button 
                 className="convert-option" 
-                onClick={() => { 
-                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/sales-order`); 
-                  setShowConvertModal(false); 
-                  setShowQuotationDetail(false); 
-                }}
+                onClick={() => handleConvert(selectedQuotation.quotation_id, 'Sales Order')}
               >
                 Sales Order
               </button>
               <button 
                 className="convert-option" 
-                onClick={() => { 
-                  navigate(`/quotation/${selectedQuotation.quotation_id}/convert/purchase-order`); 
-                  setShowConvertModal(false); 
-                  setShowQuotationDetail(false); 
-                }}
+                onClick={() => handleConvert(selectedQuotation.quotation_id, 'Purchase Order')}
               >
                 Purchase Order
               </button>

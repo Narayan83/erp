@@ -906,10 +906,20 @@ const TopMenu = () => {
     return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
   }).length;
 
+  const convertedCount = leads.filter(l => {
+    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+    return ['decided', 'converted', 'won'].includes(stage);
+  }).length;
+
+  const isConverted = (lead) => {
+    const stage = (lead.stage || lead.Stage || '').toString().toLowerCase();
+    return ['decided', 'converted', 'won'].includes(stage);
+  };
+
   const isRejected = (lead) => {
     const stage = (lead.stage || lead.Stage || '').toString().toLowerCase();
     return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
-  };
+  }; 
 
   // Paginated leads for current page
   const paginatedLeads = displayedLeads.slice((pageNo - 1) * rowsPerPage, pageNo * rowsPerPage);
@@ -1106,9 +1116,10 @@ const TopMenu = () => {
             <div className="stat-box total">Total: {totalLeads}</div>
             <div className="stat-box today">Today: {todaysLeads}</div>
             <div className="stat-box contacted">Contacted: {contactedCount}</div>
+            <div className="stat-box converted">Converted: {convertedCount}</div>
             <div className="stat-box pending">Pending: {pendingCount}</div>
             <div className="stat-box rejected">Rejected: {rejectedCount}</div>
-            <div className="stat-box potential">Potential: {formatIndianRupees(leads.reduce((sum, lead) => sum + parseInt(lead.potential || "0"), 0))}</div>
+            <div className="stat-box potential">Potential: {formatIndianRupees(leads.reduce((sum, lead) => sum + parseInt(lead.potential || "0"), 0))}</div> 
           </div>
         </div>
       </div>

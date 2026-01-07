@@ -407,11 +407,13 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 	// ---------------------------
 	tx := quotationTableDB.Begin()
 
-	// Validate Series
+	// Validate Series (optional)
 	var series models.Series
-	if err := tx.First(&series, req.Quotation.SeriesID).Error; err != nil {
-		tx.Rollback()
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid series"})
+	if req.Quotation.SeriesID != nil {
+		if err := tx.First(&series, *req.Quotation.SeriesID).Error; err != nil {
+			tx.Rollback()
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid series"})
+		}
 	}
 
 	// Set defaults

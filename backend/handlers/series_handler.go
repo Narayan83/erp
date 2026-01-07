@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"erp.local/backend/models"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -14,23 +18,27 @@ func SetSeriesDB(db *gorm.DB) {
 }
 
 type CreateSeriesRequest struct {
-	Name            string `json:"name"`
-	Prefix          string `json:"prefix"`
-	Postfix         string `json:"postfix"`
-	Remarks         string `json:"remarks"`
-	CompanyID       *uint  `json:"company_id"`
-	CompanyBranchID *uint  `json:"company_branch_id"`
-	IsActive        bool   `json:"is_active"`
+	DocumentType     string `json:"document_type"`
+	Name             string `json:"name"`
+	Prefix           string `json:"prefix"`
+	Postfix          string `json:"postfix"`
+	Remarks          string `json:"remarks"`
+	CompanyID        *uint  `json:"company_id"`
+	CompanyBranchID  *uint  `json:"company_branch_id"`
+	CompanyBranchIDs []uint `json:"company_branch_ids"`
+	IsActive         bool   `json:"is_active"`
 }
 
 type UpdateSeriesRequest struct {
-	Name            *string `json:"name"`
-	Prefix          *string `json:"prefix"`
-	Postfix         *string `json:"postfix"`
-	Remarks         *string `json:"remarks"`
-	CompanyID       *uint   `json:"company_id"`
-	CompanyBranchID *uint   `json:"company_branch_id"`
-	IsActive        *bool   `json:"is_active"`
+	DocumentType     *string `json:"document_type"`
+	Name             *string `json:"name"`
+	Prefix           *string `json:"prefix"`
+	Postfix          *string `json:"postfix"`
+	Remarks          *string `json:"remarks"`
+	CompanyID        *uint   `json:"company_id"`
+	CompanyBranchID  *uint   `json:"company_branch_id"`
+	CompanyBranchIDs *[]uint `json:"company_branch_ids"`
+	IsActive         *bool   `json:"is_active"`
 }
 
 func CreateSeries(c *fiber.Ctx) error {
@@ -40,6 +48,7 @@ func CreateSeries(c *fiber.Ctx) error {
 	}
 
 	series := models.Series{
+		DocumentType:    body.DocumentType,
 		Name:            body.Name,
 		Prefix:          body.Prefix,
 		Postfix:         body.Postfix,
@@ -47,6 +56,17 @@ func CreateSeries(c *fiber.Ctx) error {
 		CompanyID:       body.CompanyID,
 		CompanyBranchID: body.CompanyBranchID,
 		IsActive:        body.IsActive,
+	}
+
+	// Persist company_branch_ids as JSONB
+	if len(body.CompanyBranchIDs) > 0 {
+		b, _ := json.Marshal(body.CompanyBranchIDs)
+		series.CompanyBranchIDs = datatypes.JSON(b)
+		// ensure primary company_branch_id is set to the first id if not provided
+		if series.CompanyBranchID == nil {
+			first := body.CompanyBranchIDs[0]
+			series.CompanyBranchID = &first
+		}
 	}
 
 	if err := seriesDB.Create(&series).Error; err != nil {
@@ -73,7 +93,8 @@ func GetSeriesList(c *fiber.Ctx) error {
 		query = query.Where("company_id = ?", companyID)
 	}
 	if branchID != "" {
-		query = query.Where("company_branch_id = ?", branchID)
+		// Support native company_branch_id and JSONB company_branch_ids that contain the branch
+		query = query.Where("company_branch_id = ? OR company_branch_ids @> ?", branchID, fmt.Sprintf("[%s]", branchID))
 	}
 	if search != "" {
 		query = query.Where("prefix ILIKE ? OR remarks ILIKE ?",
@@ -116,6 +137,9 @@ func UpdateSeries(c *fiber.Ctx) error {
 
 	updates := map[string]interface{}{}
 
+	if body.DocumentType != nil {
+		updates["document_type"] = *body.DocumentType
+	}
 	if body.Name != nil {
 		updates["name"] = *body.Name
 	}
@@ -133,6 +157,16 @@ func UpdateSeries(c *fiber.Ctx) error {
 	}
 	if body.CompanyBranchID != nil {
 		updates["company_branch_id"] = body.CompanyBranchID
+	}
+	if body.CompanyBranchIDs != nil {
+		// marshal and set JSONB
+		b, _ := json.Marshal(*body.CompanyBranchIDs)
+		updates["company_branch_ids"] = datatypes.JSON(b)
+		if len(*body.CompanyBranchIDs) > 0 {
+			updates["company_branch_id"] = (*body.CompanyBranchIDs)[0]
+		} else {
+			updates["company_branch_id"] = nil
+		}
 	}
 	if body.IsActive != nil {
 		updates["is_active"] = *body.IsActive

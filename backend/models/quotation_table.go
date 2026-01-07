@@ -20,9 +20,9 @@ const (
 type QuotationTable struct {
 	QuotationID uint `gorm:"primaryKey" json:"quotation_id"`
 
-	// ?? Series & Numbering
-	SeriesID uint   `gorm:"not null;index" json:"series_id"`
-	Series   Series `gorm:"foreignKey:SeriesID" json:"series"`
+	// ?? Series & Numbering (optional)
+	SeriesID *uint   `gorm:"index" json:"series_id,omitempty"`
+	Series   *Series `gorm:"foreignKey:SeriesID" json:"series,omitempty"`
 
 	QuotationNumber string    `gorm:"unique;not null" json:"quotation_number"`
 	QuotationDate   time.Time `gorm:"not null" json:"quotation_date"`

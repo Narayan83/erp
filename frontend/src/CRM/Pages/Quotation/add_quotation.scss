@@ -10,11 +10,14 @@ $checkbox-blue: #1976d2; // blue used for custom checkbox to match design
 $danger: #dc3545;
 
 .create-quotation {
+  width: 100vw;
+  max-width: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial;
   color: #212529;
   padding: 20px 0;
   background: #f5f5f5;
+  margin-top: 60px !important;
 
   .top-bar {
     display: flex;
@@ -22,12 +25,16 @@ $danger: #dc3545;
     align-items: center;
     margin-bottom: 18px;
     gap: 20px;
+    border-bottom: 1px solid #838282;
+    padding: 10px;
+    background: #fff !important;
 
     .title {
       font-size: 22px;
       font-weight: 400;
       color: #333;
       flex-shrink: 0;
+      background: transparent;
     }
 
     .actions {
@@ -36,6 +43,19 @@ $danger: #dc3545;
       align-items: center;
       gap: 10px;
       flex: 1;
+      background: transparent;
+      border: none;
+
+      .doc-type-select {
+        height: 36px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid $input-border;
+        background: #fff;
+        font-size: 13px;
+        width: 160px;
+        cursor: pointer;
+      }
 
       .btn {
         display: inline-flex;
@@ -345,7 +365,8 @@ $danger: #dc3545;
 
     .party-details-container {
       display: grid;
-      grid-template-columns: 3fr 1fr; /* increased left column to reduce details box width */
+      /* make the right column (Document Details) wider relative to the left */
+      grid-template-columns: 3fr 1fr; /* left reduced, right increased from 25% -> ~33% */
       gap: 18px;
       align-items: stretch;
     }
@@ -1652,8 +1673,9 @@ select.form-control::-ms-expand {
 
 // Issued by box styles
 .issued-by-box {
-  background: #f8f9fa;
-  border: 1px solid $input-border;
+  border: 1px solid #dee2e6;
+  flex: 1;
+  min-width: 0; /* allow flex children to shrink properly */
   border-radius: 4px;
   padding: 10px 12px;
   font-size: 13px;
