@@ -121,6 +121,11 @@
   display: none;
   animation: fadeIn 0.3s ease-in;
 
+  h6 {
+    font-size: 16px;
+    color: #1976d2;
+  }
+
   &.active {
     display: block;
   }

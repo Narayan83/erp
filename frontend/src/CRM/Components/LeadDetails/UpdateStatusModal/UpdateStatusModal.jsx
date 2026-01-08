@@ -124,7 +124,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
   };
 
   return (
-    <div className="update-status-overlay" onClick={onClose}>
+    <div className="update-status-overlay">
       <div className="update-status-modal" onClick={e => e.stopPropagation()}>
         <div className="update-status-header">
           <h3>Update Status</h3>

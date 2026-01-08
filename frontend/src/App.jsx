@@ -53,6 +53,7 @@ import Salesconfiguration from "./SalesConfiguration/Salesconfiguration";
 
 import QutationList from "./CRM/Pages/Quotation/QuotationList";
 import AddQutation from "./CRM/Pages/Quotation/AddQutation";
+import ItemSummary from "./CRM/Pages/Quotation/ItemSummary";
 
 import RoleCreation from "./Admin Master/page/RoleCreation/RoleCreation";
 import MenuCreation from "./Admin Master/page/MenuCreation/MenuCreation";
@@ -187,6 +188,7 @@ function App() {
           {/* <Route path="/quotation-list" element={<QuotationList />} /> */}
 
            <Route path="/quotation-list" element={<QutationList />} />
+           <Route path="/quotation-item-summary" element={<ItemSummary />} />
           
           {/* Quotation nested routes */}
           {/* <Route path="/quotation" element={<QuotationLayout />}>

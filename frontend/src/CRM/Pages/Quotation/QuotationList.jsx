@@ -509,13 +509,34 @@ const QuotationList = () => {
   // derive a user-facing document type from a quotation object
   const getDocType = (q) => {
     if (!q) return 'Quotation';
-    // Explicit document_type (preferred)
-    if (q.document_type) return q.document_type;
-    // Legacy 'type' field
-    if (q.type) return q.type;
-    // If series is preloaded, prefer its configured document type
-    if (q.series && (q.series.document_type || q.series.DocumentType)) return q.series.document_type || q.series.DocumentType;
-    // Some endpoints use a boolean flag for proforma
+    const pick = (v) => (v === undefined || v === null) ? null : String(v).trim();
+    const candidates = [
+      pick(q.document_type),
+      pick(q.type),
+      pick(q.doc_type),
+      pick(q.docType),
+      pick(q.DocumentType),
+      pick(q.documentType),
+      pick(q.quotation_type),
+      pick(q.quotationType),
+      pick(q.document),
+    ].filter(Boolean);
+
+    for (const c of candidates) {
+      const lc = c.toLowerCase();
+      if (lc.includes('proforma')) return 'Proforma Invoice';
+      if (lc.includes('sales order')) return 'Sales Order';
+      if (lc.includes('transfer order')) return 'Transfer Order';
+      if (lc.includes('purchase order') || lc.includes('purchase')) return 'Purchase Order';
+      // otherwise return as-is (preserve casing from source)
+      return c;
+    }
+
+    if (q.series && (q.series.document_type || q.series.DocumentType)) {
+      const sdt = pick(q.series.document_type) || pick(q.series.DocumentType);
+      if (sdt) return sdt;
+    }
+
     if (q.is_proforma) return 'Proforma Invoice';
     return 'Quotation';
   };
@@ -638,22 +659,8 @@ const QuotationList = () => {
 
     if (typeFilter && typeFilter !== 'All') {
       filtered = filtered.filter((q) => {
-        if (typeFilter === 'Quotation') {
-          return q.document_type === 'Quotation' || q.type === 'Quotation' || !q.is_proforma;
-        }
-        if (typeFilter === 'Proforma Invoice') {
-          return q.document_type === 'Proforma Invoice' || q.type === 'Proforma Invoice' || q.is_proforma;
-        }
-        if (typeFilter === 'Sales Order') {
-          return q.document_type === 'Sales Order' || q.type === 'Sales Order';
-        }
-        if (typeFilter === 'Transfer Order') {
-          return q.document_type === 'Transfer Order' || q.type === 'Transfer Order';
-        }
-        if (typeFilter === 'Purchase Order') {
-          return q.document_type === 'Purchase Order' || q.type === 'Purchase Order';
-        }
-        return true;
+        const dt = getDocType(q);
+        return dt === typeFilter;
       });
     }
 
@@ -872,7 +879,7 @@ const QuotationList = () => {
             
             <button className="icon-btn square" title={exporting ? 'Exporting...' : 'Export to Excel'} onClick={handleExport} disabled={exporting}><FaFileExport /></button>
             <button className="icon-btn square" title="Display Preferences" onClick={() => { setTempVisibleColumns(visibleColumns); setShowDisplayPrefs(true); }}><FaBars /></button>
-            <button className="icon-btn square" title="Summary"><FaChartBar /></button>
+            <button className="icon-btn square" title="Items Summary" onClick={() => navigate('/quotation-item-summary')}><FaChartBar /></button>
             <button className="icon-btn square settings" title="Configuration" onClick={() => navigate('/sales-configuration')}><FaCog /></button>
             
             
@@ -882,7 +889,7 @@ const QuotationList = () => {
 
       <div className="filters-row">
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option>All Type</option>
+          <option value="All">All Type</option>
           <option>Quotation</option>
           <option>Proforma Invoice</option>
           <option>Sales Order</option>

@@ -26,7 +26,7 @@ import {
   Divider
 } from "@mui/material";
 import EnhancedEditableCell from "../Components/EnhancedEditableCell";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, ArrowBack } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, Close, ArrowBack } from "@mui/icons-material";
 import axios from "axios";
 import * as XLSX from 'xlsx';
 // exceljs will be dynamically imported inside the download function to avoid bundling issues
@@ -321,21 +321,20 @@ const getMainImageForProduct = (p) => {
 };
 
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
+  const selectAllRef = React.useRef(null);
+
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      // If checked, select all columns
       const allSelected = Object.keys(columns).reduce((acc, key) => {
         acc[key] = true;
         return acc;
       }, {});
       setColumns(allSelected);
     } else {
-      // If unchecked, deselect all but keep at least one column visible
       const allDeselected = Object.keys(columns).reduce((acc, key) => {
         acc[key] = false;
         return acc;
       }, {});
-      // Ensure at least "name" and "actions" are visible
       allDeselected.name = true;
       allDeselected.actions = true;
       setColumns(allDeselected);
@@ -343,158 +342,75 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
   };
 
   const handleColumnToggle = (columnKey) => (event) => {
-    // Count how many columns are currently visible
     const visibleCount = Object.values(columns).filter(Boolean).length;
-    
-    // If trying to uncheck the last visible column, prevent it
     if (!event.target.checked && visibleCount <= 1 && columns[columnKey]) {
       return;
     }
-    
     setColumns({
       ...columns,
       [columnKey]: event.target.checked,
     });
   };
 
-  // Check if all columns are selected
   const allSelected = Object.values(columns).every(Boolean);
-  // Check if some but not all columns are selected
   const someSelected = Object.values(columns).some(Boolean) && !allSelected;
 
+  React.useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  if (!open) return null;
+
   return (
-    <Popover
-      open={open}
-      anchorEl={anchorEl}
-      onClose={onClose}
-      anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'right',
-      }}
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
-      }}
-      PaperProps={{ sx: { boxShadow: '0 6px 20px rgba(0,0,0,0.12)', borderRadius: 1 } }}
-    >
-      <Box className="display-preferences-popover" sx={{ p: 2, width: 900, maxWidth: '95vw' }}>
-        <Typography variant="subtitle1" gutterBottom>Display Columns</Typography>
-        <FormGroup sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(110px, 1fr))', gap: 1, alignItems: 'center' }}>
-          <Box className="select-all" sx={{ gridColumn: '1 / -1' }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onChange={handleSelectAll}
-                  color="primary"
-                />
-              }
-              label="Select All"
-            />
-          </Box>
+    <div className="dp-modal-overlay" onClick={onClose}>
+      <div className="dp-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="dp-modal-header">
+          <div className="dp-modal-title">Display Columns</div>
+          <button className="dp-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
 
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.name} onChange={handleColumnToggle('name')} color="primary" />}
-            label="Name"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.code} onChange={handleColumnToggle('code')} color="primary" />}
-            label="Code"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.category} onChange={handleColumnToggle('category')} color="primary" />}
-            label="Category"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.subcategory} onChange={handleColumnToggle('subcategory')} color="primary" />}
-            label="Subcategory"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.store} onChange={handleColumnToggle('store')} color="primary" />}
-            label="Store"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.productType} onChange={handleColumnToggle('productType')} color="primary" />}
-            label="Product Type"
-          />
+        <div className="dp-modal-body">
+          <div className="display-preferences-popover">
+            <div className="select-all" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-control-label">
+                <input ref={selectAllRef} type="checkbox" checked={allSelected} onChange={handleSelectAll} />
+                <span style={{ marginLeft: 8 }}>Select All</span>
+              </label>
+            </div>
 
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.productMode} onChange={handleColumnToggle('productMode')} color="primary" />}
-            label="Product Mode"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.stock} onChange={handleColumnToggle('stock')} color="primary" />}
-            label="Stock"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.minimumStock} onChange={handleColumnToggle('minimumStock')} color="primary" />}
-            label="Minimum Stock"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.moq} onChange={handleColumnToggle('moq')} color="primary" />}
-            label="MOQ"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.leadTime} onChange={handleColumnToggle('leadTime')} color="primary" />}
-            label="Lead Time"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.note} onChange={handleColumnToggle('note')} color="primary" />}
-            label="Note"
-          />
+            <label className="form-control-label"><input type="checkbox" checked={columns.name} onChange={handleColumnToggle('name')} /> <span>Name</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.code} onChange={handleColumnToggle('code')} /> <span>Code</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.category} onChange={handleColumnToggle('category')} /> <span>Category</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.subcategory} onChange={handleColumnToggle('subcategory')} /> <span>Subcategory</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.store} onChange={handleColumnToggle('store')} /> <span>Store</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.productType} onChange={handleColumnToggle('productType')} /> <span>Product Type</span></label>
 
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.status} onChange={handleColumnToggle('status')} color="primary" />}
-            label="Status"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.importance} onChange={handleColumnToggle('importance')} color="primary" />}
-            label="Importance"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.tag} onChange={handleColumnToggle('tag')} color="primary" />}
-            label="Tag"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.description} onChange={handleColumnToggle('description')} color="primary" />}
-            label="Description"
-          />
+            <label className="form-control-label"><input type="checkbox" checked={columns.productMode} onChange={handleColumnToggle('productMode')} /> <span>Product Mode</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.stock} onChange={handleColumnToggle('stock')} /> <span>Stock</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.minimumStock} onChange={handleColumnToggle('minimumStock')} /> <span>Minimum Stock</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.moq} onChange={handleColumnToggle('moq')} /> <span>MOQ</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.leadTime} onChange={handleColumnToggle('leadTime')} /> <span>Lead Time</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.note} onChange={handleColumnToggle('note')} /> <span>Note</span></label>
 
-          <Typography variant="subtitle2" sx={{ gridColumn: '1 / -1', mt: 2, mb: 1 }}>Variant Columns</Typography>
+            <div className="subtitle" style={{ gridColumn: '1 / -1', marginTop: 12, marginBottom: 8 }}>Variant Columns</div>
 
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.color} onChange={handleColumnToggle('color')} color="primary" />}
-            label="Color Code"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.size} onChange={handleColumnToggle('size')} color="primary" />}
-            label="Size"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.sku} onChange={handleColumnToggle('sku')} color="primary" />}
-            label="SKU"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.barcode} onChange={handleColumnToggle('barcode')} color="primary" />}
-            label="Barcode"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.purchaseCost} onChange={handleColumnToggle('purchaseCost')} color="primary" />}
-            label="Purchase Cost"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.salesPrice} onChange={handleColumnToggle('salesPrice')} color="primary" />}
-            label="Sales Price"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={columns.image} onChange={handleColumnToggle('image')} color="primary" />}
-            label="Image"
-          />
-        </FormGroup>
-      </Box>
-    </Popover>
+            <label className="form-control-label"><input type="checkbox" checked={columns.color} onChange={handleColumnToggle('color')} /> <span>Color Code</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.size} onChange={handleColumnToggle('size')} /> <span>Size</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.sku} onChange={handleColumnToggle('sku')} /> <span>SKU</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.barcode} onChange={handleColumnToggle('barcode')} /> <span>Barcode</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.purchaseCost} onChange={handleColumnToggle('purchaseCost')} /> <span>Purchase Cost</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.salesPrice} onChange={handleColumnToggle('salesPrice')} /> <span>Sales Price</span></label>
+            <label className="form-control-label"><input type="checkbox" checked={columns.image} onChange={handleColumnToggle('image')} /> <span>Image</span></label>
+          </div>
+        </div>
+
+        <div className="dp-modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
   );
 });
 
@@ -806,14 +722,15 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
       )}
       {/* Image Preview Dialog */}
       <Dialog
+        className="image-preview-dialog"
         open={!!previewImage}
         onClose={handleClosePreview}
         maxWidth="md"
         fullWidth
         PaperProps={{
           sx: {
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            boxShadow: 'none'
+            backgroundColor: '#ffffffff',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
           }
         }}
       >
@@ -823,7 +740,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             justifyContent: 'center',
             alignItems: 'center',
             p: 2,
-            backgroundColor: 'rgba(0, 0, 0, 0.9)'
+            backgroundColor: '#c4d9f8ff'
           }}
         >
           {previewImage && (
@@ -836,13 +753,13 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ backgroundColor: 'rgba(0, 0, 0, 0.9)', justifyContent: 'center' }}>
-          <Button onClick={handleClosePreview} sx={{ color: 'white' }}>
+        <DialogActions sx={{ backgroundColor: '#fff', justifyContent: 'center' }}>
+          <Button onClick={handleClosePreview} sx={{ color: '#1976d2', fontWeight: 700 }}>
             Close
           </Button>
           <Button
             onClick={() => window.open(previewImage, '_blank', 'noopener,noreferrer')}
-            sx={{ color: 'white' }}
+            sx={{ color: '#1976d2', fontWeight: 700 }}
           >
             Open in New Tab
           </Button>

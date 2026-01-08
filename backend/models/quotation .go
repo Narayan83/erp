@@ -63,6 +63,9 @@ type Quotation struct {
 	EndCustomerName     *string  `gorm:"type:varchar(100)" json:"end_customer_name,omitempty"`
 	EndDealerName       *string  `gorm:"type:varchar(100)" json:"end_dealer_name,omitempty"`
 	AttachmentPath      *string  `gorm:"type:text" json:"attachment_path,omitempty"`
+	DocumentType        *string  `gorm:"type:varchar(50)" json:"document_type,omitempty"` // Quotation, Proforma Invoice, Sales Order, Transfer Order, Purchase Order
+	Type                *string  `gorm:"type:varchar(50)" json:"type,omitempty"` // Alias for document_type
+	IsProforma          *bool    `gorm:"type:boolean" json:"is_proforma,omitempty"` // true if proforma invoice
 
 	QuotationItems []QuotationItem `gorm:"foreignKey:QuotationID" json:"quotation_items,omitempty"`
 }

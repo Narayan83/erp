@@ -1499,7 +1499,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Salutation */}
           <div className="form-field">
-            <label htmlFor="salutation" className="required">Salutation</label>
+            <label htmlFor="salutation" className="required">Salutation *</label>
             <div className="form-select-wrapper">
               <Controller
                 name="salutation"
@@ -1526,7 +1526,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* First Name */}
           <div className="form-field">
-            <label htmlFor="firstname" className="required">First Name</label>
+            <label htmlFor="firstname" className="required">First Name *</label>
             <input
               id="firstname"
               type="text"
@@ -1562,7 +1562,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Gender */}
           <div className="form-field">
-            <label htmlFor="gender" className="required">Gender</label>
+            <label htmlFor="gender" className="required">Gender *</label>
             <div className="form-select-wrapper">
               <Controller
                 name="gender"
@@ -1591,7 +1591,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Country */}
           <div className="form-field">
-            <label htmlFor="country" className="required">Country</label>
+            <label htmlFor="country" className="required">Country *</label>
             <Controller
               name="country"
               control={control}
@@ -1630,7 +1630,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Mobile Number */}
           <div className="form-field">
-            <label htmlFor="mobile_number" className="required">Mobile Number</label>
+            <label htmlFor="mobile_number" className="required">Mobile Number *</label>
             <input
               id="mobile_number"
               type="tel"
@@ -1643,7 +1643,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Email */}
           <div className="form-field">
-            <label htmlFor="email" className="required">Email</label>
+            <label htmlFor="email" className="required">Email *</label>
             <input
               id="email"
               type="email"
@@ -1700,7 +1700,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
           {/* Username */}
           <div className="form-field">
-            <label htmlFor="username" className="required">User Name</label>
+            <label htmlFor="username" className="required">User Name *</label>
             <Controller
               name="username"
               control={control}
@@ -1820,7 +1820,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
           )}
 
           <div className="form-field">
-            <label htmlFor="usercode" className="required">Employee Code</label>
+            <label htmlFor="usercode" className="required">Employee Code *</label>
             <Controller
               name="usercode"
               control={control}
@@ -2178,7 +2178,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                         style={{ marginBottom: '8px' }}
                         required
                       >
-                        <option value="">Select Document Type</option>
+                        <option value="">Select Document Type *</option>
                         {documentTypes.map((type) => (
                           <option key={type} value={type}>{type}</option>
                         ))}

@@ -1251,6 +1251,9 @@ const handleSaveQuotation = async () => {
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges, 
       discounts: additiondiscounts, 
+      document_type: docType || null,
+      type: docType || null,
+      is_proforma: (docType && String(docType).toLowerCase().includes('proforma')) || false,
       status: isEditMode ? (quotationData?.status || "Open") : "Open",
       created_by: Number(selectedEmployee),
       billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : null, 
@@ -1843,6 +1846,9 @@ const fetchQuotationData = async () => {
 
 const  prefillFormData = async (data) => {
   console.log('Prefilling form with data:', data);
+  // Ensure docType is set from saved data so UI matches saved document type
+  const incomingDocType = data.document_type || data.type || (data.is_proforma ? 'Proforma Invoice' : 'Quotation');
+  setDocType(incomingDocType);
   
   // Pre-fill customer
   if (data.customer) {

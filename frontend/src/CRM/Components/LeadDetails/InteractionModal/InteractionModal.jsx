@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FaTrash, FaCheck } from 'react-icons/fa';
+import { FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 import { BASE_URL } from '../../../../config/Config';
 import './InteractionModal.scss';
 
@@ -84,13 +84,14 @@ const InteractionModal = ({ isOpen, onClose, lead, onSaved }) => {
   };
 
   return (
-    <div className="interaction-modal-overlay" onClick={onClose}>
+    <div className="interaction-modal-overlay">
       <div className="interaction-modal" onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="interaction-card">
             <div className="card-header">
               <h4>Interaction Entry</h4>
               <button type="button" className="icon-delete" title="Delete"><FaTrash /></button>
+              <button type="button" className="icon-close" title="Close" onClick={onClose}><FaTimes /></button>
             </div>
 
             <div className="row inputs-row">

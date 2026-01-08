@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { FaFileExcel, FaCloud, FaFacebook, FaGlobe } from 'react-icons/fa';
 import IndiaMartIntegration from './IndiaMartIntegration';
 import LeadsCSVImport from './LeadsCSVImport';
+import excelImg from '../../../assets/images/excel.png';
+import indiamartImg from '../../../assets/images/indaimart.webp';
+import metaImg from '../../../assets/images/meta.png';
+import justdialImg from '../../../assets/images/justdial.png';
+import mbImg from '../../../assets/images/mb.png';
+import webImg from '../../../assets/images/web.png';
+import tradindiaImg from '../../../assets/images/tradindia.png';
+import housingImg from '../../../assets/images/housing.png';
+import acresImg from '../../../assets/images/99acres.png';
 import './import_leads_dialog.scss';
 
-const Tile = ({ children, onClick, title }) => (
+const Tile = ({ imgSrc, label, onClick, title }) => (
   <div className="import-tile" onClick={onClick} title={title}>
-    {children}
+    {imgSrc && <img src={imgSrc} alt={label} className="tile-icon-img" />}
+    <div className="tile-label">{label}</div>
   </div>
 );
 
@@ -43,6 +52,7 @@ const ImportLeadsDialog = ({ isOpen, onClose, onExcelClick, onLeadsImport }) => 
         <div className="dialog-content integration-view">
           <div className="dialog-header">
             <button className="back-btn" onClick={() => setActiveIntegration(null)}>← Back</button>
+            <h3>IndiaMART</h3>
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
           <IndiaMartIntegration
@@ -72,18 +82,9 @@ const ImportLeadsDialog = ({ isOpen, onClose, onExcelClick, onLeadsImport }) => 
             <h4>Pull Integrations</h4>
             <p className="muted">Click below to fetch leads from these sources.</p>
             <div className="tiles">
-              <Tile onClick={() => setShowCSVImport(true)} title="Upload CSV">
-                <FaFileExcel className="tile-icon excel" />
-                <div className="tile-label">Excel/CSV</div>
-              </Tile>
-              <Tile onClick={() => setActiveIntegration('indiamart')} title="Fetch from IndiaMART">
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">Indiamart</div>
-              </Tile>
-              <Tile>
-                <FaFacebook className="tile-icon" />
-                <div className="tile-label">Meta</div>
-              </Tile>
+              <Tile imgSrc={excelImg} onClick={() => setShowCSVImport(true)} title="Upload CSV" />
+              <Tile imgSrc={indiamartImg} onClick={() => setActiveIntegration('indiamart')} title="Fetch from IndiaMART" />
+              <Tile imgSrc={metaImg} title={"Fetch from meta"}/>
             </div>
           </section>
 
@@ -91,22 +92,10 @@ const ImportLeadsDialog = ({ isOpen, onClose, onExcelClick, onLeadsImport }) => 
             <h4>Push Integrations</h4>
             <p className="muted">Leads from these sources will be directly fetched and imported.</p>
             <div className="tiles">
-              <Tile>
-                <FaCloud className="tile-icon" />
-                <div className="tile-label">Justdial</div>
-              </Tile>
-              <Tile>
-                <FaCloud className="tile-icon" />
-                <div className="tile-label">MB</div>
-              </Tile>
-              <Tile>
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">Indiamart</div>
-              </Tile>
-              <Tile>
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">Website</div>
-              </Tile>
+              <Tile imgSrc={justdialImg} title={"Fetch from JustDial"}/>
+              <Tile imgSrc={mbImg} title={"Fetch from Magicbricks"}/>
+              <Tile imgSrc={indiamartImg} title={"Fetch from IndiaMART"}/>
+              <Tile imgSrc={webImg} title={"Fetch from Website"}/>
             </div>
           </section>
 
@@ -114,18 +103,9 @@ const ImportLeadsDialog = ({ isOpen, onClose, onExcelClick, onLeadsImport }) => 
             <h4>No Integrations</h4>
             <p className="muted">Please visit customization to set up your integrations with these sources.</p>
             <div className="tiles">
-              <Tile>
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">TradeIndia</div>
-              </Tile>
-              <Tile>
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">Housing</div>
-              </Tile>
-              <Tile>
-                <FaGlobe className="tile-icon" />
-                <div className="tile-label">99acres</div>
-              </Tile>
+              <Tile imgSrc={tradindiaImg} title={"Fetch from TradeIndia"} />
+              <Tile imgSrc={housingImg} title={"Fetch from Housing"} />
+              <Tile imgSrc={acresImg} title={"Fetch from 99acres"} />
             </div>
           </section>
         </div>

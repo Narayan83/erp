@@ -25,9 +25,53 @@
   border-bottom: 1px solid #eee;
 }
 
-.lead-details-header h3 {
-  margin: 0;
+.lead-details-header .lead-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
+
+.lead-details-header .business-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+}
+
+.lead-details-header .lead-subtitle {
+  font-size: 13px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.lead-details-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-details-header .header-actions .icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: #666;
+  font-size: 16px;
+}
+
+.lead-details-header .header-actions .delete-btn {
+  color: #d9534f;
+}
+
+.lead-details-header .header-actions .edit-btn {
+  color: #0b5ed7;
+}
+
+.lead-details-header .header-actions .icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .lead-details-header .close-btn {
   background: none;
   color: #666;
@@ -117,7 +161,7 @@
 }
 .btn {
   padding: 8px 12px;
-  border-radius: 3px;
+  border-radius: 1px;
   border: 1px solid #ccc;
   background: #fff;
   cursor: pointer;
@@ -130,19 +174,25 @@
 }
 .btn.small {
   font-size: 13px;
+  width: 48%;
+  border-radius: 5px;
 
   &:hover {
+    background: #d0d1d3;
     transform: none;
     box-shadow: none;
     transition: none;
   }
 }
 .btn.green {
+  width: 100%;
   background: #1b7236;
   color: #fff;
   border-color: #156026;
 
   &:hover {
+    background: #114b1d;
+    border-color: #0f4619;
     transform: none;
     box-shadow: none;
     transition: none;

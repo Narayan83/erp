@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaTimes, FaPhone, FaEnvelope, FaRegCalendarAlt, FaClipboardList, FaWhatsapp, FaCopy } from 'react-icons/fa';
+import { FaTimes, FaPhone, FaEnvelope, FaRegCalendarAlt, FaClipboardList, FaWhatsapp, FaCopy, FaEdit, FaTrash } from 'react-icons/fa';
 import { BASE_URL } from '../../../config/Config';
 import UpdateStatusModal from './UpdateStatusModal/UpdateStatusModal';
 import InteractionModal from './InteractionModal/InteractionModal';
@@ -43,6 +43,40 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Error updating status. Please try again.');
+    }
+  };
+
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this lead?')) return;
+    try {
+      setDeleting(true);
+      // If this is an imported lead (no numeric backend id), remove from localStorage
+      if (!lead || !lead.id || typeof lead.id !== 'number') {
+        try {
+          const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+          const updated = imported.filter(l => l.id !== lead.id);
+          localStorage.setItem('importedLeads', JSON.stringify(updated));
+        } catch (e) {}
+        if (onStatusUpdate) onStatusUpdate();
+        onClose();
+        return;
+      }
+
+      const res = await fetch(`${BASE_URL}/api/leads/${lead.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (onStatusUpdate) onStatusUpdate();
+        onClose();
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Failed to delete lead' }));
+        alert(err.error || 'Failed to delete lead');
+      }
+    } catch (err) {
+      console.error('Failed to delete lead', err);
+      alert('Error deleting lead. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -108,11 +142,18 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
   };
 
   return (
-    <div className="lead-details-overlay" onClick={onClose}>
+    <div className="lead-details-overlay">
       <div className="lead-details-modal" onClick={e => e.stopPropagation()}>
         <div className="lead-details-header">
-          <h3>Lead Details</h3>
-          <button className="close-btn" onClick={onClose}><FaTimes /></button>
+          <div className="lead-title-group">
+            <h3 className="business-name">{lead.business || lead.businessName || lead.company || 'Lead Details'}</h3>
+          </div>
+
+          <div className="header-actions">
+            <button className="icon-btn edit-btn" title="Edit Lead" onClick={() => { if (onEdit) onEdit(lead); }}><FaEdit /></button>
+            <button className="icon-btn delete-btn" title="Delete Lead" onClick={handleDelete} disabled={deleting}><FaTrash /></button>
+            <button className="close-btn" onClick={onClose}><FaTimes /></button>
+          </div>
         </div>
 
         <div className="lead-details-body">
@@ -166,7 +207,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
                 <div className="actions-list">
                 <button className="btn small" onClick={() => { if (onEdit) onEdit(lead); }}>Reassign</button>
                 <button className="btn small" onClick={() => setShowUpdateStatus(true)}>Update Status</button>
-                <button className="btn small green" onClick={() => openQuoteFromLead()}>+ Quote</button>
+                <button className="btn small" onClick={() => openQuoteFromLead()}>+ Quote</button>
                 <button className="btn small">Business History</button>
               </div>
             </div>

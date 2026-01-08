@@ -2224,485 +2224,558 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
           </div>
 
       <div className="tab-content" style={{ display: tabIndex === 0 ? 'block' : 'none' }}>
-        <div className="form-grid">
-          <h3 className="subsection-header" style={{ gridColumn: 'span 12' }}>Personal Information</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6 style={{ marginTop: 0 }}>Personal Information</h6>
+          </div>
 
           {/* Salutation */}
-          <div className="grid-col md-2 xs-12">
-            <div className="form-field">
-              <label className="form-label">Salutation <span className="required">*</span></label>
+          <div className="form-field">
+            <label htmlFor="salutation" className="required">Salutation *</label>
+            <div className="form-select-wrapper">
               <Controller
                 name="salutation"
                 control={control}
                 rules={{ required: "Salutation is required" }}
                 render={({ field }) => (
-                  <>
-                    <select {...field} className={`form-select ${errors.salutation ? 'error' : ''}`}>
-                      <option value="">Select</option>
-                      {salutations.map((salute) => (
-                        <option key={salute} value={salute}>{salute}</option>
-                      ))}
-                    </select>
-                    {errors.salutation && <span className="form-helper-text error">{errors.salutation.message}</span>}
-                  </>
+                  <select
+                    {...field}
+                    id="salutation"
+                    className={errors.salutation ? 'error' : ''}
+                  >
+                    <option value="">Select Salutation</option>
+                    {salutations.map((salute) => (
+                      <option key={salute} value={salute}>
+                        {salute}
+                      </option>
+                    ))}
+                  </select>
                 )}
               />
             </div>
+            {errors.salutation && <div className="error-message">{errors.salutation.message}</div>}
           </div>
 
           {/* First Name */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">First Name <span className="required">*</span></label>
-              <input
-                type="text"
-                className={`form-input ${errors.firstname ? 'error' : ''}`}
-                {...register("firstname", { required: "First name is required" })}
-              />
-              {errors.firstname && <span className="form-helper-text error">{errors.firstname.message}</span>}
-            </div>
+          <div className="form-field">
+            <label htmlFor="firstname" className="required">First Name *</label>
+            <input
+              id="firstname"
+              type="text"
+              {...register("firstname", { required: "First name is required" })}
+              className={errors.firstname ? 'error' : ''}
+            />
+            {errors.firstname && <div className="error-message">{errors.firstname.message}</div>}
           </div>
 
           {/* Last Name */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Last Name</label>
-              <input
-                type="text"
-                className={`form-input ${errors.lastname ? 'error' : ''}`}
-                {...register("lastname")}
-              />
-              {errors.lastname && <span className="form-helper-text error">{errors.lastname.message}</span>}
-            </div>
+          <div className="form-field">
+            <label htmlFor="lastname">Last Name</label>
+            <input
+              id="lastname"
+              type="text"
+              {...register("lastname")}
+              className={errors.lastname ? 'error' : ''}
+            />
+            {errors.lastname && <div className="error-message">{errors.lastname.message}</div>}
           </div>
 
           {/* Date of Birth */}
-          <div className="grid-col md-2 xs-12">
-            <div className="form-field">
-              <label className="form-label">Date of Birth</label>
-              <input type="date" className="form-input" {...register("dob")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="dob">Date of Birth</label>
+            <input
+              id="dob"
+              type="date"
+              {...register("dob")}
+              className={errors.dob ? 'error' : ''}
+            />
+            {errors.dob && <div className="error-message">{errors.dob.message}</div>}
           </div>
 
           {/* Gender */}
-          <div className="grid-col md-2 xs-12">
-            <div className="form-field">
-              <label className="form-label">Gender <span className="required">*</span></label>
+          <div className="form-field">
+            <label htmlFor="gender" className="required">Gender *</label>
+            <div className="form-select-wrapper">
               <Controller
                 name="gender"
                 control={control}
                 rules={{ required: "Gender is required" }}
                 render={({ field }) => (
-                  <>
-                    <select {...field} className={`form-select ${errors.gender ? 'error' : ''}`}>
-                      <option value="">Select</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    {errors.gender && <span className="form-helper-text error">{errors.gender.message}</span>}
-                  </>
+                  <select
+                    {...field}
+                    id="gender"
+                    className={errors.gender ? 'error' : ''}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
                 )}
               />
             </div>
+            {errors.gender && <div className="error-message">{errors.gender.message}</div>}
           </div>
 
-          <h3 className="subsection-header" style={{ gridColumn: 'span 12' }}>Contact Information</h3>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6>Contact Information</h6>
+          </div>
 
           {/* Country */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Country <span className="required">*</span></label>
-              <Controller
-                name="country"
-                control={control}
-                rules={{ required: "Country is required" }}
-                render={({ field }) => (
-                  <>
-                    <select
-                      value={field.value || ''}
-                      onChange={(e) => {
-                        const val = e.target.value || '';
-                        field.onChange(val);
-                        const selected = countries.find(c => c.name === val);
-                        // set country_code hidden field so required check passes
-                        setValue('country_code', selected ? (selected.code || '') : '');
-                      }}
-                      className={`form-select ${errors.country ? 'error' : ''}`}
-                    >
-                      <option value="">Select Country</option>
-                      {countries.map((c) => (
-                        <option key={c.name} value={c.name}>{c.name} ({c.code})</option>
-                      ))}
-                    </select>
-                    {errors.country && <span className="form-helper-text error">{errors.country.message}</span>}
-                  </>
-                )}
-              />
-              <Controller name="country_code" control={control} render={({ field }) => <input type="hidden" {...field} />} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="country" className="required">Country *</label>
+            <Controller
+              name="country"
+              control={control}
+              rules={{ required: "Country is required" }}
+              render={({ field }) => (
+                <div className="form-select-wrapper">
+                  <select
+                    id="country"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val);
+                      const selected = countries.find(c => c.name === val);
+                      setValue("country_code", selected?.code || "");
+                    }}
+                    className={errors.country ? 'error' : ''}
+                  >
+                    <option value="">Select Country</option>
+                    {countries.map((c, idx) => (
+                      <option key={`${c.name}-${idx}`} value={c.name}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            />
+            {errors.country && <div className="error-message">{errors.country.message}</div>}
           </div>
+          <Controller
+            name="country_code"
+            control={control}
+            render={({ field }) => <input type="hidden" {...field} />}
+          />
 
           {/* Mobile Number */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Mobile Number <span className="required">*</span></label>
-              <input
-                type="tel"
-                className={`form-input ${errors.mobile_number ? 'error' : ''}`}
-                {...register("mobile_number", { required: "Mobile number is required" })}
-              />
-              {errors.mobile_number && <span className="form-helper-text error">{errors.mobile_number.message}</span>}
-            </div>
+          <div className="form-field">
+            <label htmlFor="mobile_number" className="required">Mobile Number *</label>
+            <input
+              id="mobile_number"
+              type="tel"
+              {...register("mobile_number", { required: "Mobile number is required" })}
+              className={errors.mobile_number ? 'error' : ''}
+            />
+            {errors.mobile_number && <div className="error-message">{errors.mobile_number.message}</div>}
           </div>
 
           {/* Email */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Email <span className="required">*</span></label>
-              <input
-                type="email"
-                className={`form-input ${errors.email ? 'error' : ''}`}
-                {...register("email", { required: "Email is required" })}
-              />
-              {errors.email && <span className="form-helper-text error">{errors.email.message}</span>}
-            </div>
+          <div className="form-field">
+            <label htmlFor="email" className="required">Email *</label>
+            <input
+              id="email"
+              type="email"
+              {...register("email", { required: "Email is required" })}
+              className={errors.email ? 'error' : ''}
+            />
+            {errors.email && <div className="error-message">{errors.email.message}</div>}
           </div>
 
           {/* WhatsApp Number */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">WhatsApp Number</label>
-              <input type="tel" className="form-input" {...register("whatsapp_number")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="whatsapp_number">WhatsApp Number</label>
+            <input
+              id="whatsapp_number"
+              type="tel"
+              {...register("whatsapp_number")}
+              className={errors.whatsapp_number ? 'error' : ''}
+            />
+            {errors.whatsapp_number && <div className="error-message">{errors.whatsapp_number.message}</div>}
           </div>
 
           {/* Emergency Contact */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Emergency Number</label>
-              <input type="tel" className="form-input" {...register("emergency_number")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="emergency_number">Emergency Number</label>
+            <input
+              id="emergency_number"
+              type="tel"
+              {...register("emergency_number")}
+              className={errors.emergency_number ? 'error' : ''}
+            />
+            {errors.emergency_number && <div className="error-message">{errors.emergency_number.message}</div>}
           </div>
 
-          {/* Alternate Contact + Website - put on their own row */}
-          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '16px' }}>
-            <div className="grid-col md-3 xs-12" style={{ gridColumn: 'span 3' }}>
-              <div className="form-field">
-                <label className="form-label">Alternate Contact No</label>
-                <input type="tel" className="form-input" {...register("alternate_number")} />
-              </div>
-            </div>
-            <div className="grid-col md-3 xs-12" style={{ gridColumn: 'span 3' }}>
-              <div className="form-field">
-                <label className="form-label">Website</label>
-                <input type="url" className="form-input" {...register("website")} />
-              </div>
-            </div>
+          {/* Alternate Contact */}
+          <div className="form-field">
+            <label htmlFor="alternate_number">Alternate Contact No</label>
+            <input
+              id="alternate_number"
+              type="tel"
+              {...register("alternate_number")}
+              className={errors.alternate_number ? 'error' : ''}
+            />
+            {errors.alternate_number && <div className="error-message">{errors.alternate_number.message}</div>}
           </div>
 
-          <h3 className="subsection-header" style={{ gridColumn: 'span 12' }}>Permanent Address</h3>
+          {/* Website */}
+          <div className="form-field">
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              type="url"
+              {...register("website")}
+              className={errors.website ? 'error' : ''}
+            />
+            {errors.website && <div className="error-message">{errors.website.message}</div>}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6>Permanent Address</h6>
+          </div>
 
           {/* GSTIN with Get button */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">GSTIN</label>
-              <div className="input-with-action">
-                <input type="text" className="form-input" style={{ flex: 1 }} {...register("permanent_gstin")} />
-                <button type="button" className="btn btn-secondary btn-small input-action-btn">Get</button>
-              </div>
+          <div className="form-field">
+            <label htmlFor="permanent_gstin">GSTIN</label>
+            <div className="input-with-action">
+              <input
+                id="permanent_gstin"
+                type="text"
+                {...register("permanent_gstin")}
+                className={`form-input ${errors.permanent_gstin ? 'error' : ''}`}
+              />
+              <button type="button" className="input-action-btn btn btn-secondary btn-small">Get</button>
             </div>
+            {errors.permanent_gstin && <div className="error-message">{errors.permanent_gstin.message}</div>}
           </div>
 
           {/* Address 1 */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Address 1</label>
-              <input type="text" className="form-input" {...register("address1")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="address1">Address 1</label>
+            <input
+              id="address1"
+              type="text"
+              {...register("address1")}
+              className={errors.address1 ? 'error' : ''}
+            />
+            {errors.address1 && <div className="error-message">{errors.address1.message}</div>}
           </div>
 
           {/* Address 2 */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Address 2</label>
-              <input type="text" className="form-input" {...register("address2")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="address2">Address 2</label>
+            <input
+              id="address2"
+              type="text"
+              {...register("address2")}
+              className={errors.address2 ? 'error' : ''}
+            />
+            {errors.address2 && <div className="error-message">{errors.address2.message}</div>}
           </div>
 
           {/* Address 3 */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">Address 3</label>
-              <input type="text" className="form-input" {...register("address3")} />
-            </div>
+          <div className="form-field">
+            <label htmlFor="address3">Address 3</label>
+            <input
+              id="address3"
+              type="text"
+              {...register("address3")}
+              className={errors.address3 ? 'error' : ''}
+            />
+            {errors.address3 && <div className="error-message">{errors.address3.message}</div>}
           </div>
 
           {/* City */}
-          <div className="grid-col md-3 xs-12">
-            <div className="form-field">
-              <label className="form-label">City</label>
-              {String(permanentCountry || "").toLowerCase() === "india" ? (
-                <Controller
-                  name="city"
-                  control={control}
-                  render={({ field }) => (
-                    <select {...field} className="form-select">
+          <div className="form-field">
+            <label htmlFor="city">City</label>
+            {String(permanentCountry || "").toLowerCase() === "india" ? (
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => (
+                  <div className="form-select-wrapper">
+                    <select
+                      {...field}
+                      id="city"
+                      className={errors.city ? 'error' : ''}
+                    >
                       <option value="">Select City</option>
                       {citiesList.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
-                  )}
-                />
-              ) : (
-                <input type="text" className="form-input" {...register("city")} />
-              )}
-            </div>
+                  </div>
+                )}
+              />
+            ) : (
+              <input
+                id="city"
+                type="text"
+                {...register("city")}
+                className={errors.city ? 'error' : ''}
+              />
+            )}
+            {errors.city && <div className="error-message">{errors.city.message}</div>}
           </div>
 
-          {/* State / Country / Pincode - put on their own row and style like other fields */}
-          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '16px' }}>
-            <div className="grid-col md-3 xs-12" style={{ gridColumn: 'span 3' }}>
-              <div className="form-field">
-                <label className="form-label">State</label>
-                {String(permanentCountry || "").toLowerCase() === "india" ? (
-                  <Controller
-                    name="state"
-                    control={control}
-                    render={({ field }) => (
-                      <select {...field} className="form-select">
-                        <option value="">Select State</option>
-                        {indiaStates.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    )}
-                  />
-                ) : (
-                  <input type="text" className="form-input" {...register("state")} />
+          {/* State */}
+          <div className="form-field">
+            <label htmlFor="state">State</label>
+            {String(permanentCountry || "").toLowerCase() === "india" ? (
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <div className="form-select-wrapper">
+                    <select
+                      {...field}
+                      id="state"
+                      className={errors.state ? 'error' : ''}
+                    >
+                      <option value="">Select State</option>
+                      {indiaStates.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
-              </div>
-            </div>
+              />
+            ) : (
+              <input
+                id="state"
+                type="text"
+                {...register("state")}
+                className={errors.state ? 'error' : ''}
+              />
+            )}
+            {errors.state && <div className="error-message">{errors.state.message}</div>}
+          </div>
 
-            <div className="grid-col md-3 xs-12" style={{ gridColumn: 'span 3' }}>
-              <div className="form-field">
-                <label className="form-label">Country</label>
-                <Controller
-                  name="permanent_country"
-                  control={control}
-                  render={({ field }) => (
-                    <select {...field} className="form-select" onChange={(e) => {
+          {/* Permanent Country */}
+          <div className="form-field">
+            <label htmlFor="permanent_country">Country</label>
+            <Controller
+              name="permanent_country"
+              control={control}
+              render={({ field }) => (
+                <div className="form-select-wrapper">
+                  <select
+                    {...field}
+                    id="permanent_country"
+                    className={errors.permanent_country ? 'error' : ''}
+                    onChange={(e) => {
                       field.onChange(e.target.value);
                       const selected = countries.find(c => c.name === e.target.value);
                       setValue("permanent_country_code", selected ? selected.code : "");
-                    }}>
-                      <option value="">Select Country</option>
-                      {countries.map((c) => (
-                        <option key={c.name} value={c.name}>{c.name} ({c.code})</option>
-                      ))}
-                    </select>
-                  )}
-                />
-                <Controller name="permanent_country_code" control={control} render={({ field }) => <input type="hidden" {...field} />} />
-              </div>
-            </div>
+                    }}
+                  >
+                    <option value="">Select Country</option>
+                    {countries.map((c) => (
+                      <option key={c.name} value={c.name}>{c.name} ({c.code})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            />
+            {errors.permanent_country && <div className="error-message">{errors.permanent_country.message}</div>}
+          </div>
+          <Controller
+            name="permanent_country_code"
+            control={control}
+            render={({ field }) => <input type="hidden" {...field} />}
+          />
 
-            <div className="grid-col md-3 xs-12" style={{ gridColumn: 'span 3' }}>
-              <div className="form-field">
-                <label className="form-label">Pincode</label>
-                <input type="text" className="form-input" {...register("pincode")} />
-              </div>
-            </div>
+          {/* Pincode */}
+          <div className="form-field">
+            <label htmlFor="pincode">Pincode</label>
+            <input
+              id="pincode"
+              type="text"
+              {...register("pincode")}
+              className={errors.pincode ? 'error' : ''}
+            />
+            {errors.pincode && <div className="error-message">{errors.pincode.message}</div>}
           </div>
         </div>
       </div>
 
       <div className="tab-content" style={{ display: tabIndex === 1 ? 'block' : 'none' }}>
-        <div className="form-grid">
-          <div className="grid-col md-2 xs-12">
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <h6 className="subsection-header" style={{ marginTop: 0 }}>Account Type</h6>
-              <div className="form-field">
-                <Controller
-                  name="account_types"
-                  control={control}
-                  rules={{ validate: v => (typeof v === 'string' && v.length > 0) || 'Account type is required' }}
-                  render={({ field }) => (
-                    <>
-                      <select
-                        {...field}
-                        className={`form-select ${errors.account_types ? 'error' : ''}`}
-                        onChange={(e) => {
-                          const selected = e.target.value;
-                          field.onChange(selected);
-                          // keep individual booleans in sync: only the selected type becomes true
-                          accountTypes.forEach(type => {
-                            setValue(type.value, selected === type.value);
-                          });
-                          // Remove the selected type from additional account types if it was there
-                          setAdditionalAccountTypes(prev => prev.filter(type => type !== selected));
-                          // Clear fields based on account type
-                          if (selected === 'is_employee') {
-                            // Clear non-employee fields
-                            setValue('under_type', '');
-                            setValue('under_entity', null);
-                            setValue('distributor_id', null);
-                            setValue('dealer_id', null);
-                            setValue('supplier_id', null);
-                          } 
-                          else if (selected === 'is_dealer') {
-                            setValue('distributor_id', null);
-                          }
-                          else if (selected === 'is_customer') {
-                            if (!defaultValues?.id) {
-                              setValue('dealer_id', null);
-                              setValue('under_type', '', { shouldDirty: true, shouldTouch: true });
-                            }
-                          }
-                        }}
-                      >
-                        <option value="">Select account type</option>
-                        {accountTypes.map(type => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                      </select>
-                      {errors.account_types && <span className="form-helper-text error">{errors.account_types.message}</span>}
-                    </>
-                  )}
-                />
-                {/* moved: button now renders after any additional-account rows so
-                    it appears below the last account type field */}
-              </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6 style={{ marginTop: 0 }}>Account Type *</h6>
+          </div>
+
+          {/* Account Type Select */}
+          <div className="form-field">
+            <label htmlFor="account_types" className="required">Account Type *</label>
+            <div className="form-select-wrapper">
+              <Controller
+                name="account_types"
+                control={control}
+                rules={{ validate: v => (typeof v === 'string' && v.length > 0) || 'Account type is required' }}
+                render={({ field }) => (
+                  <select
+                    {...field}
+                    id="account_types"
+                    className={errors.account_types ? 'error' : ''}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      field.onChange(selected);
+                      // keep individual booleans in sync: only the selected type becomes true
+                      accountTypes.forEach(type => {
+                        setValue(type.value, selected === type.value);
+                      });
+                      // Remove the selected type from additional account types if it was there
+                      setAdditionalAccountTypes(prev => prev.filter(type => type !== selected));
+                      // Clear fields based on account type
+                      if (selected === 'is_employee') {
+                        // Clear non-employee fields
+                        setValue('under_type', '');
+                        setValue('under_entity', null);
+                        setValue('distributor_id', null);
+                        setValue('dealer_id', null);
+                        setValue('supplier_id', null);
+                      } 
+                      else if (selected === 'is_dealer') {
+                        setValue('distributor_id', null);
+                      }
+                      else if (selected === 'is_customer') {
+                        if (!defaultValues?.id) {
+                          setValue('dealer_id', null);
+                          setValue('under_type', '', { shouldDirty: true, shouldTouch: true });
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">Select account type</option>
+                    {accountTypes.map(type => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                )}
+              />
             </div>
+            {errors.account_types && <div className="error-message">{errors.account_types.message}</div>}
           </div>
 
           {/* When Account Type is Dealer show distributor dropdown to select existing distributor */}
           {isDealerSelected && (
-            <div className="grid-col md-3 xs-12">
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                <h6 className="subsection-header" style={{ marginTop: 0 }}>Select Distributor</h6>
-                <div className="form-field">
-                  <Controller
-                    name="distributor_id"
-                    control={control}
-                    render={({ field }) => (
-                      <>
-                        <select
-                          {...field}
-                          className={`form-select ${errors.distributor_id ? 'error' : ''}`}
-                          disabled={isLoadingDistributors}
-                          onChange={(e) => {
-                            field.onChange(e.target.value || null);
-                            setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
-                          }}
-                        >
-                          
-                          {Array.isArray(distributors) && distributors.map(d => (
-                            <option key={d.id} value={d.id}>
-                              {d.company_name || `${d.firstname || ''} ${d.lastname || ''}`.trim() || d.username || 'Distributor'}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.distributor_id && <span className="form-helper-text error">{errors.distributor_id.message}</span>}
-                        {isLoadingDistributors && <span className="form-helper-text">Loading distributors...</span>}
-                        {!isLoadingDistributors && (!Array.isArray(distributors) || distributors.length === 0) && <span className="form-helper-text">No distributors found</span>}
-                      </>
-                    )}
-                  />
-                </div>
+            <div className="form-field">
+              <label htmlFor="distributor_id">Select Distributor</label>
+              <div className="form-select-wrapper">
+                <Controller
+                  name="distributor_id"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      id="distributor_id"
+                      className={errors.distributor_id ? 'error' : ''}
+                      disabled={isLoadingDistributors}
+                      onChange={(e) => {
+                        field.onChange(e.target.value || null);
+                        setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
+                      }}
+                    >
+                      <option value="">Select distributor</option>
+                      {Array.isArray(distributors) && distributors.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.company_name || `${d.firstname || ''} ${d.lastname || ''}`.trim() || d.username || 'Distributor'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
               </div>
+              {errors.distributor_id && <div className="error-message">{errors.distributor_id.message}</div>}
+              {isLoadingDistributors && <div className="error-message" style={{ color: '#666' }}>Loading distributors...</div>}
+              {!isLoadingDistributors && (!Array.isArray(distributors) || distributors.length === 0) && <div className="error-message" style={{ color: '#666' }}>No distributors found</div>}
             </div>
           )}
 
           {/* Dealer select - visible only when Customer account type is selected */}
           {isCustomerSelected && (
-            <div className="grid-col md-3 xs-12">
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                <h6 className="subsection-header" style={{ marginTop: 0 }}>Select Dealer</h6>
-                <div className="form-field">
-                  <Controller
-                    name="dealer_id"
-                    control={control}
-                    render={({ field }) => {
-                      const dealerOptions = [
-                        { id: 'none', username: 'Direct Customer' },
-                        { id: 'distributor', username: 'Under Distributor' },
-                      ];
-                      const allOptions = Array.isArray(dealers) ? dealerOptions.concat(dealers) : dealerOptions;
-                      return (
-                        <>
-                          <select
-                            value={field.value || ''}
-                            onChange={(e) => {
-                              const id = e.target.value;
-                              if (id === 'none') {
-                                field.onChange(null);
-                                setValue('under_type', '', { shouldDirty: true, shouldTouch: true });
-                              } else if (id === 'distributor') {
-                                field.onChange(null);
-                                setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
-                              } else {
-                                field.onChange(id);
-                                setValue('under_type', 'dealer', { shouldDirty: true, shouldTouch: true });
-                              }
-                            }}
-                            className={`form-select ${errors.dealer_id ? 'error' : ''}`}
-                            disabled={isLoadingDealers}
-                          >
-                            
-                            {allOptions.map(opt => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.id === 'none' ? 'Direct Customer' : opt.id === 'distributor' ? 'Under Distributor' : opt.company_name || `${opt.firstname || ''} ${opt.lastname || ''}`.trim() || opt.username || 'Dealer'}
-                              </option>
-                            ))}
-                          </select>
-                          {errors.dealer_id && <span className="form-helper-text error">{errors.dealer_id.message}</span>}
-                          {isLoadingDealers && <span className="form-helper-text">Loading dealers...</span>}
-                        </>
-                      );
-                    }}
-                  />
-                </div>
+            <div className="form-field">
+              <label htmlFor="dealer_id">Select Dealer</label>
+              <div className="form-select-wrapper">
+                <Controller
+                  name="dealer_id"
+                  control={control}
+                  render={({ field }) => {
+                    const dealerOptions = [
+                      { id: 'none', username: 'Direct Customer' },
+                      { id: 'distributor', username: 'Under Distributor' },
+                    ];
+                    const allOptions = Array.isArray(dealers) ? dealerOptions.concat(dealers) : dealerOptions;
+                    return (
+                      <select
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (id === 'none') {
+                            field.onChange(null);
+                            setValue('under_type', '', { shouldDirty: true, shouldTouch: true });
+                          } else if (id === 'distributor') {
+                            field.onChange(null);
+                            setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
+                          } else {
+                            field.onChange(id);
+                            setValue('under_type', 'dealer', { shouldDirty: true, shouldTouch: true });
+                          }
+                        }}
+                        id="dealer_id"
+                        className={errors.dealer_id ? 'error' : ''}
+                        disabled={isLoadingDealers}
+                      >
+                        {allOptions.map(opt => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.id === 'none' ? 'Direct Customer' : opt.id === 'distributor' ? 'Under Distributor' : opt.company_name || `${opt.firstname || ''} ${opt.lastname || ''}`.trim() || opt.username || 'Dealer'}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }}
+                />
               </div>
+              {errors.dealer_id && <div className="error-message">{errors.dealer_id.message}</div>}
+              {isLoadingDealers && <div className="error-message" style={{ color: '#666' }}>Loading dealers...</div>}
             </div>
           )}
 
           {/* Distributor select - shown when customer selects 'Under Distributor' for dealer */}
           {isCustomerSelected && underType === 'distributor' && (
-            <div className="grid-col md-3 xs-12">
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                <h6 className="subsection-header" style={{ marginTop: 0 }}>Select Distributor</h6>
-                <div className="form-field">
-                  <Controller
-                    name="distributor_id"
-                    control={control}
-                    render={({ field }) => (
-                      <>
-                        <select
-                          {...field}
-                          className={`form-select ${errors.distributor_id ? 'error' : ''}`}
-                          disabled={isLoadingDistributors}
-                          onChange={(e) => {
-                            field.onChange(e.target.value || null);
-                            setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
-                          }}
-                        >
-                          
-                          {Array.isArray(distributors) && distributors.map(d => (
-                            <option key={d.id} value={d.id}>
-                              {d.company_name || `${d.firstname || ''} ${d.lastname || ''}`.trim() || d.username || 'Distributor'}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.distributor_id && <span className="form-helper-text error">{errors.distributor_id.message}</span>}
-                        {isLoadingDistributors && <span className="form-helper-text">Loading distributors...</span>}
-                        {!isLoadingDistributors && (!Array.isArray(distributors) || distributors.length === 0) && <span className="form-helper-text">No distributors found</span>}
-                      </>
-                    )}
-                  />
-                </div>
+            <div className="form-field">
+              <label htmlFor="distributor_id_under">Select Distributor</label>
+              <div className="form-select-wrapper">
+                <Controller
+                  name="distributor_id"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      id="distributor_id_under"
+                      className={errors.distributor_id ? 'error' : ''}
+                      disabled={isLoadingDistributors}
+                      onChange={(e) => {
+                        field.onChange(e.target.value || null);
+                        setValue('under_type', 'distributor', { shouldDirty: true, shouldTouch: true });
+                      }}
+                    >
+                      <option value="">Select distributor</option>
+                      {Array.isArray(distributors) && distributors.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.company_name || `${d.firstname || ''} ${d.lastname || ''}`.trim() || d.username || 'Distributor'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
               </div>
+              {errors.distributor_id && <div className="error-message">{errors.distributor_id.message}</div>}
+              {isLoadingDistributors && <div className="error-message" style={{ color: '#666' }}>Loading distributors...</div>}
+              {!isLoadingDistributors && (!Array.isArray(distributors) || distributors.length === 0) && <div className="error-message" style={{ color: '#666' }}>No distributors found</div>}
             </div>
           )}
 
@@ -2804,7 +2877,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
             </div>
           ))}
 
-          {/* Add button after additional account rows so it sits below the last field */}
+          {/* Add button after additional account rows */}
           <div style={{ gridColumn: '1 / -1' }}>
             <button
               type="button"
@@ -2815,136 +2888,145 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
             </button>
           </div>
 
-          
-
-          {/* Business Info Section */}
-          <h3 className="subsection-header" style={{ gridColumn: 'span 12' }}>Business Info</h3>
-          <div className="grid-col md-4 xs-12">
-              <div className="form-field">
-                <label htmlFor="business_name">Business Name</label>
-                <input
-                  {...register("business_name")}
-                  id="business_name"
-                  type="text"
-                  className="form-input"
-                />
-              </div>
-            </div>
-            <div className="grid-col md-4 xs-12">
-              <div className="form-field">
-                <label htmlFor="companyname">Company Name</label>
-                <input
-                  {...register("companyname")}
-                  id="companyname"
-                  type="text"
-                  className="form-input"
-                />
-              </div>
-            </div>
-            <div className="grid-col md-4 xs-12">
-              <div className="form-field">
-                <label htmlFor="industry_segment">Industry Segment</label>
-                <Controller
-                  name="industry_segment"
-                  control={control}
-                  render={({ field: { onChange, value } }) => (
-                    <select
-                      value={value || ''}
-                      onChange={(e) => onChange(e.target.value || "")}
-                      className="form-select"
-                      id="industry_segment"
-                    >
-                      <option value="">Select industry segment</option>
-                      {industrySegments && industrySegments.map(seg => (
-                        <option key={seg} value={seg}>{seg}</option>
-                      ))}
-                    </select>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="grid-col md-4 xs-12">
-              <div className="form-field">
-                <label htmlFor="designation">Designation</label>
-                <input
-                  {...register("designation")}
-                  id="designation"
-                  type="text"
-                  className="form-input"
-                />
-              </div>
-            </div>
-            <div className="grid-col md-4 xs-12">
-              <div className="form-field">
-                <label htmlFor="title">Title</label>
-                <input
-                  {...register("title")}
-                  id="title"
-                  type="text"
-                  className="form-input"
-                />
-              </div>
-            </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6>Business Info</h6>
           </div>
-            {/* Assign to Executive section */}
-            <h6 className="subsection-header">Assign to Executive</h6>
 
-            <div style={{ gridColumn: '1 / -1' }} className="flex-row">
-              <div style={{ flex: 1, minWidth: 200, marginRight: '1rem' }}>
-                <div className="form-field">
-                  <label htmlFor="assigned_department_id">Select Department</label>
-                  <Controller
-                    name="assigned_department_id"
-                    control={control}
-                    render={({ field: { onChange, value } }) => (
-                      <select
-                        value={value || ''}
-                        onChange={(e) => onChange(e.target.value || null)}
-                        className="form-select"
-                        id="assigned_department_id"
-                      >
-                        <option value="">All departments</option>
-                        {departmentsList && departmentsList.map(d => (
-                          <option key={d.id} value={d.id}>{d.name || d.id}</option>
-                        ))}
-                      </select>
-                    )}
-                  />
-                </div>
-              </div>
+          {/* Business Name */}
+          <div className="form-field">
+            <label htmlFor="business_name">Business Name</label>
+            <input
+              id="business_name"
+              type="text"
+              {...register("business_name")}
+              className={errors.business_name ? 'error' : ''}
+            />
+            {errors.business_name && <div className="error-message">{errors.business_name.message}</div>}
+          </div>
 
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div className="form-field">
-                  <label htmlFor="assigned_executive_id">Select Executive</label>
-                  <Controller
-                    name="assigned_executive_id"
-                    control={control}
-                    render={({ field: { onChange, value } }) => (
-                      <select
-                        value={value || ''}
-                        onChange={(e) => onChange(e.target.value || null)}
-                        className="form-select"
-                        disabled={isLoadingExecutives}
-                        id="assigned_executive_id"
-                      >
-                        <option value="">Select executive</option>
-                        {filteredExecutives && filteredExecutives.map((emp) => {
-                          const label = `${emp && emp.salutation ? emp.salutation + ' ' : ''}${emp?.firstname || ''}${emp?.lastname ? ' ' + emp.lastname : ''}${emp?.usercode ? ` (${emp.usercode})` : ''}`.trim();
-                          if (!label) return null;
-                          return (
-                            <option key={emp.id ?? label} value={emp.id ?? ''}>
-                              {label}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    )}
-                  />
-                </div>
-              </div>
+          {/* Company Name */}
+          <div className="form-field">
+            <label htmlFor="companyname">Company Name</label>
+            <input
+              id="companyname"
+              type="text"
+              {...register("companyname")}
+              className={errors.companyname ? 'error' : ''}
+            />
+            {errors.companyname && <div className="error-message">{errors.companyname.message}</div>}
+          </div>
+
+          {/* Industry Segment */}
+          <div className="form-field">
+            <label htmlFor="industry_segment">Industry Segment</label>
+            <div className="form-select-wrapper">
+              <Controller
+                name="industry_segment"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <select
+                    id="industry_segment"
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value || "")}
+                    className={errors.industry_segment ? 'error' : ''}
+                  >
+                    <option value="">Select industry segment</option>
+                    {industrySegments && industrySegments.map(seg => (
+                      <option key={seg} value={seg}>{seg}</option>
+                    ))}
+                  </select>
+                )}
+              />
             </div>
+            {errors.industry_segment && <div className="error-message">{errors.industry_segment.message}</div>}
+          </div>
+
+          {/* Designation */}
+          <div className="form-field">
+            <label htmlFor="designation">Designation</label>
+            <input
+              id="designation"
+              type="text"
+              {...register("designation")}
+              className={errors.designation ? 'error' : ''}
+            />
+            {errors.designation && <div className="error-message">{errors.designation.message}</div>}
+          </div>
+
+          {/* Title */}
+          <div className="form-field">
+            <label htmlFor="title">Title</label>
+            <input
+              id="title"
+              type="text"
+              {...register("title")}
+              className={errors.title ? 'error' : ''}
+            />
+            {errors.title && <div className="error-message">{errors.title.message}</div>}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h6>Assign to Executive</h6>
+          </div>
+
+          {/* Select Department */}
+          <div className="form-field">
+            <label htmlFor="assigned_department_id">Select Department</label>
+            <div className="form-select-wrapper">
+              <Controller
+                name="assigned_department_id"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <select
+                    id="assigned_department_id"
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value || null)}
+                    className={errors.assigned_department_id ? 'error' : ''}
+                  >
+                    <option value="">All departments</option>
+                    {departmentsList && departmentsList.map(d => (
+                      <option key={d.id} value={d.id}>{d.name || d.id}</option>
+                    ))}
+                  </select>
+                )}
+              />
             </div>
+            {errors.assigned_department_id && <div className="error-message">{errors.assigned_department_id.message}</div>}
+          </div>
+
+          {/* Select Executive */}
+          <div className="form-field">
+            <label htmlFor="assigned_executive_id">Select Executive</label>
+            <div className="form-select-wrapper">
+              <Controller
+                name="assigned_executive_id"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <select
+                    id="assigned_executive_id"
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value || null)}
+                    className={errors.assigned_executive_id ? 'error' : ''}
+                    disabled={isLoadingExecutives}
+                  >
+                    <option value="">Select executive</option>
+                    {filteredExecutives && filteredExecutives.map((emp) => {
+                      const label = `${emp && emp.salutation ? emp.salutation + ' ' : ''}${emp?.firstname || ''}${emp?.lastname ? ' ' + emp.lastname : ''}${emp?.usercode ? ` (${emp.usercode})` : ''}`.trim();
+                      if (!label) return null;
+                      return (
+                        <option key={emp.id ?? label} value={emp.id ?? ''}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              />
+            </div>
+            {errors.assigned_executive_id && <div className="error-message">{errors.assigned_executive_id.message}</div>}
+          </div>
+        </div>
+      </div>
 
           <div className="tab-content" style={{ display: tabIndex === 2 ? 'block' : 'none' }}>
         <div className="form-grid">
@@ -3470,7 +3552,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                 render={({ field }) => (
                   <>
                     <input {...field} id="username" type="text" className={`form-input ${errors.username ? 'error' : ''}`} />
-                    {errors.username && <span className="form-helper-text error">{errors.username.message}</span>}
+                    {errors.username && <div className="error-message">{errors.username.message}</div>}
                   </>
                 )}
               />
@@ -3509,7 +3591,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         {showPassword ? '👁️‍🗨️' : '👁️'}
                       </button>
                     </div>
-                    {errors.password && <span className="form-helper-text error">{errors.password.message}</span>}
+                    {errors.password && <div className="error-message">{errors.password.message}</div>}
                   </>
                 )}
               />
@@ -3544,7 +3626,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         {showConfirmPassword ? '👁️‍🗨️' : '👁️'}
                       </button>
                     </div>
-                    {errors.confirmPassword && <span className="form-helper-text error">{errors.confirmPassword.message}</span>}
+                    {errors.confirmPassword && <div className="error-message">{errors.confirmPassword.message}</div>}
                   </>
                 )}
               />
@@ -3576,7 +3658,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                 render={({ field }) => (
                   <>
                     <input {...field} id="usercode" type="text" className={`form-input ${errors.usercode ? 'error' : ''}`} />
-                    {errors.usercode && <span className="form-helper-text error">{errors.usercode.message}</span>}
+                    {errors.usercode && <div className="error-message">{errors.usercode.message}</div>}
                   </>
                 )}
               />

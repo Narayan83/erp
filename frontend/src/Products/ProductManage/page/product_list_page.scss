@@ -31,36 +31,48 @@ td.MuiTableCell-root.sl-filter {
   white-space: nowrap !important;
 }
 
-.MuiTable-root th:nth-child(4), .MuiTable-root td:nth-child(4) {
-    min-width: 160px !important; /* Code column */
+.MuiTable-root th:nth-child(4),
+.MuiTable-root td:nth-child(4) {
+  min-width: 160px !important; /* Code column */
 }
 
-.MuiTable-root th:nth-child(3), .MuiTable-root td:nth-child(3) {
-    min-width: 280px !important; /* Name column */
+.MuiTable-root th:nth-child(3),
+.MuiTable-root td:nth-child(3) {
+  min-width: 280px !important; /* Name column */
 }
 
-.MuiTable-root th:nth-child(11), .MuiTable-root td:nth-child(11) {
-    min-width: 140px !important; /* minimum stock column */
+.MuiTable-root th:nth-child(11),
+.MuiTable-root td:nth-child(11) {
+  min-width: 140px !important; /* minimum stock column */
 }
 
-.MuiTable-root th:nth-child(13), .MuiTable-root td:nth-child(13) {
-    min-width: 160px !important; /* lead time column */
+.MuiTable-root th:nth-child(13),
+.MuiTable-root td:nth-child(13) {
+  min-width: 160px !important; /* lead time column */
 }
 
-.MuiTable-root th:nth-child(23), .MuiTable-root td:nth-child(23) {
-    min-width: 180px !important; /* purchase column */
+.MuiTable-root th:nth-child(23),
+.MuiTable-root td:nth-child(23) {
+  min-width: 180px !important; /* purchase column */
 }
 
-.MuiTable-root th:nth-child(24), .MuiTable-root td:nth-child(24) {
-    min-width: 160px !important; /* sales column */
+.MuiTable-root th:nth-child(24),
+.MuiTable-root td:nth-child(24) {
+  min-width: 160px !important; /* sales column */
 }
-
 
 /* stronger header bottom and row separators for clarity */
 table thead th,
 table thead td,
 table tbody tr td {
   border-bottom: 1px solid #999999 !important;
+}
+
+/* Make table headers blue with white text for better visibility */
+table thead th,
+.variants-table thead th {
+  background-color: #cde2f8 !important; /* MUI primary blue */
+  border-bottom: 1px solid rgb(143, 123, 123) !important;
 }
 
 /* Custom search styles */
@@ -113,13 +125,18 @@ table tbody tr td {
 /* Image preview on hover */
 .image-preview-dialog {
   .MuiDialog-paper {
-    background-color: rgba(0, 0, 0, 0.95) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    background-color: #fff !important;
+    color: #000 !important;
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.12) !important;
+    padding: 16px;
   }
 
   .preview-image {
     cursor: pointer;
     transition: transform 0.2s ease;
+    border-radius: 4px;
+    border: 1px solid #f0f0f0;
+    background: #fff;
 
     &:hover {
       transform: scale(1.02);
@@ -239,16 +256,12 @@ table tbody tr td {
 
 /* Display Preferences popover styles (framework-agnostic) */
 .display-preferences-popover {
-  /* ensure popover contents don't flow off-screen when aligned right */
+  /* 6-column grid for display preferences */
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
+  gap: 8px;
+  align-items: center;
   max-width: 100%;
-
-  /* Use neutral class names instead of MUI-specific ones */
-  .form-group {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(110px, 1fr));
-    gap: 8px;
-    align-items: center;
-  }
 
   .select-all {
     grid-column: 1 / -1;
@@ -259,9 +272,12 @@ table tbody tr td {
   .form-control-label {
     margin: 0;
     padding: 4px 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .form-control-label .label {
+  .form-control-label span {
     font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
@@ -271,7 +287,99 @@ table tbody tr td {
   .subtitle {
     font-weight: 700;
     grid-column: 1 / -1;
+    margin-top: 8px;
     margin-bottom: 8px;
+  }
+
+  @media (max-width: 760px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Plain modal used by DisplayPreferences when not using MUI */
+.dp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+  padding: 20px;
+}
+
+.dp-modal {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 95vw;
+  width: 900px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dp-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.dp-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dp-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dp-modal-body {
+  padding: 12px 16px 16px 16px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.dp-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.form-control-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.form-control-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #d0d0d0;
+  background: #f5f5f5;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .dp-modal {
+    width: 100%;
+  }
+  .display-preferences-popover {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
