@@ -43,9 +43,11 @@ import Designation from "./Designation/Designation";
 import AssignUserToEmployee from "./AssignUserToEmployee/AssignUserToEmployee";
 
 import CrmPage from "./CRM/Components/TopMenu/TopMenu";
+import LeadsDashboard from "./CRM/Components/LeadsDashboard/Dashboard";
 import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
+import SalesInteractions from './CRM/Pages/Reports/SalesInteractions';
 import Configuration from './CRM/Components/Configuration/Configuration';
 // import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
@@ -173,9 +175,11 @@ function App() {
           <Route path="/address/edit/:id" element={< Address />} />
 
           <Route path="/crm-master" element={<CrmPage />} />
+          <Route path="/leads-dashboard" element={<LeadsDashboard />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/customize" element={<Customize />} />
           <Route path="/reports" element={<Report />} />
+          <Route path="/reports/sales-interactions" element={<SalesInteractions />} />
           <Route path="/configuration" element={<Configuration />} />
           <Route path="/configuration/:type" element={<Configuration />} />
           <Route path="/sales-configuration" element={<Salesconfiguration />} />

@@ -727,39 +727,25 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
         onClose={handleClosePreview}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: '#ffffffff',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-          }
-        }}
       >
-        <DialogContent
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            p: 2,
-            backgroundColor: '#c4d9f8ff'
-          }}
-        >
+        <DialogContent className="preview-content">
           {previewImage && (
             <img
               src={previewImage}
               alt="Preview"
-              style={{ width: 800, height: 600, maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 4 }}
+              className="preview-image"
               onClick={() => window.open(previewImage, '_blank', 'noopener,noreferrer')}
               title="Click to open in new tab"
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ backgroundColor: '#fff', justifyContent: 'center' }}>
-          <Button onClick={handleClosePreview} sx={{ color: '#1976d2', fontWeight: 700 }}>
+        <DialogActions>
+          <Button onClick={handleClosePreview} className="preview-button">
             Close
           </Button>
           <Button
             onClick={() => window.open(previewImage, '_blank', 'noopener,noreferrer')}
-            sx={{ color: '#1976d2', fontWeight: 700 }}
+            className="preview-button"
           >
             Open in New Tab
           </Button>
@@ -774,6 +760,7 @@ const FiltersRow = memo(function FiltersRow({
   setInputFilters,
   filters,
   setFilters,
+  setDebouncedFilters,
   categories,
   allSubcategories,
   stores,
@@ -4370,49 +4357,30 @@ export default function ProductListPage() {
 
       {/* Image Preview Dialog for Product Details */}
       <Dialog
+        className="image-preview-dialog"
         open={!!detailsPreviewImage}
         onClose={handleDetailsClosePreview}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            boxShadow: 'none'
-          }
-        }}
       >
-        <DialogContent
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            p: 2,
-            backgroundColor: 'rgba(0, 0, 0, 0.9)'
-          }}
-        >
+        <DialogContent className="preview-content">
           {detailsPreviewImage && (
             <img
               src={detailsPreviewImage}
               alt="Preview"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                borderRadius: 4,
-                cursor: 'pointer'
-              }}
+              className="preview-image"
               onClick={() => window.open(detailsPreviewImage, '_blank', 'noopener,noreferrer')}
               title="Click to open in new tab"
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ backgroundColor: 'rgba(0, 0, 0, 0.9)', justifyContent: 'center' }}>
-          <Button onClick={handleDetailsClosePreview} sx={{ color: 'white' }}>
+        <DialogActions>
+          <Button onClick={handleDetailsClosePreview} className="preview-button">
             Close
           </Button>
           <Button
             onClick={() => window.open(detailsPreviewImage, '_blank', 'noopener,noreferrer')}
-            sx={{ color: 'white' }}
+            className="preview-button"
           >
             Open in New Tab
           </Button>
@@ -4733,6 +4701,7 @@ export default function ProductListPage() {
                 setInputFilters={setInputFilters}
                 filters={filters}
                 setFilters={setFilters}
+                setDebouncedFilters={setDebouncedFilters}
                 categories={categories}
                 allSubcategories={allSubcategories}
                 stores={stores}

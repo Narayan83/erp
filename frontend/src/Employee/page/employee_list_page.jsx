@@ -2152,6 +2152,32 @@ export default function EmployeeListPage() {
                   <div className="employee-details-section">
                     <h3 className="section-title">Employee Information</h3>
                     <div className="form-grid col-12">
+                      <div className="form-field photo-field">
+                        {(() => {
+                          const photoDoc = selectedEmployee.documents?.find(d => 
+                            d.doc_type?.toLowerCase() === 'photo' || 
+                            d.doc_type?.toLowerCase() === 'employee photo' || 
+                            d.doc_type?.toLowerCase() === 'profile'
+                          );
+                          const photoUrl = selectedEmployee.photo || selectedEmployee.profile_picture || (photoDoc ? buildDocUrl(photoDoc) : null);
+                          return photoUrl ? (
+                            <div className="photo-wrapper">
+                              <img
+                                src={photoUrl}
+                                alt="Employee Photo"
+                                className="employee-photo"
+                                onMouseEnter={() => handlePhotoMouseEnter(photoUrl)}
+                                onMouseLeave={handlePhotoMouseLeave}
+                                onClick={() => window.open(photoUrl, '_blank', 'noopener,noreferrer')}
+                                title="Click to open in new tab"
+                              />
+                            </div>
+                          ) : (
+                            <div className="photo-placeholder">No Photo</div>
+                          );
+                        })()}
+                      </div>
+
                       <div className="form-field">
                         <label>Employee Code</label>
                         <input type="text" value={selectedEmployee.usercode || ""} disabled />

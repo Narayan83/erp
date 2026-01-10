@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaTimes, FaPhone, FaEnvelope, FaRegCalendarAlt, FaClipboardList, FaWhatsapp, FaCopy, FaEdit, FaTrash } from 'react-icons/fa';
 import { BASE_URL } from '../../../config/Config';
 import UpdateStatusModal from './UpdateStatusModal/UpdateStatusModal';
@@ -8,6 +8,13 @@ import './leadDetails.scss';
 const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
   const [showUpdateStatus, setShowUpdateStatus] = useState(false);
   const [showInteraction, setShowInteraction] = useState(false);
+  // Local optimistic stage so UI updates instantly when user changes stage
+  const [localStage, setLocalStage] = useState(lead?.stage || 'Unqualified');
+
+  // Keep localStage in sync when the lead prop changes
+  useEffect(() => {
+    setLocalStage(lead?.stage || 'Unqualified');
+  }, [lead]);
 
   if (!isOpen || !lead) return null;
 
@@ -23,6 +30,10 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
         payload.rejectionReason = data.reason;
       }
 
+      // Optimistically update the UI immediately
+      const prevStage = localStage;
+      setLocalStage(payload.stage);
+
       const res = await fetch(`${BASE_URL}/api/leads/${lead.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -37,12 +48,16 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
         }
         setShowUpdateStatus(false);
       } else {
+        // rollback on failure
+        setLocalStage(prevStage);
         const errorData = await res.json().catch(() => ({ error: 'Failed to update status' }));
         alert(`Failed to update status: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Error updating status. Please try again.');
+      // rollback
+      try { setLocalStage(lead?.stage || 'Unqualified'); } catch (e) {}
     }
   };
 
@@ -238,7 +253,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
       <UpdateStatusModal
         isOpen={showUpdateStatus}
         onClose={() => setShowUpdateStatus(false)}
-        currentStage={lead.stage || 'Unqualified'}
+        currentStage={localStage}
         onStatusChange={handleStatusChange}
       />
     </div>

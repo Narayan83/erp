@@ -9,12 +9,20 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
   const [rejectionReasonsList, setRejectionReasonsList] = useState([]);
   const [editingReasonId, setEditingReasonId] = useState(null); // -1 indicates adding a new reason
   const [editingText, setEditingText] = useState('');
+  // Local optimistic UI state to update Current Stage immediately and track request in-flight
+  const [localCurrentStage, setLocalCurrentStage] = useState(currentStage || 'Unqualified');
+  const [isUpdating, setIsUpdating] = useState(false);
+  // Which action is selected by radio: 'change' or 'reject'
+  const [selectedAction, setSelectedAction] = useState('change');
 
   const stages = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
 
-  // Load saved rejection reasons from localStorage as objects [{id,name}]
+  // Load saved rejection reasons and sync local stage on modal open
   useEffect(() => {
     if (isOpen) {
+      // Sync displayed current stage with incoming prop (helps optimistic updates and external changes)
+      setLocalCurrentStage(currentStage || 'Unqualified');
+
       try {
         const saved = JSON.parse(localStorage.getItem('leadRejectionReasons') || '[]');
         if (Array.isArray(saved) && saved.length > 0) {
@@ -34,7 +42,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
         setRejectionReasonsList(defaults);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, currentStage]);
 
   // Reset editing state when modal closes
   useEffect(() => {
@@ -51,11 +59,25 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
       alert('Please select a stage');
       return;
     }
-    await onStatusChange({
-      type: 'stage',
-      newStage: changeStageDropdown
-    });
-    setChangeStageDropdown('');
+
+    const prev = localCurrentStage;
+    // Optimistic update
+    setLocalCurrentStage(changeStageDropdown);
+    setIsUpdating(true);
+
+    try {
+      await onStatusChange({
+        type: 'stage',
+        newStage: changeStageDropdown
+      });
+      setChangeStageDropdown('');
+    } catch (err) {
+      // rollback on error
+      setLocalCurrentStage(prev);
+      alert('Failed to update stage. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleReject = async () => {
@@ -63,11 +85,24 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
       alert('Please select a rejection reason');
       return;
     }
-    await onStatusChange({
-      type: 'reject',
-      reason: rejectReason
-    });
-    setRejectReason('');
+
+    const prev = localCurrentStage;
+    // Optimistically mark as Inactive (reject)
+    setLocalCurrentStage('Inactive');
+    setIsUpdating(true);
+
+    try {
+      await onStatusChange({
+        type: 'reject',
+        reason: rejectReason
+      });
+      setRejectReason('');
+    } catch (err) {
+      setLocalCurrentStage(prev);
+      alert('Failed to reject lead. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   // Inline edit handlers for rejection reasons
@@ -134,53 +169,53 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
         <div className="update-status-body">
           <div className="current-stage">
             <strong>Current Stage: </strong>
-            <span>{currentStage || 'Unqualified'}</span>
+            <span>{localCurrentStage || 'Unqualified'}</span>
           </div>
 
           {/* Change Stage Option */}
           <div className="status-option">
             <label>
-              <input type="radio" name="action" value="change" onChange={() => {}} defaultChecked={true} />
+              <input type="radio" name="action" value="change" onChange={() => setSelectedAction('change')} checked={selectedAction === 'change'} />
               Change Stage to
             </label>
             <div className="option-content">
-              <select value={changeStageDropdown} onChange={e => setChangeStageDropdown(e.target.value)}>
+              <select value={changeStageDropdown} onChange={e => setChangeStageDropdown(e.target.value)} disabled={selectedAction !== 'change' || isUpdating}>
                 <option value="">Select</option>
                 {stages.map(stage => (
                   <option key={stage} value={stage}>{stage}</option>
                 ))}
               </select>
-              <button className="btn update-btn" onClick={handleChangeStage}>✓ Update</button>
+              <button className="btn update-btn" onClick={handleChangeStage} disabled={isUpdating || selectedAction !== 'change'}>✓ Update</button>
             </div>
           </div>
 
           {/* Reject Option */}
           <div className="status-option">
             <label>
-              <input type="radio" name="action" value="reject" onChange={() => {}} />
+              <input type="radio" name="action" value="reject" onChange={() => setSelectedAction('reject')} checked={selectedAction === 'reject'} />
               Reject with Reason
             </label>
             <div className="option-content">
               <div className="reason-inline">
                 {editingReasonId !== null ? (
                   <div className="inline-edit" style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
-                    <input value={editingText} onChange={e => setEditingText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); }} placeholder="Enter reason" />
-                    <button type="button" className="btn save-btn" title="Save reason" onClick={handleSaveEdit}><FaCheck /></button>
-                    <button type="button" className="btn cancel-btn" title="Cancel" onClick={handleCancelEdit}><FaTimes /></button>
+                    <input value={editingText} onChange={e => setEditingText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); }} placeholder="Enter reason" disabled={selectedAction !== 'reject' || isUpdating} />
+                    <button type="button" className="btn save-btn" title="Save reason" onClick={handleSaveEdit} disabled={selectedAction !== 'reject' || isUpdating}><FaCheck /></button>
+                    <button type="button" className="btn cancel-btn" title="Cancel" onClick={handleCancelEdit} disabled={selectedAction !== 'reject' || isUpdating}><FaTimes /></button>
                   </div>
                 ) : (
                   <>
-                    <select value={rejectReason} onChange={e => setRejectReason(e.target.value)}>
+                    <select value={rejectReason} onChange={e => setRejectReason(e.target.value)} disabled={selectedAction !== 'reject' || isUpdating}>
                       <option value="">Select</option>
                       {(rejectionReasonsList || []).map(r => (
                         <option key={r.id} value={r.name}>{r.name}</option>
                       ))}
                     </select>
-                    <button className="edit-btn" title="Edit/Add Reason" onClick={(e) => { e.stopPropagation(); handleStartEdit(); }}><FaEdit /></button>
+                    <button className="edit-btn" title="Edit/Add Reason" onClick={(e) => { e.stopPropagation(); handleStartEdit(); }} disabled={selectedAction !== 'reject'}><FaEdit /></button>
                   </>
                 )}
               </div>
-              <button className="btn reject-btn" onClick={handleReject}>✕ Reject</button>
+              <button className="btn reject-btn" onClick={handleReject} disabled={isUpdating || selectedAction !== 'reject'}>✕ Reject</button>
             </div>
           </div>
         </div>

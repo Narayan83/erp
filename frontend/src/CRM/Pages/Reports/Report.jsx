@@ -4,8 +4,14 @@ import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrow
 import { MdMissedVideoCall } from 'react-icons/md';
 import './_report.scss';
 
-const ReportCard = ({ title, description, icon }) => (
-  <div className="report-card">
+const ReportCard = ({ title, description, icon, onClick }) => (
+  <div
+    className="report-card"
+    role="button"
+    tabIndex={0}
+    onClick={onClick}
+    onKeyPress={(e) => { if (e.key === 'Enter') onClick?.(); }}
+  >
     <div className="card-header">
       <div className="icon">{icon}</div>
       <h3>{title}</h3>
@@ -25,7 +31,8 @@ const Report = () => {
     {
       title: "Sales Interactions",
       description: "Monitor interaction efforts by your team with your leads.",
-      icon: <FaChartLine />
+      icon: <FaChartLine />,
+      path: '/reports/sales-interactions'
     },
     {
       title: "No Interactions",
@@ -65,7 +72,11 @@ const Report = () => {
       </div>
       <div className="reports-grid">
         {reports.map((report, index) => (
-          <ReportCard key={index} {...report} />
+          <ReportCard
+            key={index}
+            {...report}
+            onClick={() => report.path ? navigate(report.path) : null}
+          />
         ))}
       </div>
     </div>

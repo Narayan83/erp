@@ -1,6 +1,6 @@
 // Import dependencies
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 // Import icons
 import { 
   FaSearch, FaCog, FaTh, FaChartBar, 
@@ -155,6 +155,16 @@ const TopMenu = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showStatusDropdown, showViewDropdown]);
 
+  // If navigated here from dashboard with state, apply requested filters
+  const location = useLocation();
+  useEffect(() => {
+    if (location && location.state && location.state.statusFilter) {
+      setActiveStatusFilter(location.state.statusFilter);
+      // clear state so it doesn't reapply on history navigation
+      try { window.history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (e) { /* ignore */ }
+    }
+  }, [location && location.state]);
+
   // Update displayFields when DisplayPref modal closes
   useEffect(() => {
     if (!showDisplayPref) {
@@ -228,6 +238,8 @@ const TopMenu = () => {
   const handleReportsClick = () => navigate('/reports');
   const handleCustomizeClick = () => navigate('/customize');
   const handleSalesConfigClick = () => navigate('/configuration');
+  // Open leads dashboard
+  const handleDashboardClick = () => navigate('/leads-dashboard');
 
   // Lead actions
   const handleAddLeadSubmit = async (newLeadData) => {
@@ -1082,7 +1094,7 @@ const TopMenu = () => {
             <button className="icon-btn" title="Sales Configuration" onClick={handleSalesConfigClick}><FaCog /></button>
             <button className="icon-btn" title="Display Preferences" onClick={() => setShowDisplayPref(true)}><FaBars /></button>
             <button className="icon-btn" title="Export to Excel" onClick={handleExportToExcel}><FaFileExport /></button>
-            <button className="icon-btn" title="Show Leads Dashboard"><FaTh /></button>
+            <button className="icon-btn" title="Show Leads Dashboard" onClick={handleDashboardClick}><FaTh /></button>
             <button className="icon-btn" title="Reports" onClick={handleReportsClick}><FaChartBar /></button>
           </div>
         </div>

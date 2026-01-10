@@ -1,0 +1,211 @@
+@use "../../Styles/variable" as *;
+
+.sales-interactions-container {
+  padding: 10px;
+  margin-top: 60px;
+  width: 100vw;
+  max-width: 100%;
+
+  .si-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .left {
+      .filters {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+
+        .filter-item {
+          select {
+            padding: 6px 10px;
+            border: 1px solid $primary-gray;
+            border-radius: 4px;
+            background: $primary-white;
+
+            &:focus {
+              outline: none;
+              border-color: $primary-blue;
+              box-shadow: 0 0 4px rgba(21, 101, 192, 0.3);
+            }
+          }
+        }
+
+        /* Make first select wider to accommodate salesperson names */
+        .filter-item:first-child {
+          select {
+            min-width: 200px;
+          }
+        }
+
+        /* Compact month/year selectors to match dashboard */
+        .selectors {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+
+          select.month {
+            min-width: 170px;
+          }
+
+          select.year {
+            min-width: 72px;
+          }
+        }
+      }
+    }
+
+    .right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .search {
+        padding: 8px 12px;
+        border-radius: 4px;
+        border: 1px solid $primary-gray;
+        min-width: 180px;
+
+        &:focus {
+          outline: none;
+          border-color: $primary-blue;
+          box-shadow: 0 0 4px rgba(21, 101, 192, 0.3);
+        }
+      }
+
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: $primary-blue;
+        color: $primary-white;
+        border-radius: 4px;
+        border: 1px solid $primary-blue;
+        cursor: pointer;
+        font-size: 14px;
+
+        &.square {
+          width: 34px;
+          height: 34px;
+        }
+
+        &:hover:not(:disabled) {
+          color: $primary-blue;
+          background-color: $primary-white;
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
+  .si-date-filters {
+    height: 60px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding-left: 4px;
+
+    .dt-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+
+      input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+      }
+
+      .date-picker {
+        margin-left: 8px;
+        padding: 6px 8px;
+        border: 1px solid $primary-gray;
+        border-radius: 4px;
+        min-width: 120px;
+        background: $primary-white;
+      }
+    }
+  }
+
+  .si-table-wrap {
+    background: $primary-white;
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    border: 1px solid $primary-gray;
+    overflow: hidden;
+  }
+
+  .si-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    thead {
+      /* Match project table header styles for consistency */
+      background: #f5f8fb;
+      tr {
+        th {
+          text-align: left;
+          padding: 12px 16px;
+          font-size: 13px;
+          color: $primary-blue;
+          font-weight: 600;
+          border-bottom: 1px solid $primary-gray;
+          white-space: nowrap;
+        }
+
+        /* rounded corners to match wrapper */
+        th:first-child {
+          border-top-left-radius: 6px;
+        }
+        th:last-child {
+          border-top-right-radius: 6px;
+          min-width: 140px;
+        }
+      }
+    }
+
+    /* Ensure last column (Executive) behaves well */
+    tbody td:last-child {
+      min-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    tbody tr.match-row {
+      background: rgba(10, 21, 51, 0.03);
+    }
+
+    /* highlight for matched text */
+    mark.si-highlight {
+      background: #fff3bf;
+      padding: 0 3px;
+      border-radius: 2px;
+      color: inherit;
+    }
+
+    tbody {
+      tr {
+        td {
+          padding: 12px 16px;
+          font-size: 14px;
+          color: $primary-black;
+          vertical-align: middle;
+          border-bottom: 1px solid #f2f2f2;
+        }
+
+        &:nth-child(odd) {
+          background: #fafafa;
+        }
+      }
+    }
+  }
+}
