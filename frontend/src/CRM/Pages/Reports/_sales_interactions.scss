@@ -7,11 +7,22 @@
   max-width: 100%;
 
   .si-header {
+    position: relative;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
 
     .left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      h2 {
+        margin: 0;
+        font-size: 20px;
+        color: $primary-black;
+      }
+
       .filters {
         display: flex;
         gap: 12px;
@@ -19,15 +30,17 @@
 
         .filter-item {
           select {
-            padding: 6px 10px;
+            padding: 8px 12px;
             border: 1px solid $primary-gray;
-            border-radius: 4px;
+            border-radius: 6px;
             background: $primary-white;
+            min-height: 36px;
+            font-size: 14px;
 
             &:focus {
               outline: none;
               border-color: $primary-blue;
-              box-shadow: 0 0 4px rgba(21, 101, 192, 0.3);
+              box-shadow: 0 0 6px rgba(21, 101, 192, 0.12);
             }
           }
         }
@@ -35,8 +48,34 @@
         /* Make first select wider to accommodate salesperson names */
         .filter-item:first-child {
           select {
-            min-width: 200px;
+            min-width: 220px;
           }
+        }
+
+        /* Executive select - styled for visibility and consistent spacing */
+        .exec-select {
+          min-width: 260px;
+          padding: 8px 12px;
+          height: 38px;
+          border-radius: 6px;
+          border: 1px solid $primary-gray;
+          background: $primary-white;
+          font-size: 14px;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          appearance: none;
+          padding-right: 36px; /* room for caret */
+          transition: box-shadow 0.12s ease, border-color 0.12s ease;
+
+          &:focus {
+            outline: none;
+            border-color: $primary-blue;
+            box-shadow: 0 0 6px rgba(21, 101, 192, 0.12);
+          }
+        }
+
+        .date-buttons {
+          margin: 20px 0;
         }
 
         /* Compact month/year selectors to match dashboard */
@@ -53,44 +92,113 @@
             min-width: 72px;
           }
         }
+
+        .date-controls {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .date-buttons {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+
+          .fu-btn {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #f7a24b;
+            color: #f7a24b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+
+            &.active {
+              background: #f7a24b;
+              color: #fff;
+            }
+
+            &:hover {
+              opacity: 0.95;
+            }
+          }
+        }
+
+        .inline-selectors,
+        .selectors {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+
+          select.month {
+            min-width: 160px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid $primary-gray;
+            height: 36px;
+            background: $primary-white;
+          }
+
+          select.year {
+            min-width: 80px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid $primary-gray;
+            height: 36px;
+            background: $primary-white;
+          }
+        }
       }
     }
 
     .right {
+      position: absolute;
+      top: 10px;
+      right: 12px;
       display: flex;
       align-items: center;
       gap: 12px;
+      justify-self: end;
+
+      .si-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
       .search {
         padding: 8px 12px;
-        border-radius: 4px;
+        border-radius: 6px;
         border: 1px solid $primary-gray;
-        min-width: 180px;
+        min-width: 240px;
+        font-size: 14px;
 
         &:focus {
           outline: none;
           border-color: $primary-blue;
-          box-shadow: 0 0 4px rgba(21, 101, 192, 0.3);
+          box-shadow: 0 0 6px rgba(21, 101, 192, 0.12);
         }
       }
 
       .icon-btn {
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
         padding: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         background-color: $primary-blue;
         color: $primary-white;
-        border-radius: 4px;
+        border-radius: 6px;
         border: 1px solid $primary-blue;
         cursor: pointer;
         font-size: 14px;
 
         &.square {
-          width: 34px;
-          height: 34px;
+          width: 36px;
+          height: 36px;
         }
 
         &:hover:not(:disabled) {
@@ -206,6 +314,79 @@
           background: #fafafa;
         }
       }
+    }
+  }
+
+  /* Pagination controls */
+  .si-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #fff;
+    border-top: 1px solid #eef0f2;
+  }
+
+  .si-pagination .page-size {
+    display: flex;
+    gap: 8px;
+  }
+
+  .ps-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid #dcdfe2;
+    background: #fff;
+    color: $primary-black;
+    cursor: pointer;
+  }
+
+  .ps-btn.active {
+    background: #153646;
+    color: #fff;
+    border-color: #153646;
+  }
+
+  .pager {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pager-nav,
+  .pager-page {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #dcdfe2;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .pager-nav:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .pager-page.active {
+    background: #153646;
+    color: #fff;
+    border-color: #153646;
+  }
+
+  .pager-ellipsis {
+    padding: 0 6px;
+    color: #777;
+  }
+
+  @media (max-width: 600px) {
+    .si-pagination {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pager {
+      flex-wrap: wrap;
     }
   }
 }

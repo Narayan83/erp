@@ -12,13 +12,14 @@ const SalesInteractions = () => {
   const [period, setPeriod] = useState('This Month');
   const [selectedOtherMonth, setSelectedOtherMonth] = useState(''); // format YYYY-MM
   const [selectedOtherYear, setSelectedOtherYear] = useState(new Date().getFullYear());
-  const [interactionDate, setInteractionDate] = useState(true);
+  const [interactionDate, setInteractionDate] = useState(false);
   const [sinceDate, setSinceDate] = useState(false);
   const [transferDate, setTransferDate] = useState(false);
   const [interactionDateValue, setInteractionDateValue] = useState('');
   const [sinceDateValue, setSinceDateValue] = useState('');
   const [transferDateValue, setTransferDateValue] = useState('');
-  const [rows, setRows] = useState([]); // replace with API data or props when available
+  const [rows, setRows] = useState([]);
+  const [loadingInteractions, setLoadingInteractions] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -29,15 +30,23 @@ const SalesInteractions = () => {
     if (v !== 'Custom') setSelectedOtherMonth('');
   };
 
-  // Load executives from backend
+  // Load executives and interactions from backend
   React.useEffect(() => {
     let mounted = true;
+
+    // Fetch employees and normalize display name
     setLoadingEmployees(true);
-    fetch(`${BASE_URL}/api/employees`) 
+    fetch(`${BASE_URL}/api/employees`)
       .then((res) => res.json())
       .then((data) => {
         if (!mounted) return;
-        setEmployees(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+        const normalized = list.map(emp => ({
+          ...emp,
+          id: emp.id || emp.ID || emp.userId || emp.user_id || emp.employee_id || emp.EmployeeID || emp.empid || emp.EmployeeId || emp.usercode || emp.code || emp.username || emp.email,
+          displayName: emp.displayName || emp.name || emp.fullName || `${emp.firstname || emp.firstName || ''}${emp.firstname && emp.lastname ? ' ' : ''}${emp.lastname || emp.lastName || ''}`.trim() || emp.username || emp.email || `User ${emp.id}`
+        }));
+        setEmployees(normalized);
       })
       .catch(() => {
         if (!mounted) return;
@@ -45,7 +54,159 @@ const SalesInteractions = () => {
       })
       .finally(() => { if (mounted) setLoadingEmployees(false); });
 
-    return () => { mounted = false; };
+    // Fetch interactions and leads (handle paginated responses)
+    setLoadingInteractions(true);
+    Promise.all([
+      fetch(`${BASE_URL}/api/lead-interactions`).then(res => res.json()),
+      fetch(`${BASE_URL}/api/leads`).then(res => res.json())
+    ])
+      .then(([interResp, leadsResp]) => {
+        if (!mounted) return;
+
+        const interactions = Array.isArray(interResp) ? interResp : (interResp && interResp.data ? interResp.data : []);
+        const leadsList = Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []);
+
+        // Build a map of leads for quick lookup (support multiple id keys)
+        const leadsMap = {};
+        leadsList.forEach(lead => {
+          const id = lead.id || lead.ID || lead.lead_id || lead.leadId;
+          if (id !== undefined && id !== null) leadsMap[id] = lead;
+        });
+
+        const tableRows = interactions.map(inter => {
+          // Lead may be nested on interaction or referenced by id
+          const leadRef = inter.lead || inter.Lead || {};
+          const leadId = inter.lead_id || inter.leadId || leadRef.id || leadRef.ID;
+          const lead = leadsMap[leadId] || leadRef || {};
+
+          const tsRaw = inter.timestamp || inter.Timestamp || inter.created_at || inter.createdAt;
+          const timestamp = tsRaw ? new Date(tsRaw) : new Date();
+          const dateStr = isNaN(timestamp) ? '' : timestamp.toISOString().slice(0, 10);
+          
+          // Use separately stored time if available (to avoid timezone conversion)
+          let timeStr = '';
+          if (inter.time && typeof inter.time === 'string' && inter.time.includes(':')) {
+            // If time is stored separately (e.g., "03:00" or "3:00 AM"), use it directly
+            timeStr = inter.time;
+          } else if (!isNaN(timestamp)) {
+            // Fall back to formatting from timestamp
+            timeStr = formatTime12(timestamp);
+          }
+
+          // Normalize lead fields
+          const business = lead.business || lead.Business || lead.company || lead.companyName || lead.organisation || lead.organization || '';
+          const contact = lead.name || lead.contact || lead.contactPerson || lead.contact_name || lead.Name || '';
+          const sinceRaw = lead.since || lead.Since || lead.createdAt || lead.created_at || lead.since_date || '';
+          const since = isValidDisplayDate(sinceRaw) ? new Date(sinceRaw).toISOString().slice(0, 10) : '';
+          const transferredRaw = lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '';
+          const transferred = isValidDisplayDate(transferredRaw) ? new Date(transferredRaw).toISOString().slice(0, 10) : '';
+
+          const interactionText = inter.summary || inter.details || inter.type || inter.note || inter.notes || '';
+
+          // Resolve executive id from multiple possible fields
+          const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedTo || lead.assignedToId || null;
+
+          // Don't set a fallback executive name here. Resolve dynamically during render using employees list so names appear once employees load.
+          const interactionType = (inter.type || inter.Type || inter.interaction_type || inter.kind || '').toString().trim();
+          return {
+            date: dateStr,
+            time: timeStr,
+            business,
+            contact,
+            since,
+            transferred,
+            type: interactionType,
+            interaction: interactionText,
+            executive_id: execId,
+            executive: '',
+            lead_id: leadId,
+          };
+        });
+
+        setRows(tableRows);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch interactions/leads:', err);
+        if (!mounted) return;
+        setRows([]);
+      })
+      .finally(() => { if (mounted) setLoadingInteractions(false); });
+
+    const handler = (e) => {
+      try {
+        const d = e.detail || {};
+        if (d.interaction) {
+          // reload interactions
+          setLoadingInteractions(true);
+          Promise.all([
+            fetch(`${BASE_URL}/api/lead-interactions`).then(res => res.json()),
+            fetch(`${BASE_URL}/api/leads`).then(res => res.json())
+          ])
+            .then(([interResp, leadsResp]) => {
+              if (!mounted) return;
+
+              const interactions = Array.isArray(interResp) ? interResp : (interResp && interResp.data ? interResp.data : []);
+              const leadsList = Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []);
+
+              const leadsMap = {};
+              leadsList.forEach(lead => {
+                const id = lead.id || lead.ID || lead.lead_id || lead.leadId;
+                if (id !== undefined && id !== null) leadsMap[id] = lead;
+              });
+
+              const tableRows = interactions.map(inter => {
+                const leadRef = inter.lead || inter.Lead || {};
+                const leadId = inter.lead_id || inter.leadId || leadRef.id || leadRef.ID;
+                const lead = leadsMap[leadId] || leadRef || {};
+
+                const tsRaw = inter.timestamp || inter.Timestamp || inter.created_at || inter.createdAt;
+                const timestamp = tsRaw ? new Date(tsRaw) : new Date();
+                const dateStr = isNaN(timestamp) ? '' : timestamp.toISOString().slice(0, 10);
+                
+                let timeStr = '';
+                if (inter.time && typeof inter.time === 'string' && inter.time.includes(':')) {
+                  timeStr = inter.time;
+                } else if (!isNaN(timestamp)) {
+                  timeStr = formatTime12(timestamp);
+                }
+
+                const business = lead.business || lead.Business || lead.company || lead.companyName || lead.organisation || lead.organization || '';
+                const contact = lead.name || lead.contact || lead.contactPerson || lead.contact_name || lead.Name || '';
+                const sinceRaw = lead.since || lead.Since || lead.createdAt || lead.created_at || lead.since_date || '';
+                const since = isValidDisplayDate(sinceRaw) ? new Date(sinceRaw).toISOString().slice(0, 10) : '';
+                const transferredRaw = lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '';
+                const transferred = isValidDisplayDate(transferredRaw) ? new Date(transferredRaw).toISOString().slice(0, 10) : '';
+
+                const interactionText = inter.summary || inter.details || inter.type || inter.note || inter.notes || '';
+
+                const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedTo || lead.assignedToId || null;
+                const interactionType = (inter.type || inter.Type || inter.interaction_type || inter.kind || '').toString().trim();
+                return {
+                  date: dateStr,
+                  time: timeStr,
+                  business,
+                  contact,
+                  since,
+                  transferred,
+                  type: interactionType,
+                  interaction: interactionText,
+                  executive_id: execId,
+                  executive: '',
+                  lead_id: leadId,
+                };
+              });
+
+              setRows(tableRows);
+            })
+            .catch(() => {})
+            .finally(() => { if (mounted) setLoadingInteractions(false); });
+        }
+      } catch (err) {}
+    };
+
+    window.addEventListener('lead:interaction.saved', handler);
+
+    return () => { window.removeEventListener('lead:interaction.saved', handler); mounted = false; };
   }, []);
 
   const handleDateTypeChange = (type) => {
@@ -80,6 +241,7 @@ const SalesInteractions = () => {
   };
 
   const formatDateDisplay = (iso) => {
+    // Keep for older compact format if needed, but prefer using formatISOtoDDMMYYYY for table
     if (!iso) return '';
     const d = new Date(iso);
     if (isNaN(d)) return '';
@@ -88,6 +250,52 @@ const SalesInteractions = () => {
     const yy = String(d.getFullYear()).slice(2);
     return `${dd}-${m}-${yy}`;
   };
+
+  // New: format ISO (YYYY-MM-DD or full ISO) to dd-mm-yyyy numeric, but show 'Today'/'Yesterday' when applicable
+  const formatISOtoDDMMYYYY = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+
+    // Compare dates as local date-only values
+    const toDateOnly = (dateObj) => new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+    const today = toDateOnly(new Date());
+    const dateOnly = toDateOnly(d);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diffDays = Math.round((dateOnly - today) / msPerDay);
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === -1) return 'Yesterday';
+
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
+  // Format time to 12-hour clock with AM/PM
+  const formatTime12 = (dateInput) => {
+    if (!dateInput) return '';
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (isNaN(d)) return '';
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
+  // Validate that a date is plausible for display (filters out placeholder years like 0001-01-01)
+  const isValidDisplayDate = (input) => {
+    if (!input) return false;
+    const d = input instanceof Date ? input : new Date(input);
+    if (!d || isNaN(d)) return false;
+    const year = d.getFullYear();
+    const currentYear = new Date().getFullYear();
+    return year >= 1900 && year <= (currentYear + 5);
+  };
+
 
   const parseRowDate = (dateStr) => {
     if (!dateStr) return null;
@@ -108,17 +316,21 @@ const SalesInteractions = () => {
   // Format an employee object into a readable name
   const formatEmployeeDisplay = (emp) => {
     if (!emp) return '';
-    const name = `${emp.salutation ? emp.salutation + ' ' : ''}${emp.firstname || ''}${emp.firstname && emp.lastname ? ' ' : ''}${emp.lastname || ''}`.trim();
-    return name || emp.username || emp.usercode || (`User ${emp.id}`);
+    const name = `${emp.salutation ? emp.salutation + ' ' : ''}${emp.firstname || emp.firstName || ''}${(emp.firstname || emp.firstName) && (emp.lastname || emp.lastName) ? ' ' : ''}${emp.lastname || emp.lastName || ''}`.trim();
+    return name || emp.displayName || emp.username || emp.usercode || emp.email || (`User ${emp.id}`);
   };
 
   // Resolve executive for a given row using common field names or employee id
   const getExecutiveForRow = (r) => {
     if (!r) return '';
-    if (r.executive) return r.executive;
-    if (r.salesperson) return r.salesperson;
-    const id = r.executive_id ?? r.executiveId ?? r.salesperson_id ?? r.salespersonId ?? r.owner_id ?? r.ownerId;
-    if (id) {
+    // If executive is a non-numeric label, show it
+    if (r.executive && typeof r.executive === 'string' && !/^\d+$/.test(r.executive.trim())) return r.executive;
+    // If salesperson/executive string present and non-numeric, show it
+    if (r.salesperson && typeof r.salesperson === 'string' && !/^\d+$/.test(r.salesperson.trim())) return r.salesperson;
+
+    // Otherwise resolve by id fields (supports numeric-string too)
+    const id = r.executive_id ?? r.executiveId ?? r.executive ?? r.salesperson_id ?? r.salespersonId ?? r.owner_id ?? r.ownerId;
+    if (id !== undefined && id !== null && id !== '') {
       const emp = employees.find(e => String(e.id) === String(id));
       if (emp) return formatEmployeeDisplay(emp);
       return String(id);
@@ -147,29 +359,70 @@ const SalesInteractions = () => {
     if (!d) return false;
     const now = new Date();
 
-    let passesPeriod = true;
-    if (period === 'This Month') {
-      passesPeriod = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    } else if (period === 'Last Month') {
-      const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      passesPeriod = d.getMonth() === last.getMonth() && d.getFullYear() === last.getFullYear();
-    } else if (period === 'This Year') {
-      passesPeriod = d.getFullYear() === now.getFullYear();
-    } else if (period === 'Custom') {
-      if (!selectedOtherMonth) passesPeriod = false;
-      else {
-        const [y, m] = selectedOtherMonth.split('-').map(Number);
-        passesPeriod = d.getFullYear() === y && (d.getMonth() + 1) === m;
+    // If a specific date filter (interaction / since / transferred) is active, compare dates exactly
+    const compareDatesEqual = (a, b) => {
+      if (!a || !b) return false;
+      const da = parseRowDate(a);
+      const db = parseRowDate(b);
+      if (!da || !db) return false;
+      return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+    };
+
+    if (interactionDate) {
+      if (!interactionDateValue) return false;
+      if (!compareDatesEqual(r.date, interactionDateValue)) return false;
+    } else if (sinceDate) {
+      if (!sinceDateValue) return false;
+      if (!compareDatesEqual(r.since, sinceDateValue)) return false;
+    } else if (transferDate) {
+      if (!transferDateValue) return false;
+      if (!compareDatesEqual(r.transferred, transferDateValue)) return false;
+    } else {
+      // default period filtering
+      let passesPeriod = true;
+      if (period === 'This Month') {
+        passesPeriod = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      } else if (period === 'Last Month') {
+        const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        passesPeriod = d.getMonth() === last.getMonth() && d.getFullYear() === last.getFullYear();
+      } else if (period === 'This Year') {
+        passesPeriod = d.getFullYear() === now.getFullYear();
+      } else if (period === 'Custom') {
+        if (!selectedOtherMonth) passesPeriod = false;
+        else {
+          const [y, m] = selectedOtherMonth.split('-').map(Number);
+          passesPeriod = d.getFullYear() === y && (d.getMonth() + 1) === m;
+        }
       }
+
+      if (!passesPeriod) return false;
     }
 
-    if (!passesPeriod) return false;
+    // Filter by selected executive if chosen
+    if (salesperson && salesperson !== 'all') {
+      const sel = String(salesperson);
+      const execId = r.executive_id ?? r.executive ?? r.salesperson_id ?? r.salesperson;
+      // direct id match
+      if (execId !== undefined && execId !== null && String(execId) === sel) {
+        // row matches selected executive
+      } else {
+        // try to match by employee display name
+        const selEmp = employees.find(e => String(e.id) === sel);
+        if (selEmp) {
+          const execName = getExecutiveForRow(r);
+          if (execName !== formatEmployeeDisplay(selEmp) && String(execId) !== sel) return false;
+        } else {
+          return false;
+        }
+      }
+    }
 
     if (!searchTerm || !searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
     const executive = getExecutiveForRow(r) || '';
     const formattedDate = formatDateDisplay(dateStr);
-    const hay = [String(r.date||''), String(r.time||''), String(r.business||''), String(r.contact||''), String(r.since||''), String(r.transferred||''), String(r.interaction||''), executive, formattedDate].join(' ').toLowerCase();
+    const humanDateLabel = formatISOtoDDMMYYYY(dateStr);
+    const hay = [String(r.date||''), String(humanDateLabel||''), String(r.time||''), String(r.type||''), String(r.business||''), String(r.contact||''), String(r.since||''), String(r.transferred||''), String(r.interaction||''), executive, formattedDate].join(' ').toLowerCase();
     return hay.includes(term);
   });
 
@@ -177,15 +430,18 @@ const SalesInteractions = () => {
     try {
       setExporting(true);
       const exportData = filteredRows.map(r => ({
-        Date: r.date || '',
+        Date: formatISOtoDDMMYYYY(r.date) || '',
         Time: r.time || '',
+        Type: r.type || '',
         Business: r.business || '',
         Contact: r.contact || '',
-        Since: r.since || '',
-        'Transferred on': r.transferred || '',
+        Since: formatISOtoDDMMYYYY(r.since) || '',
+        'Transferred on': formatISOtoDDMMYYYY(r.transferred) || '',
         Interaction: r.interaction || '',
+        Executive: getExecutiveForRow(r) || '',
       }));
-      const ws = XLSX.utils.json_to_sheet(exportData);
+      const headers = ["Date","Time","Business","Contact","Since","Transferred on","Type","Interaction","Executive"];
+      const ws = XLSX.utils.json_to_sheet(exportData, { header: headers });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'SalesInteractions');
       const filename = `sales_interactions_${new Date().toISOString().slice(0,10)}.xlsx`;
@@ -204,7 +460,6 @@ const SalesInteractions = () => {
           <div className="filters">
             <label className="filter-item">
               <select value={salesperson} onChange={(e) => setSalesperson(e.target.value)}>
-                <option value="" disabled>Select Executive</option>
                 <option value="all">All</option>
                 {loadingEmployees ? (
                   <option>Loading...</option>
@@ -321,29 +576,36 @@ const SalesInteractions = () => {
               <th>Contact Person</th>
               <th>Since</th>
               <th>Transferred on</th>
+              <th>Type</th>
               <th>Interaction</th>
               <th>Executive</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {loadingInteractions ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20 }}>No records found for selected period</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20 }}>Loading interactions...</td>
+              </tr>
+            ) : filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20 }}>No records found for selected period</td>
               </tr>
             ) : (
               filteredRows.map((r, i) => {
                 const term = searchTerm && searchTerm.trim() ? searchTerm.toLowerCase() : '';
                 const executive = getExecutiveForRow(r) || '';
-                const hay = [String(r.date||''), String(r.time||''), String(r.business||''), String(r.contact||''), String(r.since||''), String(r.transferred||''), String(r.interaction||''), executive, formatDateDisplay(r.date)].join(' ').toLowerCase();
+                const humanDateLabel = formatISOtoDDMMYYYY(r.date);
+                const hay = [String(r.date||''), String(humanDateLabel||''), String(r.time||''), String(r.type||''), String(r.business||''), String(r.contact||''), String(r.since||''), String(r.transferred||''), String(r.interaction||''), executive, formatDateDisplay(r.date)].join(' ').toLowerCase();
                 const isMatch = term ? hay.includes(term) : false;
                 return (
                   <tr key={i} className={isMatch ? 'match-row' : ''}>
-                    <td>{highlightMatch(r.date, searchTerm)}</td>
+                    <td>{highlightMatch(formatISOtoDDMMYYYY(r.date), searchTerm)}</td>
                     <td>{highlightMatch(r.time, searchTerm)}</td>
                     <td>{highlightMatch(r.business, searchTerm)}</td>
                     <td>{highlightMatch(r.contact, searchTerm)}</td>
-                    <td>{highlightMatch(r.since, searchTerm)}</td>
-                    <td>{highlightMatch(r.transferred, searchTerm)}</td>
+                    <td>{highlightMatch(formatISOtoDDMMYYYY(r.since) || '-', searchTerm)}</td>
+                    <td>{highlightMatch(formatISOtoDDMMYYYY(r.transferred) || '-', searchTerm)}</td>
+                    <td>{highlightMatch(r.type || '-', searchTerm)}</td>
                     <td>{highlightMatch(r.interaction, searchTerm)}</td>
                     <td title={executive}>{highlightMatch(executive, searchTerm)}</td>
                   </tr>

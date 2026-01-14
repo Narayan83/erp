@@ -8,6 +8,7 @@ import './leadDetails.scss';
 const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
   const [showUpdateStatus, setShowUpdateStatus] = useState(false);
   const [showInteraction, setShowInteraction] = useState(false);
+  const [interactionMode, setInteractionMode] = useState('both'); // 'interaction', 'appointment', or 'both'
   // Local optimistic stage so UI updates instantly when user changes stage
   const [localStage, setLocalStage] = useState(lead?.stage || 'Unqualified');
 
@@ -135,6 +136,105 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     }
   };
 
+  // Local strict date formatter to hide placeholder or invalid dates
+  const formatDateStrictLocal = (dateStr, { hideIfNow = false } = {}) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date)) return '';
+    const year = date.getFullYear();
+    const currentYear = new Date().getFullYear();
+    if (year < 1900 || year > currentYear + 5) return '';
+    if (hideIfNow && Math.abs(Date.now() - date.getTime()) < 2 * 60 * 1000) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month}-${year}`;
+  };
+
+  // Simple 12-hour time formatter for appointment times
+  const formatTime12 = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  };
+
+  // Show date as 'Today', 'Yesterday', 'Tomorrow' or fallback to DD-MM-YYYY
+  const formatRelativeDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffDays = Math.round((day - todayStart) / (24*60*60*1000));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays === 1) return 'Tomorrow';
+    return formatDateStrictLocal(iso);
+  };
+
+  // Next appointment details (date/time/note) for this lead
+  const [nextAppointment, setNextAppointment] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadNextAppointment = async () => {
+      if (!isOpen || !lead || (!lead.id && lead.id !== 0)) {
+        if (mounted) setNextAppointment(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/lead-followups`);
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+        const leadIdStr = String(lead.id);
+
+        // Filter pending followups for this lead
+        const pending = arr.filter(f => {
+          const lid = String(f.lead_id || f.LeadID || (f.lead && f.lead.id) || f.lead || '');
+          const status = (f.status || f.Status || '').toString().toLowerCase();
+          return lid === leadIdStr && (status === 'pending' || status === '' || status === undefined);
+        });
+
+        if (!pending || pending.length === 0) {
+          if (mounted) setNextAppointment(null);
+          return;
+        }
+
+        const mapped = pending.map(f => {
+          const dt = f.followup_on || f.FollowUpOn || f.followupOn || '';
+          const d = dt ? new Date(dt) : null;
+          return { raw: f, dt: d, notes: f.notes || f.Notes || '', type: f.title || f.Title || '' };
+        }).filter(x => x.dt && !isNaN(x.dt));
+
+        if (mapped.length === 0) {
+          if (mounted) setNextAppointment(null);
+          return;
+        }
+
+        // Prefer the nearest future appointment; otherwise the earliest overall
+        const now = new Date();
+        let candidates = mapped.filter(x => x.dt >= now);
+        if (candidates.length === 0) candidates = mapped;
+        candidates.sort((a, b) => a.dt - b.dt);
+        const pick = candidates[0];
+        if (mounted) setNextAppointment({ followupOn: pick.dt.toISOString(), notes: pick.notes, type: pick.type, raw: pick.raw });
+      } catch (err) {
+        console.error('Failed to load next appointment', err);
+      }
+    };
+
+    loadNextAppointment();
+    const handler = () => { loadNextAppointment(); };
+    window.addEventListener('lead:interaction.saved', handler);
+    return () => { mounted = false; window.removeEventListener('lead:interaction.saved', handler); };
+  }, [isOpen, lead]);
+
   // Open the Add Quotation page in a new tab and prefill using lead data passed as query params
   const openQuoteFromLead = () => {
     try {
@@ -228,24 +328,40 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
             </div>
 
             <div className="card">
-              <div className="card-title">Business Interactions</div>
+              <div className="card-title">Business Follow-Ups</div>
               <div className="interactions">
-                <div className="next-appointment">{lead.nextTalk || 'No appointment scheduled'}</div>
-                <button className="btn small green" onClick={() => setShowInteraction(true)}>+ Enter Interaction</button>
+                <div className="next-appointment">
+                  {nextAppointment ? (
+                    <>
+                      <div className="appointment-datetime">
+                        <span className="appointment-date">{formatRelativeDate(nextAppointment.followupOn)}</span>
+                        <span className="appointment-time">{formatTime12(nextAppointment.followupOn)}</span>
+                      </div>
+                      {nextAppointment.notes ? <div className="appointment-note">{nextAppointment.notes}</div> : null}
+                    </>
+                  ) : (
+                    'No appointment scheduled'
+                  )}
+                </div>
+                <div className="button-group" style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn small green" onClick={() => { setInteractionMode('interaction'); setShowInteraction(true); }}>+ Interaction</button>
+                  <button className="btn small green" onClick={() => { setInteractionMode('appointment'); setShowInteraction(true); }}>+ Appointment</button>
+                </div>
               </div>
-            </div>
+            </div> 
           </div>
         </div>
 
       </div>
 
-      {/* Update Status Modal */}
+      {/* Interaction Modal */}
       <InteractionModal
         isOpen={showInteraction}
         onClose={() => setShowInteraction(false)}
         lead={lead}
-        onSaved={() => {
-          if (onStatusUpdate) onStatusUpdate();
+        mode={interactionMode}
+        onSaved={(result) => {
+          if (onStatusUpdate) onStatusUpdate(result);
           setShowInteraction(false);
         }}
       />

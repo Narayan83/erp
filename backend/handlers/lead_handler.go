@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -204,6 +205,42 @@ func DeleteLead(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"message": "Lead deleted successfully"})
+}
+
+// 📌 Lead Timeline (combined interactions & followups)
+func GetLeadTimeline(c *fiber.Ctx) error {
+	id := c.Params("id")
+	// Load interactions and followups
+	var interactions []models.LeadInteraction
+	var followups []models.LeadFollowUp
+
+	if err := leadInteractionDB.Preload("AssignedTo").Where("lead_id = ?", id).Find(&interactions).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	if err := leadFollowupDB.Preload("AssignedTo").Where("lead_id = ?", id).Find(&followups).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	type timelineItem struct {
+		Type      string      `json:"type"`
+		Timestamp time.Time   `json:"timestamp"`
+		Item      interface{} `json:"item"`
+	}
+
+	var timeline []timelineItem
+	for _, it := range interactions {
+		timeline = append(timeline, timelineItem{Type: "interaction", Timestamp: it.Timestamp, Item: it})
+	}
+	for _, f := range followups {
+		timeline = append(timeline, timelineItem{Type: "followup", Timestamp: f.FollowUpOn, Item: f})
+	}
+
+	// Sort by timestamp descending
+	sort.Slice(timeline, func(i, j int) bool {
+		return timeline[i].Timestamp.After(timeline[j].Timestamp)
+	})
+
+	return c.JSON(timeline)
 }
 
 // 📌 Import Leads (Bulk Create)

@@ -94,10 +94,40 @@ const TopMenu = () => {
   // Assigned to options (fetched from backend users)
   const [assignedToOptions, setAssignedToOptions] = useState(DEFAULT_ASSIGNED);
 
+  // Interactions and followups for lookup maps
+  const [interactions, setInteractions] = useState([]);
+  const [followups, setFollowups] = useState([]);
+
   // -------------------- Effects --------------------
   // Fetch leads from backend
   useEffect(() => {
     fetchLeads();
+  }, []);
+
+  // Fetch interactions and followups to build lookup maps for lastTalk and nextTalk
+  useEffect(() => {
+    const loadInteractionsAndFollowups = async () => {
+      try {
+        const [interRes, followRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/lead-interactions`),
+          fetch(`${BASE_URL}/api/lead-followups`)
+        ]);
+        const interData = await interRes.json();
+        const followData = await followRes.json();
+        const interArr = Array.isArray(interData) ? interData : (interData && interData.data ? interData.data : []);
+        const followArr = Array.isArray(followData) ? followData : (followData && followData.data ? followData.data : []);
+        console.log('Fetched interactions:', interArr);
+        console.log('Fetched followups:', followArr);
+        setInteractions(interArr);
+        setFollowups(followArr);
+      } catch (err) {
+        console.error('Failed to load interactions or followups', err);
+      }
+    };
+    loadInteractionsAndFollowups();
+    const handler = () => { loadInteractionsAndFollowups(); };
+    window.addEventListener('lead:interaction.saved', handler);
+    return () => { window.removeEventListener('lead:interaction.saved', handler); };
   }, []);
 
   // Fetch products on mount
@@ -131,6 +161,30 @@ const TopMenu = () => {
     };
     fetchEmployees();
   }, []);
+
+  // If assignedToOptions load later, update existing leads to show resolved assignedTo names
+  useEffect(() => {
+    if (!assignedToOptions || assignedToOptions.length === 0) return;
+    setLeads(prev => prev.map(l => {
+      const cur = l.assignedTo;
+      // If it's a non-numeric string (already a name), keep it
+      if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) return l;
+      // Determine candidate id from multiple possible fields
+      let idCandidate;
+      if (cur && (typeof cur === 'number' || (typeof cur === 'string' && /^\d+$/.test(cur.trim())))) {
+        idCandidate = Number(cur);
+      } else if (l.assigned_to_id !== undefined && l.assigned_to_id !== null && l.assigned_to_id !== '') {
+        idCandidate = Number(l.assigned_to_id);
+      } else if (l.assignedToId !== undefined && l.assignedToId !== null && l.assignedToId !== '') {
+        idCandidate = Number(l.assignedToId);
+      }
+      if (idCandidate === undefined || isNaN(idCandidate)) return l;
+      const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
+      const resolved = found ? found.name : String(idCandidate);
+      if (String(resolved) === String(cur)) return l;
+      return { ...l, assignedTo: resolved };
+    }));
+  }, [assignedToOptions]);
 
   // Collapse dropdowns when clicking outside
   useEffect(() => {
@@ -184,20 +238,39 @@ const TopMenu = () => {
       const data = await res.json();
 
       const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
-      const backendLeads = (data.data || []).map(lead => ({
-        ...lead,
-        starred: !!starredMap[lead.id],
-        product: lead.productName || '',
-        assignedTo: lead.assignedToName || assignedToOptions.find(opt => opt.id === lead.assigned_to_id)?.name || '',
-        // Normalize field names to match case-sensitive keys
-        addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
-        addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
-        category: lead.category || lead.Category || lead.formData?.category || '',
-        tags: lead.tags || lead.Tags || lead.formData?.tags || '',
-        // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
-        createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
-        updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
-      }));
+      const backendLeads = (data.data || []).map(lead => {
+        // Normalize assigned fields: id and display name from multiple possible backend shapes
+        const assignedId = lead.assigned_to_id || lead.assignedToId || (lead.assignedTo && typeof lead.assignedTo === 'number' ? lead.assignedTo : undefined);
+        let assignedName = '';
+        if (lead.assignedTo && typeof lead.assignedTo === 'string') {
+          assignedName = lead.assignedTo;
+        } else if (lead.assignedTo && typeof lead.assignedTo === 'object') {
+          assignedName = lead.assignedTo.name || lead.assignedTo.Name || '';
+        } else if (lead.assignedToName) {
+          assignedName = lead.assignedToName;
+        } else if (lead.assigned_to_name) {
+          assignedName = lead.assigned_to_name;
+        } else if (assignedId !== undefined && assignedId !== null) {
+          const found = assignedToOptions.find(opt => Number(opt.id) === Number(assignedId));
+          assignedName = found ? found.name : String(assignedId);
+        }
+
+        return {
+          ...lead,
+          starred: !!starredMap[lead.id],
+          product: lead.productName || '',
+          assignedTo: assignedName,
+          assigned_to_id: assignedId,
+          // Normalize field names to match case-sensitive keys
+          addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
+          addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
+          category: lead.category || lead.Category || lead.formData?.category || '',
+          tags: lead.tags || lead.Tags || lead.formData?.tags || '',
+          // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
+          createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
+          updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
+        };
+      });
 
       // Get imported leads from localStorage (those without backend id)
       const importedLeadsRaw = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
@@ -515,15 +588,66 @@ const TopMenu = () => {
   };
 
   // -------------------- Helpers --------------------
-  const formatDate = (dateStr) => {
+  // Get the most recent interaction timestamp for a lead
+  const getLastTalkForLead = (leadId) => {
+    const leadIdStr = String(leadId);
+    const leadInteractions = interactions.filter(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+    if (leadInteractions.length === 0) return '';
+    const mapped = leadInteractions.map(i => {
+      const ts = i.timestamp || i.Timestamp || i.created_at || i.createdAt || '';
+      return ts ? new Date(ts) : null;
+    }).filter(d => d && !isNaN(d));
+    if (mapped.length === 0) return '';
+    mapped.sort((a, b) => b - a);
+    return mapped[0].toISOString();
+  };
+
+  // Get the next pending followup date for a lead (nearest future or earliest overall)
+  const getNextTalkForLead = (leadId) => {
+    const leadIdStr = String(leadId);
+    const leadFollowups = followups.filter(f => {
+      const lid = String(f.lead_id || f.LeadID || (f.lead && f.lead.id) || f.lead || '');
+      const status = (f.status || f.Status || '').toString().toLowerCase();
+      return lid === leadIdStr && (status === 'pending' || status === '' || status === undefined);
+    });
+    if (leadFollowups.length === 0) return '';
+    const mapped = leadFollowups.map(f => {
+      const dt = f.followup_on || f.FollowUpOn || f.followupOn || '';
+      return dt ? new Date(dt) : null;
+    }).filter(d => d && !isNaN(d));
+    if (mapped.length === 0) return '';
+    const now = new Date();
+    let candidates = mapped.filter(d => d >= now);
+    if (candidates.length === 0) candidates = mapped;
+    candidates.sort((a, b) => a - b);
+    return candidates[0].toISOString();
+  };
+
+  // Strict date formatter: returns empty string for falsy, invalid or placeholder dates.
+  // Optionally hides dates that are effectively 'now' (within 2 minutes) which often come from imported/default values.
+  const formatDateStrict = (dateStr, { hideIfNow = false } = {}) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    if (isNaN(date)) return dateStr;
+    if (isNaN(date)) return '';
+
+    const year = date.getFullYear();
+    const currentYear = new Date().getFullYear();
+    // Hide clearly invalid or placeholder years (too old or far future)
+    if (year < 1900 || year > currentYear + 5) return '';
+
+    if (hideIfNow) {
+      const now = Date.now();
+      // if date is within 2 minutes of now, treat it as default and hide
+      if (Math.abs(now - date.getTime()) < 2 * 60 * 1000) return '';
+    }
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
     return `${day}-${month}-${year}`;
-  };
+  }; 
+
+  // Backwards-compatible alias for fields where we want to show recent dates as well
+  const formatDate = (dateStr) => formatDateStrict(dateStr, { hideIfNow: false });
 
   const parseExcelDate = (value) => {
     if (!value) return '';
@@ -572,6 +696,18 @@ const TopMenu = () => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
           const nowIso = new Date().toISOString();
+
+          // Sanitize imported date values: return ISO string or empty to avoid bogus placeholder years
+          const sanitizeImportDate = (val) => {
+            if (!val) return '';
+            const d = new Date(val);
+            if (isNaN(d)) return '';
+            const y = d.getFullYear();
+            const currentYear = new Date().getFullYear();
+            if (y < 1900 || y > currentYear + 5) return '';
+            return d.toISOString();
+          };
+
           const newLeads = jsonData.map((row, index) => ({
             // Remove id or use a string id to avoid collision with backend ids
             id: `imported_${Date.now()}_${index}`,
@@ -592,13 +728,13 @@ const TopMenu = () => {
             source: row.Source || row.source || '',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
-            since: row.Since || row.since || nowIso,
+            since: sanitizeImportDate(row.Since || row.since || '') || nowIso,
             assignedTo: row['Assigned to'] || row['AssignedTo'] || row['Assigned To'] || '',
             product: row.Product || row.product || '',
             website: row.Website || row.website || '',
-            lastTalk: row['Last Talk'] || row.LastTalk || nowIso,
-            nextTalk: row['Next Talk'] || row.NextTalk || row.Next || '',
-            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || nowIso,
+            lastTalk: sanitizeImportDate(row['Last Talk'] || row.LastTalk || ''),
+            nextTalk: sanitizeImportDate(row['Next Talk'] || row.NextTalk || row.Next || ''),
+            transferredOn: sanitizeImportDate(row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || ''),
             // Category and tags
             category: row.Category || row.category || '',
             tags: row.Tags || row.tags || row.Tag || row.tag || '',
@@ -779,8 +915,10 @@ const TopMenu = () => {
               : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
         } else if (field.key === 'potential') {
           value = lead.potential || '';
-        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
-          value = formatDate(lead[field.key]);
+        } else if (field.key === 'since') {
+          value = formatDate(lead.since);
+        } else if (field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
+          value = formatDateStrict(lead[field.key], { hideIfNow: true });
         } else if (field.key === 'assignedTo') {
           value = lead.assignedToName || (typeof lead.assignedTo === 'object' && lead.assignedTo !== null
             ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || '')
@@ -798,11 +936,13 @@ const TopMenu = () => {
         } else if (field.key === 'tags') {
           value = lead.tags || lead.Tags || lead.formData?.tags || '';
         } else if (field.key === 'lastTalk') {
-          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+          const recentInteraction = getLastTalkForLead(lead.id);
+          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
         } else if (field.key === 'nextTalk') {
-          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+          const nextFollowup = getNextTalkForLead(lead.id);
+          value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
         } else if (field.key === 'transferredOn') {
-          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
         } else if (field.key === 'assignedToId') {
           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
         } else if (field.key === 'productId') {
@@ -935,6 +1075,12 @@ const TopMenu = () => {
 
   // Paginated leads for current page
   const paginatedLeads = displayedLeads.slice((pageNo - 1) * rowsPerPage, pageNo * rowsPerPage);
+
+  // Force table re-render when interactions or followups data loads by depending on their length
+  const [, forceUpdate] = React.useState();
+  React.useEffect(() => {
+    forceUpdate({});
+  }, [interactions.length, followups.length]);
 
   // Pagination handlers
   const handlePrevPage = () => setPageNo(prev => Math.max(prev - 1, 1));
@@ -1200,12 +1346,31 @@ const TopMenu = () => {
                               : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
                         } else if (field.key === 'potential') {
                           value = `₹${lead.potential || ''}`;
-                        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
-                          value = formatDate(lead[field.key]);
+                        } else if (field.key === 'since') {
+                          // 'since' can be shown even if it's today
+                          value = formatDate(lead.since);
+                        } else if (field.key === 'lastTalk') {
+                          const recentInteraction = getLastTalkForLead(lead.id);
+                          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
+                        } else if (field.key === 'nextTalk') {
+                          const nextFollowup = getNextTalkForLead(lead.id);
+                          value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
+                        } else if (field.key === 'transferredOn') {
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
                         } else if (field.key === 'assignedTo') {
-                          value = lead.assignedToName || (typeof lead.assignedTo === 'object' && lead.assignedTo !== null
-                            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
-                            : (lead.assignedTo || ''));
+                          // Resolve name even when stored as numeric id or numeric string
+                          const cur = lead.assignedTo;
+                          if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) {
+                            value = cur;
+                          } else {
+                            const idCandidate = (cur && !isNaN(Number(cur))) ? Number(cur) : (lead.assigned_to_id ? Number(lead.assigned_to_id) : undefined);
+                            if (idCandidate !== undefined && !isNaN(idCandidate)) {
+                              const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
+                              value = found ? found.name : String(idCandidate);
+                            } else {
+                              value = '';
+                            }
+                          }
                         } else if (field.key === 'product') {
                           value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
                             ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
@@ -1219,11 +1384,11 @@ const TopMenu = () => {
                         } else if (field.key === 'tags') {
                           value = lead.tags || lead.Tags || lead.formData?.tags || '';
                         } else if (field.key === 'lastTalk') {
-                          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+                          value = formatDateStrict(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
                         } else if (field.key === 'nextTalk') {
-                          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+                          value = formatDateStrict(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
                         } else if (field.key === 'transferredOn') {
-                          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
                         } else if (field.key === 'assignedToId') {
                           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
                         } else if (field.key === 'productId') {

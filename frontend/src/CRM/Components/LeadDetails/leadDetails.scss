@@ -73,10 +73,10 @@
 }
 
 .lead-details-header .close-btn {
-  background: none;
-  color: #666;
+  background: none !important;
+  color: #666 !important;
   border: 0;
-  font-size: 18px;
+  font-size: 20px !important;
   cursor: pointer;
 }
 
@@ -202,4 +202,28 @@
 .interactions .next-appointment {
   margin-bottom: 8px;
   color: #444;
+}
+.interactions .appointment-datetime {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+.interactions .appointment-date {
+  color: rgb(255, 115, 0);
+  /* left-aligned date */
+}
+.interactions .appointment-time {
+  /* right-aligned time */
+  color: rgb(255, 115, 0);
+}
+.interactions .appointment-note {
+  font-size: 14px;
+  color: #555;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
 }

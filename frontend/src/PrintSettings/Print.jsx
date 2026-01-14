@@ -49,10 +49,57 @@ const sections = [
 	},
 ];
 
-export default function PrintSettingsDialog({ onClose }) {
+export default function PrintSettingsDialog({ onClose, initialConfig = {}, onSave, docType }) {
+	// map human labels to config keys used by callers
+	const labelToKey = {
+		"Header": 'header',
+		"Footer": 'footer',
+		"Digital Signature": 'digitalSignature',
+		"Org. / Dup. / Trip.": 'orgDupTrip',
+		"Party Information": 'partyInformation',
+		"GSTIN": 'gstin',
+		"GST Summary": 'gstSummary',
+		"GST in export also": 'gstInExport',
+		"HSN in export also": 'hsnInExport',
+		"Branch": 'branch',
+		"Bank Details": 'bankDetails',
+		"Disclaimer": 'disclaimer',
+		"Total Quantity": 'totalQuantity',
+		"Valid till": 'validTill',
+		// Party Information
+		"Mobile": 'mobile',
+		"Email": 'email',
+		"Contact Person Name": 'contactPersonName',
+		"Company before POC": 'companyBeforePOC',
+		"Total before Round off": 'totalBeforeRoundOff',
+		// Item List
+		"Item Code": 'itemCode',
+		"Notes": 'notes',
+		"Discount Rate": 'discountRate',
+		"Discount Amt": 'discountAmt',
+		"Taxable Amount": 'taxableAmt',
+		"HSN / SAC": 'hsnSac',
+		"GST Amounts / Tax": 'gstAmounts',
+		"Lead Time": 'leadTime',
+		"Qty in Services": 'qtyInServices',
+		"Item Fixed Rate": 'itemFixedRate',
+		"Item Rate": 'itemRate',
+		"Non-Stock Item Code": 'nonStockItemCode',
+		"Auto-pad small docs": 'autoPadSmallDocs',
+	};
+
 	const [checked, setChecked] = useState(() => {
 		const init = {};
-		sections.forEach((s) => s.items.forEach((i) => (init[i] = true)));
+		sections.forEach((s) =>
+			s.items.forEach((label) => {
+				const key = labelToKey[label] || label;
+				if (Object.prototype.hasOwnProperty.call(initialConfig, key)) {
+					init[label] = !!initialConfig[key];
+				} else {
+					init[label] = true; // default to true when not specified
+				}
+			})
+		);
 		return init;
 	});
 
@@ -73,6 +120,21 @@ export default function PrintSettingsDialog({ onClose }) {
 		setChecked((c) => ({ ...c, [name]: !c[name] }));
 	}
 
+	function buildConfigFromChecked() {
+		const out = {};
+		Object.keys(checked).forEach((label) => {
+			const key = labelToKey[label] || label;
+			out[key] = !!checked[label];
+		});
+		return out;
+	}
+
+	function handleDone() {
+		const cfg = buildConfigFromChecked();
+		onSave && onSave(cfg);
+		onClose && onClose();
+	}
+
 	return (
 		<div className="print-overlay" onClick={onClose} role="presentation">
 			<div
@@ -84,10 +146,10 @@ export default function PrintSettingsDialog({ onClose }) {
 			>
 				<div className="dialog-card">
 					<div className="dialog-header">
-						<h2 id="print-settings-title">Print Settings</h2>
+						<h2 id="print-settings-title">Print Settings{docType ? ` — ${docType}` : ''}</h2>
 						<div className="dialog-actions">
 							<button className="config-btn" onClick={() => navigate('/sales-configuration')}>Sales Configuration</button>
-							<button ref={closeRef} className="close-btn" onClick={onClose}>Done</button>
+							<button ref={closeRef} className="close-btn" onClick={handleDone}>Done</button>
 						</div>
 					</div>
 

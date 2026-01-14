@@ -292,6 +292,8 @@ func main() {
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+		&models.LeadInteraction{},
+		&models.LeadFollowUp{},
 		&models.RoleManagement{},
 		&models.Role{},
 		&models.Menu{},

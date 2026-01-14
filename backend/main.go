@@ -41,6 +41,9 @@ func main() {
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	// Lead interactions and followups DB
+	handler.SetLeadInteractionDB(initializers.DB)
+	handler.SetLeadFollowupDB(initializers.DB)
 	handler.SetRolesDB(initializers.DB)
 	// Initialize role-management DB used by role permission handlers
 	handler.SetRolesManagementDB(initializers.DB)
@@ -274,6 +277,26 @@ func main() {
 	api.Post("/leads/import", handler.ImportLeads)
 	api.Put("/leads/:id", handler.UpdateLead)
 	api.Delete("/leads/:id", handler.DeleteLead)
+
+	// Lead - interactions tied to a specific lead
+	api.Post("/leads/:id/interactions", handler.CreateLeadInteractionForLead)
+
+	// Lead Interactions
+	api.Post("/lead-interactions", handler.CreateLeadInteraction)
+	api.Get("/lead-interactions", handler.GetLeadInteractions)
+	api.Get("/lead-interactions/:id", handler.GetLeadInteraction)
+	api.Put("/lead-interactions/:id", handler.UpdateLeadInteraction)
+	api.Delete("/lead-interactions/:id", handler.DeleteLeadInteraction)
+
+	// Lead Followups
+	api.Post("/lead-followups", handler.CreateLeadFollowUp)
+	api.Get("/lead-followups", handler.GetLeadFollowUps)
+	api.Get("/lead-followups/:id", handler.GetLeadFollowUp)
+	api.Put("/lead-followups/:id", handler.UpdateLeadFollowUp)
+	api.Delete("/lead-followups/:id", handler.DeleteLeadFollowUp)
+
+	// Lead Timeline
+	api.Get("/lead/:id/timeline", handler.GetLeadTimeline)
 
 	// IndiaMART Integration
 	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)

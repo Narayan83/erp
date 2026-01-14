@@ -42,7 +42,8 @@ const Report = () => {
     {
       title: "Follow-ups",
       description: "Track scheduled follow-ups to ensure timely engagement.",
-      icon: <FaCalendarCheck />
+      icon: <FaCalendarCheck />,
+      path: '/reports/followups'
     },
     {
       title: "No Appointments",

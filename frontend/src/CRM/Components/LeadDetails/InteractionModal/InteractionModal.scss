@@ -38,16 +38,16 @@
   font-weight: 700;
 }
 
-.icon-delete {
+
+.icon-close {
   background: none;
   border: none;
-  color: #c32a2a;
+  color: #555;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
   padding: 6px;
   border-radius: 4px;
 }
-.icon-delete:hover { background: rgba(200,40,40,0.06); }
 
 
 .inputs-row {
@@ -150,7 +150,7 @@
 
 .modal-actions {
   display:flex;
-  justify-content:flex-start;
+  justify-content:flex-end;
   margin-top:12px;
 }
 

@@ -241,44 +241,64 @@ const [selectedBankId, setSelectedBankId] = useState(null);
 // derived selected bank object (only when an option is chosen)
 const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === String(selectedBankId)) : null;
 
-  // Print Configuration modal state and options
+  // Print Configuration modal state and options (per-document-type)
   const [openPrintConfig, setOpenPrintConfig] = useState(false);
+
+  // helper: default settings per doc type (tweak as needed)
+  const getDefaultPrintConfig = (type = 'Quotation') => ({
+    // Basic Elements
+    header: true,
+    footer: false,
+    digitalSignature: false,
+    orgDupTrip: false,
+    partyInformation: true,
+    gstin: true,
+    gstSummary: type === 'Invoice' ? true : true,
+    branch: true,
+    bankDetails: type === 'Invoice',
+    disclaimer: false,
+    totalQuantity: true,
+    validTill: type === 'Quotation',
+    // Party Information
+    mobile: true,
+    email: true,
+    contactPersonName: true,
+    companyBeforePOC: false,
+    totalBeforeRoundOff: false,
+    // Item List
+    itemCode: true,
+    notes: false,
+    discountRate: true,
+    discountAmt: true,
+    taxableAmt: true,
+    hsnSac: true,
+    gstAmounts: true,
+    leadTime: false,
+    qtyInServices: false,
+    itemFixedRate: false,
+    itemRate: true,
+    nonStockItemCode: false,
+    autoPadSmallDocs: false,
+  });
+
+  // determine initial doc type from URL (so we can load correct stored settings)
+  const initialDocType = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const t = params.get('type');
+      return t ? t : 'Quotation';
+    } catch (e) {
+      return 'Quotation';
+    }
+  })();
+
   const [printConfig, setPrintConfig] = useState(() => {
     try {
-      const saved = localStorage.getItem('printConfig');
-      return saved ? JSON.parse(saved) : {
-        // Basic Elements
-        header: true,
-        footer: false,
-        digitalSignature: false,
-        orgDupTrip: false,
-        partyInformation: true,
-        gstin: true,
-        branch: true,
-        bankDetails: true,
-        disclaimer: false,
-        // Party Information
-        mobile: true,
-        email: true,
-        contactPersonName: true,
-        companyBeforePOC: false,
-        totalBeforeRoundOff: false,
-        // Item List
-        itemCode: true,
-        notes: false,
-        discountRate: true,
-        discountAmt: true,
-        taxableAmt: true,
-        hsnSac: true,
-        gstAmounts: true,
-        leadTime: false,
-        qtyInServices: false,
-        itemRate: true,
-        nonStockItemCode: false,
-        autoPadSmallDocs: false,
-      };
+      const key = `printConfig_${initialDocType}`;
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : getDefaultPrintConfig(initialDocType);
     } catch (e) {
-      return {};
+      return getDefaultPrintConfig();
     }
   });
 
@@ -287,9 +307,12 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
   const handleOpenPrintConfig = () => setOpenPrintConfig(true);
   const handleClosePrintConfig = () => setOpenPrintConfig(false);
   const togglePrintOption = (key) => setPrintConfig(prev => ({ ...prev, [key]: !prev[key] }));
-  const handleSavePrintConfig = () => {
+  const handleSavePrintConfig = (newCfg) => {
     try {
-      localStorage.setItem('printConfig', JSON.stringify(printConfig));
+      const cfg = newCfg || printConfig;
+      const key = `printConfig_${docType}`;
+      localStorage.setItem(key, JSON.stringify(cfg));
+      setPrintConfig(cfg);
     } catch (e) {
       console.warn('Failed to save print config', e);
     }
@@ -311,6 +334,18 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
   })();
   // local state for UI-selected document type (initialized from query param)
   const [docType, setDocType] = useState(urlType || 'Quotation');
+
+  // When the document type changes, load the per-doc-type print config (or use defaults)
+  useEffect(() => {
+    try {
+      const key = `printConfig_${docType}`;
+      const saved = localStorage.getItem(key);
+      if (saved) setPrintConfig(JSON.parse(saved));
+      else setPrintConfig(getDefaultPrintConfig(docType));
+    } catch (e) {
+      setPrintConfig(getDefaultPrintConfig(docType));
+    }
+  }, [docType]);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [isReviseMode, setIsReviseMode] = useState(false);
@@ -2624,7 +2659,7 @@ const  prefillFormData = async (data) => {
             <h5 className="section-title">Document Details</h5>
             
             <div className="form-field-vertical">
-              <label>{(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma No.' : 'Quotation No.'} :</label>
+              <label>{`${titleBase} No.`} :</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {!isEditMode && (
@@ -2682,7 +2717,7 @@ const  prefillFormData = async (data) => {
                             setSeqNumber(v);
                             setQutationNo(v);
                           }}
-                          placeholder={(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma No.' : 'Quotation No.'}
+                          placeholder={`${titleBase} No.`}
                         />
                       </>
                     )
@@ -3645,7 +3680,12 @@ const  prefillFormData = async (data) => {
       {/* modal  */}
 
       {openPrintConfig && (
-        <PrintSettingsDialog onClose={handleClosePrintConfig} />
+        <PrintSettingsDialog
+          onClose={handleClosePrintConfig}
+          initialConfig={printConfig}
+          onSave={handleSavePrintConfig}
+          docType={docType}
+        />
       )}
 
       {/* Modal for search + table */}
