@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaFileExport } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
@@ -426,6 +426,40 @@ const SalesInteractions = () => {
     return hay.includes(term);
   });
 
+  // Pagination state
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [period, selectedOtherMonth, selectedOtherYear, salesperson, searchTerm, rows, interactionDate, sinceDate, transferDate, interactionDateValue, sinceDateValue, transferDateValue]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  // Ensure current page is within bounds
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
+
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
+
+  const renderPages = () => {
+    const pages = [];
+    if (totalPages <= 9) {
+      for (let p = 1; p <= totalPages; p++) pages.push(p);
+    } else {
+      pages.push(1);
+      pages.push(2);
+      const left = Math.max(3, page - 2);
+      const right = Math.min(totalPages - 2, page + 2);
+      if (left > 3) pages.push('left-ellipsis');
+      for (let p = left; p <= right; p++) pages.push(p);
+      if (right < totalPages - 2) pages.push('right-ellipsis');
+      pages.push(totalPages - 1);
+      pages.push(totalPages);
+    }
+    return pages.map((p, idx) => {
+      if (p === 'left-ellipsis' || p === 'right-ellipsis') return <span key={`e-${idx}`} className="pager-ellipsis">...</span>;
+      return <button key={`p-${idx}`} className={`pager-page ${p === page ? 'active' : ''}`} onClick={() => setPage(p)}>{p}</button>;
+    });
+  };
+
   const handleExport = () => {
     try {
       setExporting(true);
@@ -455,6 +489,7 @@ const SalesInteractions = () => {
 
   return (
     <div className="sales-interactions-container">
+      <h2 style={{textAlign: 'center'}}>Sales Interactions</h2>
       <div className="si-header">
         <div className="left">
           <div className="filters">
@@ -591,7 +626,7 @@ const SalesInteractions = () => {
                 <td colSpan={9} style={{ textAlign: 'center', padding: 20 }}>No records found for selected period</td>
               </tr>
             ) : (
-              filteredRows.map((r, i) => {
+              pagedRows.map((r, i) => {
                 const term = searchTerm && searchTerm.trim() ? searchTerm.toLowerCase() : '';
                 const executive = getExecutiveForRow(r) || '';
                 const humanDateLabel = formatISOtoDDMMYYYY(r.date);
@@ -615,6 +650,27 @@ const SalesInteractions = () => {
           </tbody>
         </table>
       </div>
+
+      {filteredRows.length > 0 && (
+        <div className="si-pagination">
+          <div className="page-size">
+            {[10,25,50,100].map(n => (
+              <button key={n} className={`ps-btn ${pageSize === n ? 'active' : ''}`} onClick={() => { setPageSize(n); setPage(1); }}>{n}</button>
+            ))}
+          </div>
+
+          <div className="pager">
+            <button className="pager-nav" onClick={() => setPage(1)} disabled={page === 1}>«</button>
+            <button className="pager-nav" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
+
+            {renderPages()}
+
+            <button className="pager-nav" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
+            <button className="pager-nav" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -44,8 +44,8 @@
 
   .reports-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 30px 20px;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 10px;
     
     
     .report-card {
@@ -85,6 +85,7 @@
       }
 
       p {
+        text-align: center;
         padding: 35px 20px;
         color: $primary-black;
         font-weight: 500;

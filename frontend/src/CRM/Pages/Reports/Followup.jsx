@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaCheck, FaTimes, FaFileExport, FaSearch } from 'react-icons/fa';
+import * as XLSX from 'xlsx';
 import { BASE_URL } from '../../../config/Config';
 import './_sales_interactions.scss';
 import './followup.scss';
@@ -67,6 +68,7 @@ const Followup = () => {
     return name || emp.displayName || emp.name || emp.email || `User ${emp.id || ''}`;
   };
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [filter, setFilter] = useState('All');
   const [execFilter, setExecFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -188,6 +190,19 @@ const Followup = () => {
     const title = (fup.title || fup.Title || '').toString().toLowerCase();
     const typeField = (fup.type || fup.Type || fup.followup_type || fup.FollowupType || '').toString().toLowerCase();
     return [business, contact, mobile, email, note, title, typeField].join(' ').includes(term);
+  };
+
+  const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const highlightMatch = (text, term) => {
+    if (!term) return text;
+    const t = String(text || '');
+    const re = new RegExp(`(${escapeRegExp(term)})`, 'ig');
+    const parts = t.split(re);
+    return parts.map((part, idx) => {
+      if (part && part.match(re)) return <mark key={idx} className="si-highlight">{part}</mark>;
+      return <span key={idx}>{part}</span>;
+    });
   };
 
   const visible = followups.filter(f => filterMatches(f) && matchesSearch(f) && matchesExec(f));
@@ -330,8 +345,57 @@ const Followup = () => {
     });
   };
 
+  const handleExport = () => {
+    try {
+      setExporting(true);
+      if (!visible || visible.length === 0) {
+        alert('No follow-ups to export');
+        return;
+      }
+
+      const exportData = visible.map(f => {
+        const lead = getLead(f.lead_id || f.LeadID || f.lead || (f.Lead && f.Lead.id));
+        const business = lead.business || lead.company || lead.companyName || '';
+        const contact = lead.name || lead.contact || lead.contactPerson || '';
+        const mobile = lead.mobile || lead.phone || lead.contact_number || '';
+        const email = lead.email || lead.emailAddress || lead.contact_email || lead.email_id || '';
+        const type = f.type || f.Type || f.followup_type || f.FollowupType || f.title || f.Title || '';
+        const leadIdKey = String(lead.id || lead.ID || lead.lead_id || lead.leadId || '');
+        const li = latestInteractions[leadIdKey];
+        const lastTalk = li ? `${formatDateShort(li.ts)}${li.type ? ` — ${li.type}` : ''}` : '';
+        const assigned = (f.assigned_to ? formatEmployeeName(f.assigned_to) : '') || (employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo)) ? formatEmployeeName(employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo))) : '') || '';
+
+        return {
+          'Date': formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn) || '',
+          'Time': formatTime12(f.followup_on || f.FollowUpOn || f.followupOn) || '',
+          'Business': business,
+          'Contact Person': contact,
+          'Mobile': mobile,
+          'Email': email,
+          'Follow-up Note': f.notes || f.Notes || '',
+          'Type': type,
+          'Last Talk': lastTalk,
+          'Executive': assigned,
+        };
+      });
+
+      const headers = ['Date','Time','Business','Contact Person','Mobile','Email','Follow-up Note','Type','Last Talk','Executive'];
+      const ws = XLSX.utils.json_to_sheet(exportData, { header: headers });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Followups');
+      const filename = `followups_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    } catch (err) {
+      console.error('Followups export failed', err);
+      alert('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="sales-interactions-container">
+        <h2 style={{textAlign: 'center'}}>Follow-ups</h2>
       <div className="si-header">
         <div className="left">
           <div className="filters">
@@ -383,7 +447,13 @@ const Followup = () => {
         <div className="right">
           <div className="si-search">
             <input placeholder="Search" className="search" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <button className="icon-btn square" title="Export"><FaFileExport/></button>
+            <button
+              className="icon-btn square"
+              title={exporting ? 'Exporting...' : 'Export'}
+              onClick={handleExport}
+              disabled={exporting || visible.length === 0}
+              aria-label="Export follow-ups"
+            ><FaFileExport/></button>
           </div>
         </div>
       </div>
@@ -418,19 +488,24 @@ const Followup = () => {
               const type = f.type || f.Type || f.followup_type || f.FollowupType || f.title || f.Title || '-';
               const leadIdKey = String(lead.id || lead.ID || lead.lead_id || lead.leadId || '');
               const li = latestInteractions[leadIdKey];
-              const lastTalk = li ? `${formatDateShort(li.ts)}${li.type ? ` — ${li.type}` : ''}` : '-';
+              const lastTalk = li ? `${formatDateShort(li.ts)}${li.type ? ` - ${li.type}` : ''}` : '-';
               const assigned = (f.assigned_to ? formatEmployeeName(f.assigned_to) : '') || (employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo)) ? formatEmployeeName(employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo))) : '') || '-';
+
+              const term = search && search.trim() ? search.toLowerCase() : '';
+              const hay = [String(business||''), String(contact||''), String(mobile||''), String(email||''), String(f.notes||''), String(type||''), String(lastTalk||''), String(assigned||'')].join(' ').toLowerCase();
+              const isMatch = term ? hay.includes(term) : false;
+
               return (
-                <tr key={f.id || i} className={`${f.status === 'done' ? 'done' : f.status === 'cancelled' ? 'cancelled' : ''}`}>
-                  <td>{formatTime12(f.followup_on || f.FollowUpOn || f.followupOn)}</td>
-                  <td>{business}</td>
-                  <td>{contact}</td>
-                  <td>{mobile}</td>
-                  <td>{email}</td>
-                  <td>{f.notes || f.Notes || '-'}</td>
-                  <td>{type}</td>
-                  <td>{lastTalk}</td>
-                  <td>{assigned}</td>
+                <tr key={f.id || i} className={`${f.status === 'done' ? 'done' : f.status === 'cancelled' ? 'cancelled' : ''} ${isMatch ? 'match-row' : ''}`}>
+                  <td>{highlightMatch(formatTime12(f.followup_on || f.FollowUpOn || f.followupOn), search)}</td>
+                  <td>{highlightMatch(business, search)}</td>
+                  <td>{highlightMatch(contact, search)}</td>
+                  <td>{highlightMatch(mobile, search)}</td>
+                  <td>{highlightMatch(email, search)}</td>
+                  <td>{highlightMatch(f.notes || f.Notes || '-', search)}</td>
+                  <td>{highlightMatch(type, search)}</td>
+                  <td>{highlightMatch(lastTalk, search)}</td>
+                  <td>{highlightMatch(assigned, search)}</td>
                   <td className="actions-cell">
                     <button className="icon-btn success" title={f._saving ? 'Saving...' : 'Mark done'} onClick={() => markDone(f)} disabled={!!f._saving} aria-busy={!!f._saving}><FaCheck/></button>
                     <button className="icon-btn danger" title="Cancel" onClick={() => cancelFollowup(f)} disabled={!!f._saving}><FaTimes/></button>

@@ -49,6 +49,7 @@ import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
 import SalesInteractions from './CRM/Pages/Reports/SalesInteractions';
 import Followup from './CRM/Pages/Reports/Followup';
+import NoReports from './CRM/Pages/Reports/NoReports';
 import Configuration from './CRM/Components/Configuration/Configuration';
 // import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
@@ -182,6 +183,7 @@ function App() {
           <Route path="/reports" element={<Report />} />
           <Route path="/reports/sales-interactions" element={<SalesInteractions />} />
           <Route path="/reports/followups" element={<Followup />} />
+          <Route path="/reports/no-reports" element={<NoReports />} />
           <Route path="/configuration" element={<Configuration />} />
           <Route path="/configuration/:type" element={<Configuration />} />
           <Route path="/sales-configuration" element={<Salesconfiguration />} />

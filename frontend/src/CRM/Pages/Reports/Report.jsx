@@ -36,24 +36,15 @@ const Report = () => {
     },
     {
       title: "No Interactions",
-      description: "Identify team members who have not engaged with assigned leads.",
-      icon: <FaUsersCog />
+      description: "Identify team members who have no interactions , no appointments , or missed appointments.",
+      icon: <FaUsersCog />,
+      path: '/reports/no-reports'
     },
     {
       title: "Follow-ups",
       description: "Track scheduled follow-ups to ensure timely engagement.",
       icon: <FaCalendarCheck />,
       path: '/reports/followups'
-    },
-    {
-      title: "No Appointments",
-      description: "View sales team performance by tracking leads without scheduled appointments.",
-      icon: <FaUserClock />
-    },
-    {
-      title: "Missed Appointments",
-      description: "Analyze missed meetings per salesperson to improve scheduling and follow-ups.",
-      icon: <MdMissedVideoCall />
     },
     {
       title: "Travel History",
