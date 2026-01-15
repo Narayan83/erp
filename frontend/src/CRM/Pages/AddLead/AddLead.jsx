@@ -213,7 +213,22 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
-    
+
+    // Validate source (required)
+    if (!formData.source || String(formData.source).trim() === '') {
+      newErrors.source = 'Source is required';
+    }
+
+    // Validate since (required)
+    if (!formData.since || String(formData.since).trim() === '') {
+      newErrors.since = 'Since (date) is required';
+    } else {
+      const d = new Date(formData.since);
+      if (isNaN(d)) {
+        newErrors.since = 'Enter a valid date for Since';
+      }
+    }
+
     // Validate assignedTo (required). Allow matching by id or name (case-insensitive)
     if (!formData.assignedTo || !String(formData.assignedTo).trim()) {
       newErrors.assignedTo = 'Assignee is required';
@@ -321,6 +336,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         let potential = parseFloat(formData.potential);
         if (isNaN(potential)) potential = 0;
 
+        // Ensure manual submissions record their source
         let payload = {
           business: formData.business,
           contact,
@@ -331,7 +347,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           city: formData.city,
           state: formData.state,
           country: formData.country,
-          source: formData.source,
+          source: formData.source || 'Filling Form',
           stage: formData.stage,
           potential,
           since: formData.since ? new Date(formData.since).toISOString() : new Date().toISOString(),
@@ -803,23 +819,26 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 <h3>Business Opportunity</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Source</label>
-                    <select name="source" value={formData.source} onChange={handleChange}>
+                    <label>Source <span className="required">*</span></label>
+                    <select name="source" value={formData.source} onChange={handleChange} className={errors.source ? 'error' : ''}>
                       <option value="">Select Source</option>
                       {sourceOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
+                    {errors.source && <span className="input-error-inside">{errors.source}</span>}
                   </div>
                   
                   <div className="form-group">
-                    <label>Since</label>
+                    <label>Since <span className="required">*</span></label>
                     <input
                       type="date"
                       name="since"
                       value={formData.since ? formData.since.slice(0, 10) : ''}
                       onChange={handleChange}
+                      className={errors.since ? 'error' : ''}
                     />
+                    {errors.since && <span className="input-error-inside">{errors.since}</span>}
                   </div>
                 </div>
                 

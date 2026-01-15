@@ -40,14 +40,16 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [productOptions, setProductOptions] = useState([]);
   const [assignedOptions, setAssignedOptions] = useState([]);
+  // Source options (sync with AddLead - can be extended via localStorage 'leadSources')
+  const [sourceOptions, setSourceOptions] = useState(['Website', 'Referral', 'Social Media', 'Direct', 'Partner']);
 
-  // Required fields for import
-  const requiredFields = ['Business', 'Salutation', 'Name', 'Mobile', 'Email', 'Product'];
+  // Required fields for import (now including Source, Since and Assigned To)
+  const requiredFields = ['Business', 'Salutation', 'Name', 'Mobile', 'Email', 'Product', 'Source', 'Since', 'Assigned To'];
 
   // Dropdown options for preview table (product/assigned filled from backend)
   const dropdownFields = {
     'Salutation': ['Mr.', 'Ms.', 'Mrs.'],
-    'Source': ['Website', 'Referral', 'Social Media', 'Direct', 'Partner'],
+    'Source': sourceOptions,
     'Stage': ['Discussion', 'Appointment', 'Demo', 'Decided', 'Inactive'],
     'Category': ['Software', 'Hardware', 'Services', 'Consulting', 'Training'],
     'Country': countries.map(c => c.name).slice(0, 50),
@@ -57,6 +59,33 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     'Product *': productOptions,
     'Assigned To': assignedOptions,
     'Assigned To *': assignedOptions,
+  };
+
+  // Column widths for preview table (label -> CSS width)
+  const columnWidths = {
+    'Business': '220px',
+    'Salutation': '50px',
+    'Name': '220px',
+    'Designation': '150px',
+    'Mobile': '120px',
+    'Email': '240px',
+    'Address Line 1': '220px',
+    'Address Line 2': '200px',
+    'City': '120px',
+    'State': '120px',
+    'Country': '120px',
+    'GSTIN': '140px',
+    'Source': '140px',
+    'Stage': '120px',
+    'Potential (₹)': '140px',
+    'Since': '140px',
+    'Requirement': '200px',
+    'Category': '130px',
+    'Product': '180px',
+    'Website': '180px',
+    'Notes': '200px',
+    'Tags': '160px',
+    'Assigned To': '180px'
   };
 
   // Fetch products and employees for dropdowns
@@ -95,6 +124,15 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       }
     };
     fetchLists();
+
+    // Also load any saved sources from localStorage (same as AddLead)
+    try {
+      const savedSources = JSON.parse(localStorage.getItem('leadSources') || '[]');
+      if (Array.isArray(savedSources) && savedSources.length > 0) {
+        setSourceOptions(savedSources.map(s => s.name));
+      }
+    } catch (e) { /* ignore */ }
+
     return () => { mounted = false; };
   }, []);
 
@@ -105,9 +143,26 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     setImportedData(newData);
   };
 
+  // Helper: format various date strings to YYYY-MM-DD for date input
+  const formatDateForInput = (val) => {
+    if (!val) return '';
+    if (typeof val !== 'string') val = String(val);
+    // ISO-like
+    const iso = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    // D-M-Y or DD-MM-YYYY
+    const dmy = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    // Fallback to Date parse
+    const dt = new Date(val);
+    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
+    return '';
+  };
+
   // Render editable cell
   const renderEditableCell = (rowIndex, fieldName, value) => {
     const lookupField = fieldName.replace(/\*/g, '').trim();
+    const lookupLower = lookupField.toLowerCase();
     const isDropdownField = dropdownFields[lookupField];
     const isProductField = lookupField.toLowerCase() === 'product';
     const cellKey = `${rowIndex}-${lookupField}`;
@@ -134,6 +189,21 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
               </MenuItem>
             ))}
           </Select>
+        );
+      } else if (lookupLower === 'since') {
+        // Render a native date picker for 'Since' field
+        const dateVal = formatDateForInput(value);
+        return (
+          <TextField
+            type="date"
+            value={dateVal}
+            onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
+            size="small"
+            autoFocus
+            onBlur={() => setEditingCell(null)}
+            inputProps={{ style: { padding: '8px 10px' } }}
+            sx={{ width: '100%' }}
+          />
         );
       } else {
         // For non-dropdown fields, allow text input
@@ -195,17 +265,17 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'State',
       'Country',
       'GSTIN',
-      'Source',
+      'Source *',
       'Stage',
       'Potential (₹)',
-      'Since',
+      'Since *',
       'Requirement',
       'Category',
       'Product *',
       'Website',
       'Notes',
       'Tags',
-      'Assigned To'
+      'Assigned To *'
     ];
 
     const exampleRow = [
@@ -221,7 +291,8 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'Maharashtra',
       'India',
       '27AABCT1234H1Z0',
-      'LinkedIn',
+      // Use first source option as example when available
+      (sourceOptions && sourceOptions.length > 0) ? sourceOptions[0] : 'LinkedIn',
       'Negotiation',
       '50000',
       '2024-01-15',
@@ -383,6 +454,9 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
         'mobile': true,
         'email': true,
         'product': true,
+      'source': true,
+      'since': true,
+      'assigned to': true
       };
       for (let colIndex = 1; colIndex <= headersArr.length; colIndex++) {
         const headerText = headersArr[colIndex - 1].toLowerCase().replace(/\*/g, '').trim();
@@ -537,7 +611,10 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'Name': ['Name', 'Name *', 'name'],
       'Mobile': ['Mobile', 'Mobile *', 'mobile'],
       'Email': ['Email', 'Email *', 'email'],
-      'Product': ['Product', 'Product *', 'product']
+      'Product': ['Product', 'Product *', 'product'],
+      'Source': ['Source', 'Source *', 'source'],
+      'Since': ['Since', 'Since *', 'since'],
+      'Assigned To': ['Assigned To', 'Assigned To *', 'assignedTo', 'assignedToName']
     };
 
     Object.keys(fieldMapping).forEach(displayName => {
@@ -617,6 +694,33 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
         return;
       }
 
+      // Ensure required textual fields (Source / Assigned To) exist for selected rows
+      const missingSpecial = [];
+      selectedArray.forEach((row, idx) => {
+        const sourceKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'source');
+        const sinceKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'since');
+        const assignedKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'assigned to');
+        const sourceVal = sourceKey ? row[sourceKey] : '';
+        const sinceVal = sinceKey ? row[sinceKey] : '';
+        const assignedVal = assignedKey ? row[assignedKey] : '';
+        if (!sourceVal || String(sourceVal).trim() === '') {
+          missingSpecial.push({ row: idx + 1, field: 'Source' });
+        }
+        if (!sinceVal || String(sinceVal).trim() === '') {
+          missingSpecial.push({ row: idx + 1, field: 'Since' });
+        }
+        if (!assignedVal || String(assignedVal).trim() === '') {
+          missingSpecial.push({ row: idx + 1, field: 'Assigned To' });
+        }
+      });
+      if (missingSpecial.length > 0) {
+        const errors = missingSpecial.map(m => ({ row: m.row, leadName: selectedArray[m.row - 1].Name || 'N/A', business: selectedArray[m.row - 1].Business || 'N/A', errors: [`Missing required field: ${m.field}`] }));
+        setImportReport({ type: 'validation_error', totalRows: selectedArray.length, successCount: 0, errorCount: errors.length, errors, successes: [] });
+        setImportReportOpen(true);
+        setImportLoading(false);
+        return;
+      }
+
       // Normalize field names before sending to backend
       const normalizedArray = selectedArray.map(row => {
         const normalizedRow = {};
@@ -657,6 +761,17 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
               value = null;
             } else {
               value = '';
+            }
+          }
+
+          // Additional validation: ensure required 'since' is a date when provided
+          if (apiKey === 'since' && value) {
+            const dt = new Date(value);
+            if (isNaN(dt)) {
+              // keep raw value; validation will catch invalid/missing required fields later
+            } else {
+              // normalize to ISO date
+              value = dt.toISOString();
             }
           }
 
@@ -736,6 +851,13 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       setImportReportOpen(true);
       setImportPreviewOpen(false);
 
+      // Broadcast import success to other components/tabs
+      try {
+        const createdCount = response.data && (response.data.created || response.data.created === 0) ? response.data.created : 0;
+        window.dispatchEvent(new CustomEvent('leads:imported', { detail: { count: createdCount } }));
+        localStorage.setItem('leads:imported', JSON.stringify({ ts: Date.now(), count: createdCount }));
+      } catch (e) { /* ignore */ }
+
       // Clear data if fully successful
       if (parsedErrors.length === 0) {
         setImportedData([]);
@@ -803,7 +925,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
               </li>
               <li>
                 <Typography component="span" variant="body2">
-                  Required fields marked with ★ (Business, Salutation, Name, Mobile, Email, Product)
+                  Required fields marked with ★ (Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To)
                 </Typography>
               </li>
               <li>
@@ -920,7 +1042,9 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                             fontWeight: 'bold',
                             color: isRequired ? '#d32f2f' : 'inherit',
                             backgroundColor: isRequired ? '#ffebee' : 'transparent',
-                            padding: '12px 8px'
+                            padding: '12px 8px',
+                            width: columnWidths[cleanedHeader] || 'auto',
+                            minWidth: columnWidths[cleanedHeader] || '80px'
                           }}
                         >
                           {cleanedHeader}
@@ -951,17 +1075,22 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                     {Object.keys(row).map((key, cellIndex) => {
                       const cleanedKey = key.replace(/\*/g, '').trim();
                       const isDropdown = !!dropdownFields[cleanedKey];
+                      const colWidth = columnWidths[cleanedKey] || 'auto';
                       return (
                       <TableCell
                         key={`${rowIndex}-${cellIndex}`}
                         sx={{
-                          maxWidth: '200px',
+                          width: colWidth,
+                          minWidth: colWidth === 'auto' ? '80px' : colWidth,
                           padding: 0,
                           backgroundColor: isDropdown
                             ? '#fffef0'
                             : requiredFields.includes(cleanedKey)
                             ? '#ffebee'
                             : 'transparent',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         {renderEditableCell(rowIndex, key, row[key])}
@@ -1155,7 +1284,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                     <strong>Required Fields (must be filled):</strong>
                   </Typography>
                   <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
-                    • Business, Salutation, Name, Mobile, Email, Product
+                    • Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To
                   </Typography>
                   <Typography variant="body2" color="warning.dark">
                     <strong>How to proceed:</strong><br/>

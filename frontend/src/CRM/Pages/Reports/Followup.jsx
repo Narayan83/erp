@@ -462,6 +462,7 @@ const Followup = () => {
         <table className="si-table">
           <thead>
             <tr>
+              <th>Date</th>
               <th>Time</th>
               <th>Business</th>
               <th>Contact Person</th>
@@ -476,9 +477,9 @@ const Followup = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} style={{textAlign:'center', padding:20}}>Loading...</td></tr>
+              <tr><td colSpan={11} style={{textAlign:'center', padding:20}}>Loading...</td></tr>
             ) : visible.length === 0 ? (
-              <tr><td colSpan={10} style={{textAlign:'center', padding:20}}>No follow-ups</td></tr>
+              <tr><td colSpan={11} style={{textAlign:'center', padding:20}}>No follow-ups</td></tr>
             ) : paged.map((f, i) => {
               const lead = getLead(f.lead_id || f.LeadID || f.lead || (f.Lead && f.Lead.id));
               const business = lead.business || lead.company || lead.companyName || '-';
@@ -492,14 +493,15 @@ const Followup = () => {
               const assigned = (f.assigned_to ? formatEmployeeName(f.assigned_to) : '') || (employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo)) ? formatEmployeeName(employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo))) : '') || '-';
 
               const term = search && search.trim() ? search.toLowerCase() : '';
-              const hay = [String(business||''), String(contact||''), String(mobile||''), String(email||''), String(f.notes||''), String(type||''), String(lastTalk||''), String(assigned||'')].join(' ').toLowerCase();
+              const hay = [String(formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn) || ''), String(business||''), String(contact||''), String(mobile||''), String(email||''), String(f.notes||''), String(type||''), String(lastTalk||''), String(assigned||'')].join(' ').toLowerCase();
               const isMatch = term ? hay.includes(term) : false;
 
               return (
                 <tr key={f.id || i} className={`${f.status === 'done' ? 'done' : f.status === 'cancelled' ? 'cancelled' : ''} ${isMatch ? 'match-row' : ''}`}>
+                  <td>{highlightMatch(formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn), search)}</td>
                   <td>{highlightMatch(formatTime12(f.followup_on || f.FollowUpOn || f.followupOn), search)}</td>
                   <td>{highlightMatch(business, search)}</td>
-                  <td>{highlightMatch(contact, search)}</td>
+                  <td>{highlightMatch(contact, search)}</td> 
                   <td>{highlightMatch(mobile, search)}</td>
                   <td>{highlightMatch(email, search)}</td>
                   <td>{highlightMatch(f.notes || f.Notes || '-', search)}</td>

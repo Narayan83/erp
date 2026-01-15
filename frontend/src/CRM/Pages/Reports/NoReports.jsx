@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FaSearch, FaFileExport } from 'react-icons/fa';
 import { BASE_URL } from '../../../config/Config';
 import './noreports.scss';
@@ -14,6 +15,15 @@ const NoReports = () => {
   const [followups, setFollowups] = useState([]);
   const [selectedOtherMonth, setSelectedOtherMonth] = useState('');
   const [selectedOtherYear, setSelectedOtherYear] = useState(new Date().getFullYear());
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || window.location.search || '');
+    const initFilter = params.get('initFilter');
+    if (initFilter && ['All','No Interactions','No Appointments','Missed Appointments'].includes(initFilter)) {
+      setFilter(initFilter);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     let mounted = true;
@@ -100,15 +110,24 @@ const NoReports = () => {
         filteredLeads.forEach(lead => {
           const leadId = lead.id ?? lead.ID ?? lead.lead_id ?? '';
 
-          // Resolve assigned name
+          // Resolve assigned name (accept multiple field variants from different imports/backends)
           let assignedName = '';
+          // Prefer explicit string labels when present
           if (lead.assignedTo && typeof lead.assignedTo === 'string' && !/^\d+$/.test((lead.assignedTo || '').toString())) {
             assignedName = lead.assignedTo;
+          } else if (lead.assigned_to && typeof lead.assigned_to === 'string' && !/^\d+$/.test((lead.assigned_to || '').toString())) {
+            assignedName = lead.assigned_to;
+          } else if (lead.assignedToName && typeof lead.assignedToName === 'string' && lead.assignedToName.trim()) {
+            assignedName = lead.assignedToName;
+          } else if (lead.assigned_to_name && typeof lead.assigned_to_name === 'string' && lead.assigned_to_name.trim()) {
+            assignedName = lead.assigned_to_name;
           } else {
+            // Otherwise try to resolve numeric id references
             let idCandidate;
             if (lead.assigned_to_id !== undefined && lead.assigned_to_id !== null && lead.assigned_to_id !== '') idCandidate = Number(lead.assigned_to_id);
             else if (lead.assignedToId !== undefined && lead.assignedToId !== null && lead.assignedToId !== '') idCandidate = Number(lead.assignedToId);
             else if (lead.assignedTo && typeof lead.assignedTo === 'number') idCandidate = Number(lead.assignedTo);
+            else if (lead.assigned_to && (typeof lead.assigned_to === 'number' || (/^\d+$/.test(String(lead.assigned_to))))) idCandidate = Number(lead.assigned_to);
             if (idCandidate !== undefined && !isNaN(idCandidate)) assignedName = empMap.get(String(idCandidate)) || String(idCandidate);
           }
           if (!assignedName) assignedName = 'Unassigned';
@@ -128,11 +147,16 @@ const NoReports = () => {
 
           const missed = lFollowups.some(f => {
             const status = (f.status || f.Status || '')?.toString().toLowerCase();
-            if (status === 'missed') return true;
-            const on = f.followup_on || f.FollowUpOn || f.followupOn;
-            if (on) {
-              const d = new Date(on);
-              if (!isNaN(d) && d < now && status !== 'done' && status !== 'cancelled') return true;
+            // If action already taken, not considered missed
+            if (status === 'done' || status === 'cancelled') return false;
+            
+            const followupDateTime = f.followup_on || f.FollowUpOn || f.followupOn;
+            if (!followupDateTime) return false;
+            
+            const followupDate = new Date(followupDateTime);
+            // If followup date/time is valid and has passed without any action, it's missed
+            if (!isNaN(followupDate) && followupDate < now) {
+              return true;
             }
             return false;
           });

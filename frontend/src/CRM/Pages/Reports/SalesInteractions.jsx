@@ -104,9 +104,12 @@ const SalesInteractions = () => {
           const interactionText = inter.summary || inter.details || inter.type || inter.note || inter.notes || '';
 
           // Resolve executive id from multiple possible fields
-          const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedTo || lead.assignedToId || null;
+          const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedToId || lead.assignedTo || lead.assigned_to || null;
 
-          // Don't set a fallback executive name here. Resolve dynamically during render using employees list so names appear once employees load.
+          // Also capture any explicit name label present on lead/interaction (helps imports that only set a name)
+          const execNameLabel = inter.assignedToName || inter.assigned_to_name || inter.assigned_to || inter.assignedTo || lead.assignedToName || lead.assigned_to_name || lead.assigned_to || lead.assignedTo || '';
+
+          // Don't set a fallback executive name here; pass both id and any label through. Renderer will prefer label or employee mapping.
           const interactionType = (inter.type || inter.Type || inter.interaction_type || inter.kind || '').toString().trim();
           return {
             date: dateStr,
@@ -118,7 +121,7 @@ const SalesInteractions = () => {
             type: interactionType,
             interaction: interactionText,
             executive_id: execId,
-            executive: '',
+            executive: execNameLabel || '',
             lead_id: leadId,
           };
         });

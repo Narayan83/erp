@@ -248,16 +248,25 @@
     border-radius: 6px;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
     border: 1px solid $primary-gray;
-    overflow: hidden;
+    /* Allow scrolling when content overflows and limit height so page scrollbar doesn't grow indefinitely */
+    overflow: auto;
+    max-height: calc(100vh - 240px);
   }
 
   .si-table {
     width: 100%;
     border-collapse: collapse;
+    /* allow horizontal scrolling when many columns exist */
+    min-width: 900px;
 
     thead {
       /* Match project table header styles for consistency */
       background: #f5f8fb;
+      /* keep header visible when scrolling vertically */
+      position: sticky;
+      top: 0;
+      z-index: 3;
+
       tr {
         th {
           text-align: left;
@@ -267,6 +276,7 @@
           font-weight: 600;
           border-bottom: 1px solid $primary-gray;
           white-space: nowrap;
+          background: #f5f8fb; /* ensure sticky header keeps background */
         }
 
         /* rounded corners to match wrapper */
@@ -310,6 +320,11 @@
           color: $primary-black;
           vertical-align: middle;
           border: none !important;
+          /* Prevent cells from expanding the table; show ellipsis when content is long */
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 320px;
         }
 
         &:nth-child(odd) {

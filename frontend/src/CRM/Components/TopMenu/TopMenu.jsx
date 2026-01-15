@@ -130,6 +130,26 @@ const TopMenu = () => {
     return () => { window.removeEventListener('lead:interaction.saved', handler); };
   }, []);
 
+  // Listen for leads import events (same-tab via CustomEvent and cross-tab via storage events)
+  useEffect(() => {
+    const onLeadsImported = (e) => {
+      console.log('Detected leads:imported event', e && e.detail);
+      fetchLeads();
+    };
+    const onStorage = (e) => {
+      if (e.key === 'leads:imported') {
+        console.log('Detected leads:imported via storage event', e.newValue);
+        fetchLeads();
+      }
+    };
+    window.addEventListener('leads:imported', onLeadsImported);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('leads:imported', onLeadsImported);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
   // Fetch products on mount
   useEffect(() => {
     const fetchProducts = async () => {
@@ -725,7 +745,7 @@ const TopMenu = () => {
             state: row.State || row.state || '',
             country: row.Country || row.country || '',
             gstin: row.GSTIN || row.gstin || '',
-            source: row.Source || row.source || '',
+            source: row.Source || row.source || 'Import from CSV',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
             since: sanitizeImportDate(row.Since || row.since || '') || nowIso,
@@ -816,7 +836,7 @@ const TopMenu = () => {
           state: l.state || l.SENDER_STATE || '',
           country: l.country || l.buyer_country || '',
           gstin: l.gstin || '',
-          source: l.source || l.enquiry_source || 'IndiaMART',
+          source: l.source || l.enquiry_source || 'Import from CSV',
           stage: l.stage || l.lead_stage || l.STATUS || 'New',
           potential: parseFloat((l.potential || l.estimated_value || '0').toString()) || 0,
           since: (() => {
@@ -937,7 +957,8 @@ const TopMenu = () => {
           value = lead.tags || lead.Tags || lead.formData?.tags || '';
         } else if (field.key === 'lastTalk') {
           const recentInteraction = getLastTalkForLead(lead.id);
-          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
+          // Show very recent interactions immediately (don't hide 'now')
+          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: false });
         } else if (field.key === 'nextTalk') {
           const nextFollowup = getNextTalkForLead(lead.id);
           value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
@@ -1351,7 +1372,8 @@ const TopMenu = () => {
                           value = formatDate(lead.since);
                         } else if (field.key === 'lastTalk') {
                           const recentInteraction = getLastTalkForLead(lead.id);
-                          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
+                          // Show very recent interactions immediately (don't hide 'now')
+                          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: false });
                         } else if (field.key === 'nextTalk') {
                           const nextFollowup = getNextTalkForLead(lead.id);
                           value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
@@ -1475,19 +1497,25 @@ const TopMenu = () => {
             console.log('Imported leads received:', importedLeads);
             if (importedLeads && importedLeads.length > 0) {
               try {
-                // Filter out leads with missing required fields
+                // Filter out leads with missing required fields (now requiring Source, Since, Assigned To)
                 const validLeads = importedLeads.filter(lead => {
                   const business = lead.company || lead.business || '';
                   const name = lead.name || lead.contact || '';
                   const email = lead.email || '';
                   const mobile = lead.phone || lead.mobile || '';
-                  
-                  if (!business || !name || !email || !mobile) {
+                  const source = lead.source || lead.Source || lead.enquiry_source || '';
+                  const since = lead.since || lead.Since || lead.QUERY_TIME || lead.enquiry_date || '';
+                  const assigned = lead.assignedTo || lead.assignedToName || lead.assigned_to || '';
+
+                  if (!business || !name || !email || !mobile || !source || !since || !assigned) {
                     console.warn('Skipping lead with missing required fields:', {
                       business,
                       name,
                       email,
                       mobile,
+                      source,
+                      since,
+                      assigned,
                       lead
                     });
                     return false;
@@ -1496,7 +1524,7 @@ const TopMenu = () => {
                 });
 
                 if (validLeads.length === 0) {
-                  alert('No valid leads to import. Make sure each lead has company, name, email, and phone.');
+                  alert('No valid leads to import. Make sure each lead has company, name, email, mobile, source, since, and assigned to.');
                   setShowImportDialog(false);
                   return;
                 }
@@ -1548,6 +1576,14 @@ const TopMenu = () => {
                   console.log('Refreshing leads list...');
                   await fetchLeads();
                   console.log('Leads list refreshed');
+
+                  // Notify other components and tabs that leads were imported
+                  try {
+                    const importedCount = (result && (result.created || result.created === 0)) ? result.created : validLeads.length;
+                    window.dispatchEvent(new CustomEvent('leads:imported', { detail: { count: importedCount } }));
+                    // Use localStorage to trigger storage events across tabs
+                    localStorage.setItem('leads:imported', JSON.stringify({ ts: Date.now(), count: importedCount }));
+                  } catch (e) { /* ignore */ }
                   
                   // Close dialog after refresh is complete
                   setShowImportDialog(false);

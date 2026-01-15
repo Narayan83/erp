@@ -133,7 +133,7 @@
   flex: 1;
 }
 .charts-right {
-  width: 300px;
+  width: 500px;
 }
 .chart-card {
   background: #fff;
@@ -151,12 +151,46 @@
   justify-content: center;
   padding: 8px;
 }
+/* enforce consistent pie size across charts */
+.chart-body .pie-chart-wrap {
+  width: 300px;
+  height: 300px;
+  flex: 0 0 300px;
+}
+.pie-chart {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
 .pie-chart {
   max-width: 100%;
 }
 .pie-chart-wrap {
   position: relative;
 }
+
+/* Product layout: place legend to the right of the pie */
+.product-pie-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.product-pie-wrap .legend {
+  flex: 1;
+  min-width: 160px;
+  max-width: 340px;
+  max-height: 300px; /* keep roughly the same height as the pie */
+  height: 300px;
+  overflow: auto;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertical center to match pie */
+  padding: 6px 8px;
+}
+
 .pie-center-text {
   fill: #222;
   font-weight: 700;
@@ -183,34 +217,50 @@
   color: #333;
   font-size: 13px;
 }
-.product-pie .legend {
-  max-height: 240px;
-  overflow: auto;
-  margin-left: 12px;
-}
-.product-pie-wrap {
-  display: flex;
-  align-items: center;
-}
 .legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 0;
+  padding: 6px 0;
 }
 .legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.02) inset;
 }
-.legend-label {
+.legend-label-text {
   flex: 1;
   color: #333;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.legend-value {
+.legend-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
+}
+.legend-btn {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  color: #444;
+}
+.legend-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.legend-page {
+  font-size: 12px;
   color: #666;
 }
 .key-data {
@@ -236,16 +286,4 @@
 }
 .key-value {
   font-weight: 700;
-}
-
-@media (max-width: 1100px) {
-  .charts-row {
-    flex-direction: column;
-  }
-  .charts-right {
-    width: 100%;
-  }
-  .mini-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }

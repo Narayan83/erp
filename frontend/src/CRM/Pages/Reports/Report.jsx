@@ -49,7 +49,8 @@ const Report = () => {
     {
       title: "Travel History",
       description: "Track travel record of sales team.",
-      icon: <FaRoute />
+      icon: <FaRoute />,
+      path: '/reports/travel-report'
     }
   ];
 

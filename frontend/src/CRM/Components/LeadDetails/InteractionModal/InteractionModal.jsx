@@ -20,6 +20,7 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
 
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [employees, setEmployees] = useState([]);
   const [assignedDisplayName, setAssignedDisplayName] = useState('');
 
@@ -57,6 +58,7 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
       setNextAssignee('');
       setAssignedDisplayName('');
       setSendWhatsApp(false);
+      setErrorMsg('');
     }
   }, [isOpen]);
 
@@ -99,14 +101,24 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
     }
   }, [isOpen, lead, employees]);
 
+  useEffect(() => {
+    if (errorMsg && tagLocation) setErrorMsg('');
+  }, [tagLocation, errorMsg]);
+
   if (!isOpen) return null;
 
   const interactionTypes = ['Call', 'Meeting', 'Online', 'Email', 'Message', 'Other'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Tag location is optional: interactions are always saved. If tagLocation is true, backend can store it in travel history.
     setSaving(true);
     setSuccessMsg('');
+    setErrorMsg('');
+
+    // determine interaction executor: prefer explicit nextAssignee, fallback to lead assigned fields
+    const interactionEmployeeId = nextAssignee ? Number(nextAssignee) : (lead && (Number(lead.assigned_to_id) || (typeof lead.assignedTo === 'number' ? lead.assignedTo : (/^\d+$/.test(String(lead.assignedTo)) ? Number(lead.assignedTo) : null)))) || null;
+    const interactionEmployeeName = !interactionEmployeeId ? (assignedDisplayName || (lead && (lead.assignedTo || lead.assignedToName || lead.assigned_to_name))) : null;
 
     const payload = {
       interaction: mode !== 'appointment' ? {
@@ -115,6 +127,11 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
         tagLocation,
         type,
         note,
+        // include executor info so backend or consumers can pick it up
+        employee_id: interactionEmployeeId,
+        user_id: interactionEmployeeId,
+        employee: interactionEmployeeName,
+        user: interactionEmployeeName,
       } : null,
       nextAppointment: (mode !== 'interaction' && nextDate) ? {
         date: nextDate,
@@ -270,6 +287,7 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
 
           <div className="modal-actions">
             {successMsg && <div style={{color: 'green', marginRight: '10px'}}>{successMsg}</div>}
+            {errorMsg && <div style={{color: 'red', marginRight: '10px'}}>{errorMsg}</div>}
             <button type="submit" className="btn-save" disabled={saving}><FaCheck /> {saving ? 'Saving...' : 'Save'}</button>
           </div>
         </form>
