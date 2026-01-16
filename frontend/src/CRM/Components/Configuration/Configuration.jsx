@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FaArrowLeft, FaUsers, FaTag, FaBox, FaCity, FaPlus, FaTimesCircle, FaThumbsDown } from 'react-icons/fa';
+import PrintHeader from '../../../Admin Master/page/PrintHeader/PrintHeader';
 import Sources from './Sources/Sources';
 import Tags from './Tags/Tags';
 import RejectionReasons from './RejectionReasons/RejectionReasons';
@@ -8,6 +9,7 @@ import './configuration.scss';
 
 const Configuration = () => {
   const navigate = useNavigate();
+  const { type } = useParams();
   const [showSources, setShowSources] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showRejectionReasons, setShowRejectionReasons] = useState(false);
@@ -22,32 +24,11 @@ const Configuration = () => {
       color: 'sources-card'
     },
     {
-      id: 'products',
-      title: 'Product List',
-      description: 'Add products or services provided by you.',
-      icon: FaBox,
-      color: 'products-card'
-    },
-    {
-      id: 'cities',
-      title: 'City List',
-      description: 'Manage the master entries of cities used for leads & connections.',
-      icon: FaCity,
-      color: 'cities-card'
-    },
-    {
       id: 'tags',
       title: 'Tags',
       description: 'Manage the master entries of tags used for prospects & connections.',
       icon: FaTag,
       color: 'tags-card'
-    },
-    {
-      id: 'extra-fields',
-      title: 'Extra Fields',
-      description: 'Maintain additional fields in leads and connections.',
-      icon: FaPlus,
-      color: 'extra-fields-card'
     },
     {
       id: 'rejection-reasons',
@@ -62,6 +43,20 @@ const Configuration = () => {
         description: 'List reasons why a lead or prospect may become inactive.',
         icon: FaTimesCircle,
         color: 'inactive-reasons-card'
+    },
+    {
+      id: 'products',
+      title: 'Product List',
+      description: 'Add products or services provided by you.',
+      icon: FaBox,
+      color: 'products-card'
+    },
+    {
+      id: 'cities',
+      title: 'City List',
+      description: 'Manage the master entries of cities used for leads & connections.',
+      icon: FaCity,
+      color: 'cities-card'
     }
   ];
 
@@ -127,6 +122,19 @@ const Configuration = () => {
       <Sources isOpen={showSources} onClose={() => setShowSources(false)} />
       <Tags isOpen={showTags} onClose={() => setShowTags(false)} />
       <RejectionReasons isOpen={showRejectionReasons} onClose={() => setShowRejectionReasons(false)} />
+  {/* Print Header page/modal when route is /configuration/header */}
+  {type === 'header' && (
+    <PrintHeader
+      show={true}
+      onClose={() => navigate('/configuration')}
+      onSave={(data) => {
+        // TODO: call API to save header; for now just navigate back
+        // console.log('Saved header', data);
+        navigate('/configuration');
+      }}
+    />
+  )}
+
     </div>
   );
 };

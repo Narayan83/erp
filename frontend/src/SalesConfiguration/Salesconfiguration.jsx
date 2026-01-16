@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./salesconfiguration.scss";
 
@@ -7,6 +7,17 @@ import { FaUsers, FaTag, FaBox, FaBoxOpen, FaCity, FaPlus, FaTimesCircle, FaThum
 import Sources from "../CRM/Components/Configuration/Sources/Sources";
 import Tags from "../CRM/Components/Configuration/Tags/Tags";
 import RejectionReasons from "../CRM/Components/Configuration/RejectionReasons/RejectionReasons";
+import TandCManager from "../Admin Master/page/TANDC/TandCManager";
+import CompanyManager from "../Admin Master/page/Company/CompanyManager";
+import BranchManager from "../Admin Master/page/Branch/BranchManager";
+import BankManager from "../Admin Master/page/Bank/BankManager";
+import PrintHeader from "../Admin Master/page/PrintHeader/PrintHeader";
+import DigitalSign from "../Admin Master/page/DigitalSign/DigitalSign";
+import NonStock from "../Admin Master/page/NonStock/NonStock";
+import PaymentLink from "../Admin Master/page/PaymentLink/PaymentLink";
+import Email from "../Admin Master/page/Email/Email";
+import Integrations from "../Admin Master/page/Integrations/Integrations";
+import QrCode from "../Admin Master/page/QrCode/QrCode";
 
 const Salesconfiguration = () => {
 	const navigate = useNavigate();
@@ -14,17 +25,30 @@ const Salesconfiguration = () => {
 	const [showSources, setShowSources] = useState(false);
 	const [showTags, setShowTags] = useState(false);
 	const [showRejectionReasons, setShowRejectionReasons] = useState(false);
+	const [showTandc, setShowTandc] = useState(false);
+	const [showCompany, setShowCompany] = useState(false);
+	const [showBranch, setShowBranch] = useState(false);
+	const [showBank, setShowBank] = useState(false);
+	const [showPrintHeader, setShowPrintHeader] = useState(false);
+	const [showDigitalSign, setShowDigitalSign] = useState(false);
+	const [showNonStock, setShowNonStock] = useState(false);
+	const [showPaymentLink, setShowPaymentLink] = useState(false);
+	const [showEmail, setShowEmail] = useState(false);
+	const [showIntegrations, setShowIntegrations] = useState(false);
+	const [showQrCode, setShowQrCode] = useState(false);
 
 	const formats = [
 		{ title: "Print Header", desc: "Upload or create a header image to include in printables.", key: "header", icon: FaFileAlt },
 		{ title: "Print Footer", desc: "Upload or create a footer image to include in printables.", key: "footer", icon: FaFileAlt },
 		{ title: "Digital Signature", desc: "Upload the digital signature of your company to include in printables.", key: "signature", icon: FaSignature },
-		{ title: "Bank Details", desc: "Enter your bank details to include those in invoices, orders, etc.", key: "bank", icon: FaUniversity },
+		{ title: "Company / Firm Name", desc: "Set or update your company's official name to display on documents.", key: "company-name", icon: FaFileAlt },
+		{ title: "Branch", desc: "Manage branch details that appear on invoices and orders.", key: "branch", icon: FaCity },
+		{ title: "Bank Configuration", desc: "Enter your bank details and configuration for payments and invoices.", key: "bank", icon: FaUniversity },
 		{ title: "Terms & Conditions", desc: "Manage default terms and conditions to be used in sales orders, invoices, etc.", key: "tandc", icon: FaClipboardList },
-		{ title: "QR Code", desc: "Upload the QR code of your company to include in printables or enable quicker payments.", key: "qrcode", icon: FaQrcode }
 	];
 
 	const integrations = [
+		{ title: "QR Code", desc: "Upload your company QR Code to include in invoices and documents.", key: "qrcode", icon: FaQrcode },
 		{ title: "Payment Link", desc: "Add Payment Link of your company to enable quicker payments.", key: "payment", icon: FaMoneyBillWave },
 		{ title: "Email Account", desc: "Link your own email account to send emails from.", key: "email", icon: FaEnvelope },
 		{ title: "Lead Platforms", desc: "Integrate with other lead platforms like IndiaMART, TradeIndia, Razorpay, JustDial & WhatsApp.", key: "leads", icon: FaShareAlt },
@@ -34,16 +58,9 @@ const Salesconfiguration = () => {
 	];
 
 	const salesDocuments = [
-		{ title: "Customer Categories", desc: "Manage the master of categories of customers used for Quotes & Invoices.", key: "customer-categories", icon: FaUsers },
 		{ title: "Templates", desc: "Manage document templates to quickly create new documents.", key: "templates", icon: FaFileAlt },
-		{ title: "Billables (Services / Non-Stock Items)", desc: "Manage Services / Non-Stock Items.", key: "billables", icon: FaBox },
 		{ title: "Document Series", desc: "Manage series for invoices, quotes etc.", key: "document-series", icon: FaListAlt },
-		{ title: "Extra Columns", desc: "Configure additional columns to be shown in quotes and invoices.", key: "extra-columns", icon: FaColumns },
-		{ title: "Extra Fields", desc: "Configure additional fields to be shown in quotes, invoices etc.", key: "extra-fields", icon: FaListAlt },
-		{ title: "Contract Types", desc: "Manage your contract types for contract entries.", key: "contract-types", icon: FaFileContract },
-		{ title: "Order Stages", desc: "Manage Order Stages to give quick order updates.", key: "order-stages", icon: FaTasks },
-		{ title: "B2C-only Mode", desc: "Enable 'B2C-only Mode' if you only sell to end consumers, not to businesses.", key: "b2c-mode", icon: FaUserFriends },
-		{ title: "Invoice Credit Days", desc: "Set the number of days to calculate the Due Date from the invoice date.", key: "invoice-credit-days", icon: FaCalendarAlt }
+		{ title: "Services / Non-Stock Items", desc: "Manage Services / Non-Stock items.", key: "quotes", icon: FaFileContract },
 	];
 
 	const settingsCards = [
@@ -53,21 +70,25 @@ const Salesconfiguration = () => {
 	];
 
 	const handleCardClick = (key) => {
-		// Placeholder navigation - adjust routes as your app defines them
-		if (key === "tandc") navigate("/terms-and-conditions");
-		else if (key === "bank") navigate("/bank-details");
-		else if (key === "header") navigate("/configuration/header");
+		// Navigation mapped to routes defined in App.jsx
+		if (key === "tandc") { setShowTandc(true); return; }
+		else if (key === "bank") { setShowBank(true); return; }
+		else if (key === "company-name") { setShowCompany(true); return; }
+		else if (key === "branch") { setShowBranch(true); return; }
+		else if (key === "header") { setShowPrintHeader(true); return; }
+		else if (key === "signature") { setShowDigitalSign(true); return; }
+		else if (key === "quotes") { setShowNonStock(true); return; }
+		else if (key === "document-series") { navigate("/ManageSeries"); return; }
 		else navigate(`/configuration/${key}`);
 	};
 
 	const configurationCards = [
 		{ id: 'sources', title: 'Sources', description: 'Add all the different sources from where your leads are coming.', icon: FaUsers, color: 'sources-card' },
-		{ id: 'products', title: 'Product List', description: 'Add products or services provided by you.', icon: FaBox, color: 'products-card' },
-		{ id: 'cities', title: 'City List', description: 'Manage the master entries of cities used for leads & connections.', icon: FaCity, color: 'cities-card' },
 		{ id: 'tags', title: 'Tags', description: 'Manage the master entries of tags used for prospects & connections.', icon: FaTag, color: 'tags-card' },
-		{ id: 'extra-fields', title: 'Extra Fields', description: 'Maintain additional fields in leads and connections.', icon: FaPlus, color: 'extra-fields-card' },
 		{ id: 'rejection-reasons', title: 'Rejection Reasons', description: 'List reasons why a prospect may reject your appointment request.', icon: FaThumbsDown, color: 'rejection-reasons-card' },
-		{ id: 'inactive-reasons', title: 'Inactive Reasons', description: 'List reasons why a lead or prospect may become inactive.', icon: FaTimesCircle, color: 'inactive-reasons-card' }
+		{ id: 'inactive-reasons', title: 'Inactive Reasons', description: 'List reasons why a lead or prospect may become inactive.', icon: FaTimesCircle, color: 'inactive-reasons-card' },
+		{ id: 'products', title: 'Product List', description: 'Add products or services provided by you.', icon: FaBox, color: 'products-card' },
+		{ id: 'cities', title: 'City List', description: 'Manage the master entries of cities used for leads & connections.', icon: FaCity, color: 'cities-card' }
 	];
 
 	const handleCrmCardClick = (cardId) => {
@@ -76,6 +97,10 @@ const Salesconfiguration = () => {
 		if (cardId === 'rejection-reasons') { setShowRejectionReasons(true); return; }
 		navigate(`/configuration/${cardId}`);
 	};
+
+	// Click handlers are attached directly to clickable cards via onClick handlers.
+
+
 
 	return (
 		<div className="sales-config-page">
@@ -89,8 +114,19 @@ const Salesconfiguration = () => {
 
 				<div className="cards-grid">
 					{formats.map((c) => {
-						const Icon = c.icon;
-						return (
+					const Icon = c.icon;
+					const clickableKeys = ['company-name', 'branch', 'bank', 'tandc', 'header', 'signature', 'document-series'];
+					if (clickableKeys.includes(c.key)) {
+							return (
+								<button key={c.key} className="config-card" onClick={() => handleCardClick(c.key)}>
+									<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
+									<div className="card-body">
+										<div className="card-title">{c.title}</div>
+										<div className="card-desc">{c.desc}</div>
+									</div>
+								</button>
+							);
+						}						return (
 							<div key={c.key} className="config-card">
 								<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
 								<div className="card-body">
@@ -140,18 +176,42 @@ const Salesconfiguration = () => {
 			<Sources isOpen={showSources} onClose={() => setShowSources(false)} />
 			<Tags isOpen={showTags} onClose={() => setShowTags(false)} />
 			<RejectionReasons isOpen={showRejectionReasons} onClose={() => setShowRejectionReasons(false)} />
+		<TandCManager isOpen={showTandc} onClose={() => setShowTandc(false)} />
+	<CompanyManager isOpen={showCompany} onClose={() => setShowCompany(false)} />
+	<BranchManager isOpen={showBranch} onClose={() => setShowBranch(false)} />
+	<BankManager isOpen={showBank} onClose={() => setShowBank(false)} />
 
-			<section className="section">
-				<div className="section-ribbon orange">
-					<div className="ribbon-title">Integrations</div>
-					<div className="ribbon-sub">Set up these integrations to make your workflow smoother.</div>
-				</div>
+	{/* Non-Stock / Services modal opened directly from Sales Configuration */}
+	<NonStock isOpen={showNonStock} onClose={() => setShowNonStock(false)} />
 
-				<div className="cards-grid">
+	{/* Print Header modal opened directly from Sales Configuration */}
+	<PrintHeader show={showPrintHeader} onClose={() => setShowPrintHeader(false)} onSave={(data) => { /* TODO: call API to save header. For now close modal */ setShowPrintHeader(false); }} />
+
+	{/* Digital Signature modal opened directly from Sales Configuration */}
+	<DigitalSign show={showDigitalSign} onClose={() => setShowDigitalSign(false)} onSave={(data) => { /* TODO: call API to save signature. For now close modal */ setShowDigitalSign(false); }} />
+
+	<PaymentLink isOpen={showPaymentLink} onClose={() => setShowPaymentLink(false)} />
+	<Email isOpen={showEmail} onClose={() => setShowEmail(false)} />
+	<Integrations isOpen={showIntegrations} onClose={() => setShowIntegrations(false)} />
+	<QrCode isOpen={showQrCode} onClose={() => setShowQrCode(false)} />
+
+		<section className="section">
+			<div className="section-ribbon green">
+				<div className="ribbon-title">Integrations</div>
+				<div className="ribbon-sub">Set up these integrations to make your workflow smoother.</div>
+			</div>
+
+			<div className="cards-grid">
 					{integrations.map((c) => {
 						const Icon = c.icon;
+						const handleClick = () => {
+							if (c.key === 'payment') setShowPaymentLink(true);
+							else if (c.key === 'email') setShowEmail(true);
+							else if (c.key === 'leads') setShowIntegrations(true);
+							// others can navigate or do nothing for now
+						};
 						return (
-							<div key={c.key} className="config-card">
+						<div key={c.key} className="config-card" onClick={() => { if (c.key === 'qrcode') setShowQrCode(true); else if (c.key === 'payment') setShowPaymentLink(true); else if (c.key === 'email') setShowEmail(true); else if (c.key === 'leads') setShowIntegrations(true); }}>
 								<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
 								<div className="card-body">
 									<div className="card-title">{c.title}</div>
@@ -172,6 +232,17 @@ const Salesconfiguration = () => {
 					<div className="cards-grid">
 						{salesDocuments.map((c) => {
 							const Icon = c.icon;
+						if (c.key === 'document-series' || c.key === 'quotes') {
+								return (
+									<button key={c.key} className="config-card" onClick={() => handleCardClick(c.key)}>
+										<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
+										<div className="card-body">
+											<div className="card-title">{c.title}</div>
+											<div className="card-desc">{c.desc}</div>
+										</div>
+									</button>
+								);
+							}
 							return (
 								<div key={c.key} className="config-card">
 									<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
@@ -194,8 +265,12 @@ const Salesconfiguration = () => {
 					<div className="cards-grid">
 						{settingsCards.map((c) => {
 							const Icon = c.icon;
+							const handleClick = () => {
+								if (c.key === 'barcode-generation') setShowQrCode(true);
+								// others can be added later
+							};
 							return (
-								<div key={c.key} className="config-card">
+								<div key={c.key} className="config-card" onClick={handleClick}>
 									<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>
 									<div className="card-body">
 										<div className="card-title">{c.title}</div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaTrash, FaPlus } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 import './sources.scss';
 
 const Sources = ({ isOpen, onClose }) => {
@@ -79,49 +79,55 @@ const Sources = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="sources-modal-overlay" onClick={onClose}>
-      <div className="sources-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="sources-modal-header">
-          <h2>Lead Sources</h2>
-          <button className="close-btn" onClick={onClose}><FaTimes /></button>
+    <div className="tandc-overlay" onClick={onClose}>
+      <div className="tandc-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="tandc-dialog-header">
+          <div className="title">Lead Sources</div>
+          <div className="actions">
+            <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            <button className="close" onClick={onClose}>✕</button>
+          </div>
         </div>
 
-        <div className="sources-modal-content">
-          <div className="sources-list-header">
-            <span>Sources</span>
-            <button className="add-btn" onClick={() => setShowAddModal(true)}><FaPlus /> Add</button>
-          </div>
-
-          <div className="sources-list">
-            {sources.length === 0 ? (
-              <div className="no-sources">No sources found. Click Add to create one.</div>
-            ) : (
-              sources.map((source) => (
-                <div key={source.id} className="source-item">
-                  <span className="source-name">{source.name}</span>
-                  <button className="delete-btn" onClick={() => handleDeleteSource(source.id)} title="Delete source"><FaTrash /></button>
+        <div className="tandc-dialog-body">
+          {sources.length === 0 ? (
+            <div className="muted">No sources found. Add one.</div>
+          ) : (
+            sources.map((source) => (
+              <div className="tandc-item" key={source.id}>
+                <div className="tandc-name">{source.name}</div>
+                <div className="item-actions">
+                  <button className="icon-button delete" title="Delete source" onClick={() => handleDeleteSource(source.id)}>
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                      <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                  </button>
                 </div>
-              ))
-            )}
-          </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {showAddModal && (
-        <div className="add-source-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="add-source-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="add-source-header">
-              <h3>Add Lead Source</h3>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}><FaTimes /></button>
+        <div className="tandc-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="tandc-dialog small" onClick={(e) => e.stopPropagation()}>
+            <div className="tandc-dialog-header">
+              <div className="title">Add Lead Source</div>
+              <div className="actions">
+                <button className="close" onClick={() => setShowAddModal(false)}>✕</button>
+              </div>
             </div>
 
-            <div className="add-source-content">
-              <label htmlFor="source-input">Source</label>
-              <input id="source-input" type="text" placeholder="Enter source name" value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} onKeyPress={handleKeyPress} autoFocus />
+            <div className="tandc-dialog-body">
+              <div className="form-row">
+                <label htmlFor="source-input">Source</label>
+                <input id="source-input" type="text" placeholder="Enter source name" value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} onKeyPress={handleKeyPress} autoFocus />
+              </div>
             </div>
 
-            <div className="add-source-footer">
-              <button className="save-btn" onClick={handleAddSource} disabled={loading || !newSourceName.trim()}>{loading ? 'Saving...' : '✓ Save'}</button>
+            <div className="tandc-dialog-footer">
+              <button className="btn-primary save" onClick={handleAddSource} disabled={loading || !newSourceName.trim()}>{loading ? 'Saving...' : 'Done'}</button>
             </div>
           </div>
         </div>

@@ -1,0 +1,565 @@
+/* Modal overlay */
+.tandc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.tandc-dialog {
+  width: 500px;
+  max-width: 100%;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+.tandc-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.tandc-dialog-header .title {
+  font-weight: 600;
+  color: #333;
+}
+
+.actions {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  border: none;
+  background: transparent;
+}
+
+.btn-add.small {
+  padding: 6px 10px;
+  background: #ff9800;
+  border-radius: 4px;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background: #fb8c00;
+  }
+}
+
+.actions .close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.tandc-dialog-body {
+  padding: 12px 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tandc-item {
+  display: flex;
+  align-items: flex-start; /* allow multi-line content */
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #eef6fb; /* light blue background like screenshot */
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* Make the name readable with multi-line clamp (max 5 lines) */
+.tandc-name {
+  flex: 1 1 auto;
+  min-width: 0; /* allow truncation on overflow */
+  font-size: 14px;
+  color: #333;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5; /* show up to 5 lines */
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* Position actions at the far right and align to top */
+.item-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tandc-item input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+  color: #333;
+  background: transparent;
+  padding: 6px 4px;
+}
+
+.tandc-item .small-meta {
+  font-size: 12px;
+  color: #555;
+}
+
+.icon-button {
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.icon-button.edit {
+  background: #fff3e0; /* light orange box */
+  border: 1px solid #ffb74d;
+  color: #ff9800;
+}
+
+.icon-button.delete {
+  background: #f0f0f0; /* grey boxed delete */
+  border: 1px solid #e0e0e0;
+  color: #666;
+}
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG icon sizing and color via currentColor */
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icon-button.edit {
+  color: #036908 !important;
+  background: #d7f1d8 !important;
+  border: none;
+}
+
+.icon-button.delete {
+  color: #962503 !important;
+  background: #f1dfd7 !important;
+  border: none;
+}
+
+.icon-button.edit {
+  background: #fff3e0;
+  border-radius: 4px;
+  color: #ff9800;
+}
+
+.icon-button.delete {
+  background: #f5f6fa;
+  border-radius: 4px;
+  color: #666;
+}
+
+.muted {
+  color: #777;
+  padding: 12px 8px;
+}
+
+.tandc-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid #e6e6e6;
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-primary.save {
+  background: #4caf50;
+  color: #fff;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background: #45a049;
+  }
+}
+
+/* --- Add company form & improved dialog styling --- */
+.tandc-dialog.small {
+  width: 500px;
+  max-width: 92%;
+  padding: 0;
+}
+
+.tandc-dialog.large {
+  width: 500px;
+  max-width: 100%;
+  padding: 0;
+}
+
+.tandc-dialog.large .tandc-dialog-body {
+  padding: 18px 20px;
+}
+
+.tandc-dialog-header .title {
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0;
+}
+
+.form-grid .form-row {
+  margin-bottom: 8px;
+}
+
+.form-grid .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid .two-col div {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkbox-row {
+  align-items: left;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+
+  & input[type="checkbox"] {
+    margin: 0 !important;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* compact inline options row shown when a T&C is marked as default */
+.options-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.options-row .checkbox-field {
+  gap: 6px;
+  font-size: 13px;
+}
+
+.form-row select {
+  border: 1px solid #e6e9ee;
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+/* Ensure Save button is right-aligned in small dialogs when used inside the modal component */
+.tandc-dialog.small .tandc-dialog-footer {
+  justify-content: flex-end;
+}
+
+.form-row label {
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+}
+
+.tandc-dialog-body input[type="text"],
+.tandc-dialog-body input {
+  border: 1px solid #e6e9ee;
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #222;
+  outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.tandc-dialog-body input:focus {
+  border-color: #89b7ff;
+  box-shadow: 0 4px 12px rgba(137, 183, 255, 0.15);
+}
+
+.tandc-dialog-footer {
+  gap: 8px;
+}
+
+.tandc-dialog-footer .btn-primary.save[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Buttons grouped on the right for small dialogs */
+.tandc-dialog.small .tandc-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+}
+
+/* Slight scale-in animation for dialogs */
+.tandc-dialog {
+  transform-origin: center;
+  animation: dialog-pop 180ms ease;
+}
+@keyframes dialog-pop {
+  from {
+    transform: scale(0.985);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Reduce overlay opacity for nested modal to focus the inner one */
+.tandc-overlay .tandc-overlay {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* Responsive tweaks */
+@media (max-width: 480px) {
+  .tandc-dialog {
+    width: 94%;
+    border-radius: 8px;
+  }
+  .tandc-dialog.small {
+    width: 92%;
+  }
+}
+
+/* Company card styles */
+.company-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border: 1px solid #e9f0fb;
+  box-shadow: 0 2px 8px rgba(20, 48, 83, 0.03);
+}
+
+.company-card-body {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto; /* allow actions to stay at right */
+  min-width: 0; /* helps with overflow */
+}
+
+.company-name,
+.company-code {
+  font-weight: 600;
+  color: #1f2d3d;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-button.edit {
+  background: #e8f4ff;
+  border-radius: 6px;
+  color: #0d73ff;
+}
+
+/* Branch card styles */
+.branch-card {
+  display: flex;
+  gap: 12px;
+  padding: 10px; /* extra bottom padding for action buttons */
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e9eef8;
+  box-shadow: 0 2px 8px rgba(20, 48, 83, 0.03);
+  align-items: flex-start;
+}
+
+.branch-card-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.branch-company {
+  font-weight: 700;
+  color: #223;
+}
+
+.branch-code-name {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.branch-name {
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.branch-address,
+.branch-city-state,
+.branch-pincode,
+.branch-gst {
+  color: #556;
+  font-size: 13px;
+}
+
+.branch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 3;
+}
+
+.branch-actions .icon-button.delete {
+  background: #f5f6fa;
+  border-radius: 6px;
+  color: #666;
+}
+
+.branch-card {
+  position: relative;
+}
+
+.branch-star {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #e48c09; /* golden */
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Bank card styles */
+.bank-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px; /* extra bottom space for actions */
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e9eef8;
+  box-shadow: 0 2px 8px rgba(20, 48, 83, 0.03);
+  align-items: flex-start;
+  position: relative;
+}
+
+.bank-card-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bank-row {
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.bank-label {
+  min-width: 130px;
+  color: #556;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bank-value {
+  flex: 1 1 auto;
+  font-size: 14px;
+  color: #1f2d3d;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.bank-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  z-index: 3;
+}
+
+.bank-row.bank-balance .bank-value {
+  font-weight: 800;
+  color: #0d73ff;
+}

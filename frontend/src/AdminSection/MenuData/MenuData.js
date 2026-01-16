@@ -71,7 +71,6 @@ export const menuItems = [
       { title: "Account", path: "/account" },
       { title: "Quotation", path: "/quotation" },
       { title: "Quotation List", path: "/quotation-list" },
-      { title: "Terms & Conditions  Management", path: "/Managetandc" },
     ],
   },
 
@@ -99,10 +98,6 @@ export const menuItems = [
     title: "Setup",
     icon: MdOutlinePhonelinkSetup,
     submenu: [
-      { title: "Company/Firm Master", path: "/ManageCompany" },
-      { title: "Branch", path: "/ManageBranch" },
-      { title: "Bank", path: "/ManageBank" },
-      { title: "Series", path: "/ManageSeries" },
     ],
   },
 
