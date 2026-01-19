@@ -286,7 +286,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
     const fetchDepartments = async () => {
       try {
         const params = { page: 1, limit: 1000 };
-        const resp = await axios.get(`${BASE_URL}/departments`, { params });
+        const resp = await axios.get(`${BASE_URL}/api/departments`, { params });
         const payload = resp.data.departments || resp.data || [];
         const list = Array.isArray(payload) ? payload : [];
         if (!cancelled) setDepartmentsList(list);
@@ -497,7 +497,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
         // Try multiple endpoints to get employees for a department
         let employees = [];
         const tryEndpoints = [
-          `${BASE_URL}/departments/${deptId}/employees`,
+          `${BASE_URL}/api/departments/${deptId}/employees`,
           `${BASE_URL}/api/employees`,
           `${BASE_URL}/employees`,
         ];
@@ -3029,7 +3029,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
       </div>
 
           <div className="tab-content" style={{ display: tabIndex === 2 ? 'block' : 'none' }}>
-        <div className="form-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Additional Address</h6>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -3215,32 +3215,32 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Bank Information</h6>
 
-          <div className="grid-col md-4 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="bank_name">Bank Name</label>
               <input {...register("bank_name")} id="bank_name" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-4 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="branch_name">Branch Name</label>
               <input {...register("branch_name")} id="branch_name" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-4 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="branch_address">Branch Address</label>
               <input {...register("branch_address")} id="branch_address" type="text" className="form-input" />
             </div>
           </div>
 
-          <div className="grid-col md-4 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="account_number">Account Number</label>
               <input {...register("account_number")} id="account_number" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-4 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="ifsc_code">IFSC Code</label>
               <input {...register("ifsc_code")} id="ifsc_code" type="text" className="form-input" />
@@ -3512,28 +3512,28 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
       <div className="tab-content" style={{ display: tabIndex === 3 ? 'block' : 'none' }}>
 
-        <div className="form-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           {/* Legal information block (Authentication tab) - moved above authentication fields */}
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Legal Information</h6>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="aadhar_number">Aadhar Number</label>
               <input {...register("aadhar_number")} id="aadhar_number" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="pan_number">PAN Number</label>
               <input {...register("pan_number")} id="pan_number" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="gstin_number">GSTIN</label>
               <input {...register("gstin_number")} id="gstin_number" type="text" className="form-input" />
             </div>
           </div>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="msme_no">MSME No</label>
               <input {...register("msme_no")} id="msme_no" type="text" className="form-input" />
@@ -3542,7 +3542,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
           {/* Authentication section - placed below legal information */}
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Authentication</h6>
-          <div className="grid-col md-2 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="username">User Name *</label>
               <Controller
@@ -3558,7 +3558,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
           </div>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="password">Password *</label>
               <Controller
@@ -3597,7 +3597,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
           </div>
-          <div className="grid-col md-3 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="confirmPassword">Confirm Password *</label>
               <Controller
@@ -3635,7 +3635,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
           {/* Primary Key & User Code */}
           {defaultValues?.id && (
-            <div className="grid-col md-2 xs-12">
+            <div>
               <div className="form-field">
                 <label htmlFor="primary_key">Primary Key (ID)</label>
                 <input
@@ -3648,7 +3648,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               </div>
             </div>
           )}
-          <div className="grid-col md-2 xs-12">
+          <div>
             <div className="form-field">
               <label htmlFor="usercode">User Code *</label>
               <Controller

@@ -3,6 +3,7 @@ import { Snackbar, Alert } from "@mui/material";
 import CategoryTable from "../components/CategoryTable";
 import CategoryDialog from "../components/CategoryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
 import { BASE_URL }  from "../../../config/Config";
 import "./category.scss";
@@ -128,39 +129,16 @@ export default function CategoryPage() {
         />
       </div>
 
-      <div className="pagination-wrapper">
-        <div className="pagination-info">
-          <span>Rows per page:</span>
-          <select 
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-          >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-          </select>
-          <span>{total > 0 ? page * rowsPerPage + 1 : 0}–{Math.min((page + 1) * rowsPerPage, total)} of {total}</span>
-        </div>
-        <div className="pagination-buttons">
-          <button
-            onClick={() => setPage(page - 1)}
-            disabled={page === 0}
-            type="button"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage(page + 1)}
-            disabled={(page + 1) * rowsPerPage >= total}
-            type="button"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <Pagination
+        page={page}
+        total={total}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+      />
 
       <CategoryDialog
         open={dialogOpen}

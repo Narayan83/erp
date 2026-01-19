@@ -1,7 +1,7 @@
 import React,{useState,useEffect} from "react";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, FormControl,Select,InputLabel,Snackbar,MenuItem,Autocomplete, IconButton, InputAdornment
+  Dialog, DialogTitle, DialogContent,
+  TextField, FormControl,Select,InputLabel,Snackbar,MenuItem,Autocomplete, IconButton, InputAdornment
 } from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -231,11 +231,38 @@ const SubcategoryDialog = ({ open, onClose, onSubmit, formData, setFormData }) =
           )}
         />
       </DialogContent>
-      <DialogActions>
-  <Button onClick={onClose}>Cancel</Button>
-  <Button onClick={handleSubmit} variant="contained">Save</Button>
-      </DialogActions>
-    </Dialog>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#1976d2',
+              padding: '6px 16px',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            style={{
+              background: '#1976d2',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: 4,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Save
+          </button>
+        </div>
+    </Dialog> 
   );
 };
 

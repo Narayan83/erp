@@ -623,7 +623,7 @@ export default function ReviewStep({
             <TableCell align="center">Lead Time</TableCell>
             <TableCell align="center">Images</TableCell>
             <TableCell align="center">Status</TableCell>
-            <TableCell align="center">Actions</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -723,7 +723,7 @@ export default function ReviewStep({
                   {v.isActive !== false ? 'Active' : 'Inactive'}
                 </Typography>
               </TableCell>
-              <TableCell align="center">
+              <TableCell align="right" sx={{ textAlign: 'right' }}>
                 <IconButton
                   size="small"
                   color="primary"
@@ -765,9 +765,14 @@ export default function ReviewStep({
 
       <Box mt={4} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={handleFinalSubmit}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleFinalSubmit}
+          aria-label="Submit Product"
+        >
           Submit
-        </Button>
+        </button>
       </Box>
 
       <DynamicDialog
@@ -789,9 +794,10 @@ export default function ReviewStep({
             label: "View Products",
             onClick: () => {
               setDialogOpen(false);
-              navigate("/ProductMaster"); // Now works with the added import
+              navigate("/ProductMaster");
             },
-            variant: "contained",
+            plain: true,
+            className: "btn btn-primary",
           },
         ]}
       />

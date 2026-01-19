@@ -10,22 +10,22 @@ export default function CategoryTable({ categories, onEdit, onDelete, page, rows
       <Table size="small">
         <TableHead sx={{ '& .MuiTableCell-root': { textAlign: 'center' } }}>
           <TableRow>
-            <TableCell>S.No.</TableCell>
+            <TableCell style={{ textAlign: 'left' }}>S.No.</TableCell>
             <TableCell>Category Name</TableCell>
-            <TableCell sx={{ width: 120 }}>Actions</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 120 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {categories.map((cat, index) => (
             <TableRow key={cat.ID} sx={{ height: 36 }}>
-              <TableCell align="center" sx={{ py: 0.5 }}>
-                {(page * rowsPerPage) + index + 1}
+              <TableCell align="left" sx={{ py: 0.5 }}>
+                {(page * rowsPerPage) + index + 1} 
               </TableCell>
               <TableCell align="center" sx={{ py: 0.5 }}>{cat.Name}</TableCell>
-              <TableCell align="center" sx={{ py: 0.5 }}>
+              <TableCell align="right" sx={{ py: 0.5, textAlign: 'right' }}>
                 <IconButton size="small" onClick={() => onEdit(cat)}><EditIcon fontSize="small" /></IconButton>
                 <IconButton size="small" onClick={() => onDelete(cat)}><DeleteIcon fontSize="small" /></IconButton>
-              </TableCell>
+              </TableCell> 
             </TableRow>
           ))}
         </TableBody>

@@ -282,7 +282,7 @@ func main() {
 		&models.UserAddress{},
 		&models.UserBankAccount{},
 		&models.UserDocument{},
-		&models.Quotation{},
+
 		&models.QuotationItem{},
 		&models.SalesOrder{},
 		&models.SalesOrderItem{},
@@ -320,8 +320,13 @@ func main() {
 		&models.UserHierarchy{},
 		&models.UserRoleMapping{},
 		&models.Department{},
-		&models.DepartmentRelation{},
-		&models.EmployeeUserRelation{},
+
+		&models.Designation{},
+		&models.Department{},
+		&models.OrganizationUnit{},
+		&models.Employee{},
+		&models.EmployeeHierarchy{},
+		&models.EmployeeOrganizationUnit{},
 	)
 
 	if err != nil {
@@ -417,16 +422,16 @@ func main() {
 	`)
 
 	// Ensure employee_user_relations.employee_id FK references users(id)
-	initializers.DB.Exec(`
-		ALTER TABLE IF EXISTS employee_user_relations DROP CONSTRAINT IF EXISTS employee_user_relations_employee_id_fkey;
-	`)
-	initializers.DB.Exec(`
-		DO $$ BEGIN
-			ALTER TABLE employee_user_relations
-			ADD CONSTRAINT employee_user_relations_employee_id_fkey
-			FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE CASCADE;
-		EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-	`)
+	// initializers.DB.Exec(`
+	// 	ALTER TABLE IF EXISTS employee_user_relations DROP CONSTRAINT IF EXISTS employee_user_relations_employee_id_fkey;
+	// `)
+	// initializers.DB.Exec(`
+	// 	DO $$ BEGIN
+	// 		ALTER TABLE employee_user_relations
+	// 		ADD CONSTRAINT employee_user_relations_employee_id_fkey
+	// 		FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE CASCADE;
+	// 	EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+	// `)
 
 	// Fixup: ensure user_addresses.user_id references users(id).
 	// Historical model tags sometimes caused GORM to create an incorrect
@@ -484,9 +489,9 @@ func main() {
 	initializers.DB.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_users_is_distributor ON users(is_distributor);
 	`)
-	initializers.DB.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_employee_user_relations_user_id ON employee_user_relations(user_id);
-	`)
+	// initializers.DB.Exec(`
+	// 	CREATE INDEX IF NOT EXISTS idx_employee_user_relations_user_id ON employee_user_relations(user_id);
+	// `)
 	initializers.DB.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_departments_head_id ON departments(head_id);
 	`)

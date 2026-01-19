@@ -38,6 +38,7 @@ import dialCodeToCountry from "../utils/dialCodeToCountry";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import EnhancedEditableCell from "../../Products/ProductManage/Components/EnhancedEditableCell";
+import Pagination from "../../CommonComponents/Pagination";
 import ListItemText from '@mui/material/ListItemText';
 import "./user_list_page.scss";
 import countriesData from "../utils/countries";
@@ -310,7 +311,7 @@ export default function UserListPage() {
     let cancelled = false;
     const loadDeptHeads = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/departments`, { params: { limit: 1000 } });
+        const res = await axios.get(`${BASE_URL}/api/departments`, { params: { limit: 1000 } });
         const payload = res.data && (res.data.departments !== undefined ? res.data.departments : res.data);
         const depts = Array.isArray(payload) ? payload : [];
         const headsMap = new Map();
@@ -356,7 +357,7 @@ export default function UserListPage() {
         }
         
         // Fetch employees assigned to this department
-        const res = await axios.get(`${BASE_URL}/departments/${headOption.deptId}/employees`);
+        const res = await axios.get(`${BASE_URL}/api/departments/${headOption.deptId}/employees`);
         const data = res.data;
         const emps = Array.isArray(data)
           ? data
@@ -1661,7 +1662,7 @@ const getUserDisplayName = (u) => {
   };
 
   return (
-    <Box p={1} mt={8}>
+    <Box p={1} mt={2}>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography variant="h5">User Master</Typography>
         <div className="header-search" style={{ width: 400 }}>
@@ -1748,7 +1749,15 @@ const getUserDisplayName = (u) => {
             </IconButton>
           </Tooltip>
 
-          <Button variant="contained" color="primary" sx={{ ml: 2, flex: 0.2 }} onClick={() => navigate("/users/add")}>+ Add User</Button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate("/users/add")}
+            style={{ marginLeft: 16, flex: '0.2' }}
+            aria-label="Add User"
+          >
+            + Add User
+          </button>
         </Box>
       </Paper>
 
@@ -2065,43 +2074,14 @@ const getUserDisplayName = (u) => {
           </div>
         )}
         <div className="table-pagination">
-          <div className="pagination-info">
-            Showing {users.length === 0 ? 0 : page * limit + 1} to {Math.min((page + 1) * limit, totalItems)} of {totalItems} users
-          </div>
-          <div className="pagination-controls">
-            <select 
-              value={limit} 
-              onChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-              className="rows-per-page"
-              aria-label="Select rows per page"
-            >
-              <option value={5}>5 per page</option>
-              <option value={10}>10 per page</option>
-              <option value={25}>25 per page</option>
-            </select>
-            <div className="pagination-buttons">
-              <button
-                className="pagination-btn"
-                onClick={() => setPage(page - 1)}
-                disabled={page === 0}
-                aria-label="Previous page"
-              >
-                ← Previous
-              </button>
-              <span className="page-number">Page {page + 1} of {Math.ceil(totalItems / limit)}</span>
-              <button
-                className="pagination-btn"
-                onClick={() => setPage(page + 1)}
-                disabled={page >= Math.ceil(totalItems / limit) - 1}
-                aria-label="Next page"
-              >
-                Next →
-              </button>
-            </div>
-          </div>
+          
+          <Pagination
+            page={page}
+            total={totalItems}
+            rowsPerPage={limit}
+            onPageChange={(newPage) => setPage(newPage)}
+            onRowsPerPageChange={(newRowsPerPage) => { setRowsPerPage(newRowsPerPage); setPage(0); }}
+          />
         </div>
       </Paper>
     {/* Display Preferences Dialog */}
@@ -2417,7 +2397,7 @@ const getUserDisplayName = (u) => {
                 {/* Personal Information */}
                 <div className="user-details-section">
                   <h3 className="section-title">Personal Information</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>Salutation</label>
                       <input type="text" value={selectedUser.salutation || selectedUser.Salutation || selectedUser.title || ""} disabled />
@@ -2459,7 +2439,7 @@ const getUserDisplayName = (u) => {
                 {/* Contact Information */}
                 <div className="user-details-section">
                   <h3 className="section-title">Contact Information</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>Country</label>
                       <input type="text" value={(() => {
@@ -2501,7 +2481,7 @@ const getUserDisplayName = (u) => {
                 {(selectedUser.is_customer || selectedUser.is_supplier || selectedUser.is_dealer || selectedUser.is_distributor) && (
                   <div className="user-details-section">
                     <h3 className="section-title">Business Information</h3>
-                    <div className="form-grid col-12">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                       <div className="form-field">
                         <label>Business Name</label>
                         <input type="text" value={selectedUser.business_name || ""} disabled />
@@ -2529,7 +2509,7 @@ const getUserDisplayName = (u) => {
                 {/* Permanent Address */}
                 <div className="user-details-section">
                   <h3 className="section-title">Permanent Address</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>GSTIN</label>
                       <input type="text" value={(() => {
@@ -2582,7 +2562,7 @@ const getUserDisplayName = (u) => {
                         <h4 className="address-title">
                           Additional Address {String(idx + 1).padStart(2, '0')}
                         </h4>
-                        <div className="form-grid col-12">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                           <div className="form-field">
                             <label>Title</label>
                             <input type="text" value={addr.title || ""} disabled />
@@ -2644,7 +2624,7 @@ const getUserDisplayName = (u) => {
                 {/* Legal Information */}
                 <div className="user-details-section">
                   <h3 className="section-title">Legal Information</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>Aadhar Number</label>
                       <input type="text" value={getLegalValue(selectedUser, ['aadhaar','aadhar','aadhaar card','aadhar card'], ['aadhar_number','aadhaar'], ['aadhar_number','doc_number'])} disabled />
@@ -2667,7 +2647,7 @@ const getUserDisplayName = (u) => {
                 {/* Bank Information */}
                 <div className="user-details-section">
                   <h3 className="section-title">Bank Information</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>Bank Name</label>
                       <input type="text" value={selectedUser.bank_accounts?.[0]?.bank_name || ""}
@@ -2699,7 +2679,7 @@ const getUserDisplayName = (u) => {
                     selectedUser.bank_accounts.slice(1).map((bank, idx) => (
                       <div key={idx} className="bank-block">
                         <h4 className="bank-title">Bank Info {idx + 1}</h4>
-                        <div className="form-grid col-12">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                           <div className="form-field">
                             <label>Bank Name</label>
                             <input type="text" value={bank.bank_name || ""} disabled />
@@ -2797,7 +2777,7 @@ const getUserDisplayName = (u) => {
                 {/* Authentication Information */}
                 <div className="user-details-section">
                   <h3 className="section-title">Authentication</h3>
-                  <div className="form-grid col-12">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div className="form-field">
                       <label>User Code</label>
                       <input type="text" value={selectedUser.usercode || selectedUser.user_code || selectedUser.userCode || ""} disabled />

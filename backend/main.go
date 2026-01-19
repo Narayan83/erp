@@ -37,7 +37,7 @@ func main() {
 	handler.SetproductsDB(initializers.DB)
 	handler.Setproduct_variantsDB(initializers.DB)
 	handler.SetUserDB(initializers.DB)
-	handler.SetQuotationDB(initializers.DB)
+	// handler.SetQuotationDB(initializers.DB)
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
@@ -52,14 +52,21 @@ func main() {
 
 	handler.SetTandcDB(initializers.DB)
 	handler.SetUserRelationDB(initializers.DB)
-	handler.SetDepartmentDB(initializers.DB)
-	handler.SetDepartmentRelationDB(initializers.DB)
-	handler.SetEmployeeDB(initializers.DB)
-	handler.SetEmployeeUserDB(initializers.DB)
+	// handler.SetDepartmentDB(initializers.DB)
+	// handler.SetDepartmentRelationDB(initializers.DB)
+	// handler.SetEmployeeDB(initializers.DB)
+	// handler.SetEmployeeUserDB(initializers.DB)
 	handler.SetCompanyDB(initializers.DB)
 	handler.SetCompanyBranchDB(initializers.DB)
 	// Series master
 	handler.SetSeriesDB(initializers.DB)
+
+	handler.SetDepartmentDB(initializers.DB)
+	handler.SetDesignationDB(initializers.DB)
+	handler.SetOrgUnitDB(initializers.DB)
+	handler.SetEmployeeDB(initializers.DB)
+	handler.SetEmployeeHierarchyDB(initializers.DB)
+	handler.SetEmployeeOrgUnitDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
@@ -195,7 +202,7 @@ func main() {
 	api.Get("/users", handler.GetUsers)
 
 	// Specific user routes (must come before /:id)
-	api.Get("/users/unassigned", handler.GetUnassignedUsers)
+	// api.Get("/users/unassigned", handler.GetUnassignedUsers)
 	api.Put("/users/restore/:id", handler.RestoreUser)
 	api.Delete("/users/force/:id", handler.ForceDeleteUser)
 
@@ -361,34 +368,34 @@ func main() {
 	app.Delete("/api/hierarchical-users/:id", handler.DeleteUserRelation)
 
 	// Department
-	app.Post("/departments", handler.CreateDepartment)
-	app.Get("/departments", handler.GetDepartments)
-	app.Get("/departments/:id", handler.GetDepartment)
-	app.Put("/departments/:id", handler.UpdateDepartment)
-	app.Delete("/departments/:id", handler.DeleteDepartment)
+	// app.Post("/departments", handler.CreateDepartment)
+	// app.Get("/departments", handler.GetDepartments)
+	// app.Get("/departments/:id", handler.GetDepartment)
+	// app.Put("/departments/:id", handler.UpdateDepartment)
+	// app.Delete("/departments/:id", handler.DeleteDepartment)
 
 	// Employee
-	app.Post("/api/employees", handler.CreateEmployee)
-	app.Get("/api/employees", handler.GetEmployees)
-	// Employees not department heads
-	api.Get("/employees/non-heads", handler.GetNonHeadEmployees)
+	// app.Post("/api/employees", handler.CreateEmployee)
+	// app.Get("/api/employees", handler.GetEmployees)
+	// // Employees not department heads
+	// api.Get("/employees/non-heads", handler.GetNonHeadEmployees)
 
 	// Employee-User assignment endpoints (must come before /:id routes)
-	app.Post("/api/employees/assign-user", handler.AssignUserToEmployee)
-	app.Delete("/api/employees/remove-user", handler.RemoveUserFromEmployee)
-	app.Post("/api/employees/shift-users", handler.ShiftUsersToEmployee)
-	app.Get("/api/employees/with-users", handler.GetEmployeesWithUsers)
-	app.Get("/api/employees/without-users", handler.GetEmployeesWithoutUsers)
-	app.Get("/api/employee-user-mappings", handler.GetAllEmployeeUserMappings)
+	// app.Post("/api/employees/assign-user", handler.AssignUserToEmployee)
+	// app.Delete("/api/employees/remove-user", handler.RemoveUserFromEmployee)
+	// app.Post("/api/employees/shift-users", handler.ShiftUsersToEmployee)
+	// app.Get("/api/employees/with-users", handler.GetEmployeesWithUsers)
+	// app.Get("/api/employees/without-users", handler.GetEmployeesWithoutUsers)
+	// app.Get("/api/employee-user-mappings", handler.GetAllEmployeeUserMappings)
 
 	// Single employee routes (must come after specific paths)
-	app.Get("/api/employees/:id", handler.GetEmployee)
-	app.Get("/api/employees/:id/user", handler.GetEmployeeUser)
-	app.Put("/api/employees/:id", handler.UpdateEmployee)
-	app.Delete("/api/employees/:id", handler.DeleteEmployee) // Department Relations (Employees)
-	app.Post("/departments/assign", handler.AssignEmployeeToDepartment)
-	app.Get("/departments/:id/employees", handler.GetDepartmentEmployees)
-	app.Delete("/departments/employee/:id", handler.RemoveEmployeeFromDepartment)
+	// app.Get("/api/employees/:id", handler.GetEmployee)
+	// app.Get("/api/employees/:id/user", handler.GetEmployeeUser)
+	// app.Put("/api/employees/:id", handler.UpdateEmployee)
+	// app.Delete("/api/employees/:id", handler.DeleteEmployee) // Department Relations (Employees)
+	// app.Post("/departments/assign", handler.AssignEmployeeToDepartment)
+	// app.Get("/departments/:id/employees", handler.GetDepartmentEmployees)
+	// app.Delete("/departments/employee/:id", handler.RemoveEmployeeFromDepartment)
 
 	// Companies
 	api.Get("/companies", handler.GetCompanies)
@@ -419,6 +426,48 @@ func main() {
 
 	// Log route registration status so startup logs show if login endpoints were registered
 	fmt.Printf("Route registration: /login=%v, /api/login=%v\n", routeStatus.Login, routeStatus.APILogin)
+
+	// Departments
+	api.Post("/departments", handler.CreateDepartment)
+	api.Get("/departments", handler.GetDepartments)
+	api.Get("/departments/:id", handler.GetDepartment)
+	api.Put("/departments/:id", handler.UpdateDepartment)
+	api.Delete("/departments/:id", handler.DeleteDepartment)
+
+	// Designations
+	api.Post("/designations", handler.CreateDesignation)
+	api.Get("/designations", handler.GetDesignations)
+	api.Get("/designations/:id", handler.GetDesignation)
+	api.Put("/designations/:id", handler.UpdateDesignation)
+	api.Delete("/designations/:id", handler.DeleteDesignation)
+
+	// Organization Units
+	api.Post("/organization-units", handler.CreateOrgUnit)
+	api.Get("/organization-units", handler.GetOrgUnits)
+	api.Get("/organization-units/:id", handler.GetOrgUnit)
+	api.Put("/organization-units/:id", handler.UpdateOrgUnit)
+	api.Delete("/organization-units/:id", handler.DeleteOrgUnit)
+
+	// Employees
+	api.Post("/employees", handler.CreateEmployeeAsUser)
+	api.Get("/employees", handler.GetEmployees)
+	api.Get("/employees/:id", handler.GetEmployee)
+	api.Put("/employees/:id", handler.UpdateEmployee)
+	api.Delete("/employees/:id", handler.DeleteEmployee)
+
+	// Employee Hierarchy
+	api.Post("/employee-hierarchy", handler.CreateEmployeeHierarchy)
+	api.Get("/employee-hierarchy", handler.GetEmployeeHierarchies)
+	api.Get("/employee-hierarchy/:id", handler.GetEmployeeHierarchy)
+	api.Put("/employee-hierarchy/:id", handler.UpdateEmployeeHierarchy)
+	api.Delete("/employee-hierarchy/:id", handler.DeleteEmployeeHierarchy)
+
+	// Employee - Organization Unit Mapping
+	api.Post("/employee-org-units", handler.CreateEmployeeOrgUnit)
+	api.Get("/employee-org-units", handler.GetEmployeeOrgUnits)
+	api.Get("/employee-org-units/:id", handler.GetEmployeeOrgUnit)
+	api.Put("/employee-org-units/:id", handler.UpdateEmployeeOrgUnit)
+	api.Delete("/employee-org-units/:id", handler.DeleteEmployeeOrgUnit)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))

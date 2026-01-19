@@ -14,8 +14,9 @@ import DisplayPref from '../../Pages/DisplayPref/DisplayPref';
 import AddLead from '../../Pages/AddLead/AddLead';
 import ImportLeadsDialog from './ImportLeadsDialog';
 import LeadDetails from '../LeadDetails/LeadDetails';
+import Pagination from '../../../CommonComponents/Pagination';
 
-import {BASE_URL} from '../../../config/Config'
+import {BASE_URL} from '../../../config/Config' 
 
 // Assigned to options will be loaded from backend users
 // (fallback to a small static list while loading)
@@ -330,7 +331,8 @@ const TopMenu = () => {
   // Navigation
   const handleReportsClick = () => navigate('/reports');
   const handleCustomizeClick = () => navigate('/customize');
-  const handleSalesConfigClick = () => navigate('/configuration');
+  // Navigate to Sales Configuration and request the CRM-only section
+  const handleSalesConfigClick = () => navigate('/sales-configuration?section=crm');
   // Open leads dashboard
   const handleDashboardClick = () => navigate('/leads-dashboard');
 
@@ -1460,17 +1462,14 @@ const TopMenu = () => {
 
       {/* Pagination Section */}
       <div className="pagination-section">
-        <button onClick={handlePrevPage} disabled={pageNo === 1}>Previous</button>
-        <span>Page {pageNo} of {totalPages}</span>
-        <span>
-          Rows per page:
-          <select value={rowsPerPage} onChange={handleRowsPerPageChange}>
-            {[5, 10, 25, 50].map(n => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </span>
-        <button onClick={handleNextPage} disabled={pageNo === totalPages}>Next</button>
+        <Pagination
+          page={pageNo}
+          total={displayedLeads.length}
+          rowsPerPage={rowsPerPage}
+          isZeroBased={false}
+          onPageChange={(newPage) => setPageNo(newPage)}
+          onRowsPerPageChange={(newRowsPerPage) => { setRowsPerPage(newRowsPerPage); setPageNo(1); }}
+        />
       </div>
 
       {/* Display Preferences Modal */}

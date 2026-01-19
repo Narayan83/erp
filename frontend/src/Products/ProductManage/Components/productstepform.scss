@@ -356,7 +356,7 @@
   .form-actions {
     display: flex;
     gap: 12px;
-    margin-top: 24px;
+    justify-content: flex-end;
 
     button {
       padding: 10px 24px;
@@ -443,60 +443,5 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-// Responsive adjustments
-@media (max-width: 768px) {
-  .product-step-form {
-    .form-grid {
-      gap: 12px;
-    }
-
-    .form-field {
-      input,
-      select,
-      textarea {
-        font-size: 13px;
-        padding: 8px 10px;
-        min-height: 36px;
-      }
-
-      .field-label {
-        font-size: 12px;
-      }
-    }
-  }
-}
-
-@media (max-width: 480px) {
-  .product-step-form {
-    .form-grid {
-      gap: 8px;
-    }
-
-    .form-field {
-      input,
-      select,
-      textarea {
-        font-size: 12px;
-        padding: 8px;
-        min-height: 34px;
-      }
-
-      .field-label {
-        font-size: 11px;
-        letter-spacing: 0px;
-      }
-
-      textarea {
-        min-height: 60px;
-      }
-    }
-
-    .form-actions button {
-      width: 100%;
-      min-width: auto;
-    }
   }
 }

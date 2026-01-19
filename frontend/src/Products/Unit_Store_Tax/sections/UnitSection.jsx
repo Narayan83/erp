@@ -3,6 +3,7 @@ import { Snackbar, Alert } from "@mui/material";
 import axios from "axios";
 import UnitTable from "../components/UnitTable";
 import UnitDialog from "../components/UnitDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import { BASE_URL }  from "../../../config/Config";
 import "./allinone.scss";
 export default function UnitSection() {
@@ -92,40 +93,16 @@ export default function UnitSection() {
       />
       </div>
 
-      <div className="pagination-wrapper">
-        <div className="pagination-info">
-          <span>Rows per page:</span>
-          <select 
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value));
-              setPage(0);
-            }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-          <span>{total > 0 ? page * rowsPerPage + 1 : 0}–{Math.min((page + 1) * rowsPerPage, total)} of {total}</span>
-        </div>
-        <div className="pagination-buttons">
-          <button
-            onClick={() => setPage(page - 1)}
-            disabled={page === 0}
-            type="button"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage(page + 1)}
-            disabled={(page + 1) * rowsPerPage >= total}
-            type="button"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <Pagination
+        page={page}
+        total={total}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+      />
 
       <UnitDialog
         open={dialogOpen}

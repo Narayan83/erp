@@ -13,7 +13,6 @@ import {
   Paper,
   IconButton,
   CircularProgress,
-  TablePagination,
   Popover,
   FormGroup,
   FormControlLabel,
@@ -26,7 +25,7 @@ import {
   Divider
 } from "@mui/material";
 import EnhancedEditableCell from "../Components/EnhancedEditableCell";
-import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, ViewColumn, GetApp, Publish, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, Close, ArrowBack } from "@mui/icons-material";
+import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, Refresh, Star as StarIcon, StarBorder as StarBorderIcon, Close, ArrowBack } from "@mui/icons-material";
 import axios from "axios";
 import * as XLSX from 'xlsx';
 // exceljs will be dynamically imported inside the download function to avoid bundling issues
@@ -34,6 +33,7 @@ import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../../config/Config";
 import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import "./product_list_page.scss";
 
 
@@ -3894,42 +3894,6 @@ export default function ProductListPage() {
 
   return (
     <Box p={3}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5">📦 Product Master</Typography>
-        <Box display="flex" gap={2} alignItems="center">
-          {loading && (
-            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-              <CircularProgress size={16} sx={{ mr: 1 }} />
-              Loading...
-            </Typography>
-          )}
-          <Tooltip title="Refresh Products">
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              startIcon={<Refresh />}
-              onClick={() => {
-                console.log("Manual refresh triggered");
-                // Clear any previous errors
-                setApiError(null);
-                fetchProducts();
-              }}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-          </Tooltip>
-          <Button 
-            variant="outlined" 
-            color="primary" 
-            onClick={checkAPI}
-            disabled={loading}
-          >
-            Check API
-          </Button>
-        </Box>
-      </Box>
-
       {/* Debug message stays */}
       {console.log('Display prefs anchor:', displayPrefsAnchor, 'Open:', Boolean(displayPrefsAnchor))}
       
@@ -3999,361 +3963,321 @@ export default function ProductListPage() {
             </DialogActions>
           </Dialog>
 
-          {/* Product view dialog (read-only) */}
-  <Dialog open={viewOpen} onClose={handleCloseView} maxWidth="xl" fullWidth>
-        <DialogTitle className="product-header">
-          <Typography component="h2" variant="h6" className="product-title">Product Details (Read-only)</Typography>
-          <Typography 
-            component="span" 
-            variant="subtitle2"
-            className={`product-status ${selectedProduct?.IsActive || selectedProduct?.isActive ? 'active' : 'inactive'}`}
-          >
-            Status: {selectedProduct?.IsActive || selectedProduct?.isActive ? 'Active' : 'Inactive'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers className="product-details-container" sx={{
-          backgroundColor: 'white',
-          color: 'black',
-          '& .MuiTypography-root': { color: 'black' },
-          '& table': { backgroundColor: 'transparent' }
-        }}>
-          {viewLoading ? (
-            <Box className="loading-state" display="flex" justifyContent="center" p={2}><CircularProgress /></Box>
-          ) : selectedProduct ? (
-            <Box className="product-form">
-              <Box className="form-grid">
-                <Box className="form-field col-60">
-                  <label className="field-label">Product Name</label>
-                  <input 
-                    type="text"
-                    className="field-input multiline"
-                    value={selectedProduct.Name ?? ''}
-                    disabled
-                    readOnly
-                    title={selectedProduct.Name ?? ''}
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Code</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Code ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">HSN/SAC Code</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.HsnSacCode ?? selectedProduct.HSN ?? selectedProduct.hsn ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-              </Box>
+          {/* Product view modal (read-only) */}
+          {viewOpen && (
+            <div className="product-view-modal" role="dialog" aria-modal="true">
+              <div className="product-modal">
+                <div className="product-header">
+                  <h2 className="product-title">Product Details (Read-only)</h2>
+                  <span className={`product-status ${selectedProduct?.IsActive || selectedProduct?.isActive ? 'active' : 'inactive'}`}>
+                    Status: {selectedProduct?.IsActive || selectedProduct?.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                  <button className="modal-close" onClick={handleCloseView} aria-label="Close">×</button>
+                </div>
 
-              <Box className="form-grid">
-                <Box className="form-field col-20">
-                  <label className="field-label">Importance</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Importance ?? selectedProduct.importance ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Minimum Stock</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.MinimumStock ?? selectedProduct.minimumStock ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-60">
-                  <label className="field-label">Category</label>
-                  <input 
-                    type="text"
-                    className="field-input multiline"
-                    value={selectedProduct.Category?.Name ?? ''}
-                    disabled
-                    readOnly
-                    title={selectedProduct.Category?.Name ?? ''}
-                  />
-                </Box>
-              </Box>
+                <div className="product-details-container" style={{ backgroundColor: 'white', color: 'black' }}>
+                  {viewLoading ? (
+                    <div className="loading-state" style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><div className="loader"></div></div>
+                  ) : selectedProduct ? (
+                    <div className="product-form">
+                      <div className="form-grid">
+                        <div className="form-field col-40">
+                          <label className="field-label">Product Name</label>
+                          <input 
+                            type="text"
+                            className="field-input multiline"
+                            value={selectedProduct.Name ?? ''}
+                            disabled
+                            readOnly
+                            title={selectedProduct.Name ?? ''}
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">Code</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Code ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">HSN/SAC Code</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.HsnSacCode ?? selectedProduct.HSN ?? selectedProduct.hsn ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">Importance</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Importance ?? selectedProduct.importance ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                      </div>
 
-              <Box className="form-grid">
-                <Box className="form-field col-40">
-                  <label className="field-label">Subcategory</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Subcategory?.Name ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Unit</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Unit?.Name || selectedProduct.Unit?.name || selectedProduct.unit_name || ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Store</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Store?.Name ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Product Mode</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-              </Box>
+                      <div className="form-grid">
+                        <div className="form-field col-20">
+                          <label className="field-label">Minimum Stock</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.MinimumStock ?? selectedProduct.minimumStock ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-40">
+                          <label className="field-label">Category</label>
+                          <input 
+                            type="text"
+                            className="field-input multiline"
+                            value={selectedProduct.Category?.Name ?? ''}
+                            disabled
+                            readOnly
+                            title={selectedProduct.Category?.Name ?? ''}
+                          />
+                        </div>
+                        <div className="form-field col-40">
+                          <label className="field-label">Subcategory</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Subcategory?.Name ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                      </div>
 
-              <Box className="form-grid">
-                <Box className="form-field col-20">
-                  <label className="field-label">Product Type</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">MOQ</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? selectedProduct.Moq ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">Tax</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.Tax?.Name ?? selectedProduct.Tax?.name ?? (selectedProduct.tax || '')}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-                <Box className="form-field col-20">
-                  <label className="field-label">GST %</label>
-                  <input 
-                    type="text"
-                    className="field-input"
-                    value={selectedProduct.GstPercent ?? selectedProduct.gstPercent ?? ''}
-                    disabled
-                    readOnly
-                  />
-                </Box>
-              </Box>
+                      <div className="form-grid">
+                        <div className="form-field col-20">
+                          <label className="field-label">Unit</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Unit?.Name || selectedProduct.Unit?.name || selectedProduct.unit_name || ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">Store</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Store?.Name ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">Product Mode</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.ProductMode ?? selectedProduct.product_mode ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">Product Type</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.ProductType ?? selectedProduct.productType ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">MOQ</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.MOQ ?? selectedProduct.MinimumOrderQuantity ?? selectedProduct.moq ?? selectedProduct.Moq ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                      </div> 
 
-              <Box className="form-grid">
-                <Box className="form-field col-100">
-                  <label className="field-label">Tags</label>
-                  <input 
-                    type="text"
-                    className="field-input multiline"
-                    value={(() => {
-                      if (Array.isArray(selectedProduct.Tags) && selectedProduct.Tags.length > 0) {
-                        return selectedProduct.Tags.map(tag => tag?.Name || tag?.name || '').filter(Boolean).join(', ');
-                      }
-                      return selectedProduct.tag || selectedProduct.Tag || '';
-                    })()}
-                    disabled
-                    readOnly
-                    placeholder="No tags assigned"
-                  />
-                </Box>
-              </Box>
+                      <div className="form-grid">
+                        <div className="form-field col-20">
+                          <label className="field-label">Tax</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.Tax?.Name ?? selectedProduct.Tax?.name ?? (selectedProduct.tax || '')}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-20">
+                          <label className="field-label">GST %</label>
+                          <input 
+                            type="text"
+                            className="field-input"
+                            value={selectedProduct.GstPercent ?? selectedProduct.gstPercent ?? ''}
+                            disabled
+                            readOnly
+                          />
+                        </div>
+                        <div className="form-field col-40">
+                          <label className="field-label">Tags</label>
+                          <input 
+                            type="text"
+                            className="field-input multiline"
+                            value={(() => {
+                              if (Array.isArray(selectedProduct.Tags) && selectedProduct.Tags.length > 0) {
+                                return selectedProduct.Tags.map(tag => tag?.Name || tag?.name || '').filter(Boolean).join(', ');
+                              }
+                              return selectedProduct.tag || selectedProduct.Tag || '';
+                            })()}
+                            disabled
+                            readOnly
+                            placeholder="No tags assigned"
+                          />
+                        </div>
+                      </div> 
 
-              <Box className="form-grid">
-                <Box className="form-field col-60">
-                  <label className="field-label">Description</label>
-                  <textarea 
-                    className="field-input multiline"
-                    value={selectedProduct.Description ?? selectedProduct.description ?? ''}
-                    disabled
-                    readOnly
-                    rows="3"
-                  />
-                </Box>
-                <Box className="form-field col-40">
-                  <label className="field-label">Internal Notes</label>
-                  <textarea 
-                    className="field-input multiline"
-                    value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''}
-                    disabled
-                    readOnly
-                    rows="3"
-                  />
-                </Box>
-              </Box>
-              <Box className="variants-section">
-                <Box className="section-header">
-                  <Typography variant="subtitle2" className="section-title">Variants</Typography>
-                  {Array.isArray(selectedProduct.Variants) && selectedProduct.Variants.length > 0 && (
-                    <Box className="variant-count">{selectedProduct.Variants.length} items</Box>
+                      <div className="form-grid">
+                        <div className="form-field col-40">
+                          <label className="field-label">Description</label>
+                          <textarea 
+                            className="field-input multiline"
+                            value={selectedProduct.Description ?? selectedProduct.description ?? ''}
+                            disabled
+                            readOnly
+                            rows="3"
+                          />
+                        </div>
+                        <div className="form-field col-60">
+                          <label className="field-label">Internal Notes</label>
+                          <textarea 
+                            className="field-input multiline"
+                            value={selectedProduct.InternalNotes ?? selectedProduct.internalNotes ?? ''}
+                            disabled
+                            readOnly
+                            rows="3"
+                          />
+                        </div>
+                      </div>
+                      <div className="variants-section">
+                        <div className="section-header">
+                          <div className="section-title">Variants</div>
+                          {Array.isArray(selectedProduct.Variants) && selectedProduct.Variants.length > 0 && (
+                            <div className="variant-count">{selectedProduct.Variants.length} items</div>
+                          )}
+                        </div>
+                        {Array.isArray(selectedProduct.Variants) && selectedProduct.Variants.length > 0 ? (
+                          <table className="variants-table" role="table">
+                            <thead>
+                              <tr>
+                                <th>Color</th>
+                                <th>Size</th>
+                                <th>Barcode</th>
+                                <th>Purchase Cost</th>
+                                <th>Sales Price</th>
+                                <th>Stock</th>
+                                <th>Lead Time</th>
+                                <th>Images</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedProduct.Variants.map((v, vidx) => {
+                                // Get color info for swatch display
+                                let colorData = ralColors.find(c => c.hex.toLowerCase() === (v.Color || '').toLowerCase());
+                                if (!colorData) {
+                                  colorData = ralColors.find(c => c.value.toLowerCase() === (v.Color || '').toLowerCase());
+                                }
+                                const colorInfo = getColorInfo(v.Color);
+                                return (
+                                <tr key={`var-${vidx}`}>
+                                  <td style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {colorData && (
+                                      <div style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #ccc', backgroundColor: colorData.hex, flexShrink: 0 }} title={colorData.name} />
+                                    )}
+                                    <span>{colorInfo?.name || v.Color || '—'}</span>
+                                  </td>
+                                  <td>{v.Size?.Name || v.Size || '—'}</td>
+                                  <td>{v.Barcode || '—'}</td>
+                                  <td>{(v.PurchaseCost ?? v.Purchase_Cost) != null ? `₹${v.PurchaseCost ?? v.Purchase_Cost}` : '—'}</td>
+                                  <td>{(v.StdSalesPrice ?? v.SalesPrice ?? v.Sales_Price) != null ? `₹${v.StdSalesPrice ?? v.SalesPrice ?? v.Sales_Price}` : '—'}</td>
+                                  <td>{v.Stock != null ? v.Stock : (v.StockAvailable != null ? v.StockAvailable : (v.Stock_on_hand != null ? v.Stock_on_hand : '—'))}</td>
+                                  <td>{v.LeadTime ?? v.lead_time ?? v.Leadtime ?? '—'}</td>
+                                  <td className="images-cell">
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                                      {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.map((img, idx) => {
+                                        const imgSrc = normalizeImageUrl(img) || 'https://via.placeholder.com/60?text=No+Image';
+                                        const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === idx) || (v.MainImage && v.MainImage === img);
+                                        return (
+                                          <div 
+                                            key={idx}
+                                            className="image-container"
+                                            onMouseEnter={() => handleDetailsImageMouseEnter(imgSrc)}
+                                            onMouseLeave={handleDetailsImageMouseLeave}
+                                            style={{ position: 'relative' }}
+                                          >
+                                            <img
+                                              src={imgSrc}
+                                              alt={`img-${idx}`}
+                                              onClick={(e) => handleDetailsImageClick(e, imgSrc)}
+                                              style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc', cursor: 'pointer', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
+                                              onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.16)'; }}
+                                              onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                              onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
+                                              title="Click to open in new tab, hover to preview"
+                                            />
+                                            {isMain && (
+                                              <div className="main-image-badge" title="Main image">
+                                                <StarIcon fontSize="small" style={{ width: 14, height: 14 }} />
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }) : (<div className="text-muted">No images</div>)}
+                                    </div>
+                                  </td>
+                                </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div className="no-variants"><div className="text-muted">No variants available for this product.</div></div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-muted">No product data available.</div>
                   )}
-                </Box>
-              {Array.isArray(selectedProduct.Variants) && selectedProduct.Variants.length > 0 ? (
-                <Table size="small" className="variants-table">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Color</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Size</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>SKU</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Barcode</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Purchase Cost</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Sales Price</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Stock</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Lead Time</TableCell>
-                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Images</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {selectedProduct.Variants.map((v, i) => {
-                      const colorInfo = getColorInfo(v.Color || v.ColorCaption);
-                      return (
-                      <TableRow key={v.ID ?? v.SKU ?? i}>
-                        <TableCell align="center">
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {colorInfo && (
-                              <>
-                                <Box
-                                  sx={{
-                                    width: 24,
-                                    height: 24,
-                                    backgroundColor: colorInfo.hex,
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    flexShrink: 0
-                                  }}
-                                  title={`Hex: ${colorInfo.hex}`}
-                                />
-                                <Typography variant="body2">{colorInfo.name}</Typography>
-                              </>
-                            )}
-                            {!colorInfo && (
-                              <Typography variant="body2">{v.Color ?? v.ColorCaption ?? ''}</Typography>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">{v.Size ?? ''}</TableCell>
-                        <TableCell align="center">{v.SKU ?? ''}</TableCell>
-                        <TableCell align="center">{v.Barcode ?? ''}</TableCell>
-                        <TableCell align="center">{v.PurchaseCost != null ? String(v.PurchaseCost) : ''}</TableCell>
-                        <TableCell align="center">{v.SalesPrice != null ? String(v.SalesPrice) : ''}</TableCell>
-                        <TableCell align="center">{v.stock != null ? String(v.stock) : ''}</TableCell>
-                        <TableCell align="center">{v.LeadTime ?? ''}</TableCell>
-                        <TableCell align="center" className="images-cell">
-                          <Box display="flex" flexWrap="wrap" gap={1} alignItems="center" justifyContent="center">
-                            {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.map((img, idx) => {
-                              const imgSrc = normalizeImageUrl(img) || 'https://via.placeholder.com/60?text=No+Image';
-                              // Determine whether this image is the main image for this variant
-                              const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === idx) || (v.MainImage && v.MainImage === img);
-                              return (
-                                <Box 
-                                  key={idx} 
-                                  className="image-container"
-                                  sx={{ position: 'relative' }}
-                                  onMouseEnter={() => handleDetailsImageMouseEnter(imgSrc)}
-                                  onMouseLeave={handleDetailsImageMouseLeave}
-                                >
-                                  <img
-                                    src={imgSrc}
-                                    alt={`img-${idx}`}
-                                    onClick={(e) => handleDetailsImageClick(e, imgSrc)}
-                                    style={{
-                                      width: 60,
-                                      height: 60,
-                                      objectFit: 'cover',
-                                      borderRadius: 4,
-                                      border: '1px solid #ccc',
-                                      cursor: 'pointer',
-                                      transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                                    }}
-                                    onMouseOver={(e) => {
-                                      e.currentTarget.style.transform = 'scale(1.1)';
-                                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                                    }}
-                                    onMouseOut={(e) => {
-                                      e.currentTarget.style.transform = 'scale(1)';
-                                      e.currentTarget.style.boxShadow = 'none';
-                                    }}
-                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
-                                    title="Click to open in new tab, hover to preview"
-                                  />
-                                  {/* Non-interactive main-image indicator for read-only product view */}
-                                  {isMain && (
-                                    <Box className="main-image-badge" title="Main image">
-                                      <StarIcon fontSize="small" color="warning" />
-                                    </Box>
-                                  )}
-                                </Box>
-                              );
-                            }) : <Typography variant="caption" color="textSecondary" className="no-images">No images</Typography>}
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <Box className="no-variants">
-                  <Typography color="textSecondary">No variants available for this product.</Typography>
-                </Box>
-              )}
-              </Box>
+                </div>
 
-              <Divider />
-            </Box>
-          ) : (
-            <Typography color="textSecondary">No product data available.</Typography>
+                <div className="dialog-actions">
+                  <button onClick={handleCloseView} className="btn btn-secondary">Close</button>
+                  <button 
+                    onClick={() => {
+                      handleCloseView();
+                      navigate(`/products/${selectedProduct?.ID}/edit`);
+                    }} 
+                    className="btn btn-primary"
+                  >
+                    Edit Product
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
-        </DialogContent>
-        <DialogActions className="dialog-actions">
-          <Button onClick={handleCloseView} className="btn-secondary">Close</Button>
-          <Button 
-            onClick={() => {
-              handleCloseView();
-              navigate(`/products/${selectedProduct?.ID}/edit`);
-            }} 
-            variant="contained" 
-            color="primary"
-          >
-            Edit Product
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Image Preview Dialog for Product Details */}
       <Dialog
@@ -4442,45 +4366,58 @@ export default function ProductListPage() {
       </Dialog>
 
       {/* Updated summary box to include status, stock, and importance filter dropdowns */}
-      <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
-        <Grid container spacing={2} alignItems="center" justifyContent="space-between">
-          <Grid item xs="auto">
-            <Typography variant="body1">
-              Total Products: {totalItems}<br />
-              Total Cost: ₹{totalCost.toFixed(2)}
-            </Typography>
-          </Grid>
-          <Grid item xs="auto" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <div className="search-wrapper">
-              <input
-                className="custom-search"
-                placeholder="Search"
-                value={commonSearch}
-                onChange={(e) => setCommonSearch(e.target.value)}
-              />
-            </div>
-            <Box display="flex" alignItems="center" gap={1} ml={2}>
-              <Button
-                variant="outlined"
-                startIcon={<GetApp />}
-                onClick={() => setImportDialogOpen(true)}
-                sx={{ minWidth: 'auto', px: 2 }}
-              >
-                Import
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<Publish />}
-                onClick={(e) => setExportAnchorEl(e.currentTarget)}
-                sx={{ minWidth: 'auto', px: 2 }}
-              >
-                Export
-              </Button>
-            </Box>
-            {/* Keep quick stock filter here as a compact select for convenience */}
-          </Grid>
-        </Grid>
-      </Box>
+      <div className="summary-box">
+        <div className="summary-left">
+          <div className="summary-text">Total Products: {totalItems}<br />Total Cost: ₹{totalCost.toFixed(2)}</div>
+        </div>
+
+        <div className="summary-right">
+          <div className="search-wrapper">
+            <input
+              className="custom-search"
+              placeholder="Search"
+              value={commonSearch}
+              onChange={(e) => setCommonSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="summary-actions">
+            <button type="button" className="btn btn-add-product" onClick={() => navigate("/ManageProduct")} title="Add Product">+ Add Product</button>
+
+            <button type="button" className="btn btn-outline btn-display-prefs" onClick={handleOpenDisplayPrefs} title="Display Preferences" aria-label="Display Preferences">
+              <svg className="icon-columns" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+                <rect x="3" y="4" width="6" height="7" fill="currentColor" />
+                <rect x="15" y="4" width="6" height="7" fill="currentColor" />
+                <rect x="3" y="13" width="6" height="7" fill="currentColor" />
+                <rect x="15" y="13" width="6" height="7" fill="currentColor" />
+              </svg>
+            </button>
+
+            <button type="button" className="btn btn-outline btn-import" onClick={() => setImportDialogOpen(true)} title="Import" aria-label="Import products">
+              <svg className="icon-import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="false" focusable="false" aria-label="Import">
+                <path d="M20.25 15.75V18A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V15.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M7.5 9L12 13.5 16.5 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M12 3v10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
+
+            <button type="button" className="btn btn-outline btn-export" onClick={(e) => setExportAnchorEl(e.currentTarget)} title="Export" aria-label="Export products">
+              <svg className="icon-export" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="false" focusable="false" aria-label="Export">
+                <path d="M3.75 8.25V6A2.25 2.25 0 0 1 6 3.75h12A2.25 2.25 0 0 1 20.25 6v2.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M16.5 15L12 10.5 7.5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M12 20.25V9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
+
+            <button type="button" className="btn btn-outline btn-settings" title="Settings" onClick={() => navigate('/product-config')} aria-label="Settings">
+              <svg className="icon-settings" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="false" focusable="false" aria-label="Settings">
+                <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.39.96a7.07 7.07 0 0 0-1.6-.93l-.36-2.54A.5.5 0 0 0 12 2h-4a.5.5 0 0 0-.49.43l-.36 2.54a7.07 7.07 0 0 0-1.6.93l-2.39-.96a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l2 3.46c.11.21.35.3.56.22l2.39-.96c.5.38 1.02.69 1.6.93l.36 2.54c.03.25.24.43.49.43h4c.25 0 .46-.18.49-.43l.36-2.54c.58-.24 1.1-.54 1.6-.93l2.39.96c.21.08.45-.01.56-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>  
+      {/* Keep quick stock filter here as a compact select for convenience */} 
 
       <Paper>
         {apiError && (
@@ -4789,34 +4726,16 @@ export default function ProductListPage() {
             />
           </Table>
         </TableContainer>
-        {/* Modified pagination box to include the display preferences button */}
-        <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-          <Box display="flex" gap={2}>
-            <Button variant="contained" color="warning" onClick={() => navigate("/ManageProduct")}>+ Add Product</Button>
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              startIcon={<ViewColumn />} 
-              onClick={handleOpenDisplayPrefs}
-              aria-label="Display Preferences"
-              size="small"
-            >
-              Display Preferences
-            </Button>
-          </Box>
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            rowsPerPage={limit}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            rowsPerPageOptions={[5, 10, 25]}
-          />
-        </Box>
+        <Pagination
+          page={page}
+          total={totalItems}
+          rowsPerPage={limit}
+          onPageChange={(p) => setPage(p)}
+          onRowsPerPageChange={(r) => {
+            setRowsPerPage(r);
+            setPage(0);
+          }}
+        />
       </Paper>
 
       {/* Import Preview Dialog */}

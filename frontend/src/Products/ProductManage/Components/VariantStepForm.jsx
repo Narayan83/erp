@@ -391,7 +391,14 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
 
       <Box mt={2} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={onNext}>Next</Button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onNext}
+          aria-label="Next"
+        >
+          Next
+        </button>
       </Box>
 
       <VariantFormDialog

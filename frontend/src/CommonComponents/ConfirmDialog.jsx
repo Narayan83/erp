@@ -1,5 +1,5 @@
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography
+  Dialog, DialogTitle, DialogContent, DialogActions, Typography
 } from "@mui/material";
 
 export default function ConfirmDialog({ open, title, message, onCancel, onConfirm }) {
@@ -9,9 +9,29 @@ export default function ConfirmDialog({ open, title, message, onCancel, onConfir
       <DialogContent>
         <Typography>{message}</Typography>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button onClick={onConfirm} variant="contained" color="error">Delete</Button>
+      <DialogActions style={{ justifyContent: 'space-between', padding: '16px' }}>
+        <div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Cancel"
+            className="btn"
+            style={{ background: 'transparent', color: '#1976d2', border: 'none', padding: 0, textTransform: 'none' }}
+          >
+            Cancel
+          </button>
+        </div>
+        <div>
+          <button
+            type="button"
+            className="btn btn-delete"
+            onClick={onConfirm}
+            aria-label="Delete"
+            style={{ textTransform: 'uppercase' }}
+          >
+            Delete
+          </button>
+        </div>
       </DialogActions>
     </Dialog>
   );

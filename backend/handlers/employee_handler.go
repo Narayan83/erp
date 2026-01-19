@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"errors"
-	"fmt"
 	"time"
+
+	"fmt"
+	"strings"
 
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
@@ -17,8 +18,54 @@ func SetEmployeeDB(db *gorm.DB) {
 	employeeDB = db
 }
 
-// Request structs
+/* ================= DTOs ================= */
+
 type CreateEmployeeRequest struct {
+	UserID        uint     `json:"user_id"`
+	EmpCode       *string  `json:"empcode,omitempty"`
+	DepartmentID  *uint    `json:"department_id,omitempty"`
+	DesignationID *uint    `json:"designation_id,omitempty"`
+	JoiningDate   *string  `json:"joining_date,omitempty"`
+	ExitDate      *string  `json:"exit_date,omitempty"`
+	Salary        *float64 `json:"salary,omitempty"`
+	WorkEmail     string   `json:"work_email,omitempty"`
+	Remarks       string   `json:"remarks,omitempty"`
+}
+
+type UpdateEmployeeRequest struct {
+	UserID        *uint    `json:"user_id"`
+	EmpCode       *string  `json:"empcode"`
+	DepartmentID  *uint    `json:"department_id"`
+	DesignationID *uint    `json:"designation_id"`
+	JoiningDate   *string  `json:"joining_date"`
+	ExitDate      *string  `json:"exit_date"`
+	Salary        *float64 `json:"salary"`
+	WorkEmail     *string  `json:"work_email"`
+	Remarks       *string  `json:"remarks"`
+}
+
+/* ================= HELPERS ================= */
+
+func parseDate(str *string) *time.Time {
+	if str == nil || *str == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, *str)
+	if err != nil {
+		// fallback: YYYY-MM-DD
+		t2, err2 := time.Parse("2006-01-02", *str)
+		if err2 != nil {
+			return nil
+		}
+		return &t2
+	}
+	return &t
+}
+
+/* ================= HANDLERS ================= */
+
+// Request structs
+type CreateEmployeeAsUserRequest struct {
 	Empcode      *string `json:"empcode"`
 	Username     *string `json:"username"`
 	Salutation   *string `json:"salutation"`
@@ -61,7 +108,7 @@ type CreateEmployeeRequest struct {
 	PrimaryIFSCCode      *string `json:"primary_ifsc_code"`
 }
 
-type UpdateEmployeeRequest struct {
+type UpdateEmployeeAsUserRequest struct {
 	Username     *string `json:"username"`
 	Salutation   *string `json:"salutation"`
 	Firstname    *string `json:"firstname"`
@@ -123,8 +170,8 @@ func getString(s *string) string {
 }
 
 // Create Employee
-func CreateEmployee(c *fiber.Ctx) error {
-	var body CreateEmployeeRequest
+func CreateEmployeeAsUser(c *fiber.Ctx) error {
+	var body CreateEmployeeAsUserRequest
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
@@ -134,6 +181,34 @@ func CreateEmployee(c *fiber.Ctx) error {
 		body.PermanentAddress1, body.PermanentAddress2, body.PermanentAddress3, body.PermanentCity, body.PermanentState, body.PermanentCountry, body.PermanentPincode)
 	fmt.Printf("CreateEmployee parsed residential fields: res1=%v res2=%v res3=%v city=%v state=%v country=%v pincode=%v\n",
 		body.ResidentialAddress1, body.ResidentialAddress2, body.ResidentialAddress3, body.ResidentialCity, body.ResidentialState, body.ResidentialCountry, body.ResidentialPincode)
+
+	// Debug: ensure email is present and log user basic info
+	fmt.Printf("CreateEmployee parsed basic info: email=%q mobile=%q firstname=%q lastname=%q\n", body.Email, body.MobileNumber, body.Firstname, body.Lastname)
+
+	// Validation: Email is required
+	if strings.TrimSpace(body.Email) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Email is required and cannot be empty"})
+	}
+
+	// Validation: Mobile number is required
+	if strings.TrimSpace(body.MobileNumber) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Mobile number is required and cannot be empty"})
+	}
+
+	// Validation: First name is required
+	if strings.TrimSpace(body.Firstname) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "First name is required and cannot be empty"})
+	}
+
+	// Validation: Last name is required
+	if strings.TrimSpace(body.Lastname) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Last name is required and cannot be empty"})
+	}
+
+	// Validation: Password is required
+	if strings.TrimSpace(body.Password) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Password is required and cannot be empty"})
+	}
 
 	hashedPassword, err := hashEmployeePassword(body.Password)
 	if err != nil {
@@ -178,7 +253,20 @@ func CreateEmployee(c *fiber.Ctx) error {
 
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		errMsg := err.Error()
+		fmt.Printf("DEBUG: Database error creating user: %v\n", errMsg)
+		fmt.Printf("DEBUG: User data: Email=%q, MobileNumber=%q, Firstname=%q, Lastname=%q\n", user.Email, user.MobileNumber, user.Firstname, user.Lastname)
+		// Check for specific constraint violations and provide helpful messages
+		if strings.Contains(errMsg, "email") && strings.Contains(errMsg, "not-null") {
+			return c.Status(400).JSON(fiber.Map{"error": "Email is required - cannot be empty", "field": "email"})
+		}
+		if strings.Contains(errMsg, "email") && strings.Contains(errMsg, "unique") {
+			return c.Status(409).JSON(fiber.Map{"error": "Email already exists - please use a different email", "field": "email"})
+		}
+		if strings.Contains(errMsg, "mobile") && strings.Contains(errMsg, "unique") {
+			return c.Status(409).JSON(fiber.Map{"error": "Mobile number already exists - please use a different number", "field": "mobile_number"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": errMsg})
 	}
 
 	// Create permanent address if provided (check all fields)
@@ -235,6 +323,18 @@ func CreateEmployee(c *fiber.Ctx) error {
 		}
 	}
 
+	// ⭐ CREATE EMPLOYEE ENTRY (ADD THIS HERE)
+	employee := models.Employee{
+		UserID:  user.ID,
+		EmpCode: body.Empcode,
+	}
+
+	if err := tx.Create(&employee).Error; err != nil {
+		tx.Rollback()
+		errMsg := err.Error()
+		return c.Status(500).JSON(fiber.Map{"error": errMsg})
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		tx.Rollback()
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -249,392 +349,170 @@ func CreateEmployee(c *fiber.Ctx) error {
 	return c.Status(201).JSON(created)
 }
 
-// Get All Employees (with search)
-func GetEmployees(c *fiber.Ctx) error {
-	search := c.Query("search")
-	var employees []models.User
-	query := employeeDB.Model(&models.User{}).Where("is_employee = ?", true)
-
-	if search != "" {
-		query = query.Where("firstname ILIKE ? OR lastname ILIKE ? OR mobile_number ILIKE ? OR usercode ILIKE ?",
-			"%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
-	}
-
-	if err := query.
-		Preload("Addresses").
-		Preload("BankAccounts").
-		Preload("Documents").
-		Find(&employees).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	return c.JSON(employees)
-}
-
-// Get employees who are not department heads
-func GetNonHeadEmployees(c *fiber.Ctx) error {
-	// Return users marked as employees who are not set as department heads
-	var users []models.User
-
-	err := employeeDB.
-		Model(&models.User{}).
-		Joins("LEFT JOIN departments d ON users.id = d.head_id").
-		Where("d.head_id IS NULL AND users.is_employee = ?", true).
-		Preload("Addresses").
-		Preload("BankAccounts").
-		Preload("Documents").
-		Find(&users).Error
-
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	return c.JSON(users)
-}
-
-// Get Single Employee
-func GetEmployee(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	var employee models.User
-	err := employeeDB.
-		Where("is_employee = ?", true).
-		Preload("Addresses").
-		Preload("BankAccounts").
-		Preload("Documents").
-		First(&employee, id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return c.Status(404).JSON(fiber.Map{"error": "Employee not found"})
-	}
-
-	return c.JSON(employee)
-}
-
-// Update Employee
-func UpdateEmployee(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	var body UpdateEmployeeRequest
+func CreateEmployee(c *fiber.Ctx) error {
+	var body CreateEmployeeRequest
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	var employee models.User
-	if err := employeeDB.Where("is_employee = ?", true).First(&employee, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Employee not found"})
+	item := models.Employee{
+		UserID:        body.UserID,
+		EmpCode:       body.EmpCode,
+		DepartmentID:  body.DepartmentID,
+		DesignationID: body.DesignationID,
+		JoiningDate:   parseDate(body.JoiningDate),
+		ExitDate:      parseDate(body.ExitDate),
+		Salary:        body.Salary,
+		WorkEmail:     body.WorkEmail,
+		Remarks:       body.Remarks,
 	}
 
-	updateData := map[string]interface{}{}
-
-	if body.Firstname != nil {
-		updateData["firstname"] = *body.Firstname
-	}
-	if body.Lastname != nil {
-		updateData["lastname"] = *body.Lastname
-	}
-	if body.Email != nil {
-		updateData["email"] = *body.Email
-	}
-	if body.MobileNumber != nil {
-		updateData["mobile_number"] = *body.MobileNumber
-	}
-	if body.Salutation != nil {
-		updateData["salutation"] = *body.Salutation
-	}
-	if body.Active != nil {
-		updateData["active"] = *body.Active
-	}
-	if body.EmergencyNumber != nil {
-		updateData["emergency_number"] = *body.EmergencyNumber
-	}
-	if body.AadharNumber != nil {
-		updateData["aadhar_number"] = *body.AadharNumber
-	}
-	if body.PANNumber != nil {
-		updateData["pan_number"] = *body.PANNumber
+	if err := employeeDB.Create(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	if body.DOB != nil {
-		if parsed, err := time.Parse("2006-01-02", *body.DOB); err == nil {
-			updateData["dob"] = parsed
-		}
-	}
+	employeeDB.
+		Preload("Department").
+		Preload("Designation").
+		Preload("User").
+		First(&item, item.ID)
 
-	if body.Country != nil {
-		updateData["country"] = *body.Country
-	}
-
-	if body.CountryCode != nil {
-		updateData["country_code"] = *body.CountryCode
-	}
-
-	if body.Designation != nil {
-		updateData["designation"] = *body.Designation
-	}
-
-	if body.Password != nil {
-		hashed, _ := hashEmployeePassword(*body.Password)
-		updateData["password"] = hashed
-	}
-
-	if body.Password != nil {
-		// store plain password as well for display consistency with user endpoint
-		updateData["plain_password"] = *body.Password
-	}
-
-	if len(updateData) > 0 {
-		updateData["updated_at"] = time.Now()
-		employeeDB.Model(&employee).Updates(updateData)
-	}
-
-	if body.Username != nil {
-		// Update username separately if provided
-		employeeDB.Model(&employee).Update("username", *body.Username)
-	}
-
-	// Handle permanent address update/create (check all fields)
-	if body.PermanentAddress1 != nil || body.PermanentAddress2 != nil || body.PermanentAddress3 != nil || body.PermanentCity != nil || body.PermanentState != nil || body.PermanentCountry != nil || body.PermanentPincode != nil {
-		// Check if permanent address exists
-		var permanentAddr models.UserAddress
-		err := employeeDB.Where("user_id = ? AND title = ?", employee.ID, "Permanent").First(&permanentAddr).Error
-
-		if err == nil {
-			// Update existing permanent address
-			addrUpdate := map[string]interface{}{}
-			if body.PermanentAddress1 != nil {
-				addrUpdate["address1"] = *body.PermanentAddress1
-			}
-			if body.PermanentAddress2 != nil {
-				addrUpdate["address2"] = *body.PermanentAddress2
-			}
-			if body.PermanentAddress3 != nil {
-				addrUpdate["address3"] = *body.PermanentAddress3
-			}
-			if body.PermanentCity != nil {
-				addrUpdate["city"] = *body.PermanentCity
-			}
-			if body.PermanentState != nil {
-				addrUpdate["state"] = *body.PermanentState
-			}
-			if body.PermanentCountry != nil {
-				addrUpdate["country"] = *body.PermanentCountry
-			}
-			if body.PermanentCountryCode != nil {
-				addrUpdate["country_code"] = *body.PermanentCountryCode
-			}
-			if body.PermanentPincode != nil {
-				addrUpdate["pincode"] = *body.PermanentPincode
-			}
-			if body.PermanentGSTIN != nil {
-				addrUpdate["gstin"] = *body.PermanentGSTIN
-			}
-			if len(addrUpdate) > 0 {
-				employeeDB.Model(&permanentAddr).Updates(addrUpdate)
-			}
-		} else if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new permanent address
-			newPermanentAddr := models.UserAddress{
-				UserID:      employee.ID,
-				Title:       "Permanent",
-				Address1:    stringPtrToString(body.PermanentAddress1),
-				Address2:    stringPtrToString(body.PermanentAddress2),
-				Address3:    stringPtrToString(body.PermanentAddress3),
-				City:        stringPtrToString(body.PermanentCity),
-				State:       stringPtrToString(body.PermanentState),
-				Country:     stringPtrToString(body.PermanentCountry),
-				CountryCode: stringPtrToString(body.PermanentCountryCode),
-				Pincode:     stringPtrToString(body.PermanentPincode),
-				GSTIN:       stringPtrToString(body.PermanentGSTIN),
-			}
-			if err := employeeDB.Create(&newPermanentAddr).Error; err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to create permanent address", "details": err.Error()})
-			}
-		}
-	}
-
-	// Handle residential address update/create (check all fields)
-	if body.ResidentialAddress1 != nil || body.ResidentialAddress2 != nil || body.ResidentialAddress3 != nil || body.ResidentialCity != nil || body.ResidentialState != nil || body.ResidentialCountry != nil || body.ResidentialPincode != nil {
-		// Check if residential address exists
-		var residentialAddr models.UserAddress
-		err := employeeDB.Where("user_id = ? AND title = ?", employee.ID, "Residential").First(&residentialAddr).Error
-
-		if err == nil {
-			// Update existing residential address
-			addrUpdate := map[string]interface{}{}
-			if body.ResidentialAddress1 != nil {
-				addrUpdate["address1"] = *body.ResidentialAddress1
-			}
-			if body.ResidentialAddress2 != nil {
-				addrUpdate["address2"] = *body.ResidentialAddress2
-			}
-			if body.ResidentialAddress3 != nil {
-				addrUpdate["address3"] = *body.ResidentialAddress3
-			}
-			if body.ResidentialCity != nil {
-				addrUpdate["city"] = *body.ResidentialCity
-			}
-			if body.ResidentialState != nil {
-				addrUpdate["state"] = *body.ResidentialState
-			}
-			if body.ResidentialCountry != nil {
-				addrUpdate["country"] = *body.ResidentialCountry
-			}
-			if body.ResidentialPincode != nil {
-				addrUpdate["pincode"] = *body.ResidentialPincode
-			}
-			if len(addrUpdate) > 0 {
-				employeeDB.Model(&residentialAddr).Updates(addrUpdate)
-			}
-		} else if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new residential address
-			newResidentialAddr := models.UserAddress{
-				UserID:   employee.ID,
-				Title:    "Residential",
-				Address1: stringPtrToString(body.ResidentialAddress1),
-				Address2: stringPtrToString(body.ResidentialAddress2),
-				Address3: stringPtrToString(body.ResidentialAddress3),
-				City:     stringPtrToString(body.ResidentialCity),
-				State:    stringPtrToString(body.ResidentialState),
-				Country:  stringPtrToString(body.ResidentialCountry),
-				Pincode:  stringPtrToString(body.ResidentialPincode),
-			}
-			if err := employeeDB.Create(&newResidentialAddr).Error; err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to create residential address", "details": err.Error()})
-			}
-		}
-	}
-
-	// Handle primary bank account update/create
-	if body.PrimaryBankName != nil || body.PrimaryAccountNumber != nil {
-		// For simplicity, find first bank account or create if none exists
-		var primaryBank models.UserBankAccount
-		err := employeeDB.Where("user_id = ?", employee.ID).First(&primaryBank).Error
-
-		if err == nil {
-			// Update existing bank account
-			bankUpdate := map[string]interface{}{}
-			if body.PrimaryBankName != nil {
-				bankUpdate["bank_name"] = *body.PrimaryBankName
-			}
-			if body.PrimaryBranchName != nil {
-				bankUpdate["branch_name"] = *body.PrimaryBranchName
-			}
-			if body.PrimaryBranchAddress != nil {
-				bankUpdate["branch_address"] = *body.PrimaryBranchAddress
-			}
-			if body.PrimaryAccountNumber != nil {
-				bankUpdate["account_number"] = *body.PrimaryAccountNumber
-			}
-			if body.PrimaryIFSCCode != nil {
-				bankUpdate["ifsc_code"] = *body.PrimaryIFSCCode
-			}
-			if len(bankUpdate) > 0 {
-				employeeDB.Model(&primaryBank).Updates(bankUpdate)
-			}
-		} else if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new bank account
-			newPrimaryBank := models.UserBankAccount{
-				UserID:        employee.ID,
-				BankName:      stringPtrToString(body.PrimaryBankName),
-				BranchName:    stringPtrToString(body.PrimaryBranchName),
-				BranchAddress: stringPtrToString(body.PrimaryBranchAddress),
-				AccountNumber: stringPtrToString(body.PrimaryAccountNumber),
-				IFSCCode:      stringPtrToString(body.PrimaryIFSCCode),
-			}
-			if err := employeeDB.Create(&newPrimaryBank).Error; err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to create primary bank account", "details": err.Error()})
-			}
-		}
-	}
-
-	// Reload employee with associations to return complete data
-	employeeDB.Preload("Addresses").
-		Preload("BankAccounts").
-		Preload("Documents").
-		First(&employee, employee.ID)
-
-	return c.JSON(employee)
+	return c.Status(201).JSON(item)
 }
 
-// Soft Delete Employee
+func GetEmployees(c *fiber.Ctx) error {
+	var items []models.Employee
+	var total int64
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	search := c.Query("search")
+
+	offset := (page - 1) * limit
+
+	query := employeeDB.Model(&models.Employee{})
+
+	if search != "" {
+		query = query.Where("work_email ILIKE ? OR emp_code ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	query.Count(&total)
+
+	query.Offset(offset).Limit(limit).
+		Order("id desc").
+		Preload("Department").
+		Preload("Designation").
+		Preload("User").
+		Preload("User.Addresses").
+		Preload("User.BankAccounts").
+		Preload("User.Documents").
+		Find(&items)
+
+	// Extract only user data
+	users := make([]models.User, 0)
+	for _, emp := range items {
+		users = append(users, emp.User)
+	}
+
+	return c.JSON(fiber.Map{
+		"data":    users,
+		"empData": items,
+		"total":   total,
+		"page":    page,
+		"limit":   limit,
+	})
+}
+
+func GetEmployee(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var item models.Employee
+
+	if err := employeeDB.
+		Preload("Department").
+		Preload("Designation").
+		Preload("User").
+		First(&item, id).Error; err != nil {
+
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{"error": "Employee not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(item)
+}
+
+func UpdateEmployee(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var body UpdateEmployeeRequest
+	var item models.Employee
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	if err := employeeDB.First(&item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{"error": "Employee not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if body.UserID != nil {
+		item.UserID = *body.UserID
+	}
+	if body.EmpCode != nil {
+		item.EmpCode = body.EmpCode
+	}
+	if body.DepartmentID != nil {
+		item.DepartmentID = body.DepartmentID
+	}
+	if body.DesignationID != nil {
+		item.DesignationID = body.DesignationID
+	}
+	if body.JoiningDate != nil {
+		item.JoiningDate = parseDate(body.JoiningDate)
+	}
+	if body.ExitDate != nil {
+		item.ExitDate = parseDate(body.ExitDate)
+	}
+	if body.Salary != nil {
+		item.Salary = body.Salary
+	}
+	if body.WorkEmail != nil {
+		item.WorkEmail = *body.WorkEmail
+	}
+	if body.Remarks != nil {
+		item.Remarks = *body.Remarks
+	}
+
+	if err := employeeDB.Save(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	employeeDB.
+		Preload("Department").
+		Preload("Designation").
+		Preload("User").
+		First(&item, id)
+
+	return c.JSON(item)
+}
+
 func DeleteEmployee(c *fiber.Ctx) error {
 	id := c.Params("id")
+	var item models.Employee
 
-	// Use a transaction to remove or nullify dependent references first to
-	// avoid foreign key constraint violations (department relations, role mappings, etc.).
-	tx := employeeDB.Begin()
-	if tx.Error != nil {
-		return c.Status(500).JSON(fiber.Map{"error": tx.Error.Error()})
-	}
-
-	// If this user is set as a department head, nullify the HeadID
-	if err := tx.Model(&models.Department{}).Where("head_id = ?", id).Update("head_id", nil).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to nullify department head", "details": err.Error()})
-	}
-
-	// Remove any department relations where this user is employee or assignee
-	if err := tx.Where("employee_id = ? OR assigned_by_id = ?", id, id).Delete(&models.DepartmentRelation{}).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete department relations", "details": err.Error()})
-	}
-
-	// Remove role mappings
-	if err := tx.Where("user_id = ?", id).Delete(&models.UserRoleMapping{}).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete user role mappings", "details": err.Error()})
-	}
-
-	// Remove addresses, bank accounts and documents explicitly (some models may have cascade set, but be explicit)
-	if err := tx.Where("user_id = ?", id).Delete(&models.UserAddress{}).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete user addresses", "details": err.Error()})
-	}
-	if err := tx.Where("user_id = ?", id).Delete(&models.UserBankAccount{}).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete user bank accounts", "details": err.Error()})
-	}
-	if err := tx.Where("user_id = ?", id).Delete(&models.UserDocument{}).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete user documents", "details": err.Error()})
-	}
-
-	// Finally delete the user record (only if it is an employee)
-	if err := tx.Model(&models.User{}).Where("is_employee = ?", true).Delete(&models.User{}, id).Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete user", "details": err.Error()})
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "transaction commit failed", "details": err.Error()})
-	}
-
-	return c.JSON(fiber.Map{"message": "Employee deleted"})
-}
-
-// 🔄 Restore Employee
-func RestoreEmployee(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	if err := employeeDB.Unscoped().Model(&models.User{}).
-		Where("id = ? AND is_employee = ?", id, true).
-		Update("deleted_at", nil).Error; err != nil {
-
+	if err := employeeDB.First(&item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{"error": "Employee not found"})
+		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"message": "Employee restored"})
-}
-
-// ❌ Force Delete Employee
-func ForceDeleteEmployee(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	if err := employeeDB.Unscoped().Where("is_employee = ?", true).Delete(&models.User{}, id).Error; err != nil {
+	if err := employeeDB.Delete(&item).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"message": "Employee permanently deleted"})
+	return c.JSON(fiber.Map{"message": "Employee deleted successfully"})
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete, IconButton, InputAdornment, Tooltip
+  Dialog, DialogTitle, DialogContent,
+  TextField, Autocomplete, IconButton, InputAdornment, Tooltip
 } from "@mui/material";
 import ClearIcon from '@mui/icons-material/Clear';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -114,11 +114,37 @@ export default function TagDialog({ open, onClose, tag, onSuccess, onError }) {
             )}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">Save</Button>
-        </DialogActions>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#1976d2',
+              padding: '6px 16px',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            style={{
+              background: '#1976d2',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: 4,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Save
+          </button>
+        </div>
       </form>
-    </Dialog>
+    </Dialog> 
   );
 }

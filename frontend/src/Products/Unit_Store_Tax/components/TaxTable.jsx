@@ -11,13 +11,13 @@ export default function TaxTable({ taxes, onEdit, onDelete, page, rowsPerPage })
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
         <TableHead>
           <TableRow>
-            <TableCell align="center" sx={{ width: 60 }}>S.No.</TableCell>
+            <TableCell style={{ textAlign: 'left', width: 60 }}>S.No.</TableCell>
             <TableCell align="center" sx={{ width: '35%' }}>Tax Name</TableCell>
             <TableCell align="center" sx={{ width: 100 }}>Percentage</TableCell>
             <TableCell align="center" sx={{ width: 80 }}>IGST</TableCell>
             <TableCell align="center" sx={{ width: 80 }}>CGST</TableCell>
             <TableCell align="center" sx={{ width: 80 }}>SGST</TableCell>
-            <TableCell align="center" sx={{ width: 120, textAlign: 'center' }}>Actions</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 120 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -35,7 +35,7 @@ export default function TaxTable({ taxes, onEdit, onDelete, page, rowsPerPage })
 
             return (
               <TableRow key={tax.ID} sx={{ height: 36 }}>
-                <TableCell align="center" sx={{ py: 0.5, width: 60 }}>
+                <TableCell align="left" sx={{ py: 0.5, width: 60 }}>
                   {(page * rowsPerPage) + index + 1}
                 </TableCell>
                 <TableCell align="center" sx={{ py: 0.5, width: '35%' }}>
@@ -53,7 +53,7 @@ export default function TaxTable({ taxes, onEdit, onDelete, page, rowsPerPage })
                 <TableCell align="center" sx={{ py: 0.5, width: 80 }}>
                   {fmt(sgstVal)}
                 </TableCell>
-                <TableCell align="center" sx={{ py: 0.5, width: 120, textAlign: 'center' }}>
+                <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
                   <IconButton size="small" onClick={() => onEdit(tax)}><EditIcon fontSize="small" /></IconButton>
                   <IconButton size="small" onClick={() => onDelete(tax)}><DeleteIcon fontSize="small" /></IconButton>
                 </TableCell>

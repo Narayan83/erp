@@ -6,6 +6,7 @@ import PrintSettingsDialog from "../../../PrintSettings/Print.jsx";
 import { debounce } from "lodash";
 import * as XLSX from 'xlsx';
 import "./quotationlist.scss";
+import Pagination from "../../../CommonComponents/Pagination";
 
 import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt } from 'react-icons/fa';
 
@@ -14,7 +15,7 @@ const QuotationList = () => {
   const [quotations, setQuotations] = useState([]);
   const [displayedQuotations, setDisplayedQuotations] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -873,10 +874,6 @@ const QuotationList = () => {
                 <span className="search-icon"><FaSearch /></span>
               </div>
             
-            <button className="icon-btn" title="Print Settings" onClick={() => setShowPrintSettings(true)}>
-              Print Settings
-            </button>
-            
             <button className="icon-btn square" title={exporting ? 'Exporting...' : 'Export to Excel'} onClick={handleExport} disabled={exporting}><FaFileExport /></button>
             <button className="icon-btn square" title="Display Preferences" onClick={() => { setTempVisibleColumns(visibleColumns); setShowDisplayPrefs(true); }}><FaBars /></button>
             <button className="icon-btn square" title="Items Summary" onClick={() => navigate('/quotation-item-summary')}><FaChartBar /></button>
@@ -1235,11 +1232,14 @@ const QuotationList = () => {
       )}
 
       <div className="pagination">
-        <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>Page {page}</span>
-        <button onClick={() => setPage(page + 1)}>Next</button>
+        <Pagination
+          page={page}
+          total={displayedQuotations.length}
+          rowsPerPage={limit}
+          isZeroBased={false}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newRowsPerPage) => { setLimit(newRowsPerPage); setPage(1); }}
+        />
       </div>
     </div>
   );

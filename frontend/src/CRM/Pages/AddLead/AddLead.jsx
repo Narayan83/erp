@@ -956,7 +956,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                       ))}
                     </select>
                   </div>
-
+                </div>
+                <div className="form-row">
                   <div className="form-group">
                     <label>Notes</label>
                     <input

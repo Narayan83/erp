@@ -486,7 +486,7 @@ export default function Series() {
                   <tr key={series.id}>
                     <td>{(pagination.page - 1) * pagination.limit + index + 1}</td>
                     <td>{series.document_type || '-'}</td>
-                    <td><strong>{series.name}</strong></td>
+                    <td>{series.name}</td>
                     <td>{series.prefix}</td>
                     <td>{series.postfix}</td>
                     <td>{series.remarks || '-'}</td>

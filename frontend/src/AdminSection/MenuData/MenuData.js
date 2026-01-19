@@ -1,14 +1,20 @@
 // menuData.js
-import { GrDashboard } from "react-icons/gr";
-import { GiRingmaster } from "react-icons/gi";
-import { MdOutlinePhonelinkSetup } from "react-icons/md";
-import { SiTemporal } from "react-icons/si";
+import {
+  FiHome,
+  FiBox,
+  FiUsers,
+  FiUserCheck,
+  FiBriefcase,
+  FiSettings,
+  FiTool,
+  FiFileText,
+} from "react-icons/fi";
 export const menuItems = [
   {
     id: 0,
     title: "Dashboard",
     path: "/home",
-    icon: GrDashboard,
+    icon: FiHome,
   },
   // {
   //   id: 1,
@@ -29,43 +35,34 @@ export const menuItems = [
   {
     id: 2,
     title: "Product Masters",
-    icon: GiRingmaster,
-    submenu: [
-      { title: "Product Master", path: "/ProductMaster" },
-      { title: "Product Management", path: "/ManageProduct" },
-      { title: "Category Management", path: "/ManageCategory" },
-      { title: "Subcategory Management", path: "/ManageSubcategory" },
-      { title: "Tag Management", path: "/ManageTag" },
-      { title: "Store / Unit / Tax / HSN / Size", path: "/ManageUnitStoreTax" },
-    ],
+    icon: FiBox,
+    submenu: [{ title: "Product Management", path: "/ProductMaster" }],
   },
 
   {
     id: 3,
     title: "Users Masters",
-    icon: GiRingmaster,
-    submenu: [
-      { title: "Users Management", path: "/users" },
-      { title: "User Address", path: "/address" },
-    ],
+    icon: FiUsers,
+    submenu: [{ title: "Users Management", path: "/users" }],
   },
 
   {
     id: 8,
     title: "Employee Masters",
-    icon: GiRingmaster,
+    icon: FiUserCheck,
     submenu: [
+      { title: "Deparments", path: "/departmentmaster" },
+      { title: "Designations", path: "/designation" },
+      { title: "Organization Units", path: "/orgunits" },
       { title: "Employee Management", path: "/employeemanagement" },
-      { title: "Manage Department Head", path: "/departmentmaster" },
-      { title: "Assign Employee to Head", path: "/designation" },
-      { title: "Assign User to Employee", path: "/assignusertoemployee" },
+      { title: "Employee Hierarchy", path: "/empHierarchy" },
     ],
   },
 
   {
     id: 6,
     title: "CRM Masters",
-    icon: GiRingmaster,
+    icon: FiBriefcase,
     submenu: [
       { title: "CRM", path: "/crm-master" },
       { title: "Account", path: "/account" },
@@ -77,7 +74,7 @@ export const menuItems = [
   {
     id: 7,
     title: "Admin",
-    icon: GiRingmaster,
+    icon: FiSettings,
     submenu: [
       { title: "Role Creation", path: "/rolecreation" },
       // "Role Management" here links to the list of existing roles
@@ -96,15 +93,14 @@ export const menuItems = [
   {
     id: 4,
     title: "Setup",
-    icon: MdOutlinePhonelinkSetup,
-    submenu: [
-    ],
+    icon: FiTool,
+    submenu: [],
   },
 
   {
     id: 5,
     title: "Reports",
-    icon: MdOutlinePhonelinkSetup,
+    icon: FiFileText,
     submenu: [{ title: "reports", path: "/erpreport" }],
   },
 ];

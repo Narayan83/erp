@@ -1,0 +1,189 @@
+// Sidebar Color Scheme & Variables
+$sidebar-bg: #f8fafc;
+$sidebar-border: #e2e8f0;
+$menu-item-hover: #f1f5f9;
+$menu-item-active: #eff6ff;
+$menu-text-primary: #1f2937;
+$menu-text-secondary: #6b7280;
+$primary-color: #2563eb;
+$primary-light: #3b82f6;
+$icon-color: #6b7280;
+$transition-speed: 0.25s;
+$sidebar-width: 250px;
+
+.sidebar {
+  background-color: $sidebar-bg;
+  border-right: 1px solid $sidebar-border;
+  height: 100%;
+  overflow-y: auto;
+  padding: 1rem 0;
+  position: relative;
+
+  .sidebar-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .menu-item {
+    margin: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .menu-link {
+    text-decoration: none;
+    display: block;
+  }
+
+  .menu-btn {
+    background: transparent;
+    border: none;
+    width: 100%;
+    padding: 0.75rem 0.75rem;
+    text-align: left;
+    color: $menu-text-primary;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .menu-icon-bg {
+      width: 2rem;
+      height: 2rem;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 4px;
+      color: $menu-text-primary;
+      background: $menu-item-hover;
+      transition:
+        background $transition-speed ease,
+        transform $transition-speed ease,
+        box-shadow $transition-speed ease;
+      font-size: 1.1rem;
+    }
+
+    &.active {
+      background: linear-gradient(90deg, rgba(37, 99, 235, 0.06), transparent);
+      color: $primary-color;
+      border-left: 4px solid $primary-color;
+      padding-left: calc(1rem - 4px);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.03);
+
+      .menu-icon-bg {
+        background: $menu-item-hover;
+        transform: translateY(-1px);
+      }
+
+      .menu-arrow {
+        color: $menu-item-hover;
+      }
+    }
+
+    &:hover {
+      background: rgba(105, 147, 238, 0.2) !important;
+
+      .menu-arrow {
+        translate: 4px 0;
+      }
+    }
+
+    &.open .menu-arrow {
+      transform: rotate(90deg);
+      transition: transform $transition-speed ease;
+    }
+
+    &:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+    }
+  }
+
+  .menu-icon {
+    font-size: 1.125rem;
+    color: $icon-color;
+    flex-shrink: 0;
+    transition: color $transition-speed ease;
+  }
+
+  .menu-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: $menu-item-hover;
+  }
+
+  .menu-arrow {
+    font-size: 1.125rem;
+    color: $menu-item-hover;
+    flex-shrink: 0;
+    transition: color $transition-speed ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  // Submenu Wrapper
+  .submenu-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    transition:
+      max-height $transition-speed ease,
+      padding $transition-speed ease;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+    margin: 0 0.5rem;
+    padding: 0 0.25rem;
+
+    &.open {
+      max-height: 500px;
+      padding: 0.375rem 0.25rem 0.6rem 0.25rem;
+      transition:
+        max-height $transition-speed ease,
+        padding $transition-speed ease;
+    }
+
+    &.closed {
+      max-height: 0;
+      padding: 0 0.25rem;
+      transition:
+        max-height $transition-speed ease,
+        padding $transition-speed ease;
+    }
+  }
+
+  .submenu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .submenu-item {
+    margin: 0;
+
+    .submenu-link {
+      display: block;
+      padding: 0.625rem 1rem 0.625rem 2.75rem;
+      color: $menu-item-hover;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all $transition-speed ease;
+      border-left: 3px solid transparent;
+
+      &.active {
+        color: $sidebar-bg;
+        background: rgba(244, 244, 245, 0.2) !important;
+        padding-left: calc(2.75rem - 2px);
+      }
+    }
+  }
+}

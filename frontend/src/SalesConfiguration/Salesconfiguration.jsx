@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./salesconfiguration.scss";
 
-import { FaUsers, FaTag, FaBox, FaBoxOpen, FaCity, FaPlus, FaTimesCircle, FaThumbsDown, FaFileAlt, FaSignature, FaUniversity, FaClipboardList, FaQrcode, FaMoneyBillWave, FaEnvelope, FaShareAlt, FaStar, FaCode, FaFileInvoiceDollar, FaColumns, FaListAlt, FaFileContract, FaTasks, FaUserFriends, FaCalendarAlt, FaBoxes, FaBarcode } from 'react-icons/fa';
+import { FaUsers, FaTag, FaBox, FaBoxOpen, FaCity, FaPlus, FaTimesCircle, FaThumbsDown, FaFileAlt, FaSignature, FaUniversity, FaClipboardList, FaQrcode, FaMoneyBillWave, FaEnvelope, FaShareAlt, FaStar, FaCode, FaFileInvoiceDollar, FaColumns, FaListAlt, FaFileContract, FaTasks, FaUserFriends, FaCalendarAlt, FaBoxes, FaChevronLeft, FaBarcode } from 'react-icons/fa';
 import Sources from "../CRM/Components/Configuration/Sources/Sources";
 import Tags from "../CRM/Components/Configuration/Tags/Tags";
 import RejectionReasons from "../CRM/Components/Configuration/RejectionReasons/RejectionReasons";
@@ -100,13 +100,19 @@ const Salesconfiguration = () => {
 
 	// Click handlers are attached directly to clickable cards via onClick handlers.
 
-
+	const location = useLocation();
+	const params = new URLSearchParams(location.search || window.location.search || '');
+	const showOnlyCRM = params.get('section') === 'crm';
 
 	return (
 		<div className="sales-config-page">
-			<h1 className="page-title">Sales Configuration</h1>
-
-			<section className="section">
+			<div className="page-header">
+				<h1 className="page-title">Sales Configuration</h1>
+				<button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+					<FaChevronLeft /> Back
+				</button>
+			</div>
+		{!showOnlyCRM && (			<section className="section">
 				<div className="section-ribbon blue">
 					<div className="ribbon-title">Formats</div>
 					<div className="ribbon-sub">Set up the formats for your business identity & other details.</div>
@@ -138,6 +144,7 @@ const Salesconfiguration = () => {
 					})}
 				</div>
 			</section>
+			)}
 
 			<section className="section">
 				<div className="section-ribbon green">
@@ -195,6 +202,7 @@ const Salesconfiguration = () => {
 	<Integrations isOpen={showIntegrations} onClose={() => setShowIntegrations(false)} />
 	<QrCode isOpen={showQrCode} onClose={() => setShowQrCode(false)} />
 
+		{!showOnlyCRM && (
 		<section className="section">
 			<div className="section-ribbon green">
 				<div className="ribbon-title">Integrations</div>
@@ -223,6 +231,9 @@ const Salesconfiguration = () => {
 				</div>
 			</section>
 
+			)}
+
+				{!showOnlyCRM && (
 				<section className="section">
 					<div className="section-ribbon blue">
 						<div className="ribbon-title">Sales Documents</div>
@@ -255,7 +266,9 @@ const Salesconfiguration = () => {
 						})}
 					</div>
 				</section>
+				)}
 
+				{!showOnlyCRM && (
 				<section className="section">
 					<div className="section-ribbon orange">
 						<div className="ribbon-title">Settings</div>
@@ -281,6 +294,7 @@ const Salesconfiguration = () => {
 						})}
 					</div>
 				</section>
+			)}
 		</div>
 	);
 };

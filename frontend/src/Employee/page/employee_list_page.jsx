@@ -51,6 +51,8 @@ import stateListData from "../../User/utils/state_list.json";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import "./employee_list_page.scss";
+import EmployeeEditModal from "../components/EmployeeEditModal.jsx";
+import Pagination from "../../CommonComponents/Pagination";
 
 // Build import-friendly country strings from countries data
 const IMPORT_COUNTRY_OPTIONS = Array.isArray(countries)
@@ -70,6 +72,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error = fals
   useEffect(() => {
     setEditValue(value);
   }, [value]);
+
+
+
 
   const getDropdownOptions = (key) => {
     const cleanKey = String(key).replace(/\s*\*\s*$/g, '');
@@ -153,6 +158,7 @@ export default function EmployeeListPage() {
   const [limit, setLimit] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [openEmpManage, setOpenEmpManage] = useState(false);
 
   // Display Preferences dialog state
   const [displayPrefOpen, setDisplayPrefOpen] = useState(false);
@@ -362,26 +368,74 @@ export default function EmployeeListPage() {
     return () => clearTimeout(handler);
   }, [filters.search]);
 
+  // const fetchEmployees = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const params = {
+  //       page: page + 1,
+  //       limit,
+  //       search: filters.search,
+  //     };
+  //     const response = await axios.get(`${BASE_URL}/api/employees`, { params });
+     
+  //    console.log(response.data.data)
+
+  //     const employeesPayload = response.data.employees || response.data.data;
+  //     // console.log(employeesPayload);
+  //     const safeEmployees = Array.isArray(employeesPayload) ? employeesPayload : [];
+  //     setEmployees(safeEmployees);
+
+  //     console.log(safeEmployees)  
+  //     setTotalItems(response.data.total || safeEmployees.user.length);
+  //   } catch (error) {
+  //     console.error("Error fetching employees:", error);
+  //     showSnackbar("Error fetching employees", "error");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
+
+
   const fetchEmployees = async () => {
-    setLoading(true);
-    try {
-      const params = {
-        page: page + 1,
-        limit,
-        search: filters.search,
+  setLoading(true);
+
+  try {
+    const params = {
+      page: page + 1,
+      limit,
+      search: filters.search,
+    };
+
+    const response = await axios.get(`${BASE_URL}/api/employees`, { params });
+
+    const userData = response.data.data || [];
+    const empData = response.data.empData || [];
+
+    // Merge empData (PK, codes, dept, desig) into userData
+    const merged = userData.map((u) => {
+      const emp = empData.find((e) => e.user_id === u.id);
+
+      return {
+        ...u,
+        empPmKeyid: emp?.id || null,          // employee table primary key
+        empcode: emp?.empcode || "",          // employee code if needed
+        department: emp?.Department || null,  // optional
+        designation: emp?.Designation || null // optional
       };
-      const response = await axios.get(`${BASE_URL}/api/employees`, { params });
-      const employeesPayload = response.data.employees || response.data;
-      const safeEmployees = Array.isArray(employeesPayload) ? employeesPayload : [];
-      setEmployees(safeEmployees);
-      setTotalItems(response.data.total || safeEmployees.length);
-    } catch (error) {
-      console.error("Error fetching employees:", error);
-      showSnackbar("Error fetching employees", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+
+    setEmployees(merged);
+    setTotalItems(response.data.total);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    showSnackbar("Error fetching employees", "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleToggleSelectAll = (e) => {
     const checked = e.target.checked;
@@ -1244,7 +1298,9 @@ export default function EmployeeListPage() {
   };
 
   const handleEditEmployee = (employee) => {
-    navigate(`/employeemaster/${employee.id}`);
+    // Use the employee table primary key (empPmKeyid) when navigating to the edit page
+    const empId = employee.empPmKeyid || employee.id; // fallback to user id if empPmKeyid missing
+    navigate(`/employeemaster/${empId}`);
   };
 
   const handleViewEmployee = (employee) => {
@@ -1260,8 +1316,18 @@ export default function EmployeeListPage() {
   const confirmDelete = async () => {
     if (!employeeToDelete) return;
 
+    // Use the employee table primary key (empPmKeyid) for delete operations
+    const empId = employeeToDelete.empPmKeyid;
+    if (!empId) {
+      // If there is no employee record for this user, inform the user
+      showSnackbar("No employee record exists for this user", "error");
+      setConfirmDeleteOpen(false);
+      setEmployeeToDelete(null);
+      return;
+    }
+
     try {
-      await axios.delete(`${BASE_URL}/api/employees/${employeeToDelete.id}`);
+      await axios.delete(`${BASE_URL}/api/employees/${empId}`);
       showSnackbar("Employee deleted successfully", "success");
       fetchEmployees();
     } catch (error) {
@@ -1357,12 +1423,12 @@ export default function EmployeeListPage() {
   return (
     <section className="right-content">
       <Box sx={{ p: 1, mt: 1 }}>
-        <Typography variant="h5" gutterBottom>All Employees List</Typography>
+        <Typography variant="h5" gutterBottom>Employee Management</Typography>
         {/* Filters */}
         <div className="filters-section">
-          <Box display="flex" alignItems="center" width="100%" className="list-toolbar">
-            <Box display="flex" alignItems="center">
-              <div className="search-wrap" style={{ marginRight: 16 }}>
+          <div className="list-toolbar">
+            <div className="filters-left">
+              <div className="search-wrap">
                 <div className="search-input">
                   <input
                     type="text"
@@ -1395,17 +1461,14 @@ export default function EmployeeListPage() {
                   <span className="action-label">Export</span>
                 </button>
               </div>
-            </Box>
+            </div>
 
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddEmployee}
-              sx={{ ml: 'auto' }}
-            >
-              Add Employee
-            </Button>
-          </Box>
+            <div className="filters-right">
+              <button type="button" className="btn btn-primary add-employee-btn" onClick={handleAddEmployee}>
+                <AddIcon style={{ marginRight: 8 }} /> Add Employee
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Table */}
@@ -1644,41 +1707,14 @@ export default function EmployeeListPage() {
 
         {/* Pagination */}
         <div className="table-pagination">
-          <div className="pagination-info">
-            Showing {employees.length === 0 ? 0 : page * limit + 1} to {Math.min((page + 1) * limit, totalItems)} of {totalItems} employees
-          </div>
-          <div className="pagination-controls">
-            <select 
-              value={limit} 
-              onChange={handleLimitChange}
-              className="rows-per-page"
-              aria-label="Select rows per page"
-            >
-              <option value={5}>5 per page</option>
-              <option value={10}>10 per page</option>
-              <option value={25}>25 per page</option>
-              <option value={50}>50 per page</option>
-            </select>
-            <div className="pagination-buttons">
-              <button
-                className="pagination-btn"
-                onClick={() => handlePageChange(null, page - 1)}
-                disabled={page === 0}
-                aria-label="Previous page"
-              >
-                ← Previous
-              </button>
-              <span className="page-number">Page {page + 1} of {Math.ceil(totalItems / limit)}</span>
-              <button
-                className="pagination-btn"
-                onClick={() => handlePageChange(null, page + 1)}
-                disabled={page >= Math.ceil(totalItems / limit) - 1}
-                aria-label="Next page"
-              >
-                Next →
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            total={totalItems}
+            rowsPerPage={limit}
+            onPageChange={(p) => setPage(p)}
+            onRowsPerPageChange={(rows) => { setLimit(rows); setPage(0); }}
+            isZeroBased={true}
+          />
         </div>
 
         {/* Delete Confirmation Dialog */}
@@ -2422,11 +2458,14 @@ export default function EmployeeListPage() {
                 className="btn btn-outline" 
                 onClick={() => {
                   setViewDialogOpen(false);
-                  navigate(`/employeemaster/${selectedEmployee.id}`);
+                  // Navigate using employee primary key (empPmKeyid) which references the employees table
+                  const empId = selectedEmployee.empPmKeyid || selectedEmployee.id;
+                  navigate(`/employeemaster/${empId}`);
                 }}
               >
                 Edit Employee
               </button>
+              <button className="btn btn-secondary" onClick={() => setOpenEmpManage(true)}> Manage Employee</button>
             </div>
           </div>
         </div>
@@ -2446,6 +2485,17 @@ export default function EmployeeListPage() {
           />
         )}
       </Box>
+      { selectedEmployee ? <EmployeeEditModal
+          open={openEmpManage}
+          onClose={(refresh) => {
+            setOpenEmpManage(false);
+           }}
+          employee={selectedEmployee.empPmKeyid}
+        /> :''
+
+      }
+
+      
     </section>
   );
 }

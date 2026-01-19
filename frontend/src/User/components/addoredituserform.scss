@@ -35,6 +35,11 @@ $spacing-xl: 32px;
   }
 }
 
+/* Neutralize MUI Container margin-top when a generated class is present */
+.css-uowltm-MuiContainer-root {
+  margin-top: 0 !important;
+}
+
 // ============ TABS ============
 .form-tabs-wrapper {
   border-bottom: 2px solid $border-color;
