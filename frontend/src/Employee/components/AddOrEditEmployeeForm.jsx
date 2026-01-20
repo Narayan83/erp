@@ -4,6 +4,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/Config" // adjust if needed
 import ImageEditor from '../../Products/ProductManage/Components/ImageEditor';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import './addeditemployee.scss';
 import industries from "../../User/industries.json";
 import countries from "../../User/utils/countries";
@@ -805,12 +806,13 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
 
       let created;
       if (defaultValues?.id) {
-        // Update employee
-        console.log('Updating employee with payload:', payload);
-        const response = await axios.put(`${BASE_URL}/api/employees/${defaultValues.id}`, payload);
+        // Update existing user (the form edits User fields). Use users endpoint to avoid 404
+        // (employee table updates are handled by separate employee/job modal).
+        console.log('Updating user with payload:', payload);
+        const response = await axios.put(`${BASE_URL}/api/users/${defaultValues.id}`, payload);
         created = response.data;
       } else {
-        // Add new employee
+        // Create new employee (this endpoint creates both User + Employee record)
         console.log('Creating new employee with payload:', payload);
         const response = await axios.post(`${BASE_URL}/api/employees`, payload);
         created = response.data;
@@ -1458,18 +1460,17 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
         <h5 style={{ margin: 0 }}>
           {defaultValues ? "Edit Employee" : "Add Employee"}
         </h5>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* status switch placed to the left of the View button; clearly editable */}
-          <div className="toggle-switch">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="form-switch">
             <input
               type="checkbox"
+              id="status-toggle"
               checked={activeStatus}
               onChange={(e) => setValue("active", e.target.checked, { shouldDirty: true, shouldTouch: true })}
-              id="active-switch"
             />
-            <label htmlFor="active-switch">{activeStatus ? "Active" : "Inactive"}</label>
+            <label htmlFor="status-toggle">{activeStatus ? "Active" : "Inactive"}</label>
           </div>
-          <button type="button" className="btn btn-outline" onClick={() => navigate(`/employeemanagement`)}>View</button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/employeemanagement`)}>View</button>
         </div>
       </div>
       
@@ -1750,8 +1751,10 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                     className="password-toggle-btn"
                     onClick={handleClickShowPassword}
                     onMouseDown={handleMouseDownPassword}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? '👁' : '👁‍🗨'}
+                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                   </button>
                 </div>
               )}
@@ -1797,8 +1800,10 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                     className="password-toggle-btn"
                     onClick={handleClickShowConfirmPassword}
                     onMouseDown={handleMouseDownPassword}
+                    title={showConfirmPassword ? "Hide password" : "Show password"}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
-                    {showConfirmPassword ? '👁' : '👁‍🗨'}
+                    {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                   </button>
                 </div>
               )}

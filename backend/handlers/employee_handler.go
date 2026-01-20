@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"fmt"
-	"strings"
 
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
@@ -182,34 +181,6 @@ func CreateEmployeeAsUser(c *fiber.Ctx) error {
 	fmt.Printf("CreateEmployee parsed residential fields: res1=%v res2=%v res3=%v city=%v state=%v country=%v pincode=%v\n",
 		body.ResidentialAddress1, body.ResidentialAddress2, body.ResidentialAddress3, body.ResidentialCity, body.ResidentialState, body.ResidentialCountry, body.ResidentialPincode)
 
-	// Debug: ensure email is present and log user basic info
-	fmt.Printf("CreateEmployee parsed basic info: email=%q mobile=%q firstname=%q lastname=%q\n", body.Email, body.MobileNumber, body.Firstname, body.Lastname)
-
-	// Validation: Email is required
-	if strings.TrimSpace(body.Email) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Email is required and cannot be empty"})
-	}
-
-	// Validation: Mobile number is required
-	if strings.TrimSpace(body.MobileNumber) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Mobile number is required and cannot be empty"})
-	}
-
-	// Validation: First name is required
-	if strings.TrimSpace(body.Firstname) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "First name is required and cannot be empty"})
-	}
-
-	// Validation: Last name is required
-	if strings.TrimSpace(body.Lastname) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Last name is required and cannot be empty"})
-	}
-
-	// Validation: Password is required
-	if strings.TrimSpace(body.Password) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Password is required and cannot be empty"})
-	}
-
 	hashedPassword, err := hashEmployeePassword(body.Password)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Password encryption failed"})
@@ -253,20 +224,7 @@ func CreateEmployeeAsUser(c *fiber.Ctx) error {
 
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
-		errMsg := err.Error()
-		fmt.Printf("DEBUG: Database error creating user: %v\n", errMsg)
-		fmt.Printf("DEBUG: User data: Email=%q, MobileNumber=%q, Firstname=%q, Lastname=%q\n", user.Email, user.MobileNumber, user.Firstname, user.Lastname)
-		// Check for specific constraint violations and provide helpful messages
-		if strings.Contains(errMsg, "email") && strings.Contains(errMsg, "not-null") {
-			return c.Status(400).JSON(fiber.Map{"error": "Email is required - cannot be empty", "field": "email"})
-		}
-		if strings.Contains(errMsg, "email") && strings.Contains(errMsg, "unique") {
-			return c.Status(409).JSON(fiber.Map{"error": "Email already exists - please use a different email", "field": "email"})
-		}
-		if strings.Contains(errMsg, "mobile") && strings.Contains(errMsg, "unique") {
-			return c.Status(409).JSON(fiber.Map{"error": "Mobile number already exists - please use a different number", "field": "mobile_number"})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": errMsg})
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	// Create permanent address if provided (check all fields)
@@ -331,8 +289,7 @@ func CreateEmployeeAsUser(c *fiber.Ctx) error {
 
 	if err := tx.Create(&employee).Error; err != nil {
 		tx.Rollback()
-		errMsg := err.Error()
-		return c.Status(500).JSON(fiber.Map{"error": errMsg})
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	if err := tx.Commit().Error; err != nil {

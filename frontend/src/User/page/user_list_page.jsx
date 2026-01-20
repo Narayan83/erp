@@ -1752,7 +1752,7 @@ const getUserDisplayName = (u) => {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => navigate("/users/add")}
+            onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
             style={{ marginLeft: 16, flex: '0.2' }}
             aria-label="Add User"
           >

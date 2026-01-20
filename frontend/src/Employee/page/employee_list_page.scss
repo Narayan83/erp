@@ -5,51 +5,16 @@
 // ============================================================================
 
 .filters-section {
-  padding: 20px 5px;
-  background-color: white;
+  margin-bottom: 16px;
+}
 
-  .list-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .filters-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1 1 auto;
-  }
-
-  .filters-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-  }
-
-  .search-wrap {
-    margin-right: 0;
-  }
-
-  .search-input {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 260px;
-    background: #fff;
-    border: 1px solid #d0d0d0;
-    padding: 6px 8px;
-    border-radius: 6px;
-  }
-
-  .add-employee-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    font-weight: 600;
-  }
+/* Header for page title above filters */
+.employee-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 // ============================================================================
@@ -432,67 +397,6 @@
   font-size: 0.85rem;
 }
 
-// ============================================================================
-// RESPONSIVE DESIGN
-// ============================================================================
-
-@media (max-width: 1200px) {
-  .employee-table {
-    font-size: 0.85rem;
-
-    thead th,
-    tbody td {
-      padding: 12px 10px;
-    }
-  }
-}
-
-@media (max-width: 768px) {
-  .employee-table-wrapper {
-    margin: 0 -12px 24px -12px;
-    border-radius: 0;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .employee-table {
-    font-size: 0.8rem;
-
-    thead th {
-      padding: 12px 8px;
-
-      &:nth-child(4),
-      &:nth-child(5) {
-        display: none;
-      }
-    }
-
-    tbody td {
-      padding: 10px 8px;
-
-      &:nth-child(4),
-      &:nth-child(5) {
-        display: none;
-      }
-    }
-  }
-
-  .table-pagination {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .pagination-controls {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .pagination-buttons {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
 // Dialog Styles
 .employee-view-dialog {
   display: none;
@@ -626,38 +530,16 @@
 
   &.col-3 {
     grid-template-columns: repeat(3, 1fr);
-
-    @media (max-width: 1200px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    @media (max-width: 768px) {
-      grid-template-columns: 1fr;
-    }
   }
 
   &.col-4 {
     grid-template-columns: repeat(4, 1fr);
-
-    @media (max-width: 1200px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    @media (max-width: 768px) {
-      grid-template-columns: 1fr;
-    }
   }
 
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+  &.col-5 {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
   }
-}
-
-// Form Field/Input Container
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 
   label {
     font-size: 0.875rem;
@@ -709,6 +591,13 @@
   }
 }
 
+// Form fields grid - responsive grid layout for form sections in dialogs
+.form-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
 /* Photo field styling for employee view */
 .photo-field {
   /* keep label left, center the image wrapper horizontally */
@@ -752,6 +641,12 @@
     border-radius: 6px;
     font-size: 0.85rem;
   }
+}
+
+/* Ensure image/photo field aligns nicely in the 5-column grid */
+.form-grid.col-5 .photo-field {
+  align-self: start;
+  justify-content: flex-start;
 }
 
 .no-data-message {
@@ -805,19 +700,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
-
-  @media (max-width: 1024px) {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  }
-
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 16px;
-  }
-
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr;
-  }
 }
 
 .document-card {
@@ -953,6 +835,20 @@
 // Toolbar / Search / Action buttons
 .list-toolbar {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .toolbar-right {
+    margin-left: auto;
+  }
 
   .search-wrap {
     .search-input {
@@ -1017,100 +913,100 @@
         font-size: 0.9rem;
       }
     }
-  }
-}
 
-// Button Styles
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
+    .add-employee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      background-color: #1976d2;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition:
+        background-color 0.15s ease,
+        transform 0.08s ease;
+    }
 
-  &:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  &.btn-primary {
-    background-color: #1976d2;
-    color: white;
-
-    &:hover {
+    .add-employee-btn:hover {
       background-color: #1565c0;
     }
   }
 
-  &.btn-secondary {
-    background-color: #757575;
-    color: white;
-
-    &:hover {
-      background-color: #616161 !important;
-      box-shadow: none !important;
-      transform: none !important;
-    }
-  }
-
-  &.btn-outline {
-    background-color: transparent;
-    color: #1976d2;
-    border: 1px solid #1976d2;
-
-    &:hover {
-      background-color: rgba(25, 118, 210, 0.05);
-      border-color: #1565c0;
-      color: #1565c0;
-    }
-  }
-
-  &.btn-small {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    min-width: 32px;
-    height: 32px;
-  }
-}
-
-// Password Input Container
-.password-input-container {
-  position: relative;
-
-  input {
-    padding-right: 40px;
-  }
-
-  .password-toggle {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
+  // Button Styles
+  .btn {
+    padding: 8px 16px;
     border: none;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
-    color: #1976d2;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: all 0.2s ease;
+    font-family: inherit;
 
-    svg {
-      width: 20px;
-      height: 20px;
+    &:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    &.btn-outline {
+      background-color: transparent;
+      color: #1976d2;
+      border: 1px solid #1976d2;
+
+      &:hover {
+        background-color: rgba(25, 118, 210, 0.05);
+        border-color: #1565c0;
+        color: #1565c0;
+      }
+    }
+
+    &.btn-small {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      min-width: 32px;
+      height: 32px;
+    }
+  }
+
+  // Password Input Container
+  .password-input-container {
+    position: relative;
+
+    input {
+      padding-right: 40px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #1976d2;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
     }
   }
 }
@@ -1168,7 +1064,7 @@
   min-width: 180px;
 }
 .col-pincode {
-  min-width: 100px;
+  min-width: 120px;
 }
 .col-resaddress1 {
   min-width: 220px;

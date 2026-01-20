@@ -877,7 +877,7 @@ const QuotationList = () => {
             <button className="icon-btn square" title={exporting ? 'Exporting...' : 'Export to Excel'} onClick={handleExport} disabled={exporting}><FaFileExport /></button>
             <button className="icon-btn square" title="Display Preferences" onClick={() => { setTempVisibleColumns(visibleColumns); setShowDisplayPrefs(true); }}><FaBars /></button>
             <button className="icon-btn square" title="Items Summary" onClick={() => navigate('/quotation-item-summary')}><FaChartBar /></button>
-            <button className="icon-btn square settings" title="Configuration" onClick={() => navigate('/sales-configuration')}><FaCog /></button>
+            <button className="icon-btn square settings" title="Configuration" onClick={() => window.open(`${window.location.origin}/sales-configuration`, '_blank')}><FaCog /></button>
             
             
           </div>
@@ -984,7 +984,7 @@ const QuotationList = () => {
         <div className="filters-right">
           <button
             className="btn-create"
-            onClick={() => navigate(`/quotation?type=${encodeURIComponent(typeFilter === 'All' ? 'Quotation' : typeFilter)}`)}
+            onClick={() => window.open(`${window.location.origin}/quotation?type=${encodeURIComponent(typeFilter === 'All' ? 'Quotation' : typeFilter)}`, '_blank', 'noopener,noreferrer')}
           >
             {getCreateButtonText()}
           </button>

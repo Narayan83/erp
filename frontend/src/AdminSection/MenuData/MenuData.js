@@ -51,10 +51,10 @@ export const menuItems = [
     title: "Employee Masters",
     icon: FiUserCheck,
     submenu: [
+      { title: "Employee Management", path: "/employeemanagement" },
       { title: "Deparments", path: "/departmentmaster" },
       { title: "Designations", path: "/designation" },
       { title: "Organization Units", path: "/orgunits" },
-      { title: "Employee Management", path: "/employeemanagement" },
       { title: "Employee Hierarchy", path: "/empHierarchy" },
     ],
   },
@@ -66,8 +66,7 @@ export const menuItems = [
     submenu: [
       { title: "CRM", path: "/crm-master" },
       { title: "Account", path: "/account" },
-      { title: "Quotation", path: "/quotation" },
-      { title: "Quotation List", path: "/quotation-list" },
+      { title: "Manage QTN", path: "/quotation-list" },
     ],
   },
 

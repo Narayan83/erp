@@ -329,10 +329,10 @@ const TopMenu = () => {
   };
 
   // Navigation
-  const handleReportsClick = () => navigate('/reports');
-  const handleCustomizeClick = () => navigate('/customize');
+  const handleReportsClick = () => window.open(`${window.location.origin}/reports`, '_blank');
+  const handleCustomizeClick = () => window.open(`${window.location.origin}/customize`, '_blank');
   // Navigate to Sales Configuration and request the CRM-only section
-  const handleSalesConfigClick = () => navigate('/sales-configuration?section=crm');
+  const handleSalesConfigClick = () => window.open(`${window.location.origin}/sales-configuration?section=crm`, '_blank');
   // Open leads dashboard
   const handleDashboardClick = () => navigate('/leads-dashboard');
 

@@ -52,7 +52,7 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import "./employee_list_page.scss";
 import EmployeeEditModal from "../components/EmployeeEditModal.jsx";
-import Pagination from "../../CommonComponents/Pagination";
+import Pagination from "../../CommonComponents/Pagination.jsx";
 
 // Build import-friendly country strings from countries data
 const IMPORT_COUNTRY_OPTIONS = Array.isArray(countries)
@@ -1293,14 +1293,22 @@ export default function EmployeeListPage() {
     setPage(0);
   };
 
+  // Simple wrappers for the `Pagination` component
+  const handlePaginationPageChange = (pageNumber) => {
+    setPage(pageNumber);
+  };
+
+  const handleRowsPerPageChange = (rows) => {
+    setLimit(rows);
+    setPage(0);
+  };
+
   const handleAddEmployee = () => {
-    navigate("/employeemaster");
+    window.open(`${window.location.origin}/employeemaster`, '_blank', 'noopener,noreferrer');
   };
 
   const handleEditEmployee = (employee) => {
-    // Use the employee table primary key (empPmKeyid) when navigating to the edit page
-    const empId = employee.empPmKeyid || employee.id; // fallback to user id if empPmKeyid missing
-    navigate(`/employeemaster/${empId}`);
+    navigate(`/employeemaster/${employee.id}`);
   };
 
   const handleViewEmployee = (employee) => {
@@ -1316,18 +1324,8 @@ export default function EmployeeListPage() {
   const confirmDelete = async () => {
     if (!employeeToDelete) return;
 
-    // Use the employee table primary key (empPmKeyid) for delete operations
-    const empId = employeeToDelete.empPmKeyid;
-    if (!empId) {
-      // If there is no employee record for this user, inform the user
-      showSnackbar("No employee record exists for this user", "error");
-      setConfirmDeleteOpen(false);
-      setEmployeeToDelete(null);
-      return;
-    }
-
     try {
-      await axios.delete(`${BASE_URL}/api/employees/${empId}`);
+      await axios.delete(`${BASE_URL}/api/employees/${employeeToDelete.id}`);
       showSnackbar("Employee deleted successfully", "success");
       fetchEmployees();
     } catch (error) {
@@ -1423,12 +1421,14 @@ export default function EmployeeListPage() {
   return (
     <section className="right-content">
       <Box sx={{ p: 1, mt: 1 }}>
-        <Typography variant="h5" gutterBottom>Employee Management</Typography>
+        <div className="employee-header">
+          <h2 className="page-title">Employee Managment</h2>
+        </div>
         {/* Filters */}
         <div className="filters-section">
           <div className="list-toolbar">
-            <div className="filters-left">
-              <div className="search-wrap">
+            <div className="toolbar-left">
+              <div className="search-wrap" style={{ marginRight: 16 }}>
                 <div className="search-input">
                   <input
                     type="text"
@@ -1463,9 +1463,14 @@ export default function EmployeeListPage() {
               </div>
             </div>
 
-            <div className="filters-right">
-              <button type="button" className="btn btn-primary add-employee-btn" onClick={handleAddEmployee}>
-                <AddIcon style={{ marginRight: 8 }} /> Add Employee
+            <div className="toolbar-right">
+              <button
+                type="button"
+                className="btn btn-primary add-employee-btn"
+                onClick={handleAddEmployee}
+                aria-label="Add Employee"
+              >
+                <AddIcon fontSize="small" style={{ marginRight: 8 }} /> Add Employee
               </button>
             </div>
           </div>
@@ -1673,7 +1678,7 @@ export default function EmployeeListPage() {
                             onClick={(e) => { e.stopPropagation(); handleViewEmployee(employee); }}
                             aria-label="View employee"
                           >
-                            👁️
+                            <VisibilityIcon />
                           </button>
                         </Tooltip>
                         <Tooltip title="Edit">
@@ -1683,7 +1688,7 @@ export default function EmployeeListPage() {
                             onClick={(e) => { e.stopPropagation(); handleEditEmployee(employee); }}
                             aria-label="Edit employee"
                           >
-                            ✏️
+                            <EditIcon />
                           </button>
                         </Tooltip>
                         <Tooltip title="Delete">
@@ -1693,7 +1698,7 @@ export default function EmployeeListPage() {
                             onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(employee); }}
                             aria-label="Delete employee"
                           >
-                            🗑️
+                            <DeleteIcon />
                           </button>
                         </Tooltip>
                       </div>
@@ -1712,10 +1717,10 @@ export default function EmployeeListPage() {
             total={totalItems}
             rowsPerPage={limit}
             onPageChange={(p) => setPage(p)}
-            onRowsPerPageChange={(rows) => { setLimit(rows); setPage(0); }}
+            onRowsPerPageChange={(r) => { setLimit(r); setPage(0); }}
             isZeroBased={true}
           />
-        </div>
+        </div> 
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
@@ -2169,26 +2174,29 @@ export default function EmployeeListPage() {
                   </p>
                 )}
               </div>
-              <div>
-                {selectedEmployee && (() => {
+              {selectedEmployee ? (
+                <div className={`employee-view-dialog-status ${(() => {
                   const val = (selectedEmployee.is_active !== undefined) ? selectedEmployee.is_active : (selectedEmployee.active !== undefined ? selectedEmployee.active : (selectedEmployee.status !== undefined ? selectedEmployee.status : selectedEmployee.isActive));
                   const isActive = (typeof val === 'boolean') ? val : (typeof val === 'string' ? (val.toLowerCase() === 'active' || val.toLowerCase() === 'true') : !!val);
-                  return (
-                    <div className={`employee-view-dialog-status ${isActive ? 'active' : 'inactive'}`}>
-                      {isActive ? 'Active' : 'Inactive'}
-                    </div>
-                  );
-                })()}
-              </div>
+                  return isActive ? 'active' : 'inactive';
+                })()}`}>
+                  {(() => {
+                    const val = (selectedEmployee.is_active !== undefined) ? selectedEmployee.is_active : (selectedEmployee.active !== undefined ? selectedEmployee.active : (selectedEmployee.status !== undefined ? selectedEmployee.status : selectedEmployee.isActive));
+                    const isActive = (typeof val === 'boolean') ? val : (typeof val === 'string' ? (val.toLowerCase() === 'active' || val.toLowerCase() === 'true') : !!val);
+                    return isActive ? 'Active' : 'Inactive';
+                  })()}
+                </div>
+              ) : null}
             </div>
             <div className="employee-view-dialog-body">
               {selectedEmployee ? (
                 <div>
-                  {/* Employee Information */}
+                  {/* Personal Information */}
                   <div className="employee-details-section">
-                    <h3 className="section-title">Employee Information</h3>
-                    <div className="form-grid col-12">
+                    <h3 className="section-title">Personal Information</h3>
+                    <div className="form-fields-grid">
                       <div className="form-field photo-field">
+                        <label>Photo</label>
                         {(() => {
                           const photoDoc = selectedEmployee.documents?.find(d => 
                             d.doc_type?.toLowerCase() === 'photo' || 
@@ -2215,21 +2223,32 @@ export default function EmployeeListPage() {
                       </div>
 
                       <div className="form-field">
-                        <label>Employee Code</label>
-                        <input type="text" value={selectedEmployee.usercode || ""} disabled />
+                        <label>Salutation</label>
+                        <input type="text" value={selectedEmployee.salutation || ""} disabled />
                       </div>
                       <div className="form-field">
-                        <label>Name</label>
-                        <input type="text" value={[selectedEmployee.salutation, selectedEmployee.firstname, selectedEmployee.lastname].filter(Boolean).join(' ')} disabled />
+                        <label>First Name</label>
+                        <input type="text" value={selectedEmployee.firstname || ""} disabled />
                       </div>
                       <div className="form-field">
-                        <label>DOB</label>
+                        <label>Last Name</label>
+                        <input type="text" value={selectedEmployee.lastname || ""} disabled />
+                      </div>
+                      <div className="form-field">
+                        <label>Date of Birth</label>
                         <input type="text" value={selectedEmployee.dob ? new Date(selectedEmployee.dob).toLocaleDateString() : ""} disabled />
                       </div>
                       <div className="form-field">
                         <label>Gender</label>
                         <input type="text" value={selectedEmployee.gender || ""} disabled />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="employee-details-section">
+                    <h3 className="section-title">Contact Information</h3>
+                    <div className="form-fields-grid">
                       <div className="form-field">
                         <label>Country</label>
                         <input type="text" value={formatCountry(selectedEmployee)} disabled />
@@ -2239,12 +2258,12 @@ export default function EmployeeListPage() {
                         <input type="text" value={selectedEmployee.mobile_number || ""} disabled />
                       </div>
                       <div className="form-field">
-                        <label>Email</label>
-                        <input type="text" value={selectedEmployee.email || ""} disabled />
-                      </div>
-                      <div className="form-field">
                         <label>Emergency Number</label>
                         <input type="text" value={selectedEmployee.emergency_contact || selectedEmployee.emergency_number || ""} disabled />
+                      </div>
+                      <div className="form-field">
+                        <label>Email</label>
+                        <input type="text" value={selectedEmployee.email || ""} disabled />
                       </div>
                     </div>
                   </div>
@@ -2253,49 +2272,47 @@ export default function EmployeeListPage() {
                   <div className="employee-details-section">
                     <h3 className="section-title">Address Information</h3>
                     {Array.isArray(selectedEmployee.addresses) && selectedEmployee.addresses.length > 0 ? (
-                      <div>
-                        {selectedEmployee.addresses.map((addr, idx) => (
-                          <div key={idx} className="address-block">
-                            <h4 className="address-title">
-                              {addr.title || `Address ${idx + 1}`}
-                            </h4>
-                            <div className="form-grid col-12">
-                              <div className="form-field">
-                                <label>Address 1</label>
-                                <input type="text" value={addr.address1 || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Address 2</label>
-                                <input type="text" value={addr.address2 || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Address 3</label>
-                                <input type="text" value={addr.address3 || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>City</label>
-                                <input type="text" value={addr.city || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>State</label>
-                                <input type="text" value={addr.state || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Country</label>
-                                <input type="text" value={
-                                  addr.country && addr.country_code 
-                                    ? `${addr.country} (${addr.country_code})` 
-                                    : (addr.country || addr.country_code || "")
-                                } disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Pincode</label>
-                                <input type="text" value={addr.pincode || ""} disabled />
-                              </div>
+                      selectedEmployee.addresses.map((addr, idx) => (
+                        <div key={idx} className="address-block">
+                          <h4 className="address-title">
+                            {addr.title || `Address ${idx + 1}`}
+                          </h4>
+                          <div className="form-fields-grid">
+                            <div className="form-field">
+                              <label>Address 1</label>
+                              <input type="text" value={addr.address1 || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Address 2</label>
+                              <input type="text" value={addr.address2 || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Address 3</label>
+                              <input type="text" value={addr.address3 || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>City</label>
+                              <input type="text" value={addr.city || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>State</label>
+                              <input type="text" value={addr.state || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Country</label>
+                              <input type="text" value={
+                                addr.country && addr.country_code 
+                                  ? `${addr.country} (${addr.country_code})` 
+                                  : (addr.country || addr.country_code || "")
+                              } disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Pincode</label>
+                              <input type="text" value={addr.pincode || ""} disabled />
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))
                     ) : (
                       <p className="no-data-message">No addresses available</p>
                     )}
@@ -2305,37 +2322,35 @@ export default function EmployeeListPage() {
                   <div className="employee-details-section">
                     <h3 className="section-title">Bank Information</h3>
                     {Array.isArray(selectedEmployee.bank_accounts) && selectedEmployee.bank_accounts.length > 0 ? (
-                      <div>
-                        {selectedEmployee.bank_accounts.map((bank, idx) => (
-                          <div key={idx} className="bank-block">
-                            <h4 className="bank-title">
-                              Bank Account {idx + 1}
-                            </h4>
-                            <div className="form-grid col-12">
-                              <div className="form-field">
-                                <label>Bank Name</label>
-                                <input type="text" value={bank.bank_name || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Branch Name</label>
-                                <input type="text" value={bank.branch_name || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Branch Address</label>
-                                <input type="text" value={bank.branch_address || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>Account Number</label>
-                                <input type="text" value={bank.account_number || ""} disabled />
-                              </div>
-                              <div className="form-field">
-                                <label>IFSC Code</label>
-                                <input type="text" value={bank.ifsc_code || ""} disabled />
-                              </div>
+                      selectedEmployee.bank_accounts.map((bank, idx) => (
+                        <div key={idx} className="bank-block">
+                          <h4 className="bank-title">
+                            Bank Account {idx + 1}
+                          </h4>
+                          <div className="form-fields-grid">
+                            <div className="form-field">
+                              <label>Bank Name</label>
+                              <input type="text" value={bank.bank_name || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Branch Name</label>
+                              <input type="text" value={bank.branch_name || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Branch Address</label>
+                              <input type="text" value={bank.branch_address || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>Account Number</label>
+                              <input type="text" value={bank.account_number || ""} disabled />
+                            </div>
+                            <div className="form-field">
+                              <label>IFSC Code</label>
+                              <input type="text" value={bank.ifsc_code || ""} disabled />
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))
                     ) : (
                       <p className="no-data-message">No bank information available</p>
                     )}
@@ -2383,7 +2398,7 @@ export default function EmployeeListPage() {
                                   onClick={() => handleViewDoc(doc)}
                                   title="View"
                                 >
-                                  👁️ View
+                                  <VisibilityIcon />
                                 </button>
                                 <button 
                                   type="button"
@@ -2391,7 +2406,7 @@ export default function EmployeeListPage() {
                                   onClick={() => handleDownloadDoc(doc)}
                                   title="Download"
                                 >
-                                  ⬇️ Download
+                                  <DownloadIcon />
                                 </button>
                               </div>
                             </div>
@@ -2406,23 +2421,26 @@ export default function EmployeeListPage() {
                   {/* Legal Information */}
                   <div className="employee-details-section">
                     <h3 className="section-title">Legal Information</h3>
-                    <div className="form-grid col-12">
+                    <div className="form-fields-grid">
                       <div className="form-field">
-                        <label>Aadhaar</label>
+                        <label>Aadhaar Number</label>
                         <input type="text" value={selectedEmployee.aadhar_number || ""} disabled />
                       </div>
                       <div className="form-field">
-                        <label>PAN</label>
+                        <label>PAN Number</label>
                         <input type="text" value={selectedEmployee.pan_number || ""} disabled />
                       </div>
-
                     </div>
                   </div>
 
                   {/* Authentication */}
                   <div className="employee-details-section">
                     <h3 className="section-title">Authentication</h3>
-                    <div className="form-grid col-12">
+                    <div className="form-fields-grid">
+                      <div className="form-field">
+                        <label>Employee Code</label>
+                        <input type="text" value={selectedEmployee.usercode || ""} disabled />
+                      </div>
                       <div className="form-field">
                         <label>Username</label>
                         <input type="text" value={selectedEmployee.username || ""} disabled />
@@ -2441,7 +2459,7 @@ export default function EmployeeListPage() {
                             onClick={() => setShowPassword(!showPassword)}
                             title={showPassword ? "Hide password" : "Show password"}
                           >
-                            {showPassword ? '🙈' : '👁️'}
+                            {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                           </button>
                         )}
                       </div>
@@ -2454,18 +2472,24 @@ export default function EmployeeListPage() {
             </div>
             <div className="employee-view-dialog-footer">
               <button className="btn btn-secondary" onClick={() => setViewDialogOpen(false)}>Close</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setViewDialogOpen(true);
+                  setOpenEmpManage(true);
+                }}
+              >
+                Manage Employee
+              </button>
               <button 
                 className="btn btn-outline" 
                 onClick={() => {
                   setViewDialogOpen(false);
-                  // Navigate using employee primary key (empPmKeyid) which references the employees table
-                  const empId = selectedEmployee.empPmKeyid || selectedEmployee.id;
-                  navigate(`/employeemaster/${empId}`);
+                  handleEditEmployee(selectedEmployee);
                 }}
               >
                 Edit Employee
               </button>
-              <button className="btn btn-secondary" onClick={() => setOpenEmpManage(true)}> Manage Employee</button>
             </div>
           </div>
         </div>
@@ -2485,15 +2509,21 @@ export default function EmployeeListPage() {
           />
         )}
       </Box>
-      { selectedEmployee ? <EmployeeEditModal
+      { selectedEmployee ? (
+        <EmployeeEditModal
           open={openEmpManage}
           onClose={(refresh) => {
             setOpenEmpManage(false);
-           }}
+            if (refresh) {
+              fetchEmployees();
+              setViewDialogOpen(false);
+            }
+          }}
           employee={selectedEmployee.empPmKeyid}
-        /> :''
+        />
+      ) : null}
 
-      }
+      
 
       
     </section>

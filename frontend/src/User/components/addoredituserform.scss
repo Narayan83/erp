@@ -398,23 +398,25 @@ $spacing-xl: 32px;
     padding-right: 44px;
   }
 
-  .password-toggle {
+  /* Keep compatibility with both class names used across forms */
+  .password-toggle,
+  .password-toggle-btn {
     position: absolute;
-    right: 10px;
-    top: 20%;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     cursor: pointer;
-    color: $text-secondary;
+    color: $primary-color;
     padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 1.2rem;
 
     &:hover {
-      outline: none;
-      transform: none;
-      box-shadow: none;
+      opacity: 0.7;
     }
 
     svg {

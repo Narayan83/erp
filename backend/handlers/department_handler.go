@@ -134,16 +134,6 @@ func DeleteDepartment(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Check if there are any employees in this department
-	var employeeCount int64
-	if err := departmentDB.Model(&models.Employee{}).Where("department_id = ?", id).Count(&employeeCount).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	if employeeCount > 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "Cannot delete department with assigned employees. Please reassign or remove employees first."})
-	}
-
 	if err := departmentDB.Delete(&dept).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

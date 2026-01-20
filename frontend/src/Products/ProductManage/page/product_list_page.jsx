@@ -4382,7 +4382,7 @@ export default function ProductListPage() {
           </div>
 
           <div className="summary-actions">
-            <button type="button" className="btn btn-add-product" onClick={() => navigate("/ManageProduct")} title="Add Product">+ Add Product</button>
+            <button type="button" className="btn btn-add-product" onClick={() => window.open(`${window.location.origin}/ManageProduct`, '_blank', 'noopener,noreferrer')} title="Add Product">+ Add Product</button>
 
             <button type="button" className="btn btn-outline btn-display-prefs" onClick={handleOpenDisplayPrefs} title="Display Preferences" aria-label="Display Preferences">
               <svg className="icon-columns" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -4409,7 +4409,7 @@ export default function ProductListPage() {
               </svg>
             </button>
 
-            <button type="button" className="btn btn-outline btn-settings" title="Settings" onClick={() => navigate('/product-config')} aria-label="Settings">
+            <button type="button" className="btn btn-outline btn-settings" title="Settings" onClick={() => window.open(`${window.location.origin}/product-config`, '_blank')} aria-label="Settings">
               <svg className="icon-settings" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="false" focusable="false" aria-label="Settings">
                 <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.39.96a7.07 7.07 0 0 0-1.6-.93l-.36-2.54A.5.5 0 0 0 12 2h-4a.5.5 0 0 0-.49.43l-.36 2.54a7.07 7.07 0 0 0-1.6.93l-2.39-.96a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l2 3.46c.11.21.35.3.56.22l2.39-.96c.5.38 1.02.69 1.6.93l.36 2.54c.03.25.24.43.49.43h4c.25 0 .46-.18.49-.43l.36-2.54c.58-.24 1.1-.54 1.6-.93l2.39.96c.21.08.45-.01.56-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>

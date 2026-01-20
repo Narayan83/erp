@@ -148,7 +148,7 @@ export default function PrintSettingsDialog({ onClose, initialConfig = {}, onSav
 					<div className="dialog-header">
 						<h2 id="print-settings-title">Print Settings{docType ? ` — ${docType}` : ''}</h2>
 						<div className="dialog-actions">
-							<button className="config-btn" onClick={() => navigate('/sales-configuration')}>Sales Configuration</button>
+							<button className="config-btn" onClick={() => window.open(`${window.location.origin}/sales-configuration`, '_blank')}>Sales Configuration</button>
 							<button ref={closeRef} className="close-btn" onClick={handleDone}>Done</button>
 						</div>
 					</div>

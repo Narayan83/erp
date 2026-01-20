@@ -9,6 +9,7 @@ import countries from "../utils/countries";
 import citiesList from "../utils/cities-name-list.json";
 import stateList from "../utils/state_list.json";
 import ImageEditor from '../../Products/ProductManage/Components/ImageEditor';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import "./addoredituserform.scss";
 
 const salutations = ["Mr", "Mrs", "Miss", "Dr", "Prof"];
@@ -3585,10 +3586,11 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         type="button"
                         onClick={handleClickShowPassword}
                         onMouseDown={handleMouseDownPassword}
-                        className="btn btn-small password-toggle"
-                        title="Toggle password visibility"
+                        className="password-toggle-btn"
+                        title={showPassword ? "Hide password" : "Show password"}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        {showPassword ? '👁️‍🗨️' : '👁️'}
+                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </button>
                     </div>
                     {errors.password && <div className="error-message">{errors.password.message}</div>}
@@ -3620,10 +3622,11 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         type="button"
                         onClick={handleClickShowConfirmPassword}
                         onMouseDown={handleMouseDownPassword}
-                        className="btn btn-small password-toggle"
-                        title="Toggle password visibility"
+                        className="password-toggle-btn"
+                        title={showConfirmPassword ? "Hide password" : "Show password"}
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                       >
-                        {showConfirmPassword ? '👁️‍🗨️' : '👁️'}
+                        {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </button>
                     </div>
                     {errors.confirmPassword && <div className="error-message">{errors.confirmPassword.message}</div>}
