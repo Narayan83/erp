@@ -823,32 +823,48 @@ $spacing-xl: 32px;
     padding: $spacing-sm;
     border-top: 1px solid $border-color;
 
+    /* Make action buttons more visible and easier to tap/click */
     button {
-      background: none;
+      background: transparent;
       border: none;
       cursor: pointer;
       color: $primary-color;
-      padding: 4px;
-      display: flex;
+      padding: 0px !important;
+      min-width: 40px;
+      min-height: 40px;
+      border-radius: $radius;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: color 0.3s ease;
+      transition:
+        background-color 0.12s ease,
+        color 0.12s ease,
+        transform 0.06s ease;
 
       &:hover {
+        background: rgba($primary-color, 0.08);
         color: $primary-dark;
+      }
+
+      &:focus {
+        outline: 2px solid rgba($primary-color, 0.18);
+        outline-offset: 2px;
       }
 
       &.delete {
         color: $error-color;
 
         &:hover {
+          background: rgba($error-color, 0.08);
           color: $error-light;
         }
       }
 
+      /* Larger icons for better visibility */
       svg {
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
+        display: block;
       }
     }
   }

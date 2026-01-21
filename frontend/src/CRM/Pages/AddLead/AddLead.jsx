@@ -550,8 +550,70 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const [tagsOptions, setTagsOptions] = useState([]);
   const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
   const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
-  // Use assignedToOptions passed from parent (TopMenu) or fallback to empty
-  const assignedToOptions = Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : [];
+  // Use assignedToOptions passed from parent (TopMenu) or fetch employees if not provided
+  const [assignedToOptions, setAssignedToOptions] = useState(Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : []);
+
+  // Fetch employees to populate the Assigned To dropdown.
+  // Always fetch from backend and merge any valid parent-provided options,
+  // but filter out obvious sample/test placeholder entries.
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
+      const json = await res.json();
+      const list = json.data || [];
+
+      const mapped = list.map(u => ({
+        id: u.id,
+        name: [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || String(u.id)
+      }));
+
+      // Merge parentProvided options if valid and not duplicates
+      const finalMap = new Map();
+      mapped.forEach(m => finalMap.set(String(m.id), m));
+
+      if (Array.isArray(parentAssignedToOptions)) {
+        parentAssignedToOptions.forEach(p => {
+          const pid = String(p?.id || '');
+          const pname = (p?.name || '').trim();
+          // Accept parent-provided option only if it has a numeric id and non-empty name
+          if (pid && !isNaN(Number(pid)) && pname) {
+            if (!finalMap.has(pid)) finalMap.set(pid, { id: Number(pid), name: pname });
+          }
+        });
+      }
+
+      // Filter out placeholder/sample entries and obvious dummy values (abc, xyz, numeric-only like 123)
+      const PLACEHOLDERS = new Set(['sample','test','example','abc','xyz','demo','123','000']);
+
+      const filtered = Array.from(finalMap.values()).filter(item => {
+        const name = (item.name || '').toLowerCase().trim();
+        if (!name) return false;
+
+        // Direct placeholder matches
+        if (PLACEHOLDERS.has(name)) return false;
+
+        // Numeric-only values (eg. "123")
+        if (/^[0-9]+$/.test(name)) return false;
+
+        // Common short placeholder patterns (e.g., 'abc', 'xyz') already covered above.
+        // Also exclude gibberish single-letter or 2-letter uppercase tokens if needed
+        // (but be conservative to avoid removing real short names):
+        if (/^[a-z]{1,2}$/.test(name)) return false;
+
+        return true;
+      });
+
+      setAssignedToOptions(filtered);
+    } catch (err) {
+      // fallback to empty
+      setAssignedToOptions([]);
+    }
+  };
+
+  useEffect(() => {
+    // Always fetch live employees and merge / sanitize parent-provided options
+    fetchEmployees();
+  }, [parentAssignedToOptions]);
 
   // Load saved sources and tags from localStorage on mount/open
   useEffect(() => {

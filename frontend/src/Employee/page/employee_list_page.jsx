@@ -25,6 +25,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import ImportDialog from "../../CommonComponents/ImportDialog"; 
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import ListItemText from '@mui/material/ListItemText';
@@ -172,7 +173,7 @@ export default function EmployeeListPage() {
     "Country",
     "MobileNumber",
     "Email",
-    "Emergency Number",
+    "Emerg Number",
     "Aadhaar",
     "PAN",
     "Address 1",
@@ -224,7 +225,7 @@ export default function EmployeeListPage() {
         return 140;
       case 'Email':
         return 220;
-      case 'Emergency Number':
+      case 'Emerg Number':
         return 140;
       case 'Aadhaar':
         return 150;
@@ -489,7 +490,7 @@ export default function EmployeeListPage() {
       'Country *',
       'Mobile Number *',
       'Email *',
-      'Emergency Number',
+      'Emerg Number',
       'Aadhaar',
       'PAN',
       'Address 1',
@@ -1324,13 +1325,35 @@ export default function EmployeeListPage() {
   const confirmDelete = async () => {
     if (!employeeToDelete) return;
 
+    // Use the employee table primary key (empPmKeyid) if available — the
+    // table's `employee.id` is different from the user id in the merged list.
+    const empId = employeeToDelete.empPmKeyid || null;
+
+    if (!empId) {
+      // No employee record id available for this row; refresh list and warn user
+      showSnackbar("Employee record not present on server (no emp id). Refreshing list.", "warning");
+      fetchEmployees();
+      setConfirmDeleteOpen(false);
+      setEmployeeToDelete(null);
+      return;
+    }
+
     try {
-      await axios.delete(`${BASE_URL}/api/employees/${employeeToDelete.id}`);
+      await axios.delete(`${BASE_URL}/api/employees/${empId}`);
       showSnackbar("Employee deleted successfully", "success");
       fetchEmployees();
     } catch (error) {
       console.error("Error deleting employee:", error);
-      showSnackbar("Error deleting employee", "error");
+      const status = error?.response?.status;
+      const serverMsg = error?.response?.data?.error || error?.message || "Error deleting employee";
+
+      if (status === 404) {
+        // If server reports not found, show a warning and refresh the list to remove stale entry
+        showSnackbar(serverMsg || "Employee not found", "warning");
+        fetchEmployees();
+      } else {
+        showSnackbar(serverMsg, "error");
+      }
     } finally {
       setConfirmDeleteOpen(false);
       setEmployeeToDelete(null);
@@ -1788,71 +1811,28 @@ export default function EmployeeListPage() {
           </DialogActions>
         </Dialog>
 
-        {/* Import Dialog */}
-        <Dialog
+        {/* Import Dialog (reused) */}
+        <ImportDialog
           open={importDialogOpen}
-          onClose={() => {
-            setImportDialogOpen(false);
-            setImportFile(null);
-            setImportLoading(false);
-          }}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>Import Employees</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Import employees from a CSV file. Make sure you have downloaded the template and filled it correctly.
-            </Typography>
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Instructions:</strong>
-              </Typography>
-              <Typography variant="body2" component="ul" sx={{ pl: 2, mb: 0 }}>
-                <li>Download the template Excel file below</li>
-                <li>Fill in your employee data following the template format</li>
-                <li>Required fields are marked with asterisk (*)</li>
-                <li>You can edit the info after upload the CSV file</li>
-                <li style={{ color: 'red' }}>Upload the completed CSV file</li>
-              </Typography>
-            </Box>
-            <Box sx={{ mb: 2 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={downloadTemplateCSV}
-                startIcon={<DownloadIcon />}
-              >
-                Download Template Excel
-              </Button>
-            </Box>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => setImportFile(e.target.files[0])}
-              style={{ marginBottom: '16px' }}
-            />
-            {importFile && (
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                Selected file: <strong>{importFile.name}</strong>
-              </Typography>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleImport}
-              disabled={!importFile || importLoading}
-            >
-              {importLoading ? <CircularProgress size={20} /> : 'Upload & Preview'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
+          title="Import Employees"
+          instructions={[
+            'Download the template Excel file below',
+            'Fill in your employee data following the template format',
+            'Required fields are marked with asterisk (*)',
+            'You can edit the info after upload the CSV file',
+            'Upload the completed CSV file'
+          ]}
+          importFile={importFile}
+          setImportFile={setImportFile}
+          importLoading={importLoading}
+          onImport={handleImport}
+          downloadTemplate={downloadTemplateCSV}
+        />
 
         {/* Import Preview Dialog */}
         <Dialog
+          className="import-preview-dialog"
           open={importPreviewOpen}
           onClose={(event, reason) => {
             if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
@@ -1899,7 +1879,10 @@ export default function EmployeeListPage() {
                           const requiredSet = new Set(['salutation','firstname','gender','countrynamecode','mobilenumber','email','active']);
                           const normalized = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                           const isRequired = requiredSet.has(normalized);
-                          const displayKey = key === 'Employee Code' ? 'Emp Code' : key;
+                          // Normalize some common header labels for concise display
+                          let displayKey = key;
+                          if (normalized === 'employeecode') displayKey = 'Emp Code';
+                          else if (normalized.includes('emerg')) displayKey = 'Emerg No.';
                           return (
                             <TableCell key={key} sx={{ fontWeight: 600 }}>
                               {displayKey}{isRequired ? <span style={{ color: 'red', marginLeft: 6 }}>*</span> : null}
@@ -1965,14 +1948,12 @@ export default function EmployeeListPage() {
             })()}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setImportPreviewOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={handleFinalImport} 
-              variant="contained" 
-              disabled={importSelectedRows.size === 0 || importLoading}
-            >
-              {importLoading ? <CircularProgress size={20} /> : `Import ${importSelectedRows.size} Employees`}
-            </Button>
+            <div className="dialog-actions import-preview-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setImportPreviewOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleFinalImport} disabled={importSelectedRows.size === 0 || importLoading}>
+                {importLoading ? <span className="spinner" aria-hidden="true"></span> : `Import ${importSelectedRows.size} Employees`}
+              </button>
+            </div>
           </DialogActions>
         </Dialog>
 
@@ -2258,7 +2239,7 @@ export default function EmployeeListPage() {
                         <input type="text" value={selectedEmployee.mobile_number || ""} disabled />
                       </div>
                       <div className="form-field">
-                        <label>Emergency Number</label>
+                        <label>Emerg Number</label>
                         <input type="text" value={selectedEmployee.emergency_contact || selectedEmployee.emergency_number || ""} disabled />
                       </div>
                       <div className="form-field">

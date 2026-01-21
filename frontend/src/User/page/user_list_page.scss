@@ -73,15 +73,15 @@
         min-width: 80px;
         text-align: center;
         font-weight: 500;
-      font-size: 16px;
-      color: rgb(0, 0, 0);
+        font-size: 16px;
+        color: rgb(0, 0, 0);
       }
 
       &.data-col {
         padding: 16px 14px;
         font-weight: 500;
-      font-size: 16px;
-      color: rgb(0, 0, 0);
+        font-size: 16px;
+        color: rgb(0, 0, 0);
       }
 
       &.actions-col {
@@ -89,8 +89,8 @@
         min-width: 240px;
         text-align: center;
         font-weight: 500;
-      font-size: 16px;
-      color: rgb(0, 0, 0);
+        font-size: 16px;
+        color: rgb(0, 0, 0);
       }
     }
   }
@@ -381,7 +381,9 @@
   vertical-align: middle;
   white-space: normal;
   word-break: break-word;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
   cursor: pointer;
   min-height: 36px;
 }
@@ -1098,23 +1100,25 @@
   background-color: white;
 
   thead {
-    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+    /* lighter blue header with dark text for better contrast */
+    background: linear-gradient(180deg, #e6f3ff 0%, #d7ecff 100%);
     position: sticky;
     top: 0;
     z-index: 10;
 
     tr {
-      border-bottom: 2px solid #1b5e20;
+      border-bottom: 2px solid #d0e6ff;
     }
 
     th {
       padding: 12px 8px;
       text-align: left;
-      font-weight: 600;
-      color: white;
+      font-weight: 700;
+      color: #0f172a; /* dark header text */
       white-space: nowrap;
       user-select: none;
-      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      /* remove vertical separators */
+      border-right: none;
 
       &:last-child {
         border-right: none;
@@ -1140,10 +1144,11 @@
       td {
         padding: 8px 8px;
         vertical-align: middle;
-        color: #333;
+        color: #0f172a; /* match darker body text */
         transition: color 0.2s ease;
         word-break: break-word;
-        border-right: 1px solid #f0f0f0;
+        /* remove vertical separators */
+        border-right: none;
 
         &:last-child {
           border-right: none;

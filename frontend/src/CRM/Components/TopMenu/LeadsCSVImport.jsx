@@ -25,6 +25,7 @@ import { BASE_URL } from '../../../config/Config';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import countries from '../../../User/utils/countries.js';
+import ImportDialog from '../../../CommonComponents/ImportDialog';
 import stateList from '../../../User/utils/state_list.json';
 import cities from '../../../User/utils/cities-name-list.json';
 
@@ -899,88 +900,28 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
   return (
     <>
-      {/* Import Dialog */}
-      <Dialog 
-        open={isOpen && !importPreviewOpen && !importReportOpen} 
-        onClose={(event, reason) => { if (reason === 'backdropClick') return; onClose(); }} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>Import Leads from CSV</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              Instructions:
-            </Typography>
-            <ul style={{ marginTop: 0, marginBottom: 8, paddingLeft: '1.25rem' }}>
-              <li>
-                <Typography component="span" variant="body2">
-                  Download the template Excel file below
-                </Typography>
-              </li>
-              <li>
-                <Typography component="span" variant="body2">
-                  Fill in your lead data following the template format
-                </Typography>
-              </li>
-              <li>
-                <Typography component="span" variant="body2">
-                  Required fields marked with ★ (Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To)
-                </Typography>
-              </li>
-              <li>
-                <Typography component="span" variant="body2">
-                  Save the file as CSV format
-                </Typography>
-              </li>
-              <li>
-                <Typography component="span" variant="body2">
-                  Upload the completed CSV file
-                </Typography>
-              </li>
-            </ul>
-          </Box>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import leads from a CSV file. Make sure you have downloaded the template and filled it correctly.
-          </Typography>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => setImportFile(e.target.files[0])}
-            style={{ marginBottom: '16px' }}
-          />
-          {importFile && (
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Selected file: {importFile.name}
-            </Typography>
-          )}
-
-          <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="body2"
-              color="primary"
-              sx={{ cursor: 'pointer' }}
-              onClick={downloadTemplateCSV}
-            >
-              ↓ Download template Excel file
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleImport}
-            disabled={!importFile || importLoading}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Next'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Import Dialog (reused) */}
+      <ImportDialog
+        open={isOpen && !importPreviewOpen && !importReportOpen}
+        onClose={() => onClose()}
+        title="Import Leads from CSV"
+        instructions={[
+          'Download the template Excel file below',
+          'Fill in your lead data following the template format',
+          'Required fields marked with ★ (Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To)',
+          'Save the file as CSV format',
+          'Upload the completed CSV file'
+        ]}
+        importFile={importFile}
+        setImportFile={setImportFile}
+        importLoading={importLoading}
+        onImport={handleImport}
+        downloadTemplate={downloadTemplateCSV}
+      />
 
       {/* Import Preview Dialog */}
       <Dialog
+        className="import-preview-dialog"
         open={importPreviewOpen}
         onClose={(event, reason) => {
           if (reason === 'backdropClick') return;
@@ -1048,7 +989,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                           }}
                         >
                           {cleanedHeader}
-                          {isRequired && <span style={{ color: '#d32f2f', marginLeft: '4px' }}>★</span>}
+                          {isRequired && <span style={{ color: '#d32f2f', marginLeft: '4px' }}>*</span>}
                         </TableCell>
                       );
                     })}
@@ -1104,23 +1045,10 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => {
-              setImportPreviewOpen(false);
-              setImportedData([]);
-              setImportSelectedRows(new Set());
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleFinalImport}
-            disabled={importLoading || importSelectedRows.size === 0}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Import'}
-          </Button>
+          <div className="dialog-actions import-preview-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => { setImportPreviewOpen(false); setImportedData([]); setImportSelectedRows(new Set()); }}>Cancel</button>
+            <button type="button" className="btn btn-primary" onClick={handleFinalImport} disabled={importLoading || importSelectedRows.size === 0}>{importLoading ? <span className="spinner" aria-hidden="true"></span> : 'Import'}</button>
+          </div>
         </DialogActions>
       </Dialog>
 

@@ -34,6 +34,7 @@ import { BASE_URL } from "../../../config/Config";
 import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
+import ImportDialog from "../../../CommonComponents/ImportDialog";
 import "./product_list_page.scss";
 
 
@@ -373,10 +374,10 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
 
         <div className="dp-modal-body">
           <div className="display-preferences-popover">
-            <div className="select-all" style={{ gridColumn: '1 / -1' }}>
+            <div className="select-all">
               <label className="form-control-label">
                 <input ref={selectAllRef} type="checkbox" checked={allSelected} onChange={handleSelectAll} />
-                <span style={{ marginLeft: 8 }}>Select All</span>
+                <span>Select All</span>
               </label>
             </div>
 
@@ -394,7 +395,7 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
             <label className="form-control-label"><input type="checkbox" checked={columns.leadTime} onChange={handleColumnToggle('leadTime')} /> <span>Lead Time</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.note} onChange={handleColumnToggle('note')} /> <span>Note</span></label>
 
-            <div className="subtitle" style={{ gridColumn: '1 / -1', marginTop: 12, marginBottom: 8 }}>Variant Columns</div>
+            <div className="subtitle">Variant Columns</div>
 
             <label className="form-control-label"><input type="checkbox" checked={columns.color} onChange={handleColumnToggle('color')} /> <span>Color Code</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.size} onChange={handleColumnToggle('size')} /> <span>Size</span></label>
@@ -518,7 +519,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                 const minStock = p.MinimumStock ?? p.MinStock ?? p.minimum_stock ?? p.min_stock ?? 0;
                 const isLowStock = stock !== '' && minStock !== '' && Number(stock) < Number(minStock);
                 return (
-                  <span style={{ color: isLowStock ? '#d32f2f' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
+                  <span className={isLowStock ? 'low-stock' : ''}>
                     {stock}
                   </span>
                 );
@@ -635,31 +636,15 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                 if (imgSrc) {
                   return (
                     <Box
-                      sx={{ display: 'inline-block', position: 'relative' }}
+                      className="image-wrap"
                       onMouseEnter={() => handleImageMouseEnter(imgSrc)}
                       onMouseLeave={handleImageMouseLeave}
                     >
                       <img
+                        className="product-image"
                         src={imgSrc}
                         alt={`product-main-${p.ID}`}
                         onClick={(e) => handleImageClick(e, imgSrc)}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          objectFit: 'cover',
-                          borderRadius: 4,
-                          border: '1px solid #ccc',
-                          cursor: 'pointer',
-                          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.1)';
-                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
                         onError={(e) => {
                           console.error('Failed to load main product image:', { src: e.target.src, productId: p.ID });
                           e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="100%" height="100%" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="8">No Img</text></svg>';
@@ -3948,11 +3933,11 @@ export default function ProductListPage() {
                     What you can do:
                   </Typography>
                   <Typography component="div" variant="body2" sx={{ ml: 1 }}>
-                    <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                    <ul className="instruction-list">
                       <li>Remove this product from any related inventory or stock records like Quotation, CRM etc</li>
                       <li>After removing references, try deleting the product again</li>
                     </ul>
-                  </Typography>
+                  </Typography> 
                 </Box>
               )}
             </DialogContent>
@@ -3975,9 +3960,9 @@ export default function ProductListPage() {
                   <button className="modal-close" onClick={handleCloseView} aria-label="Close">×</button>
                 </div>
 
-                <div className="product-details-container" style={{ backgroundColor: 'white', color: 'black' }}>
+                <div className="product-details-container">
                   {viewLoading ? (
-                    <div className="loading-state" style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><div className="loader"></div></div>
+                    <div className="loading-state"><div className="loader"></div></div>
                   ) : selectedProduct ? (
                     <div className="product-form">
                       <div className="form-grid">
@@ -4203,9 +4188,9 @@ export default function ProductListPage() {
                                 const colorInfo = getColorInfo(v.Color);
                                 return (
                                 <tr key={`var-${vidx}`}>
-                                  <td style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <td className="color-cell">
                                     {colorData && (
-                                      <div style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #ccc', backgroundColor: colorData.hex, flexShrink: 0 }} title={colorData.name} />
+                                      <div className="color-swatch" style={{ '--swatch-color': colorData.hex }} title={colorData.name} />
                                     )}
                                     <span>{colorInfo?.name || v.Color || '—'}</span>
                                   </td>
@@ -4216,7 +4201,7 @@ export default function ProductListPage() {
                                   <td>{v.Stock != null ? v.Stock : (v.StockAvailable != null ? v.StockAvailable : (v.Stock_on_hand != null ? v.Stock_on_hand : '—'))}</td>
                                   <td>{v.LeadTime ?? v.lead_time ?? v.Leadtime ?? '—'}</td>
                                   <td className="images-cell">
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                                    <div className="images-inner">
                                       {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.map((img, idx) => {
                                         const imgSrc = normalizeImageUrl(img) || 'https://via.placeholder.com/60?text=No+Image';
                                         const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === idx) || (v.MainImage && v.MainImage === img);
@@ -4226,21 +4211,18 @@ export default function ProductListPage() {
                                             className="image-container"
                                             onMouseEnter={() => handleDetailsImageMouseEnter(imgSrc)}
                                             onMouseLeave={handleDetailsImageMouseLeave}
-                                            style={{ position: 'relative' }}
                                           >
                                             <img
+                                              className="variant-image"
                                               src={imgSrc}
                                               alt={`img-${idx}`}
                                               onClick={(e) => handleDetailsImageClick(e, imgSrc)}
-                                              style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc', cursor: 'pointer', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
-                                              onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.16)'; }}
-                                              onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
                                               onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
                                               title="Click to open in new tab, hover to preview"
                                             />
                                             {isMain && (
                                               <div className="main-image-badge" title="Main image">
-                                                <StarIcon fontSize="small" style={{ width: 14, height: 14 }} />
+                                                <StarIcon fontSize="small" />
                                               </div>
                                             )}
                                           </div>
@@ -4311,59 +4293,25 @@ export default function ProductListPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Import dialog */}
-      <Dialog open={importDialogOpen} onClose={() => {
-        setImportDialogOpen(false);
-        setImportFile(null);
-        setImportLoading(false);
-      }} maxWidth="md" fullWidth>
-        <DialogTitle>Import Products</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Instructions:</Typography>
-            <ul style={{ marginTop: 0, marginBottom: 8, paddingLeft: '1.25rem' }}>
-              <li><Typography component="span" variant="body2">Download the template Excel file below</Typography></li>
-              <li><Typography component="span" variant="body2">Fill in your user data following the template format</Typography></li>
-              <li><Typography component="span" variant="body2">Required fields are marked with asterisk (*)</Typography></li>
-              <li><Typography component="span" variant="body2">Unit, Store, Size, and Tax will be auto-created if they don't exist</Typography></li>
-              <li><Typography component="span" variant="body2">You can edit the info after upload the CSV file</Typography></li>
-              <li><Typography component="span" variant="body2" color="error">Upload the completed CSV file</Typography></li>
-            </ul>
-          </Box>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import products from a CSV file. Make sure you have downloaded the template and filled it correctly.
-          </Typography>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => setImportFile(e.target.files[0])}
-            style={{ marginBottom: '16px' }}
-          />
-          {importFile && (
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Selected file: {importFile.name}
-            </Typography>
-          )}
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} 
-              onClick={() => downloadTemplateCSV()}>
-              ↓ Download template Excel file
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleImport}
-            disabled={!importFile || importLoading}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Import'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Import dialog (reusable component) */}
+      <ImportDialog
+        open={importDialogOpen}
+        onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
+        title="Import Products"
+        instructions={[
+          'Download the template Excel file below',
+          'Fill in your data following the template format',
+          "Required fields are marked with asterisk (*)",
+          "Unit, Store, Size, and Tax will be auto-created if they don't exist",
+          'You can edit the info after uploading the CSV file',
+          'Upload the completed CSV file'
+        ]}
+        importFile={importFile}
+        setImportFile={setImportFile}
+        importLoading={importLoading}
+        onImport={handleImport}
+        downloadTemplate={downloadTemplateCSV}
+      />
 
       {/* Updated summary box to include status, stock, and importance filter dropdowns */}
       <div className="summary-box">
@@ -5009,23 +4957,28 @@ export default function ProductListPage() {
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => {
-              setImportPreviewOpen(false);
-              setImportedData([]);
-              setImportFieldErrors({});
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleFinalImport}
-            disabled={importLoading}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Finalize Import'}
-          </Button>
+          <div className="dialog-actions import-preview-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setImportPreviewOpen(false);
+                setImportedData([]);
+                setImportFieldErrors({});
+              }}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleFinalImport}
+              disabled={importLoading}
+            >
+              {importLoading ? <span className="spinner" aria-hidden="true"></span> : 'Finalize Import'}
+            </button>
+          </div>
         </DialogActions>
       </Dialog>
 

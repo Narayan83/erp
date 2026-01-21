@@ -169,13 +169,28 @@ const TopMenu = () => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        // try to fetch many employees; endpoint returns array
+        // try to fetch many employees; backend returns { data: [...] }
         const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
         const data = await res.json();
-        // Data is an array
-        const employeesList = Array.isArray(data) ? data : [];
-        const opts = employeesList.map(u => ({ id: u.id, name: (u.firstname || u.Firstname || '') + (u.lastname ? (' ' + u.lastname) : '') || u.email || String(u.id) }));
-        if (opts.length > 0) setAssignedToOptions(opts);
+        // Support both shapes: { data: [...] } or direct array
+        const employeesList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+
+        const opts = employeesList.map(u => {
+          const name = [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || u.email || String(u.id);
+          return { id: u.id, name };
+        });
+
+        // Filter out obvious placeholders
+        const placeholders = new Set(['abc','xyz','123','sample','test','example','demo']);
+        const filtered = opts.filter(o => {
+          const n = (o.name || '').toLowerCase().trim();
+          if (!n) return false;
+          if (placeholders.has(n)) return false;
+          if (/^[0-9]+$/.test(n)) return false;
+          return true;
+        });
+
+        if (filtered.length > 0) setAssignedToOptions(filtered);
       } catch (err) {
         // keep default assignedToOptions
       }

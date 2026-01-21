@@ -1099,3 +1099,196 @@
 .col-actions {
   min-width: 180px;
 }
+
+.import-preview-dialog .MuiTableCell-root:nth-child(2),
+.import-preview-dialog .import-preview-table th:nth-child(3),
+.import-preview-dialog .import-preview-table td:nth-child(3) {
+  min-width: 100px;
+  width: 100px; /* Emp Code */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(3),
+.import-preview-dialog .import-preview-table th:nth-child(4),
+.import-preview-dialog .import-preview-table td:nth-child(4) {
+  min-width: 80px !important;
+  width: 80px !important; /* Salutation */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(4),
+.import-preview-dialog .import-preview-table th:nth-child(5),
+.import-preview-dialog .import-preview-table td:nth-child(5) {
+  min-width: 140px;
+  width: 140px; /* First Name */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(5),
+.import-preview-dialog .import-preview-table th:nth-child(6),
+.import-preview-dialog .import-preview-table td:nth-child(6) {
+  min-width: 140px;
+  width: 140px; /* Last Name */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(6),
+.import-preview-dialog .import-preview-table th:nth-child(7),
+.import-preview-dialog .import-preview-table td:nth-child(7) {
+  min-width: 120px;
+  width: 120px; /* Date of Birth */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(7),
+.import-preview-dialog .import-preview-table th:nth-child(8),
+.import-preview-dialog .import-preview-table td:nth-child(8) {
+  min-width: 90px;
+  width: 90px; /* Gender */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(8),
+.import-preview-dialog .import-preview-table th:nth-child(9),
+.import-preview-dialog .import-preview-table td:nth-child(9) {
+  min-width: 120px;
+  width: 150px; /* Country */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(9),
+.import-preview-dialog .import-preview-table th:nth-child(10),
+.import-preview-dialog .import-preview-table td:nth-child(10) {
+  min-width: 150px;
+  width: 150px; /* Mobile Number */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(10),
+.import-preview-dialog .import-preview-table th:nth-child(11),
+.import-preview-dialog .import-preview-table td:nth-child(11) {
+  min-width: 220px;
+  width: 220px; /* Email */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(11),
+.import-preview-dialog .import-preview-table th:nth-child(12),
+.import-preview-dialog .import-preview-table td:nth-child(12) {
+  min-width: 130px;
+  width: 130px; /* Emerg No. */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(12),
+.import-preview-dialog .import-preview-table th:nth-child(13),
+.import-preview-dialog .import-preview-table td:nth-child(13) {
+  min-width: 150px;
+  width: 150px; /* Aadhaar */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(13),
+.import-preview-dialog .import-preview-table th:nth-child(14),
+.import-preview-dialog .import-preview-table td:nth-child(14) {
+  min-width: 120px;
+  width: 120px; /* PAN */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(14),
+.import-preview-dialog .import-preview-table th:nth-child(15),
+.import-preview-dialog .import-preview-table td:nth-child(15) {
+  min-width: 260px;
+  width: 260px; /* Address 1 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(15),
+.import-preview-dialog .import-preview-table th:nth-child(16),
+.import-preview-dialog .import-preview-table td:nth-child(16) {
+  min-width: 260px;
+  width: 260px; /* Address 2 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(16),
+.import-preview-dialog .import-preview-table th:nth-child(17),
+.import-preview-dialog .import-preview-table td:nth-child(17) {
+  min-width: 260px;
+  width: 260px; /* Address 3 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(17),
+.import-preview-dialog .import-preview-table th:nth-child(18),
+.import-preview-dialog .import-preview-table td:nth-child(18) {
+  min-width: 140px;
+  width: 140px; /* City */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(18),
+.import-preview-dialog .import-preview-table th:nth-child(19),
+.import-preview-dialog .import-preview-table td:nth-child(19) {
+  min-width: 140px;
+  width: 140px; /* State */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(19),
+.import-preview-dialog .import-preview-table th:nth-child(20),
+.import-preview-dialog .import-preview-table td:nth-child(20) {
+  min-width: 140px;
+  width: 140px; /* Add. Country */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(20),
+.import-preview-dialog .import-preview-table th:nth-child(21),
+.import-preview-dialog .import-preview-table td:nth-child(21) {
+  min-width: 100px;
+  width: 100px; /* Pincode */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(21),
+.import-preview-dialog .import-preview-table th:nth-child(22),
+.import-preview-dialog .import-preview-table td:nth-child(22) {
+  min-width: 260px;
+  width: 260px; /* Res Address 1 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(22),
+.import-preview-dialog .import-preview-table th:nth-child(23),
+.import-preview-dialog .import-preview-table td:nth-child(23) {
+  min-width: 260px;
+  width: 260px; /* Res Address 2 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(23),
+.import-preview-dialog .import-preview-table th:nth-child(24),
+.import-preview-dialog .import-preview-table td:nth-child(24) {
+  min-width: 260px;
+  width: 260px; /* Res Address 3 */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(24),
+.import-preview-dialog .import-preview-table th:nth-child(25),
+.import-preview-dialog .import-preview-table td:nth-child(25) {
+  min-width: 140px;
+  width: 140px; /* Res City */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(25),
+.import-preview-dialog .import-preview-table th:nth-child(26),
+.import-preview-dialog .import-preview-table td:nth-child(26) {
+  min-width: 140px;
+  width: 140px; /* Res State */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(26),
+.import-preview-dialog .import-preview-table th:nth-child(27),
+.import-preview-dialog .import-preview-table td:nth-child(27) {
+  min-width: 140px;
+  width: 140px; /* Res Country */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(27),
+.import-preview-dialog .import-preview-table th:nth-child(28),
+.import-preview-dialog .import-preview-table td:nth-child(28) {
+  min-width: 120px;
+  width: 120px; /* Res Pincode */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(28),
+.import-preview-dialog .import-preview-table th:nth-child(29),
+.import-preview-dialog .import-preview-table td:nth-child(29) {
+  min-width: 200px;
+  width: 200px; /* Bank Name */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(29),
+.import-preview-dialog .import-preview-table th:nth-child(30),
+.import-preview-dialog .import-preview-table td:nth-child(30) {
+  min-width: 160px;
+  width: 160px; /* Branch Name */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(30),
+.import-preview-dialog .import-preview-table th:nth-child(31),
+.import-preview-dialog .import-preview-table td:nth-child(31) {
+  min-width: 220px;
+  width: 220px; /* Branch Address */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(31),
+.import-preview-dialog .import-preview-table th:nth-child(32),
+.import-preview-dialog .import-preview-table td:nth-child(32) {
+  min-width: 160px;
+  width: 160px; /* Account Number */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(32),
+.import-preview-dialog .import-preview-table th:nth-child(33),
+.import-preview-dialog .import-preview-table td:nth-child(33) {
+  min-width: 140px;
+  width: 140px; /* IFSC Code */
+}
+.import-preview-dialog .MuiTableCell-root:nth-child(33),
+.import-preview-dialog .import-preview-table th:nth-child(34),
+.import-preview-dialog .import-preview-table td:nth-child(34) {
+  min-width: 100px;
+  width: 100px; /* Active */
+}

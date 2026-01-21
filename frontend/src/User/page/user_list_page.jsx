@@ -34,6 +34,7 @@ import { useNavigate } from "react-router-dom";
 import { debounce } from "lodash";
 import { BASE_URL } from "../../config/Config";
 import ConfirmDialog from "../../CommonComponents/ConfirmDialog";
+import ImportDialog from "../../CommonComponents/ImportDialog";
 import dialCodeToCountry from "../utils/dialCodeToCountry";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -135,9 +136,12 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
       } : {}
     };
 
+    // Derive a safe column class from the columnKey to avoid undefined variable errors
+    const columnClass = `col-${String(columnKey || '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+
     return (
       <td
-        className={`editable-cell ${columnClass || ''} ${error ? 'has-error' : ''}`}
+        className={`editable-cell ${columnClass} ${error ? 'has-error' : ''}`}
         onClick={() => !editing && setEditing(true)}
       >
         {editing ? (
@@ -2840,71 +2844,28 @@ const getUserDisplayName = (u) => {
         />
       )}
 
-      {/* Import Dialog */}
-      <Dialog 
-        open={importDialogOpen} 
-        onClose={() => {
-          setImportDialogOpen(false);
-          setImportFile(null);
-          setImportLoading(false);
-        }} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>Import Users</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Import users from a CSV file. Make sure you have downloaded the template and filled it correctly.
-          </Typography>
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              <strong>Instructions:</strong>
-            </Typography>
-            <Typography variant="body2" component="ul" sx={{ pl: 2, mb: 0 }}>
-              <li>Download the template Excel file below</li>
-              <li>Fill in your user data following the template format</li>
-              <li>Required fields are marked with asterisk (*)</li>
-              <li>You can edit the info after upload the CSV file</li>
-              <li style={{ color: 'red' }}>Upload the completed CSV file</li>
-            </Typography>
-          </Box>
-          <Box sx={{ mb: 2 }}>
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              onClick={downloadTemplateCSV}
-              startIcon={<FileDownload />}
-            >
-              Download Template Excel
-            </Button>
-          </Box>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => setImportFile(e.target.files[0])}
-            style={{ marginBottom: '16px' }}
-          />
-          {importFile && (
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Selected file: <strong>{importFile.name}</strong>
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleImport}
-            disabled={!importFile || importLoading}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Upload & Preview'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Import Dialog (reused) */}
+      <ImportDialog
+        open={importDialogOpen}
+        onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
+        title="Import Users"
+        instructions={[
+          'Download the template Excel file below',
+          'Fill in your user data following the template format',
+          'Required fields are marked with asterisk (*)',
+          'You can edit the info after upload the CSV file',
+          'Upload the completed CSV file'
+        ]}
+        importFile={importFile}
+        setImportFile={setImportFile}
+        importLoading={importLoading}
+        onImport={handleImport}
+        downloadTemplate={downloadTemplateCSV}
+      />
 
       {/* Import Preview Dialog */}
       <Dialog 
+        className="import-preview-dialog"
         open={importPreviewOpen} 
         onClose={(event, reason) => {
           if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
@@ -3023,22 +2984,27 @@ const getUserDisplayName = (u) => {
           </div>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => {
-              setImportPreviewOpen(false);
-              setImportedData([]);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleFinalImport}
-            disabled={importLoading}
-          >
-            {importLoading ? <CircularProgress size={20} /> : 'Finalize Import'}
-          </Button>
+          <div className="dialog-actions import-preview-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setImportPreviewOpen(false);
+                setImportedData([]);
+              }}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleFinalImport}
+              disabled={importLoading}
+            >
+              {importLoading ? <span className="spinner" aria-hidden="true"></span> : 'Finalize Import'}
+            </button>
+          </div>
         </DialogActions>
       </Dialog>
 

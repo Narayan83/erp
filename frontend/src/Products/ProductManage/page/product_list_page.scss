@@ -440,6 +440,102 @@ table thead th,
   margin-bottom: 8px;
 }
 
+/* -----------------------------
+   Inline-style → classes (moved from JSX)
+   ----------------------------- */
+/* Stock low indicator */
+.low-stock {
+  color: #d32f2f;
+  font-weight: 700;
+}
+
+/* Small thumbnail used in product list */
+.image-wrap {
+  display: inline-block;
+  position: relative;
+}
+.product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.product-image:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Variant color & images */
+.color-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  flex-shrink: 0;
+  background-color: var(--swatch-color);
+}
+.images-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.variant-image {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.variant-image:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.16);
+}
+/* Ensure main image badge icon uses smaller size as expected */
+.variants-table .main-image-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Instruction lists used in dialogs */
+.instruction-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* Product view modal specific tweaks that were inline */
+.product-view-modal .product-details-container {
+  background-color: white;
+  color: black;
+}
+.product-view-modal .loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Simple utility for file inputs on this page */
+.file-input {
+  margin-bottom: 16px;
+}
+
 /* Plain popover/modal used by DisplayPreferences */
 .dp-modal-overlay {
   position: fixed;
@@ -1013,6 +1109,38 @@ tbody td:nth-child(8) {
 }
 .dialog-actions button.btn-secondary:hover {
   background: #d0d0d0;
+}
+
+/* Import preview specific actions - replace MUI buttons with project buttons and layout */
+.import-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+}
+.import-preview-actions .btn-secondary {
+  margin-right: auto;
+  background: transparent;
+  color: $primary-500;
+}
+.import-preview-actions .btn-secondary:hover {
+  background: rgba(25, 118, 210, 0.04);
+}
+.import-preview-actions .btn-primary {
+  min-width: 150px;
+  padding: 8px 20px;
+}
+.import-preview-actions .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hide MUI Button root inside this dialog so only our native buttons show */
+.import-preview-dialog .MuiButton-root {
+  display: none !important;
 }
 
 /* -----------------------------
