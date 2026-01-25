@@ -1,4 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../../config/Config";
 import { FaUpload, FaTimes, FaCheck } from 'react-icons/fa';
 import { MdCrop, MdDelete } from 'react-icons/md';
 import ImageEditor from '../../../Products/ProductManage/Components/ImageEditor';
@@ -10,6 +12,26 @@ export default function QrCode({ isOpen = false, onClose = () => {}, onSave = ()
   const [fileName, setFileName] = useState(null);
   const [preview, setPreview] = useState(null);
   const [showImageEditor, setShowImageEditor] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchData = async () => {
+        try {
+          const res = await axios.get(`${BASE_URL}/api/integrations`, {
+            params: { type: 'qr', provider: 'custom' }
+          });
+          if (res.data && res.data.length > 0) {
+            const config = res.data[0].config;
+            setPreview(config.dataUrl || config.image);
+            setFileName(config.fileName || 'qrcode.png');
+          }
+        } catch (err) {
+          console.error("Error fetching QR code:", err);
+        }
+      };
+      fetchData();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

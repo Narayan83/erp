@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+import { BASE_URL } from "../config/Config";
 import "./salesconfiguration.scss";
 
 import { FaUsers, FaTag, FaBox, FaBoxOpen, FaCity, FaPlus, FaTimesCircle, FaThumbsDown, FaFileAlt, FaSignature, FaUniversity, FaClipboardList, FaQrcode, FaMoneyBillWave, FaEnvelope, FaShareAlt, FaStar, FaCode, FaFileInvoiceDollar, FaColumns, FaListAlt, FaFileContract, FaTasks, FaUserFriends, FaCalendarAlt, FaBoxes, FaChevronLeft, FaBarcode } from 'react-icons/fa';
@@ -18,9 +20,39 @@ import PaymentLink from "../Admin Master/page/PaymentLink/PaymentLink";
 import Email from "../Admin Master/page/Email/Email";
 import Integrations from "../Admin Master/page/Integrations/Integrations";
 import QrCode from "../Admin Master/page/QrCode/QrCode";
+import SavedTemplate from "../Admin Master/page/SavedTemplate/SavedTemplate";
 
 const Salesconfiguration = () => {
 	const navigate = useNavigate();
+
+	const saveIntegration = async (type, provider, config, name) => {
+		try {
+			// Check if already exists
+			const res = await axios.get(`${BASE_URL}/api/integrations`, {
+				params: { type, provider }
+			});
+
+			const existing = res.data && res.data.length > 0 ? res.data[0] : null;
+
+			const payload = {
+				name: name || provider,
+				type,
+				provider,
+				config,
+				is_active: true
+			};
+
+			if (existing) {
+				await axios.put(`${BASE_URL}/api/integrations/${existing.id}`, payload);
+			} else {
+				await axios.post(`${BASE_URL}/api/integrations`, payload);
+			}
+			return true;
+		} catch (error) {
+			console.error(`Error saving integration ${type}/${provider}:`, error);
+			throw error;
+		}
+	};
 
 	const [showSources, setShowSources] = useState(false);
 	const [showTags, setShowTags] = useState(false);
@@ -36,6 +68,7 @@ const Salesconfiguration = () => {
 	const [showEmail, setShowEmail] = useState(false);
 	const [showIntegrations, setShowIntegrations] = useState(false);
 	const [showQrCode, setShowQrCode] = useState(false);
+	const [showSavedTemplates, setShowSavedTemplates] = useState(false);
 
 	const formats = [
 		{ title: "Print Header", desc: "Upload or create a header image to include in printables.", key: "header", icon: FaFileAlt },
@@ -78,6 +111,7 @@ const Salesconfiguration = () => {
 		else if (key === "header") { setShowPrintHeader(true); return; }
 		else if (key === "signature") { setShowDigitalSign(true); return; }
 		else if (key === "quotes") { setShowNonStock(true); return; }
+		else if (key === "templates") { setShowSavedTemplates(true); return; }
 		else if (key === "document-series") { navigate("/ManageSeries"); return; }
 		else navigate(`/configuration/${key}`);
 	};
@@ -108,9 +142,9 @@ const Salesconfiguration = () => {
 		<div className="sales-config-page">
 			<div className="page-header">
 				<h1 className="page-title">Sales Configuration</h1>
-				<button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+				{/* <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
 					<FaChevronLeft /> Back
-				</button>
+				</button> */}
 			</div>
 		{!showOnlyCRM && (			<section className="section">
 				<div className="section-ribbon blue">
@@ -195,12 +229,72 @@ const Salesconfiguration = () => {
 	<PrintHeader show={showPrintHeader} onClose={() => setShowPrintHeader(false)} onSave={(data) => { /* TODO: call API to save header. For now close modal */ setShowPrintHeader(false); }} />
 
 	{/* Digital Signature modal opened directly from Sales Configuration */}
-	<DigitalSign show={showDigitalSign} onClose={() => setShowDigitalSign(false)} onSave={(data) => { /* TODO: call API to save signature. For now close modal */ setShowDigitalSign(false); }} />
+	<DigitalSign 
+		show={showDigitalSign} 
+		onClose={() => setShowDigitalSign(false)} 
+		onSave={async (data) => { 
+			try {
+				await saveIntegration('digital_signature', 'custom', data, 'Digital Signature');
+				setShowDigitalSign(false);
+			} catch (e) {
+				alert("Failed to save digital signature");
+			}
+		}} 
+	/>
 
-	<PaymentLink isOpen={showPaymentLink} onClose={() => setShowPaymentLink(false)} />
-	<Email isOpen={showEmail} onClose={() => setShowEmail(false)} />
-	<Integrations isOpen={showIntegrations} onClose={() => setShowIntegrations(false)} />
-	<QrCode isOpen={showQrCode} onClose={() => setShowQrCode(false)} />
+	<PaymentLink 
+		isOpen={showPaymentLink} 
+		onClose={() => setShowPaymentLink(false)} 
+		onSave={async (link) => {
+			try {
+				await saveIntegration('payment', 'custom', { link }, 'Payment Link');
+				setShowPaymentLink(false);
+			} catch (e) {
+				alert("Failed to save payment link");
+			}
+		}}
+	/>
+	<Email 
+		isOpen={showEmail} 
+		onClose={() => setShowEmail(false)} 
+		onSave={async (data) => {
+			try {
+				await saveIntegration('email', data.provider, data, 'Email Account');
+				setShowEmail(false);
+			} catch (e) {
+				alert("Failed to save email account");
+			}
+		}}
+	/>
+	<Integrations 
+		isOpen={showIntegrations} 
+		onClose={() => setShowIntegrations(false)} 
+		onSaveIntegration={saveIntegration}
+	/>
+	<QrCode 
+		isOpen={showQrCode} 
+		onClose={() => setShowQrCode(false)} 
+		onSave={async (data) => {
+			try {
+				await saveIntegration('qr', 'custom', data, 'QR Code');
+				setShowQrCode(false);
+			} catch (e) {
+				alert("Failed to save QR code");
+			}
+		}}
+	/>
+
+	{showSavedTemplates && (
+		<SavedTemplate 
+			onClose={() => setShowSavedTemplates(false)} 
+			onSelect={(template) => {
+				// In settings we probably just want to view/delete, 
+				// but we could also navigate to the create page with this template
+				console.log("Selected template in settings:", template);
+				setShowSavedTemplates(false);
+			}}
+		/>
+	)}
 
 		{!showOnlyCRM && (
 		<section className="section">
@@ -243,7 +337,7 @@ const Salesconfiguration = () => {
 					<div className="cards-grid">
 						{salesDocuments.map((c) => {
 							const Icon = c.icon;
-						if (c.key === 'document-series' || c.key === 'quotes') {
+						if (c.key === 'document-series' || c.key === 'quotes' || c.key === 'templates') {
 								return (
 									<button key={c.key} className="config-card" onClick={() => handleCardClick(c.key)}>
 										<div className="card-icon">{Icon ? <Icon /> : c.title.charAt(0)}</div>

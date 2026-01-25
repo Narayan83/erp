@@ -3,7 +3,7 @@ import { FaTimes, FaCheck } from 'react-icons/fa';
 import '../DigitalSign/DigitalSign.scss';
 import './Email.scss';
 
-export default function OtherMail({ isOpen = false, onClose = () => {}, onSave = () => {}, provider = 'other', onSwitchProvider = () => {} }) {
+export default function OtherMail({ isOpen = false, onClose = () => {}, onSave = () => {}, provider = 'other', onSwitchProvider = () => {}, initialData = null }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [host, setHost] = useState('');
@@ -14,9 +14,18 @@ export default function OtherMail({ isOpen = false, onClose = () => {}, onSave =
 
   useEffect(() => {
     if (isOpen) {
-      setEmail(''); setPassword(''); setHost(''); setPort(''); setSsl(true); setError(''); setLoading(false);
+      if (initialData) {
+        setEmail(initialData.email || '');
+        setPassword(initialData.password || '');
+        setHost(initialData.host || '');
+        setPort(initialData.port || '');
+        setSsl(initialData.ssl !== false); // default true
+      } else {
+        setEmail(''); setPassword(''); setHost(''); setPort(''); setSsl(true);
+      }
+      setError(''); setLoading(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const handleSave = async () => {
     setError('');

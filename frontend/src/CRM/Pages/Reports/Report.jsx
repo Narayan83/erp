@@ -58,10 +58,10 @@ const Report = () => {
     <div className="reports-container">
       <div className="header">
         <h2>Lead Reports</h2>
-        <button className="back-btn" onClick={handleBack}>
+        {/* <button className="back-btn" onClick={handleBack}>
           <FaArrowLeft style={{ marginRight: '5px' }} />
           Back
-        </button>
+        </button> */}
       </div>
       <div className="reports-grid">
         {reports.map((report, index) => (

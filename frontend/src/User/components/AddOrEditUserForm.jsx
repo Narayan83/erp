@@ -2966,12 +2966,12 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
             {errors.title && <div className="error-message">{errors.title.message}</div>}
           </div>
 
-          <div style={{ gridColumn: '1 / -1' }}>
+          {/* <div style={{ gridColumn: '1 / -1' }}>
             <h6>Assign to Executive</h6>
-          </div>
+          </div> */}
 
           {/* Select Department */}
-          <div className="form-field">
+          {/* <div className="form-field">
             <label htmlFor="assigned_department_id">Select Department</label>
             <div className="form-select-wrapper">
               <Controller
@@ -2993,10 +2993,10 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
             {errors.assigned_department_id && <div className="error-message">{errors.assigned_department_id.message}</div>}
-          </div>
+          </div> */}
 
           {/* Select Executive */}
-          <div className="form-field">
+          {/* <div className="form-field">
             <label htmlFor="assigned_executive_id">Select Executive</label>
             <div className="form-select-wrapper">
               <Controller
@@ -3025,7 +3025,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
             {errors.assigned_executive_id && <div className="error-message">{errors.assigned_executive_id.message}</div>}
-          </div>
+          </div> */}
         </div>
       </div>
 

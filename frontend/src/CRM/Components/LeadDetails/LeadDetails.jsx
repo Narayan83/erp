@@ -323,7 +323,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
                 <button className="btn small" onClick={() => { if (onEdit) onEdit(lead); }}>Reassign</button>
                 <button className="btn small" onClick={() => setShowUpdateStatus(true)}>Update Status</button>
                 <button className="btn small" onClick={() => openQuoteFromLead()}>+ Quote</button>
-                <button className="btn small">Business History</button>
+                <button className="btn small">History</button>
               </div>
             </div>
 

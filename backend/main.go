@@ -60,6 +60,9 @@ func main() {
 	handler.SetCompanyBranchDB(initializers.DB)
 	// Series master
 	handler.SetSeriesDB(initializers.DB)
+	handler.SetPrinterHeaderDB(initializers.DB)
+	handler.SetIntegrationDB(initializers.DB)
+	handler.SetQuotationTemplatesDB(initializers.DB)
 
 	handler.SetDepartmentDB(initializers.DB)
 	handler.SetDesignationDB(initializers.DB)
@@ -257,6 +260,12 @@ func main() {
 	app.Put("/api/quotations/:id", handler.UpdateQuotationTable)
 	app.Delete("/api/quotations/:id", handler.DeleteQuotationTable)
 
+	// Quotation Templates
+	api.Post("/quotation-templates", handler.CreateQuotationTemplate)
+	api.Get("/quotation-templates", handler.GetAllQuotationTemplates)
+	api.Get("/quotation-templates/:id", handler.GetQuotationTemplateByID)
+	api.Delete("/quotation-templates/:id", handler.DeleteQuotationTemplate)
+
 	app.Get("/api/quotations/max-scp-count/:sales_credit_person_id", handler.GetMaxQuotationScpCount)
 
 	//HsnCode
@@ -307,6 +316,20 @@ func main() {
 
 	// IndiaMART Integration
 	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
+
+	// Printer Header
+	api.Post("/printer-headers", handler.CreatePrinterHeader)
+	api.Get("/printer-headers", handler.GetPrinterHeaders)
+	api.Get("/printer-headers/:id", handler.GetPrinterHeader)
+	api.Put("/printer-headers/:id", handler.UpdatePrinterHeader)
+	api.Delete("/printer-headers/:id", handler.DeletePrinterHeader)
+
+	// Integrations
+	api.Post("/integrations", handler.CreateIntegration)
+	api.Get("/integrations", handler.GetIntegrations)
+	api.Get("/integrations/:id", handler.GetIntegration)
+	api.Put("/integrations/:id", handler.UpdateIntegration)
+	api.Delete("/integrations/:id", handler.DeleteIntegration)
 
 	// menu
 	api.Get("/loadMenus", handler.GetAllMenus)
@@ -451,6 +474,7 @@ func main() {
 	// Employees
 	api.Post("/employees", handler.CreateEmployeeAsUser)
 	api.Get("/employees", handler.GetEmployees)
+	api.Get("/employees/non-heads", handler.GetNonHeadEmployees)
 	api.Get("/employees/:id", handler.GetEmployee)
 	api.Put("/employees/:id", handler.UpdateEmployee)
 	api.Delete("/employees/:id", handler.DeleteEmployee)

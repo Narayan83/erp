@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import axios from 'axios';
+import { BASE_URL } from "../../../config/Config";
 import { FaUpload, FaTimes, FaCheck } from 'react-icons/fa';
 import { MdCrop, MdDelete } from 'react-icons/md';
 import ImageEditor from '../../../Products/ProductManage/Components/ImageEditor';
@@ -9,6 +11,26 @@ export default function DigitalSign({ show = false, onClose = () => {}, onSave =
   const [fileName, setFileName] = useState(null);
   const [preview, setPreview] = useState(null);
   const [showImageEditor, setShowImageEditor] = useState(false);
+
+  useEffect(() => {
+    if (show) {
+      const fetchData = async () => {
+        try {
+          const res = await axios.get(`${BASE_URL}/api/integrations`, {
+            params: { type: 'digital_signature', provider: 'custom' }
+          });
+          if (res.data && res.data.length > 0) {
+            const config = res.data[0].config;
+            setPreview(config.dataUrl || config.image);
+            setFileName(config.fileName || 'signature.png');
+          }
+        } catch (err) {
+          console.error("Error fetching digital signature:", err);
+        }
+      };
+      fetchData();
+    }
+  }, [show]);
 
   if (!show) return null;
 

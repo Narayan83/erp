@@ -70,6 +70,9 @@ type QuotationTable struct {
 	ShippingCode  *string  `gorm:"type:varchar(50)" json:"shipping_code,omitempty"`
 	GSTApplicable *bool    `json:"gst_applicable,omitempty"`
 
+	DocumentType string `gorm:"type:varchar(50)" json:"document_type,omitempty"`
+	Type         string `gorm:"type:varchar(50)" json:"type,omitempty"`
+
 	// ?? Addresses
 	BillingAddressID uint        `gorm:"not null" json:"billing_address_id"`
 	BillingAddress   UserAddress `gorm:"foreignKey:BillingAddressID" json:"billing_address"`

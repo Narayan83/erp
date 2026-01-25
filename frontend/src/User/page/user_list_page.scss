@@ -1021,43 +1021,6 @@
   }
 }
 
-// Responsive adjustments
-@media (max-width: 1200px) {
-  .form-grid {
-    &.col-4 {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    &.col-3 {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-}
-
-@media (max-width: 768px) {
-  .user-view-dialog-content {
-    width: 98%;
-    max-height: 95vh;
-  }
-
-  .user-view-dialog-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .documents-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .account-types-container {
-    gap: 8px;
-  }
-}
-
 // ============================================================================
 // IMPORT TABLES STYLES
 // ============================================================================

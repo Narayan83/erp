@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../../config/Config";
 
 export default function PaymentLink({ isOpen = false, onClose = () => {}, onSave = () => {} }) {
   const [link, setLink] = useState("");
@@ -10,6 +12,20 @@ export default function PaymentLink({ isOpen = false, onClose = () => {}, onSave
       setLink("");
       setError("");
       setLoading(false);
+
+      const fetchData = async () => {
+        try {
+          const res = await axios.get(`${BASE_URL}/api/integrations`, {
+            params: { type: 'payment', provider: 'custom' }
+          });
+          if (res.data && res.data.length > 0) {
+            setLink(res.data[0].config.link || "");
+          }
+        } catch (err) {
+          console.error("Error fetching payment link:", err);
+        }
+      };
+      fetchData();
     }
   }, [isOpen]);
 

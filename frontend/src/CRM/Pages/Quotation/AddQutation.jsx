@@ -21,8 +21,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { BASE_URL } from "../../../config/Config";
 import TermsConditionSelector from "./TermsConditionModal";
 import PrintSettingsDialog from "../../../PrintSettings/Print";
+import SavedTemplate from "../../../Admin Master/page/SavedTemplate/SavedTemplate";
 import { useParams } from "react-router-dom"; 
-
 import {
   TextField,
   SearchableSelect,
@@ -223,6 +223,12 @@ const [additiondiscounts, setAdditiondiscounts] = useState([]);
 
 const [selectedFile, setSelectedFile]  = useState(null); 
 const [attachmentPath, setAttachmentPath] = useState(null);
+
+// Template State
+const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+const [templateName, setTemplateName] = useState("");
+const [showTemplateModal, setShowTemplateModal] = useState(false);
+const [showSavedTemplates, setShowSavedTemplates] = useState(false);
 
 // Bank Details Modal state
 const [openBankModal, setOpenBankModal] = useState(false);
@@ -1253,28 +1259,21 @@ const handleSaveQuotation = async () => {
 
   let computedTotal = base + (base * (percentCharges / 100)) + fixedCharges - (base * (percentDiscounts / 100)) - fixedDiscounts;
 
-  // totalBeforeRound is the computed total after adjustments (do not add tax again - tax was already included in `base`)
   const totalBeforeRound = computedTotal;
   const roundoffAmount = includeRoundOff ? Number((Math.round(totalBeforeRound) - totalBeforeRound).toFixed(2)) : 0;
   const grandTotalToSend = includeRoundOff ? Number(Math.round(totalBeforeRound)) : Number(Number(totalBeforeRound).toFixed(2));
-
-  // Sum up per-item tax amounts (cgst+sgst+igst) so we can send an accurate total tax amount
   const computedTaxAmount = tableItems.reduce((s, it) => s + (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0)), 0);
 
   const payload = {
     quotation: {
-      // series_id is optional — allow creating a quotation without selecting a series
       series_id: selectedSeries ? Number(selectedSeries) : null,
-      // include company/branch context when available
-      company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : null,
-      company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : null,
-      company_branch_bank_id:selectedBankId,
-      // If no quotation number provided on create, send null so backend can assign one if desired
+      company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : 0,
+      company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : 0,
+      company_branch_bank_id: selectedBankId ? Number(selectedBankId) : null,
       quotation_number: isEditMode ? (qutationNo || quotationData?.quotation_number || '') : (qutationNo && qutationNo.toString().trim() !== '' ? qutationNo : null),
       quotation_date: new Date(quotationDate).toISOString(),
       customer_id: Number(selectedCustomer.id),
-      sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : null,
-      // Backend expects quotation_scp_count (not null constraint)
+      sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : 0,
       quotation_scp_count: isEditMode 
         ? Number(currentScpCount?.max_quotation_scp_count || 0) 
         : Number(currentScpCount?.max_quotation_scp_count || 0) + 1,
@@ -1284,15 +1283,15 @@ const handleSaveQuotation = async () => {
       tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
       roundoff_amount: roundoffAmount,
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
-      extra_charges: extrcharges, 
-      discounts: additiondiscounts, 
+      extra_charges: extrcharges,
+      discounts: additiondiscounts,
       document_type: docType || null,
       type: docType || null,
       is_proforma: (docType && String(docType).toLowerCase().includes('proforma')) || false,
       status: isEditMode ? (quotationData?.status || "Open") : "Open",
       created_by: Number(selectedEmployee),
-      billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : null, 
-      shipping_address_id: isSameAsBilling ? (selectedBillingAddressId ? Number(selectedBillingAddressId) : null) : (selectedShippingAddressId ? Number(selectedShippingAddressId) : null), 
+      billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : 0,
+      shipping_address_id: isSameAsBilling ? (selectedBillingAddressId ? Number(selectedBillingAddressId) : 0) : (selectedShippingAddressId ? Number(selectedShippingAddressId) : 0),
       terms_and_conditions: tandcSelections,
       note: note,
       references: references,
@@ -1300,10 +1299,8 @@ const handleSaveQuotation = async () => {
       end_dealer_name: enddealer,
     },
     quotation_items: tableItems.map((it) => {
-      // product_id should be null for non-product rows (e.g. services) to avoid FK violation
       const pid = Number(it.id);
       const product_id = (Number.isFinite(pid) && pid > 0) ? pid : null;
-
       return {
         product_id,
         product_code: it.sku || '',
@@ -1313,23 +1310,18 @@ const handleSaveQuotation = async () => {
         rate: Number(it.rate) || 0,
         lead_time: String(it.leadTime || ''),
         hsncode: it.hsn || '',
+        discount_percentage: Number(it.discountPercent) || 0,
+        discount_amount: Number(it.discount) || 0,
         gst: Number(it.gst || 0),
         tax_amount: Number((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) || 0,
         line_total: Number(it.amount) || 0,
-        // helpful for backend to distinguish service/non-stock lines
         is_service: !!it._isService,
       };
     }),
   };
 
-  // Log payload for debugging
   try {
-    console.log('Quotation payload (JS object):', payload);
-    console.log('Quotation items JSON string:', JSON.stringify(payload.quotation_items));
-
     setSaving(true);
-
-    // If no file selected, send JSON body to avoid multipart parsing issues
     if (!selectedFile) {
       if (isEditMode && id) {
         await axios.put(`${BASE_URL}/api/quotations/${id}`, payload);
@@ -1338,22 +1330,33 @@ const handleSaveQuotation = async () => {
         await axios.post(`${BASE_URL}/api/quotations`, payload);
         alert("Quotation saved successfully.");
       }
-      navigate("/quotation-list");
-      return;
+    } else {
+      const formData = new FormData();
+      formData.append("quotation", JSON.stringify(payload.quotation));
+      formData.append("quotation_items", JSON.stringify(payload.quotation_items));
+      formData.append("attachment", selectedFile);
+
+      if (isEditMode && id) {
+        await axios.put(`${BASE_URL}/api/quotations/${id}`, formData);
+        alert("Quotation updated successfully.");
+      } else {
+        await axios.post(`${BASE_URL}/api/quotations`, formData);
+        alert("Quotation saved successfully.");
+      }
     }
 
-    // Otherwise use multipart/form-data when a file is present
-    const formData = new FormData();
-    formData.append("quotation", JSON.stringify(payload.quotation));
-    formData.append("quotation_items", JSON.stringify(payload.quotation_items));
-    formData.append("attachment", selectedFile);
-
-    if (isEditMode && id) {
-      await axios.put(`${BASE_URL}/api/quotations/${id}`, formData);
-      alert("Quotation updated successfully.");
-    } else {
-      await axios.post(`${BASE_URL}/api/quotations`, formData);
-      alert("Quotation saved successfully.");
+    if (saveAsTemplate) {
+      const tName = templateName || (payload.quotation.quotation_number || `Template_${Date.now()}`);
+      const tPayload = {
+        template_name: tName,
+        quotation: payload.quotation,
+        quotation_items: payload.quotation_items
+      };
+      try {
+        await axios.post(`${BASE_URL}/api/quotation-templates`, tPayload);
+      } catch (tErr) {
+        console.error("Failed to save template via Next Action", tErr);
+      }
     }
 
     navigate("/quotation-list");
@@ -1362,6 +1365,100 @@ const handleSaveQuotation = async () => {
     alert(`Failed to ${isEditMode ? 'update' : 'save'} quotation.`);
   } finally {
     setSaving(false);
+  }
+};
+
+const handleSaveAsTemplate = async () => {
+  if (!templateName) return alert("Please enter a template name.");
+  if (!selectedCustomer) return alert("Select a customer.");
+  if (!tableItems.length) return alert("Add at least one item.");
+
+  const base = Number(grandTotal) || 0;
+  const percentCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? Number(ch.value) : 0), 0);
+  const fixedCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? 0 : Number(ch.value) || 0), 0);
+  const percentDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? Number(ds.value) : 0), 0);
+  const fixedDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? 0 : Number(ds.value) || 0), 0);
+
+  let computedTotal = base + (base * (percentCharges / 100)) + fixedCharges - (base * (percentDiscounts / 100)) - fixedDiscounts;
+
+  const totalBeforeRound = computedTotal;
+  const roundoffAmount = includeRoundOff ? Number((Math.round(totalBeforeRound) - totalBeforeRound).toFixed(2)) : 0;
+  const grandTotalToSend = includeRoundOff ? Number(Math.round(totalBeforeRound)) : Number(Number(totalBeforeRound).toFixed(2));
+  const computedTaxAmount = tableItems.reduce((s, it) => s + (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0)), 0);
+
+  const payload = {
+    template_name: templateName,
+    quotation: {
+      series_id: selectedSeries ? Number(selectedSeries) : null,
+      company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : null,
+      company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : null,
+      company_branch_bank_id: selectedBankId,
+      quotation_date: new Date(quotationDate).toISOString(),
+      customer_id: Number(selectedCustomer.id),
+      sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : null,
+      quotation_scp_count: 0, // Placeholder for templates
+      valid_until: new Date(validTill).toISOString(),
+      contact_person: contactPerson,
+      total_amount: Number(grandTotal) || 0,
+      tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
+      roundoff_amount: roundoffAmount,
+      grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
+      extra_charges: extrcharges,
+      discounts: additiondiscounts,
+      document_type: docType || null,
+      type: docType || null,
+      is_proforma: (docType && String(docType).toLowerCase().includes('proforma')) || false,
+      status: "draft",
+      created_by: Number(selectedEmployee),
+      billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : null,
+      shipping_address_id: isSameAsBilling ? (selectedBillingAddressId ? Number(selectedBillingAddressId) : null) : (selectedShippingAddressId ? Number(selectedShippingAddressId) : null),
+      terms_and_conditions: tandcSelections,
+      note: note,
+      references: references,
+      end_customer_name: endcustomer,
+      end_dealer_name: enddealer,
+    },
+    quotation_items: tableItems.map((it) => {
+      const pid = Number(it.id);
+      const product_id = (Number.isFinite(pid) && pid > 0) ? pid : null;
+      return {
+        product_id,
+        product_code: it.sku || '',
+        description: it.desc || it.name || '',
+        quantity: Number(it.qty) || 0,
+        unit: it.unit || '',
+        rate: Number(it.rate) || 0,
+        lead_time: String(it.leadTime || ''),
+        hsncode: it.hsn || '',
+        discount_percentage: Number(it.discountPercent) || 0,
+        discount_amount: Number(it.discount) || 0,
+        gst: Number(it.gst || 0),
+        tax_amount: Number((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) || 0,
+        line_total: Number(it.amount) || 0,
+        is_service: !!it._isService,
+      };
+    }),
+  };
+
+  try {
+    setSaving(true);
+    await axios.post(`${BASE_URL}/api/quotation-templates`, payload);
+    alert("Template saved successfully.");
+    setShowTemplateModal(false);
+    setTemplateName("");
+  } catch (err) {
+    console.error(err?.response?.data || err);
+    alert("Failed to save template.");
+  } finally {
+    setSaving(false);
+  }
+};
+
+
+const onSelectTemplate = (template) => {
+  if (template && template.qutation_table) {
+    prefillFormData(template.qutation_table);
+    setShowSavedTemplates(false);
   }
 };
 
@@ -1887,11 +1984,13 @@ const  prefillFormData = async (data) => {
   
   // Pre-fill customer
   if (data.customer) {
+     const customerId = data.customer.id || data.customer.ID;
      setSelectedCustomer(data.customer);
-      const response = await axios.get(`${BASE_URL}/api/users/${data.customer.id}`);
-      console.log("this is customer");
-      console.log(response)
-      handleSelectCustomer(response.data.user);
+     if (customerId) {
+        const response = await axios.get(`${BASE_URL}/api/users/${customerId}`);
+        console.log("this is customer", response.data);
+        handleSelectCustomer(response.data.user);
+     }
   }
 
   if(data.contact_person){
@@ -1921,13 +2020,22 @@ const  prefillFormData = async (data) => {
     }
   }
 
+  // Pre-fill bank details
+  const possibleBankId = data.company_branch_bank_id || data.company_bank_id || data.bank_id || data.bank?.id || data.bank?.ID;
+  if (possibleBankId) {
+    setSelectedBankId(possibleBankId.toString());
+  }
+
 
 
   // Pre-fill series
-  if (data.series_id) {
-    setSelectedSeries(data.series_id.toString());
-    const split = splitQuotationNumber(data.quotation_number, data.series.prefix, data.series.postfix);
-    setSeqNumber(String(split.number));
+  const seriesId = data.series_id || data.SeriesID || data.seriesID;
+  if (seriesId) {
+    setSelectedSeries(seriesId.toString());
+    if (data.quotation_number && data.series) {
+      const split = splitQuotationNumber(data.quotation_number, data.series.prefix, data.series.postfix);
+      setSeqNumber(String(split.number));
+    }
   }
 
   // Pre-fill billing address - use the preloaded billing address object
@@ -1966,8 +2074,9 @@ const  prefillFormData = async (data) => {
   }
 
   // Pre-fill employee/sales credit
-  if (data.sales_credit_person_id) {
-    setSelectedEmployee(data.sales_credit_person_id.toString());
+  const employeeId = data.sales_credit_person_id || data.SalesCreditPersonID || data.employee_id;
+  if (employeeId) {
+    setSelectedEmployee(employeeId.toString());
   }
 
   // Pre-fill dates
@@ -2336,10 +2445,10 @@ const  prefillFormData = async (data) => {
             <span><IoMdPrint /></span>
             Print Settings
           </button>
-          <button className="btn btn--back" onClick={() => navigate(-1)}>
+          {/* <button className="btn btn--back" onClick={() => navigate(-1)}>
             <span><FaLongArrowAltLeft /></span>
             Back
-          </button>
+          </button> */}
           {isEditMode && (
             <button className="btn btn--save" onClick={() => handleSaveQuotation()} disabled={saving}>
               <MdEdit /> Update
@@ -2406,7 +2515,16 @@ const  prefillFormData = async (data) => {
                 None
               </div>
             ) : (
-              <select id="copyFrom" className="form-control">
+              <select
+                id="copyFrom"
+                className="form-control"
+                onChange={(e) => {
+                  if (e.target.value === "templates") {
+                    setShowSavedTemplates(true);
+                  }
+                  e.target.value = "none";
+                }}
+              >
                 <option value="none">None</option>
                 <option value="earlier">Earlier Quotations</option>
                 <option value="templates">Saved Templates</option>
@@ -3515,11 +3633,17 @@ const  prefillFormData = async (data) => {
               <h5>Next Actions</h5>
               <div className="col-md-12">
                 <div className="form-check">
-                  <input className="form-check-input" type="checkbox" value="" id="1" />
-                <label className="form-check-label" htmlFor="1">
-                  Save Template
-                </label>
-              </div>
+                  <input 
+                    className="form-check-input" 
+                    type="checkbox" 
+                    id="saveAsTemplateCheck" 
+                    checked={saveAsTemplate}
+                    onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor="saveAsTemplateCheck">
+                    Save as Template
+                  </label>
+                </div>
 
 
                <div className="form-check">
@@ -4235,6 +4359,43 @@ const  prefillFormData = async (data) => {
       </div>
     </div>
   </div>
+)}
+
+{showTemplateModal && (
+  <div className="modal-overlay">
+    <div className="modal-content" style={{ width: '400px' }}>
+      <div className="modal-header">
+        <h3>Save as Template</h3>
+        <button onClick={() => setShowTemplateModal(false)} className="close-btn">&times;</button>
+      </div>
+      <div className="modal-body">
+        <div className="form-group">
+          <label>Template Name:</label>
+          <input
+            type="text"
+            className="form-control"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Enter template name"
+          />
+        </div>
+      </div>
+      <div className="modal-footer">
+        <button className="btn btn--back" onClick={() => setShowTemplateModal(false)}>Cancel</button>
+        <button className="btn btn--save ml-2" onClick={handleSaveAsTemplate} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Template'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showSavedTemplates && (
+  <SavedTemplate 
+    onClose={() => setShowSavedTemplates(false)} 
+    onSelect={onSelectTemplate}
+    showAction={false}
+  />
 )}
 
     </section>

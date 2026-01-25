@@ -81,9 +81,9 @@ const Configuration = () => {
     <div className="configuration-container">
       {/* Header Section */}
       <div className="config-header">
-        <button className="back-btn" onClick={() => navigate('/crm')}>
+        {/* <button className="back-btn" onClick={() => navigate('/crm')}>
           <FaArrowLeft /> Back
-        </button>
+        </button> */}
         <h1>Sales Configuration</h1>
       </div>
 

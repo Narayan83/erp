@@ -485,6 +485,8 @@ func GetAllQuotationsTable(c *fiber.Ctx) error {
 	offset := (page - 1) * limit
 
 	if err := quotationTableDB.
+		// Exclude quotations that are saved as templates
+		Where("quotation_id NOT IN (SELECT template_quotation_id FROM qutation_templates)").
 		Preload("Series").
 		Preload("CompanyBranch").
 		Preload("CompanyBranchBank").
@@ -581,8 +583,42 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	var req QuotationRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+
+	// ---------------------------
+	// Parse Multipart or JSON
+	// ---------------------------
+	form, err := c.MultipartForm()
+	if err != nil {
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body", "details": err.Error()})
+		}
+	} else {
+		if len(form.Value["quotation"]) > 0 {
+			if err := json.Unmarshal([]byte(form.Value["quotation"][0]), &req.Quotation); err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid quotation JSON"})
+			}
+		}
+
+		if len(form.Value["quotation_items"]) > 0 {
+			if err := json.Unmarshal([]byte(form.Value["quotation_items"][0]), &req.QuotationItems); err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid quotation_items JSON"})
+			}
+		}
+	}
+
+	// ---------------------------
+	// File Upload (Update Attachment)
+	// ---------------------------
+	file, err := c.FormFile("attachment")
+	if err == nil {
+		uploadDir := "./uploads/quotations/"
+		_ = os.MkdirAll(uploadDir, 0755)
+
+		filePath := filepath.Join(uploadDir, file.Filename)
+		if err := c.SaveFile(file, filePath); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		req.Quotation.AttachmentPath = &filePath
 	}
 
 	tx := quotationTableDB.Begin()

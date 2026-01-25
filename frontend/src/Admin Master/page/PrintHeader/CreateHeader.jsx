@@ -4,12 +4,12 @@ import { MdCrop, MdDelete } from 'react-icons/md';
 import './CreateHeader.scss';
 import ImageEditor from '../../../Products/ProductManage/Components/ImageEditor';
 
-export default function CreateHeader({ show = false, onClose = () => {}, onCreate = () => {} }) {
+export default function CreateHeader({ show = false, onClose = () => {}, onCreate = () => {}, initialData = null }) {
   const fileRef = useRef(null);
   const [company, setCompany] = useState('');
   const [address, setAddress] = useState('');
   const [pin, setPin] = useState('');
-  const [cin, setCin] = useState('');
+  const [gstin, setGstin] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -18,6 +18,35 @@ export default function CreateHeader({ show = false, onClose = () => {}, onCreat
   const [logoPreview, setLogoPreview] = useState(null);
   const [textSide, setTextSide] = useState('left');
   const [showLogoEditor, setShowLogoEditor] = useState(false);
+
+  React.useEffect(() => {
+    if (show && initialData) {
+      // Map backend field names to component states
+      setCompany(initialData.header_title || '');
+      setAddress(initialData.address || '');
+      setPin(initialData.pin || '');
+      setGstin(initialData.gstin || '');
+      setPhone(initialData.mobile || '');
+      setEmail(initialData.email || '');
+      setWebsite(initialData.website || '');
+      setLogoPreview(initialData.logo_data || null);
+      setTextSide(initialData.alignment === 'right' ? 'right' : 'left');
+      setIncludeLogo(true);
+    } else if (!show) {
+      // Reset form when modal closes
+      setCompany('');
+      setAddress('');
+      setPin('');
+      setGstin('');
+      setPhone('');
+      setEmail('');
+      setWebsite('');
+      setLogoPreview(null);
+      setLogoFile(null);
+      setTextSide('left');
+      setIncludeLogo(true);
+    }
+  }, [show, initialData]);
 
   if (!show) return null;
 
@@ -90,7 +119,7 @@ export default function CreateHeader({ show = false, onClose = () => {}, onCreat
     if (address) lines.push(...address.split('\n'));
     // other small lines
     if (pin) lines.push(pin);
-    if (cin) lines.push(cin);
+    if (gstin) lines.push(gstin);
     if (phone) lines.push(phone);
     if (email) lines.push(email);
     if (website) lines.push(website);
@@ -129,7 +158,19 @@ export default function CreateHeader({ show = false, onClose = () => {}, onCreat
     });
 
     const dataUrl = canvas.toDataURL('image/png');
-    onCreate({ fileName: 'created-header.png', dataUrl });
+    const formValues = {
+      header_title: company,
+      header_subtitle: '',
+      address,
+      pin,
+      gstin,
+      mobile: phone,
+      email,
+      website,
+      alignment: textSide,
+      logo_data: logoPreview, // Only the logo image, not the composed canvas
+    };
+    onCreate({ fileName: 'created-header.png', dataUrl, formValues });
     onClose();
   }
 
@@ -148,7 +189,7 @@ export default function CreateHeader({ show = false, onClose = () => {}, onCreat
             <input className="input" placeholder="Company name" value={company} onChange={(e) => setCompany(e.target.value)} />
             <textarea className="input textarea" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
             <input className="input" placeholder="PIN Code" value={pin} onChange={(e) => setPin(e.target.value)} />
-            <input className="input" placeholder="CIN" value={cin} onChange={(e) => setCin(e.target.value)} />
+            <input className="input" placeholder="GSTIN" value={gstin} onChange={(e) => setGstin(e.target.value)} />
             <input className="input" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <input className="input" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input className="input" placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />

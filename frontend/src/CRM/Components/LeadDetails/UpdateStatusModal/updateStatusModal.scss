@@ -31,11 +31,43 @@
 }
 
 .update-status-header .close-btn {
-  background: none;
+  background: none !important;
   border: 0;
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  font-size: 20px;
   cursor: pointer;
-  color: #999;
+  color: #666 !important;
+  border-radius: 6px;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.08s ease;
+}
+
+.update-status-header .close-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: currentColor;
+}
+
+.update-status-header .close-btn svg path {
+  fill: currentColor;
+}
+
+.update-status-header .close-btn:hover {
+  color: #333;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.update-status-header .close-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(27, 114, 54, 0.12);
 }
 
 .update-status-body {
@@ -159,7 +191,6 @@
   width: 14px;
   height: 14px;
 }
-
 
 .btn {
   padding: 8px 12px;

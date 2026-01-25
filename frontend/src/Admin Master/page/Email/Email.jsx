@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../../config/Config";
 import { FaTimes, FaCheck } from 'react-icons/fa';
 import "../DigitalSign/DigitalSign.scss"; // reuse modal styles
 import "./Email.scss";
@@ -12,16 +14,60 @@ export default function Email({ isOpen = false, onClose = () => {}, onSave = () 
   const [error, setError] = useState("");
   const [showOtherModal, setShowOtherModal] = useState(false);
 
+  // Separate states for storing loaded data
+  const [gmailConfig, setGmailConfig] = useState({ email: "", appPassword: "" });
+  const [otherConfig, setOtherConfig] = useState({ email: "", password: "", host: "", port: "", ssl: true });
+
   useEffect(() => {
     if (isOpen) {
-      // reset when opened
-      setProvider("gmail");
-      setEmail("");
-      setAppPassword("");
       setError("");
       setLoading(false);
+
+      const fetchData = async () => {
+        try {
+          const res = await axios.get(`${BASE_URL}/api/integrations`, {
+            params: { type: 'email' }
+          });
+          if (res.data && res.data.length > 0) {
+            const gmail = res.data.find(it => it.provider === 'gmail');
+            const other = res.data.find(it => it.provider === 'other');
+
+            if (gmail) {
+              setGmailConfig(gmail.config);
+              // Default to gmail if it exists
+              setProvider("gmail");
+              setEmail(gmail.config.email || "");
+              setAppPassword(gmail.config.appPassword || "");
+            }
+            if (other) {
+              setOtherConfig(other.config);
+              if (!gmail) {
+                setProvider("other");
+              }
+            }
+          } else {
+            // Reset to default empty if no data
+            setProvider("gmail");
+            setEmail("");
+            setAppPassword("");
+          }
+        } catch (err) {
+          console.error("Error fetching email config:", err);
+        }
+      };
+      fetchData();
     }
   }, [isOpen]);
+
+  const handleProviderChange = (p) => {
+    setProvider(p);
+    if (p === 'gmail') {
+      setEmail(gmailConfig.email || "");
+      setAppPassword(gmailConfig.appPassword || "");
+    } else {
+      setShowOtherModal(true);
+    }
+  };
 
   const handleSave = async () => {
     setError("");
@@ -32,7 +78,9 @@ export default function Email({ isOpen = false, onClose = () => {}, onSave = () 
 
     setLoading(true);
     try {
-      await onSave({ provider, email: email.trim(), appPassword });
+      const data = { provider, email: email.trim(), appPassword };
+      await onSave(data);
+      setGmailConfig({ email: data.email, appPassword: data.appPassword });
       setLoading(false);
       onClose();
     } catch (err) {
@@ -54,8 +102,8 @@ export default function Email({ isOpen = false, onClose = () => {}, onSave = () 
 
         <div className="ds-body">
           <div className="email-radio-row">
-            <label className="email-radio"><input type="radio" name="provider" value="gmail" checked={provider === 'gmail'} onChange={() => setProvider('gmail')} /> <span>Gmail</span></label>
-            <label className="email-radio"><input type="radio" name="provider" value="other" checked={provider === 'other'} onChange={() => { setProvider('other'); setShowOtherModal(true); }} /> <span>Other Mail Sender</span></label>
+            <label className="email-radio"><input type="radio" name="provider" value="gmail" checked={provider === 'gmail'} onChange={() => handleProviderChange('gmail')} /> <span>Gmail</span></label>
+            <label className="email-radio"><input type="radio" name="provider" value="other" checked={provider === 'other'} onChange={() => handleProviderChange('other')} /> <span>Other Mail Sender</span></label>
           </div>
 
           <div className="email-row">
@@ -65,8 +113,10 @@ export default function Email({ isOpen = false, onClose = () => {}, onSave = () 
 
           <div className="email-row">
             <label className="label-left">App Password:</label>
-            <input className="email-input" type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} />
-            <button className="info-square" title="For Gmail, generate an App Password from your Google Account security settings">i</button>
+            <div style={{display:'flex', alignItems:'center', flex: 1}}>
+              <input className="email-input" type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} />
+              <button className="info-square" style={{marginLeft: 8}} title="For Gmail, generate an App Password from your Google Account security settings">i</button>
+            </div>
           </div>
 
           {error && <div className="error-text">{error}</div>}
@@ -84,11 +134,24 @@ export default function Email({ isOpen = false, onClose = () => {}, onSave = () 
       <OtherMail
         isOpen={showOtherModal}
         provider={provider}
-        onSwitchProvider={(p) => { setProvider(p); if (p === 'gmail') setShowOtherModal(false); }}
-        onClose={() => setShowOtherModal(false)}
+        initialData={otherConfig}
+        onSwitchProvider={(p) => { 
+          if (p === 'gmail') {
+            setProvider('gmail');
+            setShowOtherModal(false);
+            setEmail(gmailConfig.email || "");
+            setAppPassword(gmailConfig.appPassword || "");
+          }
+        }}
+        onClose={() => {
+          setShowOtherModal(false);
+          // If we cancel from other mail, go back to gmail in the main view if that's what was active
+          // or just stay on whatever was selected.
+        }}
         onSave={(data) => {
           // forward other-mail settings to parent onSave handler
           setShowOtherModal(false);
+          setOtherConfig(data);
           onSave({ provider: 'other', ...data });
         }}
       />

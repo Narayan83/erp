@@ -14,8 +14,13 @@ type QuotationTableItems struct {
 	Units       string  `gorm:"type:text" json:"unit"`
 	Rate        float64 `gorm:"not null" json:"rate"`
 
-	LeadTime  string  `gorm:"type:text" json:"lead_time"`
-	HsnCode   string  `gorm:"type:text" json:"hsncode"`
+	LeadTime string `gorm:"type:text" json:"lead_time"`
+	HsnCode  string `gorm:"type:text" json:"hsncode"`
+
+	// Discount fields
+	DiscountPercentage float64 `gorm:"not null;default:0" json:"discount_percentage"`
+	DiscountAmount     float64 `gorm:"not null;default:0" json:"discount_amount"`
+
 	Gst       float64 `gorm:"not null" json:"gst"`
 	TaxAmount float64 `gorm:"not null" json:"tax_amount"`
 	LineTotal float64 `gorm:"not null" json:"line_total"`

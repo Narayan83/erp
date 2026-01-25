@@ -380,6 +380,27 @@ func GetEmployees(c *fiber.Ctx) error {
 	})
 }
 
+// GetNonHeadEmployees returns employees who are not department heads (or just all employees as a fallback)
+func GetNonHeadEmployees(c *fiber.Ctx) error {
+	var items []models.Employee
+
+	// In a real implementation, you might filter out managers from EmployeeHierarchy
+	// For now, we return all employees with their User details
+	if err := employeeDB.Preload("User").Find(&items).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Extract only user data for the frontend
+	users := make([]models.User, 0)
+	for _, emp := range items {
+		users = append(users, emp.User)
+	}
+
+	return c.JSON(fiber.Map{
+		"data": users,
+	})
+}
+
 func GetEmployee(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var item models.Employee

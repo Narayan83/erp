@@ -1689,7 +1689,7 @@ const getUserDisplayName = (u) => {
         <Box display="flex" alignItems="center" width="100%">
            
            {/* DEPT HEAD DROPDOWN */}
-          <Box flex={0.5} sx={{ mr: 1 }}>
+          {/* <Box flex={0.5} sx={{ mr: 1 }}>
             <Autocomplete
               size="small"
               options={deptHeadOptions}
@@ -1701,10 +1701,10 @@ const getUserDisplayName = (u) => {
               renderInput={(params) => <TextField {...params} label="Dept Head" />}
               isOptionEqualToValue={(option, value) => option.id === value.id}
             />
-          </Box>
+          </Box> */}
 
            {/* SELECT EXECUTIVE DROPDOWN */}
-          <Box flex={0.4} sx={{ mr: 1 }}>
+          {/* <Box flex={0.4} sx={{ mr: 1 }}>
             <Autocomplete
               size="small"
               options={executiveOptions}
@@ -1717,7 +1717,7 @@ const getUserDisplayName = (u) => {
               isOptionEqualToValue={(option, value) => option.id === value.id}
               disabled={!filters.deptHead}
             />
-          </Box>
+          </Box> */}
 
           {/* USER TYPE DROPDOWN */}
           <Box flex={0.3}>
@@ -1757,7 +1757,7 @@ const getUserDisplayName = (u) => {
             type="button"
             className="btn btn-primary"
             onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
-            style={{ marginLeft: 16, flex: '0.2' }}
+            style={{ marginLeft: 'auto' }}
             aria-label="Add User"
           >
             + Add User

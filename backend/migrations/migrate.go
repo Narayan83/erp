@@ -311,6 +311,7 @@ func main() {
 		//30/9/2025
 		&models.TandC{},
 		&models.Series{},
+		&models.PrinterHeader{},
 
 		&models.QuotationTable{},
 		&models.QuotationTableItems{},
@@ -327,10 +328,53 @@ func main() {
 		&models.Employee{},
 		&models.EmployeeHierarchy{},
 		&models.EmployeeOrganizationUnit{},
+		&models.Integration{},
 	)
 
 	if err != nil {
 		log.Fatal("Migration failed:", err)
+	}
+
+	// Handle PrinterHeader column rename: logo_path -> logo_data
+	var printerHeaderTableExists bool
+	initializers.DB.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables 
+			WHERE table_name = 'printer_headers'
+		)
+	`).Scan(&printerHeaderTableExists)
+
+	if printerHeaderTableExists {
+		// Check if old logo_path column exists
+		var oldLogoPathExists bool
+		initializers.DB.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name = 'printer_headers' AND column_name = 'logo_path'
+			)
+		`).Scan(&oldLogoPathExists)
+
+		if oldLogoPathExists {
+			// Check if new logo_data column exists
+			var newLogoDataExists bool
+			initializers.DB.Raw(`
+				SELECT EXISTS (
+					SELECT 1 FROM information_schema.columns 
+					WHERE table_name = 'printer_headers' AND column_name = 'logo_data'
+				)
+			`).Scan(&newLogoDataExists)
+
+			if newLogoDataExists {
+				// Both exist, copy old to new then drop old
+				log.Println("Both logo_path and logo_data exist. Copying data from logo_path to logo_data...")
+				initializers.DB.Exec(`UPDATE printer_headers SET logo_data = logo_path WHERE logo_data IS NULL`)
+				initializers.DB.Exec(`ALTER TABLE printer_headers DROP COLUMN logo_path`)
+			} else {
+				// Only old exists, rename it
+				log.Println("Renaming logo_path to logo_data...")
+				initializers.DB.Exec(`ALTER TABLE printer_headers RENAME COLUMN logo_path TO logo_data`)
+			}
+		}
 	}
 
 	// Post-migration cleanup: drop typo column if it still exists
