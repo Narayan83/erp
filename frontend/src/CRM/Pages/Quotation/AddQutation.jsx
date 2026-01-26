@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect,useMemo } from "react";
 // removed CiSearch import (search button removed)
-import { IoMdPrint } from "react-icons/io";
+import { IoMdPrint, IoIosSearch } from "react-icons/io";
 import { IoDocumentText } from "react-icons/io5";
 import { FaYoutube } from "react-icons/fa";
 import { MdEdit, MdModelTraining } from "react-icons/md";
@@ -2460,11 +2460,11 @@ const  prefillFormData = async (data) => {
         </div>
       </div>
       <div className={`section-card basic-info-card ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
-        <h5 className="section-title">Basic Information</h5>
+        <h6 className="section-title">Basic Information</h6>
         <div className="form-row">
-          <div className="form-group left-start">
+          <div className="form-group">
             <label htmlFor="customer">Customer :</label>
-            <div className="input-with-actions search-and-add-customer">
+            <div className="input-with-actions">
               <input
                 id="customer"
                 type="text"
@@ -2477,40 +2477,43 @@ const  prefillFormData = async (data) => {
                 onClick={() => openSearch()}
                 readOnly
               />
-              <button type="button" className="btn btn-customer" title="Create Customer" onClick={addUserNavigate}>
+              <button
+                type="button"
+                className="btn-customer-action btn-customer-add"
+                title="Create Customer"
+                onClick={addUserNavigate}
+              >
                 <IoMdAdd />
               </button>
             </div>
-
           </div>
 
           <div className="form-group">
             <label htmlFor="branchSelect">Branch :</label>
-              <select
-                id="branchSelect"
-                className="form-control"
-                value={selectedBranch?.id || ''}
-                onChange={(e) => {
-                  const branchId = e.target.value;
-                  const branch = branches.find(b => b.id == branchId);
-                  setSelectedBranch(branch || null);
-                }}
-              >
-                <option value="">-- Select Branch --</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}{b.city ? ` - ${b.city}` : ''}{b.state ? ` (${b.state})` : ''}
-                  </option>
-                ))}
-              </select>
+            <select
+              id="branchSelect"
+              className="form-control"
+              value={selectedBranch?.id || ''}
+              onChange={(e) => {
+                const branchId = e.target.value;
+                const branch = branches.find(b => b.id == branchId);
+                setSelectedBranch(branch || null);
+              }}
+            >
+              <option value="">-- Select --</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.name}{b.city ? ` - ${b.city}` : ''}{b.state ? ` (${b.state})` : ''}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="form-row">
-          <div className="form-group left-start">
+          <div className="form-group">
             <label htmlFor="copyFrom">Copy from :</label>
             {isEditMode ? (
-              // read-only in edit mode
               <div className="form-control" style={{ background: '#f5f5f5', cursor: 'not-allowed' }}>
                 None
               </div>
@@ -2550,7 +2553,7 @@ const  prefillFormData = async (data) => {
                   </option>
                 ))
               ) : (
-                <option value="" disabled>No series available for selected type/branch</option>
+                <option value="" disabled>No series available</option>
               )}
             </select>
           </div>
@@ -2560,8 +2563,9 @@ const  prefillFormData = async (data) => {
       <div className={`section-card party-details-wrapper ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
         <div className="party-details-container">
           <div className="party-details-left">
-            <h5 className="section-title">Party Details</h5>
+            <h6 className="section-title">Party Details</h6>
             
+            {/* Row 1: Contact Person & Sales Credit */}
             <div className="form-row">
               <div className="form-field">
                 <label htmlFor="contactPerson">Contact Person:</label>
@@ -2571,11 +2575,12 @@ const  prefillFormData = async (data) => {
                   className="form-control"
                   value={contactPerson}
                   onChange={(e) => setContactPerson(e.target.value)}
+                  placeholder="Enter contact person name"
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="salesCredit">Sales Credit:</label>
+                <label htmlFor="salesCredit">Sales Credit :</label>
                 <select
                   id="salesCredit"
                   className="form-control"
@@ -2599,11 +2604,13 @@ const  prefillFormData = async (data) => {
               </div>
             </div>
 
-            <div className="form-row">
+            {/* Row 2: Billing Address & Shipping Address */}
+            <div className="form-row row-address">
+              {/* Billing Address Column */}
               <div className="form-field field-with-address">
                 <div className="field-inline">
-                  <label htmlFor="address">Address:</label>
-                  {selectedCustomer ? (
+                  <label htmlFor="address">Address :</label>
+                  {selectedCustomer && (selectedCustomer.addresses || []).length > 0 ? (
                     <>
                       <select
                         id="address"
@@ -2623,7 +2630,7 @@ const  prefillFormData = async (data) => {
                       </select>
                       <button
                         type="button"
-                        className="btn-icon btn-add"
+                        className="btn-customer-action btn-customer-add"
                         onClick={() => handleAddAddress('billing')}
                         title="Add address"
                       >
@@ -2631,13 +2638,13 @@ const  prefillFormData = async (data) => {
                       </button>
                     </>
                   ) : (
-                    <button className="btn btn-success">
+                    <button className="btn-add-address" onClick={() => handleAddAddress('billing')}>
                       + Click here to add an address.
                     </button>
                   )}
                 </div>
 
-                {/* Display selected billing address details (under the field) */}
+                {/* Display selected billing address details */}
                 {selectedBillingAddress && (
                   <div className="address-display-box">
                     <div className="address-display-header">
@@ -2652,21 +2659,22 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="address-content">
-                      {/* Requested layout: AddressLine1, AddressLine2, AddressLine3, city, pincode, state, country, gstin */}
-                      {selectedBillingAddress.address1 && <div>{selectedBillingAddress.address1},</div>}
-                      {selectedBillingAddress.address2 && <div>{selectedBillingAddress.address2},</div>}
-                      {selectedBillingAddress.address3 && <div>{selectedBillingAddress.address3},</div>}
-                      {(selectedBillingAddress.city || selectedBillingAddress.postal_code) && (
-                        <div>{selectedBillingAddress.city ? selectedBillingAddress.city : ''}{selectedBillingAddress.postal_code ? ' , ' + selectedBillingAddress.postal_code : ''}</div>
-                      )}
-                      {(selectedBillingAddress.state || selectedBillingAddress.country) && (
-                        <div>{selectedBillingAddress.state ? selectedBillingAddress.state : ''}{selectedBillingAddress.country ? ', ' + selectedBillingAddress.country : ''}</div>
+                      {selectedBillingAddress.address1 && <div>{selectedBillingAddress.address1}</div>}
+                      {selectedBillingAddress.address2 && <div>{selectedBillingAddress.address2}</div>}
+                      {selectedBillingAddress.address3 && <div>{selectedBillingAddress.address3}</div>}
+                      {(selectedBillingAddress.city || selectedBillingAddress.state || selectedBillingAddress.country || selectedBillingAddress.postal_code) && (
+                        <div>
+                          {selectedBillingAddress.city && <span>{selectedBillingAddress.city}</span>}
+                          {selectedBillingAddress.state && <span>{selectedBillingAddress.state ? (selectedBillingAddress.city ? ', ' : '') + selectedBillingAddress.state : ''}</span>}
+                          {selectedBillingAddress.country && <span>{selectedBillingAddress.country ? (selectedBillingAddress.city || selectedBillingAddress.state ? ', ' : '') + selectedBillingAddress.country : ''}</span>}
+                          {selectedBillingAddress.postal_code && <span>{selectedBillingAddress.postal_code ? ' - ' + selectedBillingAddress.postal_code : ''}</span>}
+                        </div>
                       )}
                       {gstForAddr(selectedBillingAddress) && (
                         <div><strong>GSTIN :</strong> {gstForAddr(selectedBillingAddress)}</div>
                       )}
                       {selectedBillingAddress.extra && (
-                        typeof selectedBillingAddress.extra === 'object' ? (
+                         typeof selectedBillingAddress.extra === 'object' ? (
                           Object.entries(selectedBillingAddress.extra).map(([k, v]) => (
                             <div key={k}><strong>{k} :</strong> {v}</div>
                           ))
@@ -2679,27 +2687,27 @@ const  prefillFormData = async (data) => {
                 )}
               </div>
 
+              {/* Shipping Address Column */}
               <div className="form-field field-with-address">
-                <div className="field-inline">
-                  <label htmlFor="shippingAddress">Shipping Address:</label>
-                  {isSameAsBilling && (
-                    <div className="checkbox-field">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="checkDefault"
-                        checked={isSameAsBilling}
-                        onChange={() => setIsSameAsBilling((prev) => !prev)}
-                      />
+                <div className="shipping-header-row">
+                  <label htmlFor="shippingAddress">Shipping Address :</label>
+                  <div className="checkbox-field">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="checkDefault"
+                      checked={isSameAsBilling}
+                      onChange={() => setIsSameAsBilling((prev) => !prev)}
+                    />
+                    {isSameAsBilling && (
                       <label className="form-check-label" htmlFor="checkDefault">
                         Same as Billing address
                       </label>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* when not same as billing show select + add button inline (matches billing layout) */}
                   {!isSameAsBilling && selectedCustomer && (
-                    <>
+                    <div className="field-inline-nested">
                       <select
                         id="shippingAddressSelect"
                         className="form-control"
@@ -2719,19 +2727,19 @@ const  prefillFormData = async (data) => {
                       </select>
                       <button
                         type="button"
-                        className="btn-icon btn-add"
+                        className="btn-customer-action btn-customer-add"
                         onClick={() => handleAddAddress('shipping')}
                         title="Add shipping address"
                       >
                         <IoMdAdd />
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
 
-                {/* Display selected shipping address details (under the field) */}
-                {selectedShippingAddress && (
-                  <div className="address-display-box">
+                {/* Display selected shipping address details */}
+                {!isSameAsBilling && selectedShippingAddress && (
+                  <div className="address-display-box" style={{ marginLeft: '120px', width: 'calc(100% - 120px)' }}>
                     <div className="address-display-header">
                       <h6 className="address-title">{(selectedShippingAddress.title || selectedShippingAddress.address1 || 'Address')}{gstForAddr(selectedShippingAddress) ? ' - ' + gstForAddr(selectedShippingAddress) : ''}</h6>
                       <button
@@ -2744,21 +2752,22 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="address-content">
-                      {/* Requested layout: AddressLine1, AddressLine2, AddressLine3, city, pincode, state, country, gstin */}
-                      {selectedShippingAddress.address1 && <div>{selectedShippingAddress.address1},</div>}
-                      {selectedShippingAddress.address2 && <div>{selectedShippingAddress.address2},</div>}
-                      {selectedShippingAddress.address3 && <div>{selectedShippingAddress.address3},</div>}
-                      {(selectedShippingAddress.city || selectedShippingAddress.postal_code) && (
-                        <div>{selectedShippingAddress.city ? selectedShippingAddress.city : ''}{selectedShippingAddress.postal_code ? ' , ' + selectedShippingAddress.postal_code : ''}</div>
-                      )}
-                      {(selectedShippingAddress.state || selectedShippingAddress.country) && (
-                        <div>{selectedShippingAddress.state ? selectedShippingAddress.state : ''}{selectedShippingAddress.country ? ', ' + selectedShippingAddress.country : ''}</div>
+                      {selectedShippingAddress.address1 && <div>{selectedShippingAddress.address1}</div>}
+                      {selectedShippingAddress.address2 && <div>{selectedShippingAddress.address2}</div>}
+                      {selectedShippingAddress.address3 && <div>{selectedShippingAddress.address3}</div>}
+                      {(selectedShippingAddress.city || selectedShippingAddress.state || selectedShippingAddress.country || selectedShippingAddress.postal_code) && (
+                        <div>
+                          {selectedShippingAddress.city && <span>{selectedShippingAddress.city}</span>}
+                          {selectedShippingAddress.state && <span>{selectedShippingAddress.state ? (selectedShippingAddress.city ? ', ' : '') + selectedShippingAddress.state : ''}</span>}
+                          {selectedShippingAddress.country && <span>{selectedShippingAddress.country ? (selectedShippingAddress.city || selectedShippingAddress.state ? ', ' : '') + selectedShippingAddress.country : ''}</span>}
+                          {selectedShippingAddress.postal_code && <span>{selectedShippingAddress.postal_code ? ' - ' + selectedShippingAddress.postal_code : ''}</span>}
+                        </div>
                       )}
                       {gstForAddr(selectedShippingAddress) && (
                         <div><strong>GSTIN :</strong> {gstForAddr(selectedShippingAddress)}</div>
                       )}
                       {selectedShippingAddress.extra && (
-                        typeof selectedShippingAddress.extra === 'object' ? (
+                         typeof selectedShippingAddress.extra === 'object' ? (
                           Object.entries(selectedShippingAddress.extra).map(([k, v]) => (
                             <div key={k}><strong>{k} :</strong> {v}</div>
                           ))
@@ -2774,55 +2783,29 @@ const  prefillFormData = async (data) => {
           </div>
 
           <div className="document-details-box">
-            <h5 className="section-title">Document Details</h5>
+            <h6 className="section-title">Document Details</h6>
             
             <div className="form-field-vertical">
-              <label>{`${titleBase} No.`} :</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+              <label>{`${titleBase} No. :`}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {!isEditMode && (
-                    <div style={{ color: '#333' }}>{/* prefix and series */}
-                      {selectedSeries ? (() => {
+                  {!isEditMode && selectedSeries && (
+                    <div style={{ color: '#333', fontSize: '14px' }}>
+                      {(() => {
                         const s = seriesList.find(x => String(x.id) === String(selectedSeries));
                         const p = s?.prefix || 'QTN';
                         const pn = s?.prefix_number || '';
-                        return `${p}/${pn}`;
-                      })() : null}
+                        return `${p}${pn}/`;
+                      })()}
                     </div>
                   )}
 
-                  {/* If editing, show full quotation number as read-only; otherwise render inputs */}
                   {isEditMode ? (
-                    <div style={{ padding: '6px 8px', background: '#f5f5f5', borderRadius: 4, fontWeight: 600}}>
+                    <div className="form-control" style={{ background: '#f8f9fa', height: 'auto', minHeight: '34px', display: 'flex', alignItems: 'center'}}>
                       {qutationNo || quotationData?.quotation_number || ''}
                     </div>
                   ) : (
-                    // render interactive inputs when creating
                     selectedSeries ? (
-                      <>
-                        <input
-                          id="quotationSeq"
-                          type="text"
-                          className="form-control"
-                          style={{ width: '48px' }}
-                          value={seqNumber}
-                          onChange={(e) => {
-                            const v = e.target.value.replace(/[^0-9]/g, '');
-                            setSeqNumber(v);
-                            // rebuild full qutationNo
-                            const s = seriesList.find(x => String(x.id) === String(selectedSeries));
-                            const p = s?.prefix || 'QTN';
-                            const pn = s?.prefix_number || '';
-                            const yr = yearRange || (() => {
-                              const d = new Date(); const y = d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}`;
-                            })();
-                            setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
-                          }}
-                        />
-                        <div>/</div>
-                        <div style={{ color: '#333' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
-                      </>
-                    ) : (
                       <>
                         <input
                           id="quotationSeq"
@@ -2833,20 +2816,34 @@ const  prefillFormData = async (data) => {
                           onChange={(e) => {
                             const v = e.target.value.replace(/[^0-9]/g, '');
                             setSeqNumber(v);
-                            setQutationNo(v);
+                            const s = seriesList.find(x => String(x.id) === String(selectedSeries));
+                            const p = s?.prefix || 'QTN';
+                            const pn = s?.prefix_number || '';
+                            const yr = yearRange || (() => {
+                              const d = new Date(); const y = d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}`;
+                            })();
+                            setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
                           }}
-                          placeholder={`${titleBase} No.`}
                         />
+                        <div style={{margin: '0 4px'}}>/</div>
+                        <div style={{ color: '#333', fontSize: '14px' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
                       </>
+                    ) : (
+                      <input
+                        id="quotationSeq"
+                        type="text"
+                        className="form-control"
+                        value={seqNumber}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSeqNumber(v);
+                          setQutationNo(v);
+                        }}
+                        placeholder={`${titleBase} No.`}
+                      />
                     )
                   )}
                 </div>
-
-                {prevQutationNo && (
-                  <small style={{ color: '#666', fontSize: '12px', marginTop: '2px', display: 'block' }}>
-                    Prev: {prevQutationNo}
-                  </small>
-                )}
               </div>
             </div>
 
@@ -2862,14 +2859,14 @@ const  prefillFormData = async (data) => {
             </div>
 
             <div className="form-field-vertical">
-              <label htmlFor="quotationDate">{(docType && docType.toString().toLowerCase().includes('proforma')) ? 'Proforma Date' : 'Quotation Date'} :</label>
+              <label htmlFor="quotationDate">{`${titleBase} Date :`}</label>
               <input
                 id="quotationDate"
                 type="date"
                 className="form-control"
                 value={quotationDate}
-                readOnly= {true}
                 onChange={(e) => setQuotationDate(e.target.value)}
+                readOnly={true}
               />
             </div>
 
@@ -3815,33 +3812,31 @@ const  prefillFormData = async (data) => {
       {/* Modal for search + table */}
       {open && (
         <div className="custom-modal" onClick={handleClose}>
-          <div className="modal-box modal-width-400" onClick={(e) => e.stopPropagation()}>
-            <h6>Select Customer</h6>
+          <div className="modal-box modal-width-500 customer-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="customer-modal-header">
+              <h5 className="modal-title">Select Customer</h5>
+              <button className="modal-close-btn" onClick={handleClose}>✕</button>
+            </div>
 
             <input
               type="text"
-              className="form-control input-small mb-12"
-              placeholder="Search customer..."
+              className="form-control customer-search-input"
+              placeholder="Search"
               value={search}
               onChange={handleSearch}
             />
 
-            <table className="table table-sm">
-              <tbody>
-                {customers.map((cust) => (
-                  <tr key={cust.id} className="clickable-row" onClick={() => handleSelectCustomer(cust)}>
-                    <td>
-                      <div className="cust-company">{cust.company_name || cust.company || ""}</div>
-                      <div className="muted muted-sm">
-                        {`${cust.firstname || ''} ${cust.lastname || ''}`.trim()}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="text-right">
-              <button className="btn btn-secondary" onClick={handleClose}>Close</button>
+            <div className="customer-list-container">
+              {customers.map((cust) => (
+                <div key={cust.id} className="customer-list-item" onClick={() => handleSelectCustomer(cust)}>
+                  <div className="customer-item-content">
+                    <div className="customer-company-name">{cust.company_name || cust.company || ""}</div>
+                    <div className="customer-contact-name">
+                      {`${cust.firstname || ''} ${cust.lastname || ''}`.trim()}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
