@@ -99,20 +99,27 @@
 
 .tandc-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: #eef6fb;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.03);
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e1effe;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  margin-bottom: 4px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .tandc-name {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 14px;
-  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
@@ -122,25 +129,31 @@
 .item-actions {
   margin-left: auto;
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
+  gap: 12px;
+  align-items: center;
 }
 
 .icon-button {
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 18px;
-  padding: 6px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.icon-button.edit {
+  background-color: #def7ec !important;
+  color: #03543f !important;
 }
 
 .icon-button.delete {
-  color: #962503 !important;
-  background: #f1dfd7 !important;
+  background-color: #fde8e8 !important;
+  color: #9b1c1c !important;
 }
 
 .icon-button svg {

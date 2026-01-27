@@ -329,6 +329,11 @@ func main() {
 		&models.EmployeeHierarchy{},
 		&models.EmployeeOrganizationUnit{},
 		&models.Integration{},
+
+		// CRM Configuration
+		&models.CRMTag{},
+		&models.LeadSource{},
+		&models.RejectionReason{},
 	)
 
 	if err != nil {

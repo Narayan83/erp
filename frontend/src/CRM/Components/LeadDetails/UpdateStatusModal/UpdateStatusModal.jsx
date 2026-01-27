@@ -5,10 +5,13 @@ import './updateStatusModal.scss';
 const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) => {
   const [changeStageDropdown, setChangeStageDropdown] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  // Store rejection reasons as objects {id, name} so they can be edited and saved to localStorage
+  const [rejectReasonId, setRejectReasonId] = useState('');
   const [rejectionReasonsList, setRejectionReasonsList] = useState([]);
-  const [editingReasonId, setEditingReasonId] = useState(null); // -1 indicates adding a new reason
+  const [editingReasonId, setEditingReasonId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [isEditingReason, setIsEditingReason] = useState(false);
+  const [isReasonSaving, setIsReasonSaving] = useState(false);
+  
   // Local optimistic UI state to update Current Stage immediately and track request in-flight
   const [localCurrentStage, setLocalCurrentStage] = useState(currentStage || 'Unqualified');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -16,41 +19,50 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
   const [selectedAction, setSelectedAction] = useState('change');
 
   const stages = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
+  const apiBase = '/api';
+  const genCode = (title) => title.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 50);
+  const normalizeReason = (reason) => {
+    if (!reason) return reason;
+    return {
+      ...reason,
+      id: reason.id ?? reason.ID
+    };
+  };
 
-  // Load saved rejection reasons and sync local stage on modal open
-  useEffect(() => {
-    if (isOpen) {
-      // Sync displayed current stage with incoming prop (helps optimistic updates and external changes)
-      setLocalCurrentStage(currentStage || 'Unqualified');
-
-      try {
-        const saved = JSON.parse(localStorage.getItem('leadRejectionReasons') || '[]');
-        if (Array.isArray(saved) && saved.length > 0) {
-          // support older format where saved could be an array of strings
-          if (typeof saved[0] === 'string') {
-            setRejectionReasonsList(saved.map((name, idx) => ({ id: idx + 1, name })));
-          } else {
-            setRejectionReasonsList(saved);
-          }
-        } else {
-          // fallback to default if none saved
-          const defaults = ['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other'].map((name, idx) => ({ id: idx + 1, name }));
-          setRejectionReasonsList(defaults);
-        }
-      } catch (e) {
-        const defaults = ['Budget', 'Timeline', 'Competitor', 'No Interest', 'Other'].map((name, idx) => ({ id: idx + 1, name }));
-        setRejectionReasonsList(defaults);
-      }
-    }
-  }, [isOpen, currentStage]);
-
-  // Reset editing state when modal closes
+  // Load rejection reasons from API and sync local stage on modal open
   useEffect(() => {
     if (!isOpen) {
+      setIsEditingReason(false);
       setEditingReasonId(null);
       setEditingText('');
+      setIsReasonSaving(false);
+      return;
     }
-  }, [isOpen]);
+
+    // Sync displayed current stage with incoming prop and clear selections
+    setLocalCurrentStage(currentStage || 'Unqualified');
+    setRejectReason('');
+    setRejectReasonId('');
+    setIsEditingReason(false);
+    setEditingReasonId(null);
+    setEditingText('');
+    setIsReasonSaving(false);
+
+    const fetchReasons = async () => {
+      try {
+        const res = await fetch(`${apiBase}/rejection-reasons`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch');
+        }
+        const data = await res.json();
+        setRejectionReasonsList((data || []).map(normalizeReason));
+      } catch (err) {
+        console.error('Failed to fetch rejection reasons:', err);
+      }
+    };
+
+    fetchReasons();
+  }, [isOpen, currentStage]);
 
   if (!isOpen) return null;
 
@@ -97,6 +109,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
         reason: rejectReason
       });
       setRejectReason('');
+      setRejectReasonId('');
     } catch (err) {
       setLocalCurrentStage(prev);
       alert('Failed to reject lead. Please try again.');
@@ -105,55 +118,80 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
     }
   };
 
-  // Inline edit handlers for rejection reasons
-  const handleStartEdit = () => {
-    // If a reason is selected, start editing that reason; otherwise start a new entry
-    const found = rejectionReasonsList.find(r => r.name === rejectReason);
-    if (found) {
-      setEditingReasonId(found.id);
-      setEditingText(found.name);
-    } else {
-      setEditingReasonId(-1); // adding new
-      setEditingText(rejectReason || '');
-    }
+  const handleReasonSelection = (value) => {
+    const selected = rejectionReasonsList.find(r => String(r.id) === value);
+    setRejectReason(value ? selected?.title || '' : '');
+    setRejectReasonId(value);
   };
 
-  const handleSaveEdit = () => {
+  const handleStartEdit = () => {
+    if (isUpdating || isReasonSaving) return;
+    const selected = rejectionReasonsList.find(r => String(r.id) === rejectReasonId);
+    if (selected) {
+      setEditingReasonId(selected.id);
+      setEditingText(selected.title || '');
+    } else {
+      setEditingReasonId(null);
+      setEditingText('');
+    }
+    setIsEditingReason(true);
+  };
+
+  const handleSaveReason = async () => {
     const trimmed = (editingText || '').trim();
     if (!trimmed) {
       alert('Please enter a reason');
       return;
     }
+    setIsReasonSaving(true);
 
-    const listCopy = Array.isArray(rejectionReasonsList) ? [...rejectionReasonsList] : [];
-
-    if (editingReasonId === -1) {
-      // add new reason
-      const newItem = { id: Date.now(), name: trimmed };
-      listCopy.push(newItem);
-      setRejectionReasonsList(listCopy);
-      try { localStorage.setItem('leadRejectionReasons', JSON.stringify(listCopy)); } catch (e) {}
-      setRejectReason(newItem.name);
-    } else {
-      // update existing
-      const idx = listCopy.findIndex(x => x.id === editingReasonId);
-      if (idx !== -1) {
-        listCopy[idx] = { ...listCopy[idx], name: trimmed };
+    try {
+      if (editingReasonId) {
+        const existing = rejectionReasonsList.find(r => r.id === editingReasonId);
+        const payload = { title: trimmed, code: existing?.code || genCode(trimmed) };
+        const res = await fetch(`${apiBase}/rejection-reasons/${editingReasonId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Update failed');
+        }
+        const updated = normalizeReason(await res.json());
+        setRejectionReasonsList(prev => prev.map(r => (r.id === updated.id ? updated : r)));
+        setRejectReason(updated.title);
+        setRejectReasonId(String(updated.id));
       } else {
-        // fallback: add new
-        listCopy.push({ id: Date.now(), name: trimmed });
+        const payload = { title: trimmed, code: genCode(trimmed) };
+        const res = await fetch(`${apiBase}/rejection-reasons`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Create failed');
+        }
+        const created = normalizeReason(await res.json());
+        setRejectionReasonsList(prev => [...prev, created]);
+        setRejectReason(created.title);
+        setRejectReasonId(String(created.id));
       }
-      setRejectionReasonsList(listCopy);
-      try { localStorage.setItem('leadRejectionReasons', JSON.stringify(listCopy)); } catch (e) {}
-      setRejectReason(trimmed);
+      setIsEditingReason(false);
+      setEditingReasonId(null);
+      setEditingText('');
+    } catch (err) {
+      console.error('Failed to save rejection reason:', err);
+      alert('Failed to save reason. Please try again.');
+    } finally {
+      setIsReasonSaving(false);
     }
-
-    // exit edit mode
-    setEditingReasonId(null);
-    setEditingText('');
   };
 
   const handleCancelEdit = () => {
+    if (isReasonSaving) return;
+    setIsEditingReason(false);
     setEditingReasonId(null);
     setEditingText('');
   };
@@ -197,21 +235,50 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
             </label>
             <div className="option-content">
               <div className="reason-inline">
-                {editingReasonId !== null ? (
+                {isEditingReason ? (
                   <div className="inline-edit" style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
-                    <input value={editingText} onChange={e => setEditingText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); }} placeholder="Enter reason" disabled={selectedAction !== 'reject' || isUpdating} />
-                    <button type="button" className="btn save-btn" title="Save reason" onClick={handleSaveEdit} disabled={selectedAction !== 'reject' || isUpdating}><FaCheck /></button>
-                    <button type="button" className="btn cancel-btn" title="Cancel" onClick={handleCancelEdit} disabled={selectedAction !== 'reject' || isUpdating}><FaTimes /></button>
+                    <input
+                      value={editingText}
+                      onChange={e => setEditingText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveReason(); }}
+                      placeholder="Enter reason"
+                      disabled={selectedAction !== 'reject' || isUpdating || isReasonSaving}
+                    />
+                    <div className="inline-actions" style={{ display: 'flex', gap: 0 }}>
+                      <button
+                        type="button"
+                        className="btn save-btn"
+                        title="Save reason"
+                        onClick={handleSaveReason}
+                        disabled={selectedAction !== 'reject' || isUpdating || isReasonSaving}
+                      ><FaCheck /></button>
+                      <button
+                        type="button"
+                        className="btn cancel-btn"
+                        title="Cancel"
+                        onClick={handleCancelEdit}
+                        disabled={selectedAction !== 'reject' || isUpdating || isReasonSaving}
+                      ><FaTimes /></button>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <select value={rejectReason} onChange={e => setRejectReason(e.target.value)} disabled={selectedAction !== 'reject' || isUpdating}>
+                    <select
+                      value={rejectReasonId}
+                      onChange={e => handleReasonSelection(e.target.value)}
+                      disabled={selectedAction !== 'reject' || isUpdating}
+                    >
                       <option value="">Select</option>
                       {(rejectionReasonsList || []).map(r => (
-                        <option key={r.id} value={r.name}>{r.name}</option>
+                        <option key={r.id} value={String(r.id)}>{r.title}</option>
                       ))}
                     </select>
-                    <button className="edit-btn" title="Edit/Add Reason" onClick={(e) => { e.stopPropagation(); handleStartEdit(); }} disabled={selectedAction !== 'reject'}><FaEdit /></button>
+                    <button
+                      className="edit-btn"
+                      title="Edit/Add Reason"
+                      onClick={(e) => { e.stopPropagation(); handleStartEdit(); }}
+                      disabled={selectedAction !== 'reject' || isUpdating || isReasonSaving}
+                    ><FaEdit /></button>
                   </>
                 )}
               </div>

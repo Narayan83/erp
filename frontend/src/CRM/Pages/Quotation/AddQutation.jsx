@@ -3,7 +3,7 @@
 import { IoMdPrint, IoIosSearch } from "react-icons/io";
 import { IoDocumentText } from "react-icons/io5";
 import { FaYoutube } from "react-icons/fa";
-import { MdEdit, MdModelTraining } from "react-icons/md";
+import { MdEdit, MdModelTraining, MdNoteAdd } from "react-icons/md";
 import { CgMenuGridO } from "react-icons/cg";
 import { IoSettingsSharp } from "react-icons/io5";
 import { MdSummarize } from "react-icons/md";
@@ -85,6 +85,7 @@ const AddQutation = () => {
   const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState('');
   const [tableItems, setTableItems] = useState([]); // items in main table
   const [grandTotal , setGrandTotal] = useState(0);
+  const [printerHeader, setPrinterHeader] = useState(null);
 
   const [isGSTStateMatch, setIsGSTStateMatch]  = useState(true);
   const [branchGstNumber,setBranchGstNumber]  = useState("");
@@ -226,6 +227,7 @@ const [attachmentPath, setAttachmentPath] = useState(null);
 
 // Template State
 const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+const [printAfterSave, setPrintAfterSave] = useState(false);
 const [templateName, setTemplateName] = useState("");
 const [showTemplateModal, setShowTemplateModal] = useState(false);
 const [showSavedTemplates, setShowSavedTemplates] = useState(false);
@@ -605,6 +607,25 @@ useEffect(()=>{console.log(customers)},[customers]);
       setSelectedShippingAddress(null);
       setIsSameAsBilling(true); 
     }, [selectedCustomer, isEditMode, quotationData]);
+
+  // Fetch printer headers
+  const fetchPrinterHeaders = async () => {
+    try {
+      const phRes = await axios.get(`${BASE_URL}/api/printer-headers`);
+      const phData = phRes.data;
+      if (Array.isArray(phData) && phData.length > 0) {
+        setPrinterHeader(phData[0]);
+      } else if (phData && !Array.isArray(phData)) {
+        setPrinterHeader(phData);
+      }
+    } catch (e) {
+      console.error('Failed to fetch printer headers', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPrinterHeaders();
+  }, []);
 
   const handleProductSearch = (e) => {
     const value = e.target.value;
@@ -993,6 +1014,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     state: "",
     postal_code: "",
     gst_in: "",
+    is_sez: false,
     extra_key: "",
     extra_value: "",
   });
@@ -1012,6 +1034,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     normalized.country = addr.country || addr.Country || 'India';
     normalized.postal_code = addr.postal_code || addr.pincode || addr.Pincode || addr.pin || addr.zipcode || addr.ZipCode || '';
     normalized.gst_in = addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || '';
+    normalized.is_sez = addr.is_sez || false;
     // persistent flag: whether to show title when printing documents
     normalized.show_title_on_print = addr.show_title_on_print || false;
     return normalized;
@@ -1245,6 +1268,363 @@ const handleTandCClose = () => setOpenTandCModal(false);
     setAddressModalOpen(false);
   };
 
+  // Helper function to convert number to words (simplified Indian numbering)
+  const numberToWords = (num) => {
+    if (!num || num === 0) return 'Zero';
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    
+    const convertLessThanThousand = (n) => {
+      if (n === 0) return '';
+      if (n < 10) return ones[n];
+      if (n < 20) return teens[n - 10];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+      return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convertLessThanThousand(n % 100) : '');
+    };
+    
+    const crore = Math.floor(num / 10000000);
+    const lakh = Math.floor((num % 10000000) / 100000);
+    const thousand = Math.floor((num % 100000) / 1000);
+    const remainder = Math.floor(num % 1000);
+    
+    let result = '';
+    if (crore > 0) result += convertLessThanThousand(crore) + ' Crore ';
+    if (lakh > 0) result += convertLessThanThousand(lakh) + ' Lakh ';
+    if (thousand > 0) result += convertLessThanThousand(thousand) + ' Thousand ';
+    if (remainder > 0) result += convertLessThanThousand(remainder);
+    
+    return result.trim() || 'Zero';
+  };
+
+  const generatePDF = (quotationDataFromSave = null) => {
+    // If we have quotationDataFromSave, use it, else try to use current state
+    const q = quotationDataFromSave || {};
+    const cust = q.customer || selectedCustomer || {};
+    const branch = q.company_branch || selectedBranch || {};
+    const items = q.quotation_items || q.items || tableItems || [];
+    const company = q.company || branch.company || {};
+    
+    const customerName = cust.company_name || `${cust.salutation || ''} ${cust.firstname || ''} ${cust.lastname || ''}`.replace(/\s+/g, ' ').trim() || 'Guest';
+    
+    // addresses
+    const bAddr = q.billing_address || selectedBillingAddress || {};
+    const billingTitle = bAddr.title || customerName;
+    const billingGSTIN = bAddr.gstin || '-';
+    const billingAddress1 = bAddr.address1 || '';
+    const billingAddress2 = bAddr.address2 || '';
+    const billingAddress3 = bAddr.address3 || '';
+    const billingCity = bAddr.city || '';
+    const billingState = bAddr.state || '';
+    const billingCountry = bAddr.country || 'India';
+    const billingPincode = bAddr.postal_code || bAddr.pincode || '';
+
+    const sAddr = isSameAsBilling ? bAddr : (q.shipping_address || selectedShippingAddress || {});
+    const shippingTitle = sAddr.title || customerName;
+    const shippingGSTIN = sAddr.gstin || '-';
+    const shippingAddress1 = sAddr.address1 || '';
+    const shippingAddress2 = sAddr.address2 || '';
+    const shippingAddress3 = sAddr.address3 || '';
+    const shippingCity = sAddr.city || '';
+    const shippingState = sAddr.state || '';
+    const shippingCountry = sAddr.country || 'India';
+    const shippingPincode = sAddr.postal_code || sAddr.pincode || '';
+    
+    const custPhone = cust.mobile || cust.phone || '';
+    const custEmail = cust.email || '';
+    
+    const companyName = printerHeader?.header_title || (branch.name || branch.company_name) || company.company_name || 'Canares Automation Pvt Ltd';
+    const branchName = printerHeader?.header_subtitle || (branch.name || branch.branch_name || '');
+    const branchGSTIN = printerHeader?.gstin || branch.gst_number || branch.gstin || company.gst_number || '';
+    const branchAddress = printerHeader?.address || branch.address || branch.branch_address || company.address || '';
+    const branchCity = printerHeader?.address ? '' : (branch.city || '');
+    const branchState = printerHeader?.address ? '' : (branch.state || '');
+    const branchPincode = printerHeader?.pin || branch.pincode || branch.zip || '';
+    const companyPhone = printerHeader?.mobile || branch.phone || company.phone || '';
+    const companyEmail = printerHeader?.email || branch.email || company.email || '';
+    const companyWebsite = printerHeader?.website || company.website || '';
+    const companyLogo = printerHeader?.logo_data || null;
+    const headerAlignment = printerHeader?.alignment || 'left';
+    
+    // Bank details
+    const bankB = q.company_branch_bank || branch.company_branch_bank || selectedBank || {};
+    const bankName = bankB.bankName || bankB.bank_name || '';
+    const bankBranch = bankB.branch || bankB.bank_branch || '';
+    const bankBranchAddress = branch.bank_branch_address || company.bank_branch_address || branchAddress || '';
+    const accountNo = bankB.accountNo || bankB.account_number || '';
+    const ifscCode = bankB.ifsc || bankB.ifsc_code || '';
+    const swiftCode = bankB.swiftCode || bankB.swift_code || '';
+    
+    const termsArr = (q.terms_and_conditions || tandcSelections || []);
+    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || t}</div>`).join('');
+    const notesHtml = (q.note || note) ? `<div style="margin-top: 10px;"><strong>Notes:</strong><br/>${q.note || note}</div>` : '';
+
+    // Calculate summary components
+    let subtotalVal = 0;
+    items.forEach(item => {
+        const qty = Number(item.quantity || item.qty || 0);
+        const rate = Number(item.rate || 0);
+        const itemTotal = qty * rate;
+        const discAmt = Number(item.discount_amount || item.discount || 0);
+        const discPct = Number(item.discount_percentage || item.discountPercent || 0);
+        let itemDisc = discAmt > 0 ? discAmt : (itemTotal * discPct / 100);
+        subtotalVal += (itemTotal - itemDisc);
+    });
+
+    const taxableAmount = subtotalVal;
+    const totalTax = Number(q.tax_amount || items.reduce((s, it) => s + (Number(it.tax_amount) || (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0))), 0));
+    
+    // TAX SPLIT LOGIC
+    let cgst = 0, sgst = 0, igst = 0;
+    if (isGSTStateMatch) {
+        cgst = totalTax / 2;
+        sgst = totalTax / 2;
+    } else {
+        igst = totalTax;
+    }
+
+    const grandTotalVal = Number(q.grand_total || (taxableAmount + totalTax));
+    
+    const extraChargesArr = Array.isArray(q.extra_charges || extrcharges) ? (q.extra_charges || extrcharges) : [];
+    const discountsArr = Array.isArray(q.discounts || additiondiscounts) ? (q.discounts || additiondiscounts) : [];
+
+    const itemRows = items.map((item, idx) => {
+      const quantity = Number(item.quantity || item.qty) || 0;
+      const rate = Number(item.rate) || 0;
+      const itemTotal = quantity * rate;
+      const discountPct = Number(item.discount_percentage || item.discountPercent || 0);
+      const discountAmt = itemTotal * (discountPct / 100);
+      const taxable = itemTotal - discountAmt;
+      const taxAmount = Number(item.tax_amount || (Number(item.cgst||0) + Number(item.sgst||0) + Number(item.igst||0)));
+      const finalAmount = Number(item.line_total || item.amount || (taxable + taxAmount));
+      
+      const imgUrl = getProductImage(item.product || item);
+      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="max-width: 50px; max-height: 50px; object-fit: contain;" />` : '-';
+
+      return `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="text-align: center;">${imgHtml}</td>
+          <td>${item.product_name || item.name || item.description || item.desc || '-'}</td>
+          <td>${item.product_code || item.item_code || item.sku || '-'}</td>
+          <td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>
+          <td style="text-align: center;">${quantity}</td>
+          <td>${item.unit || 'Nos'}</td>
+          <td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+          <td style="text-align: right;">${Math.round(discountPct)}%</td>
+          <td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+          <td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+          <td style="text-align: right;">${(item.gst || 0)}%</td>
+          <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
+        </tr>
+      `;
+    }).join('');
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${docType} ${q.quotation_number || qutationNo}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; }
+          .doc-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; gap: 20px; }
+          .branch-info { flex: 0 0 auto; max-width: 35%; }
+          .branch-info h2 { font-size: 14px; color: #1976d2; margin-bottom: 6px; }
+          .branch-info p { font-size: 10px; line-height: 1.5; margin: 2px 0; }
+          .quotation-details { flex: 0 0 auto; min-width: 280px; }
+          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; }
+          .quotation-details td { padding: 4px 8px; border: 1px solid #ddd; }
+          .quotation-details td:first-child { font-weight: 600; background: #f5f5f5; white-space: nowrap; width: 40%; }
+          .addresses { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 15px; }
+          .address-box { flex: 1; border: 1px solid #000; padding: 10px; }
+          .address-box h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; text-transform: uppercase; }
+          .address-box p { font-size: 10px; line-height: 1.6; margin: 3px 0; }
+          table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px; }
+          table.items th, table.items td { border: 1px solid #000; padding: 6px 4px; }
+          table.items th { background: #e3f2fd; font-weight: 600; text-align: center; font-size: 9px; }
+          table.items td { vertical-align: top; }
+          .summary { margin-left: auto; width: 380px; margin-bottom: 15px; }
+          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; }
+          .summary td { padding: 5px 10px; border: 1px solid #ddd; }
+          .summary td:first-child { text-align: left; font-weight: 500; background: #f9f9f9; }
+          .summary td:last-child { text-align: right; font-weight: 600; }
+          .summary .amount-words { border-top: 2px solid #000; background: #fff3e0; font-style: italic; }
+          .summary .grand-total td { background: #e3f2fd; font-weight: bold; font-size: 12px; border-top: 2px solid #000; }
+          .bottom-section { display: flex; gap: 15px; margin-bottom: 15px; }
+          .terms { flex: 1; border: 1px solid #000; padding: 10px; }
+          .terms h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+          .terms p { font-size: 10px; line-height: 1.6; white-space: pre-line; }
+          .bank-details { flex: 1; border: 1px solid #000; padding: 10px; }
+          .bank-details h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+          .bank-details table { width: 100%; font-size: 10px; }
+          .bank-details td { padding: 3px 5px; }
+          .bank-details td:first-child { font-weight: 600; width: 45%; }
+          .footer { text-align: right; margin-top: 30px; padding-top: 10px; border-top: 1px solid #000; }
+          .footer p { font-size: 10px; margin: 4px 0; }
+          @media print {
+            body { padding: 10px; }
+            @page { margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="doc-title">${docType.toUpperCase()}</div>
+
+        <div class="header">
+          ${headerAlignment === 'right' ? `
+            ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
+            <div class="branch-info" style="text-align: right; padding: 0 10px;">
+              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
+              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
+              ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
+              ${companyPhone ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Phone:</strong> ${companyPhone}</p>` : ''}
+              ${companyEmail ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Email:</strong> ${companyEmail}</p>` : ''}
+              ${companyWebsite ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Website:</strong> ${companyWebsite}</p>` : ''}
+            </div>
+          ` : `
+            <div class="branch-info" style="text-align: left; padding: 0 10px;">
+              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
+              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
+              ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
+              ${companyPhone ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Phone:</strong> ${companyPhone}</p>` : ''}
+              ${companyEmail ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Email:</strong> ${companyEmail}</p>` : ''}
+              ${companyWebsite ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Website:</strong> ${companyWebsite}</p>` : ''}
+            </div>
+            ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
+          `}
+          <div class="quotation-details" style="flex: 0 0 auto; min-width: 250px;">
+            <table>
+              <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
+              <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
+              <tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>
+              <tr><td>Ref.</td><td>${references || q.quotation_number || qutationNo || '-'}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="addresses">
+          <div class="address-box">
+            <h3>Billing Address</h3>
+            ${billingAddress1 ? `<p>${billingAddress1}</p>` : ''}
+            ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
+            ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
+            <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
+            ${billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
+            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+          </div>
+          <div class="address-box">
+            <h3>Shipping Address</h3>
+            ${shippingAddress1 ? `<p>${shippingAddress1}</p>` : ''}
+            ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
+            ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
+            <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
+            ${shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
+            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+          </div>
+        </div>
+
+        <table class="items">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Image</th>
+              <th>Item & Description</th>
+              <th>Item Code</th>
+              <th>HSN / SAC</th>
+              <th>Qty</th>
+              <th>Unit</th>
+              <th>Rate (₹)</th>
+              <th>Discount %</th>
+              <th>Discount (₹)</th>
+              <th>Taxable (₹)</th>
+              <th>GST %</th>
+              <th>Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows || '<tr><td colspan="13" style="text-align: center;">No items</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="summary">
+          <table>
+            <tr class="amount-words">
+              <td colspan="2"><strong>Total Amount in Words:</strong> Rupees ${numberToWords(grandTotalVal)} only</td>
+            </tr>
+            <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            
+            ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+            ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+            ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+            
+            <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            
+            <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+
+            ${extraChargesArr.map(c => `
+              <tr>
+                <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
+                <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+              </tr>
+            `).join('')}
+
+            ${discountsArr.map(d => `
+              <tr>
+                <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
+                <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+              </tr>
+            `).join('')}
+
+            ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+
+            <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotalVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+          </table>
+        </div>
+
+        <div class="bottom-section">
+          <div class="terms">
+            <h3>Terms & Conditions</h3>
+            ${termsAndConditionsHtml || '<p>-</p>'}
+            ${notesHtml}
+          </div>
+          <div class="bank-details">
+            <h3>Bank Details</h3>
+            <table>
+              <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
+              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
+              <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
+              <tr><td>Branch Address</td><td>${bankBranchAddress || '-'}</td></tr>
+              ${ifscCode ? `<tr><td>IFSC</td><td>${ifscCode}</td></tr>` : ''}
+              ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
+            </table>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
+          <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
+          <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (err) {} }, 800);
+  };
+
 const handleSaveQuotation = async () => {
   if (!selectedCustomer) return alert("Select a customer.");
   if (!selectedEmployee) return alert("Select a sales credit.");
@@ -1322,12 +1702,15 @@ const handleSaveQuotation = async () => {
 
   try {
     setSaving(true);
+    let savedQuotation = null;
     if (!selectedFile) {
       if (isEditMode && id) {
-        await axios.put(`${BASE_URL}/api/quotations/${id}`, payload);
+        const res = await axios.put(`${BASE_URL}/api/quotations/${id}`, payload);
+        savedQuotation = res.data?.data || res.data;
         alert("Quotation updated successfully.");
       } else {
-        await axios.post(`${BASE_URL}/api/quotations`, payload);
+        const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
+        savedQuotation = res.data?.data || res.data;
         alert("Quotation saved successfully.");
       }
     } else {
@@ -1337,12 +1720,18 @@ const handleSaveQuotation = async () => {
       formData.append("attachment", selectedFile);
 
       if (isEditMode && id) {
-        await axios.put(`${BASE_URL}/api/quotations/${id}`, formData);
+        const res = await axios.put(`${BASE_URL}/api/quotations/${id}`, formData);
+        savedQuotation = res.data?.data || res.data;
         alert("Quotation updated successfully.");
       } else {
-        await axios.post(`${BASE_URL}/api/quotations`, formData);
+        const res = await axios.post(`${BASE_URL}/api/quotations`, formData);
+        savedQuotation = res.data?.data || res.data;
         alert("Quotation saved successfully.");
       }
+    }
+
+    if (printAfterSave) {
+      generatePDF(savedQuotation);
     }
 
     if (saveAsTemplate) {
@@ -2434,7 +2823,6 @@ const  prefillFormData = async (data) => {
             aria-label="Document type"
             disabled={isEditMode}
             title={isEditMode ? 'Document type cannot be changed in edit mode' : 'Document type'}
-            style={{ cursor: isEditMode ? 'not-allowed' : 'pointer' }}
           >
             {docTypes.map(dt => (
               <option key={dt} value={dt}>{dt}</option>
@@ -2514,7 +2902,7 @@ const  prefillFormData = async (data) => {
           <div className="form-group">
             <label htmlFor="copyFrom">Copy from :</label>
             {isEditMode ? (
-              <div className="form-control" style={{ background: '#f5f5f5', cursor: 'not-allowed' }}>
+              <div className="form-control readonly-bg">
                 None
               </div>
             ) : (
@@ -2739,7 +3127,7 @@ const  prefillFormData = async (data) => {
 
                 {/* Display selected shipping address details */}
                 {!isSameAsBilling && selectedShippingAddress && (
-                  <div className="address-display-box" style={{ marginLeft: '120px', width: 'calc(100% - 120px)' }}>
+                  <div className="address-display-box shipping-offset">
                     <div className="address-display-header">
                       <h6 className="address-title">{(selectedShippingAddress.title || selectedShippingAddress.address1 || 'Address')}{gstForAddr(selectedShippingAddress) ? ' - ' + gstForAddr(selectedShippingAddress) : ''}</h6>
                       <button
@@ -2787,10 +3175,10 @@ const  prefillFormData = async (data) => {
             
             <div className="form-field-vertical">
               <label>{`${titleBase} No. :`}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="field-column">
+                <div className="input-inline-group">
                   {!isEditMode && selectedSeries && (
-                    <div style={{ color: '#333', fontSize: '14px' }}>
+                    <div className="seq-prefix">
                       {(() => {
                         const s = seriesList.find(x => String(x.id) === String(selectedSeries));
                         const p = s?.prefix || 'QTN';
@@ -2801,7 +3189,7 @@ const  prefillFormData = async (data) => {
                   )}
 
                   {isEditMode ? (
-                    <div className="form-control" style={{ background: '#f8f9fa', height: 'auto', minHeight: '34px', display: 'flex', alignItems: 'center'}}>
+                    <div className="form-control edit-mode-display">
                       {qutationNo || quotationData?.quotation_number || ''}
                     </div>
                   ) : (
@@ -2810,8 +3198,7 @@ const  prefillFormData = async (data) => {
                         <input
                           id="quotationSeq"
                           type="text"
-                          className="form-control"
-                          style={{ width: '60px' }}
+                          className="form-control seq-input"
                           value={seqNumber}
                           onChange={(e) => {
                             const v = e.target.value.replace(/[^0-9]/g, '');
@@ -2825,8 +3212,8 @@ const  prefillFormData = async (data) => {
                             setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
                           }}
                         />
-                        <div style={{margin: '0 4px'}}>/</div>
-                        <div style={{ color: '#333', fontSize: '14px' }}>{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
+                        <div className="seq-divider">/</div>
+                        <div className="seq-suffix">{yearRange || (() => { const d=new Date(); const y=d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}` })()}</div>
                       </>
                     ) : (
                       <input
@@ -2914,43 +3301,40 @@ const  prefillFormData = async (data) => {
       </div>
 
      <div className="customer-info-container">
-        <div className="container">
           <h5>Items list.</h5>
-          <div className="row">
-            <div className="col-md-12">
-              <table className="table table-bordered">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Image</th>
-                    <th>Items Description</th>
-                    <th>Code</th>
-                    <th>HSN/SAC</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>Fixed Rate</th>
-                    <th>Rate</th>
-                    <th>Discount %</th>
-                    <th>Taxable</th>
-                    {isGSTStateMatch ? (
-                      <>
-                        <th>CGST %</th>
-                        <th>CGST</th>
-                        <th>SGST %</th>
-                        <th>SGST</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>IGST %</th>
-                        <th>IGST</th>
-                      </>
-                    )}
-                    <th>Amount</th>
-                    <th>Lead Time</th>
-                     <th>Actions</th> 
-                  </tr>
-                </thead>
-               <tbody>
+          <table className="professional-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Image</th>
+                <th>Items Description</th>
+                <th>Code</th>
+                <th>HSN/SAC</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Fixed Rate</th>
+                <th>Rate</th>
+                <th>Discount %</th>
+                <th>Taxable</th>
+                {isGSTStateMatch ? (
+                  <>
+                    <th>CGST %</th>
+                    <th>CGST</th>
+                    <th>SGST %</th>
+                    <th>SGST</th>
+                  </>
+                ) : (
+                  <>
+                    <th>IGST %</th>
+                    <th>IGST</th>
+                  </>
+                )}
+                <th>Amount</th>
+                <th>Lead Time</th>
+                 <th>Actions</th> 
+              </tr>
+            </thead>
+           <tbody>
   {tableItems.map((item, index) => (
     <tr key={item._rowId || index}>
       <td>{index + 1}</td>
@@ -3174,45 +3558,43 @@ const  prefillFormData = async (data) => {
     </tr>
   ))}
 </tbody>
+          </table>
 
-              </table>
+          <div className="item-list-footer">
+            <div className="left">
+              <button className="add-another" onClick={handleProdOpen}>
+                + Add Another Item
+              </button>
             </div>
-            <div className="col-md-12 item-list-footer">
-              <div className="left">
-                <button className="btn btn-success add-another" onClick={handleProdOpen}>
-                  + Add Another Item
-                </button>
-              </div>
 
-              <div className="center">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                  <label className="barcode-label" style={{ margin: 0 }}>Search Using Barcode :</label>
-                  <div className="barcode-search" style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Scan Barcode"
-                        value={prodsearch}
-                        onChange={(e) => { setProdSearch(e.target.value); debouncedBarcodeFetch(e.target.value); }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleBarcodeSearch();
-                          }
-                        }}
-                        style={{ flex: 1 }}
-                      />
-                      <button className="btn btn-success go-btn" onClick={() => handleBarcodeSearch()}>
-                        ➜
-                      </button>
+            <div className="center">
+              <div className="barcode-search-container">
+                <label className="barcode-label">Search Using Barcode :</label>
+                <div className="barcode-search">
+                  <div className="barcode-input-group">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Scan Barcode"
+                      value={prodsearch}
+                      onChange={(e) => { setProdSearch(e.target.value); debouncedBarcodeFetch(e.target.value); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleBarcodeSearch();
+                        }
+                      }}
+                    />
+                    <button className="btn-success go-btn" onClick={() => handleBarcodeSearch()}>
+                      ➜
+                    </button>
 
                     {prodsearch && barcodeSuggestions.length > 0 && (
-                      <div className="searchable-select-dropdown" style={{ position: 'absolute', zIndex: 40, left: 0, right: 0, maxHeight: 280, overflowY: 'auto' }}>
+                      <div className="searchable-select-dropdown">
                         {barcodeSuggestions.map((p) => (
                           <div key={p.ID || p.id || (p.Code || p.code)} className="searchable-select-option" onMouseDown={() => { handleSelectProduct(p); setBarcodeSuggestions([]); setProdSearch(''); }}>
-                             <div style={{ fontWeight: 600 }}>{p.Code || p.code || p.Sku || p.SKU || ''}</div>
-                             <div style={{ fontSize: 12 }}>{p.Name || p.name}</div>
+                             <div className="option-code">{p.Code || p.code || p.Sku || p.SKU || ''}</div>
+                             <div className="option-name">{p.Name || p.name}</div>
                           </div>
                         ))}
                       </div>
@@ -3223,13 +3605,11 @@ const  prefillFormData = async (data) => {
             </div>
           </div>
         </div>
-      </div>
-      </div>
 
-      <div className="container">
-        <div className="row">
-          <div className="col-md-8">
-
+      <div className="quotation-summary-layout">
+        <div className="summary-left-side">
+          {/* Terms & Conditions Section */}
+          <div className="summary-card tandc-card">
              <TermsConditionSelector 
               open={openTandCModal} 
               handleClose={(p,ec,ed) => { setTandcSelections(p);setEndCustomer(ec),setEndDealer(ed) }} 
@@ -3238,168 +3618,156 @@ const  prefillFormData = async (data) => {
               end_dealer_name = {isEditMode?enddealer:''} 
             /> 
           </div>
-          <div className="col-md-4">
-           <div className="customer-info-container flex-column">
-            {tableItems.length === 0 ? (
-              <>
-                <div className="row mb-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Total</strong> <strong>  ₹ {grandTotal.toFixed(2)}</strong>
-                  </div>
-                </div>
 
-                <div className="row mb-2">
-                  <div className="col-12 d-flex justify-content-between align-items-center">
-                    
-                    <div style={{ minWidth: '90px' }} />
-                  </div>
-                </div>
+          <div className="summary-row-inline">
+            {/* Notes Section */}
+            <div className="summary-card notes-card">
+              <h5>Notes</h5>
+              <textarea 
+                placeholder="Enter internal notes, special instructions, or payment terms..."
+                value={note}
+                onChange={(e)=>setNote(e.target.value)}
+              />
+            </div>
 
-                <div className="row border-top pt-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Grand Total</strong> <strong>₹ {finalTotal.toFixed(2)}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="row mb-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Total Amount before Tax</strong> <strong>  ₹ {(() => {
-                      const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
-                      return subtotal.toFixed(2);
-                    })()}</strong>
-                  </div>
-                </div>
+            {/* Bank Details Section moved here */}
+            <div className="summary-card bank-card">
+              <h5>Bank Details</h5>
+              <div className="bank-selection-row">
+                <select 
+                  value={selectedBankId || ''}
+                  onChange={(e) => setSelectedBankId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">-- Select Bank Account --</option>
+                  {bankDetails && bankDetails.length > 0 ? (
+                    bankDetails.map((bank) => (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.title || `${bank.bankName} - ${bank.accountNo}`}
+                      </option>
+                    ))
+                  ) : null}
+                </select>
+                <button 
+                  type="button"
+                  className="btn-customer-action btn-customer-add"
+                  onClick={() => handleOpenBankModal()}
+                  title="Add new bank account"
+                >
+                   <IoMdAdd />
+                </button>
+              </div>
 
-                {isGSTStateMatch ? (
-                  <>
-                    <div className="row mb-2 border-top pt-2">
-                      <div className="col-12 d-flex justify-content-between">
-                        <strong>CGST {(() => {
-                          const pcts = tableItems.map(it => {
-                            const taxable = Number(it.taxable) || 0;
-                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
-                            return Math.round(gstRaw / 2);
-                          }).filter(p => p && !isNaN(p));
-                          const uniq = Array.from(new Set(pcts));
-                          if (uniq.length === 1) return `(${uniq[0]}%)`;
-                          if (uniq.length === 0) return "";
-                          return "(mixed)";
-                        })()}</strong>
-                        <strong>₹ {(() => {
-                          const cgstSum = tableItems.reduce((s, it) => {
-                            const taxable = Number(it.taxable) || 0;
-                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
-                            const cgstPct = Math.round(gstRaw / 2);
-                            const cgstVal = (Number(it.cgst) && Number(it.cgst) > 0) ? Number(it.cgst) : +(taxable * (cgstPct / 100));
-                            return s + cgstVal;
-                          }, 0);
-                          return cgstSum.toFixed(2);
-                        })()}</strong>
-                      </div>
+              <div className="bank-display-box-container">
+                {selectedBankId && selectedBank && (
+                  <div className="bank-display-box">
+                    <div className="bank-info-header">
+                      <div className="bank-name">{selectedBank.bankName}</div>
+                      <button
+                        type="button"
+                        className="btn-action"
+                        title="Edit bank details"
+                        onClick={() => handleOpenBankModal(selectedBank)}
+                      >
+                        ✎
+                      </button>
                     </div>
-
-                    <div className="row mb-2">
-                      <div className="col-12 d-flex justify-content-between">
-                        <strong>SGST {(() => {
-                          const pcts = tableItems.map(it => {
-                            const taxable = Number(it.taxable) || 0;
-                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
-                            return Math.round(gstRaw / 2);
-                          }).filter(p => p && !isNaN(p));
-                          const uniq = Array.from(new Set(pcts));
-                          if (uniq.length === 1) return `(${uniq[0]}%)`;
-                          if (uniq.length === 0) return "";
-                          return "(mixed)";
-                        })()}</strong>
-                        <strong>₹ {(() => {
-                          const sgstSum = tableItems.reduce((s, it) => {
-                            const taxable = Number(it.taxable) || 0;
-                            const gstRaw = Number(it.gst) || (taxable > 0 ? (((Number(it.cgst)||0) + (Number(it.sgst)||0)) / taxable) * 100 : 0);
-                            const sgstPct = Math.round(gstRaw / 2);
-                            const sgstVal = (Number(it.sgst) && Number(it.sgst) > 0) ? Number(it.sgst) : +(taxable * (sgstPct / 100));
-                            return s + sgstVal;
-                          }, 0);
-                          return sgstSum.toFixed(2);
-                        })()}</strong>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="row mb-2 border-top pt-2">
-                    <div className="col-12 d-flex justify-content-between">
-                      <strong>iGST {(() => {
-                        const pcts = tableItems.map(it => {
-                          const taxable = Number(it.taxable) || 0;
-                          const pctRaw = Number(it.gst) || (taxable > 0 ? ((Number(it.igst) || 0) / taxable) * 100 : 0);
-                          return Math.round(pctRaw);
-                        }).filter(p => p && !isNaN(p));
-                        const uniq = Array.from(new Set(pcts));
-                        if (uniq.length === 1) return `(${uniq[0]}%)`;
-                        if (uniq.length === 0) return "";
-                        return "(mixed)";
-                      })()}</strong>
-                      <strong>₹ {(() => {
-                        const igstSum = tableItems.reduce((s, it) => {
-                          const taxable = Number(it.taxable) || 0;
-                          const pctRaw = Number(it.gst) || (taxable > 0 ? ((Number(it.igst) || 0) / taxable) * 100 : 0);
-                          const pct = Math.round(pctRaw);
-                          const igstVal = (Number(it.igst) && Number(it.igst) > 0) ? Number(it.igst) : +(taxable * (pct / 100));
-                          return s + igstVal;
-                        }, 0);
-                        return igstSum.toFixed(2);
-                      })()}</strong>
+                    <div className="bank-details-grid">
+                      <div className="bank-item"><strong>A/C No:</strong> <span>{selectedBank.accountNo}</span></div>
+                      {selectedBank.branch && <div className="bank-item"><strong>Branch:</strong> <span>{selectedBank.branch}</span></div>}
+                      {selectedBank.ifsc && <div className="bank-item"><strong>IFSC:</strong> <span>{selectedBank.ifsc}</span></div>}
+                      {selectedBank.swiftCode && <div className="bank-item"><strong>SWIFT:</strong> <span>{selectedBank.swiftCode}</span></div>}
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
 
-                <div className="row mb-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Total Tax Amount</strong> <strong>  ₹ {(() => {
-                      const taxAmount = tableItems.reduce((sum, item) => {
-                        if (isGSTStateMatch) {
-                          const taxable = Number(item.taxable) || 0;
-                          const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
-                          const pctHalf = Math.round(gstRaw / 2);
-                          const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
-                          const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
-                          return sum + cgstVal + sgstVal;
-                        }
-                        const taxable = Number(item.taxable) || 0;
-                        const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
-                        const pct = Math.round(pctRaw);
-                        const igstVal = +(taxable * (pct / 100));
-                        return sum + igstVal;
-                      }, 0);
-                      return taxAmount.toFixed(2);
-                    })()}</strong>
-                  </div>
+          {/* Upload Section moved here */}
+          <div className="summary-card upload-card wide-upload-card">
+            <div className="upload-section-content">
+              <div className="upload-field-row">
+                <span className="upload-label">Upload File :</span>
+                <div className="upload-button-wrapper">
+                  <label htmlFor="file-upload" className="btn-upload-label">
+                    <MdNoteAdd className="icon" /> Upload File
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => setSelectedFile(e.target.files[0])}
+                    style={{ display: 'none' }}
+                  />
                 </div>
 
-                <div className="row mb-2">
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Total</strong> <strong>₹ {(() => {
-                      const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
-                      const taxAmount = tableItems.reduce((sum, item) => {
-                        if (isGSTStateMatch) return sum + (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
-                        const taxable = Number(item.taxable) || 0;
-                        const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
-                        const pct = Math.round(pctRaw);
-                        const igstVal = +(taxable * (pct / 100));
-                        return sum + igstVal;
-                      }, 0);
-                      return (subtotal + taxAmount).toFixed(2);
-                    })()}</strong>
+                {selectedFile && (
+                  <div className="selected-file-pill">
+                    <span>✓ {selectedFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFile(null)}
+                      className="btn-clear"
+                    >
+                      ×
+                    </button>
                   </div>
+                )}
+
+                {attachmentPath && !selectedFile && (
+                  <div className="current-attachment-pill">
+                    <span className="label">Current: </span>
+                    <a 
+                      href={`${BASE_URL}/${attachmentPath}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      {attachmentPath.split('/').pop()}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="summary-right-side">
+          {/* Totals Section */}
+          <div className="totals-box-container">
+            {tableItems.length === 0 ? (
+              <div className="totals-content">
+                <div className="total-row">
+                  <span>Total Amount before Taxes:</span>
+                  <strong>₹ 0.00</strong>
+                </div>
+                {isGSTStateMatch ? (
+                  <>
+                    <div className="total-row">
+                      <span>CGST:</span>
+                      <strong>₹ 0.00</strong>
+                    </div>
+                    <div className="total-row">
+                      <span>SGST:</span>
+                      <strong>₹ 0.00</strong>
+                    </div>
+                  </>
+                ) : (
+                  <div className="total-row">
+                    <span>IGST:</span>
+                    <strong>₹ 0.00</strong>
+                  </div>
+                )}
+                <div className="total-row total-amount-line">
+                  <span>Total:</span>
+                  <strong>₹ 0.00</strong>
                 </div>
 
-                {extrcharges.length > 0 && (
-                  <div className="mb-2">
+                {(extrcharges.length > 0 || additiondiscounts.length > 0) && (
+                  <div className="charge-discount-list">
                     {extrcharges.map((c, i) => (
-                      <div key={i} className="d-flex justify-content-between align-items-center">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <button className="btn-action btn-edit" title="Edit charge" onClick={() => { setEditingChargeIndex(i); setOpenChargeDialog(true); }}>
+                      <div key={i} className="item-line">
+                        <div className="item-info">
+                          <button className="btn-action" title="Edit charge" onClick={() => { setEditingChargeIndex(i); setOpenChargeDialog(true); }}>
                             ✎
                           </button>
                           <button className="btn-action btn-delete" title="Delete charge" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>
@@ -3407,23 +3775,17 @@ const  prefillFormData = async (data) => {
                           </button>
                           <span>{c.title} ({c.type === "percent" ? `${Math.round(Number(c.value) || 0)}%` : `₹${Number(c.value) || 0}`})</span>
                         </div>
-                        <span>
-                          ₹{" "}
-                          {c.type === "percent"
+                        <span className="amount">
+                          ₹ {c.type === "percent"
                             ? ((grandTotal * (Number(c.value) || 0)) / 100).toFixed(2)
                             : (Number(c.value) || 0).toFixed(2)}
                         </span>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {additiondiscounts.length > 0 && (
-                  <div className="mb-2">
                     {additiondiscounts.map((d, i) => (
-                      <div key={i} className="d-flex justify-content-between align-items-center">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <button className="btn-action btn-edit" title="Edit discount" onClick={() => { setEditingDiscountIndex(i); setOpenDiscountDialog(true); }}>
+                      <div key={i} className="item-line">
+                        <div className="item-info">
+                          <button className="btn-action" title="Edit discount" onClick={() => { setEditingDiscountIndex(i); setOpenDiscountDialog(true); }}>
                             ✎
                           </button>
                           <button className="btn-action btn-delete" title="Delete discount" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>
@@ -3431,9 +3793,8 @@ const  prefillFormData = async (data) => {
                           </button>
                           <span>{d.title} ({d.type === "percent" ? `${Math.round(Number(d.value) || 0)}%` : `₹${Number(d.value) || 0}`})</span>
                         </div>
-                        <span>
-                          - ₹{" "}
-                          {d.type === "percent"
+                        <span className="amount">
+                          - ₹ {d.type === "percent"
                             ? ((grandTotal * (Number(d.value) || 0)) / 100).toFixed(2)
                             : (Number(d.value) || 0).toFixed(2)}
                         </span>
@@ -3442,358 +3803,343 @@ const  prefillFormData = async (data) => {
                   </div>
                 )}
 
-                <div className="row border-top pt-2">
-                  <div className="form-check">
-                      <input id="roundOffCheck2" className="form-check-input" type="checkbox" checked={includeRoundOff} onChange={() => setIncludeRoundOff(!includeRoundOff)} />
-                      <label htmlFor="roundOffCheck2">Include Round off</label>
-                    </div>
-                  <div className="col-12 d-flex justify-content-between">
-                    <strong>Grand Total</strong> <strong>₹ {finalTotal.toFixed(2)}</strong>
-                  </div>
+                <div className="total-row grand-total">
+                  <span>Grand Total</span>
+                  <span>₹ {finalTotal.toFixed(2)}</span>
                 </div>
-              </>
+              </div>
+            ) : (
+              <div className="totals-content">
+                <div className="total-row">
+                  <span>Untaxed Amount:</span>
+                  <strong>₹ {tableItems.reduce((acc, item) => acc + (Number(item.taxable) || 0), 0).toFixed(2)}</strong>
+                </div>
+
+                {isGSTStateMatch ? (
+                  <>
+                    <div className="total-row">
+                      <span>CGST:</span>
+                      <strong>₹ {tableItems.reduce((sum, item) => {
+                        const taxable = Number(item.taxable) || 0;
+                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+                        const pctHalf = Math.round(gstRaw/2);
+                        const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
+                        return sum + cgstVal;
+                      }, 0).toFixed(2)}</strong>
+                    </div>
+                    <div className="total-row">
+                      <span>SGST:</span>
+                      <strong>₹ {tableItems.reduce((sum, item) => {
+                        const taxable = Number(item.taxable) || 0;
+                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+                        const pctHalf = Math.round(gstRaw/2);
+                        const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
+                        return sum + sgstVal;
+                      }, 0).toFixed(2)}</strong>
+                    </div>
+                  </>
+                ) : (
+                  <div className="total-row">
+                    <span>IGST:</span>
+                    <strong>₹ {tableItems.reduce((sum, item) => {
+                      const taxable = Number(item.taxable) || 0;
+                      const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+                      const pct = Math.round(pctRaw);
+                      const igstVal = (Number(item.igst) && Number(item.igst) > 0) ? Number(item.igst) : +(taxable * (pct / 100));
+                      return sum + igstVal;
+                    }, 0).toFixed(2)}</strong>
+                  </div>
+                )}
+
+                <div className="total-row total-amount-line">
+                  <span>Total:</span>
+                  <strong>₹ {(() => {
+                    const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
+                    const taxAmount = tableItems.reduce((sum, item) => {
+                      if (isGSTStateMatch) {
+                        const taxable = Number(item.taxable) || 0;
+                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
+                        const pctHalf = Math.round(gstRaw/2);
+                        const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
+                        const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
+                        return sum + cgstVal + sgstVal;
+                      }
+                      const taxable = Number(item.taxable) || 0;
+                      const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
+                      const pct = Math.round(pctRaw);
+                      const igstVal = (Number(item.igst) && Number(item.igst) > 0) ? Number(item.igst) : +(taxable * (pct / 100));
+                      return sum + igstVal;
+                    }, 0);
+                    return (subtotal + taxAmount).toFixed(2);
+                  })()}</strong>
+                </div>
+
+                {(extrcharges.length > 0 || additiondiscounts.length > 0) && (
+                  <div className="charge-discount-list">
+                    {extrcharges.map((c, i) => (
+                      <div key={i} className="item-line">
+                        <div className="item-info">
+                          <button className="btn-action" title="Edit charge" onClick={() => { setEditingChargeIndex(i); setOpenChargeDialog(true); }}>
+                            ✎
+                          </button>
+                          <button className="btn-action btn-delete" title="Delete charge" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>
+                            🗑
+                          </button>
+                          <span>{c.title} ({c.type === "percent" ? `${Math.round(Number(c.value) || 0)}%` : `₹${Number(c.value) || 0}`})</span>
+                        </div>
+                        <span className="amount">
+                          ₹ {c.type === "percent"
+                            ? ((grandTotal * (Number(c.value) || 0)) / 100).toFixed(2)
+                            : (Number(c.value) || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                    {additiondiscounts.map((d, i) => (
+                      <div key={i} className="item-line">
+                        <div className="item-info">
+                          <button className="btn-action" title="Edit discount" onClick={() => { setEditingDiscountIndex(i); setOpenDiscountDialog(true); }}>
+                            ✎
+                          </button>
+                          <button className="btn-action btn-delete" title="Delete discount" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>
+                            🗑
+                          </button>
+                          <span>{d.title} ({d.type === "percent" ? `${Math.round(Number(d.value) || 0)}%` : `₹${Number(d.value) || 0}`})</span>
+                        </div>
+                        <span className="amount">
+                          - ₹ {d.type === "percent"
+                            ? ((grandTotal * (Number(d.value) || 0)) / 100).toFixed(2)
+                            : (Number(d.value) || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="form-check round-off-check">
+                  <input id="roundOffCheck2" className="form-check-input" type="checkbox" checked={includeRoundOff} onChange={() => setIncludeRoundOff(!includeRoundOff)} />
+                  <label htmlFor="roundOffCheck2">Include Round off</label>
+                </div>
+
+                <div className="total-row grand-total">
+                  <span>Grand Total</span>
+                  <span>₹ {finalTotal.toFixed(2)}</span>
+                </div>
+              </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '8px' }}>
-              <button className="btn btn-warning rounded-0" 
-                    onClick={() => setOpenChargeDialog(true)}
-                    >
+            <div className="totals-box">
+              <button className="btn-add-aux" onClick={() => setOpenChargeDialog(true)}>
                 + Add Charge
               </button>
-              <button className="btn btn-warning rounded-0" onClick={() => setOpenDiscountDialog(true)}>
+              <button className="btn-add-aux" onClick={() => setOpenDiscountDialog(true)}>
                 + Add Discount
               </button>
             </div>
           </div>
-
-          </div>
         </div>
       </div>
 
-      <div className="container">
-          <div className="row">
-              <div className="customer-info-container">
-                <div className="col-md-3">
-
-                  <h5>Notes</h5>
-
-                  <textarea cols={50}
-                   value={note}
-                   onChange={(e)=>setNote(e.target.value)}
-                  
-                  >
-
-                  </textarea>
-
-
-
-
-                </div>
-
-                <div className="col-md-4">
-                  <h5>Bank Details</h5>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
-                    <select 
-                      className="form-control"
-                      style={{ flex: 1 }}
-                      value={selectedBankId || ''}
-                      onChange={(e) => setSelectedBankId(e.target.value ? Number(e.target.value) : null)}
-                    >
-                      <option value="">-- Select Bank Account --</option>
-                      {bankDetails && bankDetails.length > 0 ? (
-                        bankDetails.map((bank) => (
-                          <option key={bank.id} value={bank.id}>
-                            {`${bank.branch ? '  ' + bank.branch : ''}${bank.accountNo ? ' - ' + bank.accountNo : ''}`}
-                          </option>
-                        ))
-                      ) : null}
-                    </select>
-                    <button 
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        background: '#1e7b5a',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '6px 10px',
-                        cursor: 'pointer',
-                        fontSize: '18px',
-                        lineHeight: 1,
-                        flexShrink: 0,
-                      }}
-                      onClick={handleOpenBankModal}
-                      title="Add new bank account"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {selectedBankId ? (
-                      selectedBank ? (
-                        <div key={selectedBank.id} style={{
-                          padding: '10px',
-                          marginBottom: '8px',
-                          background: '#f0f8f5',
-                          border: '1px solid #c8e6c9',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          position: 'relative',
-                        }}>
-                          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                            <div>
-                              <div>Bank Name : {selectedBank.bankName}</div>
-                              <div>Account No : {selectedBank.accountNo}</div>
-                              {selectedBank.branch && <div>Branch: {selectedBank.branch}</div>}
-                              {selectedBank.ifsc && <div>IFSC: {selectedBank.ifsc}</div>}
-                              {selectedBank.swiftCode && <div>SWIFT Code: {selectedBank.swiftCode}</div>}
-                            </div>
-                            <div style={{marginLeft: '8px', display: 'flex', gap: '6px'}}>
-                              <button
-                                type="button"
-                                title="Edit bank details"
-                                onClick={() => handleOpenBankModal(selectedBank)}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                  color: '#1976d2',
-                                  fontSize: '16px'
-                                }}
-                              >
-                                ✎
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ color: '#999', fontSize: '12px', fontStyle: 'italic' }}>
-                          No bank details added for selected account
-                        </div>
-                      )
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-          </div>
-          <div className="row">
-            <div className="col-md-12">
-              <label>Upload File :</label>
-              {attachmentPath && (
-                <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-                  <span style={{ marginRight: '10px' }}>Current file:</span>
-                  <a 
-                    href={`${BASE_URL}/${attachmentPath}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ color: '#1976d2', textDecoration: 'none' }}
-                  >
-                    {attachmentPath.split('/').pop()}
-                  </a>
-                  <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
-                    (Upload new file to replace)
-                  </span>
-                </div>
-              )}
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setSelectedFile(e.target.files[0])}
+      <div className="summary-full-width">
+        <div className="summary-card next-actions-card">
+          <h5>Next Actions</h5>
+          <div className="actions-list">
+            <div className="form-check">
+              <input 
+                className="form-check-input" 
+                type="checkbox" 
+                id="saveAsTemplateCheck" 
+                checked={saveAsTemplate}
+                onChange={(e) => setSaveAsTemplate(e.target.checked)}
               />
-              {selectedFile && (
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#28a745' }}>
-                  New file selected: {selectedFile.name}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFile(null)}
-                    style={{
-                      marginLeft: '10px',
-                      fontSize: '12px',
-                      padding: '2px 6px',
-                      backgroundColor: '#dc3545',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
+              <label className="form-check-label" htmlFor="saveAsTemplateCheck">
+                Save as Template
+              </label>
+            </div>
+
+            <div className="form-check">
+              <input className="form-check-input" type="checkbox" id="emailCheck" />
+              <label className="form-check-label" htmlFor="emailCheck">
+                Share By Email
+              </label>
+            </div>
+
+            <div className="form-check">
+              <input className="form-check-input" type="checkbox" id="whatsappCheck" />
+              <label className="form-check-label" htmlFor="whatsappCheck">
+                Share By WhatsApp
+              </label>
+            </div>
+
+            <div className="form-check">
+              <input 
+                className="form-check-input" 
+                type="checkbox" 
+                id="printAfterSaveCheck" 
+                checked={printAfterSave}
+                onChange={(e) => setPrintAfterSave(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="printAfterSaveCheck">
+                Print Document After save
+              </label>
             </div>
           </div>
 
-          <div className="row">
-            <div className="customer-info-container">
-              <h5>Next Actions</h5>
-              <div className="col-md-12">
-                <div className="form-check">
-                  <input 
-                    className="form-check-input" 
-                    type="checkbox" 
-                    id="saveAsTemplateCheck" 
-                    checked={saveAsTemplate}
-                    onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                  />
-                  <label className="form-check-label" htmlFor="saveAsTemplateCheck">
-                    Save as Template
-                  </label>
-                </div>
+          <div className="final-actions-footer">
+            <button className="btn btn--save" onClick={handleSaveQuotation} disabled={saving}>
+              {isEditMode ? <><MdEdit /> {saving ? 'Updating...' : 'Update Quotation'}</> : <><FaCheck /> {saving ? 'Saving...' : 'Save Quotation'}</>}
+            </button>
 
-
-               <div className="form-check">
-                  <input className="form-check-input" type="checkbox" value="" id="2" />
-                <label className="form-check-label" htmlFor="2">
-                  Share By Email
-                </label>
-              </div>
-
-
-              <div className="form-check">
-                  <input className="form-check-input" type="checkbox" value="" id="3" />
-                <label className="form-check-label" htmlFor="3">
-                  Share By Whats App
-                </label>
-              </div>
-
-
-              <div className="form-check">
-                  <input className="form-check-input" type="checkbox" value="" id="4" />
-                <label className="form-check-label" htmlFor="4">
-                  Print Document After save
-                </label>
-              </div>
-
-
-
-              <div className="form-check">
-                  <input className="form-check-input" type="checkbox" value="" id="5" />
-                <label className="form-check-label" htmlFor="5">
-                  Alert me on Openning
-                </label>
-              </div>
-              </div>
-            </div>
-<div className="footer-button">
-                {isEditMode && (
-                  <button className="btn btn--save ml-4" onClick={handleSaveQuotation} disabled={saving}>
-                    <MdEdit /> Update
-                  </button>
-                )}
-
-                <button className="btn btn--save ml-4" onClick={handleSaveQuotation} disabled={saving}>
-                  <FaCheck /> Save
-                </button>
-
-                <button className="btn btn--save ml-4" onClick={async ()=>{
-                  await handleSaveQuotation();
-                  // reset form for new quotation
-                  setSelectedCustomer(null);
-                  setTableItems([]);
-                  setGrandTotal(0);
-                }} disabled={saving}>
-                  <FaCheck /> Save & Add New
-                </button>
-              </div>
+            <button className="btn btn--secondary" onClick={async ()=>{
+              await handleSaveQuotation();
+              setSelectedCustomer(null);
+              setTableItems([]);
+              setGrandTotal(0);
+              alert("Saved successfully!");
+            }} disabled={saving}>
+              Save & Create New
+            </button>
           </div>
         </div>
-
-
-
+      </div>
       
 
       {/* Address Add Modal */}
       {addressModalOpen && (
         <div className="custom-modal" onClick={() => setAddressModalOpen(false)}>
-          <div className="modal-box address-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h6>Add Address</h6>
-              <button className="btn" onClick={() => setAddressModalOpen(false)}>✕</button>
+          <div className="address-modal-v2" onClick={(e) => e.stopPropagation()}>
+            <div className="address-modal-header">
+              <h5>ADD ADDRESS</h5>
+              <button className="close-btn" onClick={() => setAddressModalOpen(false)}>❌</button>
             </div>
 
-            <div className="modal-body">
-              <div className="mb-8">
+            <div className="address-modal-body">
+              <div className="address-form-group">
                 <label>Title</label>
-                <input className="form-control" value={addressForm.title} onChange={(e) => setAddressForm(prev => ({ ...prev, title: e.target.value }))} />
-                <div style={{ marginTop: 8 }}>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={!!addressForm.show_title_on_print}
-                      onChange={(e) => setAddressForm(prev => ({ ...prev, show_title_on_print: e.target.checked }))}
-                    />
-                    <span>show title on print</span>
-                  </label>
-                </div>
-              </div> 
+                <input 
+                  type="text"
+                  className="address-input" 
+                  value={addressForm.title} 
+                  placeholder="Title"
+                  onChange={(e) => setAddressForm(prev => ({ ...prev, title: e.target.value }))} 
+                />
+              </div>
 
-              <div className="mb-8">
+              <div className="address-checkbox-group">
+                <label className="address-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={!!addressForm.show_title_in_shipping}
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, show_title_in_shipping: e.target.checked }))}
+                  />
+                  <span>Show title instead of business name in shipping address</span>
+                </label>
+              </div>
+
+              <div className="address-form-group mt-10">
                 <label>Address</label>
-                <input className="form-control" placeholder="Line1" value={addressForm.address1} onChange={(e) => setAddressForm(prev => ({ ...prev, address1: e.target.value }))} />
-                <input className="form-control mb-8" placeholder="Line2" value={addressForm.address2} onChange={(e) => setAddressForm(prev => ({ ...prev, address2: e.target.value }))} />
-              </div>
-
-              <div className="mb-8">
-                <label>City</label>
-                <input className="form-control" value={addressForm.city} onChange={(e) => setAddressForm(prev => ({ ...prev, city: e.target.value }))} />
-              </div>
-
-              <div className="grid-2">
-                <div>
-                  <label>Country</label>
-                  <SearchableSelect
-                    options={countries}
-                    value={addressForm.country}
-                    onChange={(val) => setAddressForm(prev => ({ ...prev, country: val }))}
-                    placeholder="Select country"
+                <div className="address-vertical-stack">
+                  <input 
+                    type="text"
+                    className="address-input" 
+                    placeholder="Line1" 
+                    value={addressForm.address1} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, address1: e.target.value }))} 
+                  />
+                  <input 
+                    type="text"
+                    className="address-input" 
+                    placeholder="Line2" 
+                    value={addressForm.address2} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, address2: e.target.value }))} 
                   />
                 </div>
-                <div>
+              </div>
+
+              <div className="address-form-group">
+                <label>City</label>
+                <input 
+                  type="text"
+                  className="address-input address-input-half" 
+                  value={addressForm.city} 
+                  onChange={(e) => setAddressForm(prev => ({ ...prev, city: e.target.value }))} 
+                />
+              </div>
+
+              <div className="address-grid-2">
+                <div className="address-form-group">
+                  <label>Country</label>
+                  <select
+                    className="address-select"
+                    value={addressForm.country}
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, country: e.target.value }))}
+                  >
+                    {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="address-form-group">
                   <label>State</label>
-                  {addressForm.country === 'India' ? (
-                    <SearchableSelect
-                      options={indianStates}
-                      value={addressForm.state}
-                      onChange={(val) => setAddressForm(prev => ({ ...prev, state: val }))}
-                      placeholder="Select state"
-                    />
-                  ) : (
-                    <SearchableSelect
-                      options={[]}
-                      value={addressForm.state}
-                      onChange={(val) => setAddressForm(prev => ({ ...prev, state: val }))}
-                      placeholder="Type state"
-                      allowCustom={true}
-                    />
-                  )}
+                  <select
+                    className="address-select"
+                    value={addressForm.state}
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, state: e.target.value }))}
+                  >
+                    <option value="">Select State</option>
+                    {indianStates.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
               </div>
 
-              <div className="grid-2">
-                <div>
+              <div className="address-grid-2 mt-10">
+                <div className="address-form-group">
                   <label>Pincode</label>
-                  <input className="form-control" value={addressForm.postal_code} onChange={(e) => setAddressForm(prev => ({ ...prev, postal_code: e.target.value }))} />
+                  <input 
+                    type="text"
+                    className="address-input" 
+                    value={addressForm.postal_code} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, postal_code: e.target.value }))} 
+                  />
                 </div>
-                <div>
-                  <label>GSTIN</label>
-                  <input className="form-control" value={addressForm.gst_in} onChange={(e) => setAddressForm(prev => ({ ...prev, gst_in: e.target.value }))} />
+                <div className="address-form-group">
+                  <div className="address-label-row">
+                    <label>GSTIN</label>
+                    <label className="address-sez-label">
+                    </label>
+                  </div>
+                  <input 
+                    type="text"
+                    className="address-input" 
+                    value={addressForm.gst_in} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, gst_in: e.target.value }))} 
+                  />
                 </div>
               </div>
 
-              <div className="mb-8">
+              <div className="address-form-group mt-10">
                 <label>Extra Field (e.g. Mobile: 9000012345)</label>
-                <div className="grid-extra">
-                  <input className="form-control" placeholder="Key" value={addressForm.extra_key} onChange={(e) => setAddressForm(prev => ({ ...prev, extra_key: e.target.value }))} />
-                  <input className="form-control" placeholder="Value" value={addressForm.extra_value} onChange={(e) => setAddressForm(prev => ({ ...prev, extra_value: e.target.value }))} />
+                <div className="address-extra-field">
+                  <input 
+                    type="text"
+                    className="address-input address-key" 
+                    placeholder="Key" 
+                    value={addressForm.extra_key} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, extra_key: e.target.value }))} 
+                  />
+                  <span className="address-separator">:</span>
+                  <input 
+                    type="text"
+                    className="address-input address-value" 
+                    placeholder="Value" 
+                    value={addressForm.extra_value} 
+                    onChange={(e) => setAddressForm(prev => ({ ...prev, extra_value: e.target.value }))} 
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setAddressModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveAddressModal}>Save</button>
+            <div className="address-modal-footer">
+              <button className="address-btn-save" onClick={saveAddressModal}>
+                <FaCheck /> Save
+              </button>
             </div>
           </div>
         </div>
@@ -3812,31 +4158,33 @@ const  prefillFormData = async (data) => {
       {/* Modal for search + table */}
       {open && (
         <div className="custom-modal" onClick={handleClose}>
-          <div className="modal-box modal-width-500 customer-modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="customer-modal-header">
-              <h5 className="modal-title">Select Customer</h5>
-              <button className="modal-close-btn" onClick={handleClose}>✕</button>
+          <div className="professional-modal select-customer-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5>Select Customer</h5>
+              <button className="close-btn" onClick={handleClose}>❌</button>
             </div>
 
-            <input
-              type="text"
-              className="form-control customer-search-input"
-              placeholder="Search"
-              value={search}
-              onChange={handleSearch}
-            />
+            <div className="modal-body">
+              <input
+                type="text"
+                className="form-control search-input"
+                placeholder="Search customers..."
+                value={search}
+                onChange={handleSearch}
+              />
 
-            <div className="customer-list-container">
-              {customers.map((cust) => (
-                <div key={cust.id} className="customer-list-item" onClick={() => handleSelectCustomer(cust)}>
-                  <div className="customer-item-content">
-                    <div className="customer-company-name">{cust.company_name || cust.company || ""}</div>
-                    <div className="customer-contact-name">
-                      {`${cust.firstname || ''} ${cust.lastname || ''}`.trim()}
+              <div className="customer-list-container">
+                {customers.map((cust) => (
+                  <div key={cust.id} className="customer-list-item" onClick={() => handleSelectCustomer(cust)}>
+                    <div className="customer-item-content">
+                      <div className="customer-company-name">{cust.company_name || cust.company || ""}</div>
+                      <div className="customer-contact-name">
+                        {`${cust.firstname || ''} ${cust.lastname || ''}`.trim()}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -3852,144 +4200,148 @@ const  prefillFormData = async (data) => {
       {/* Product Modal */}
       {openProdTable && (
         <div className="custom-modal" onClick={handleProdClose}>
-          <div className="modal-box modal-width-800 modal-scroll" onClick={(e) => e.stopPropagation()}>
+          <div className="professional-modal product-selection-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h5 style={{ margin: 0 }}>Select Item</h5>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className="btn btn--print"
-                    onClick={() => setProductLayout((p) => (p === 'list' ? 'grid' : 'list'))}
-                  >
-                    Change Layout
-                  </button>
-                  <button className="btn" onClick={handleProdClose}>✕</button>
-                </div>
-            </div>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search Products"
-              value={prodsearch}
-              onChange={handleProductSearch}
-            />
-
-            {/* Layout: list (default) or grid */}
-            {productLayout === 'list' ? (
-              products.map((prod) => (
-                <div
-                  key={prod.ID}
-                  className="product-row"
+              <h5>Select Item</h5>
+              <div className="flex-center-gap-12">
+                <button
+                  type="button"
+                  className="btn-layout"
+                  onClick={() => setProductLayout((p) => (p === 'list' ? 'grid' : 'list'))}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedProductIds.includes(prod.ID)}
-                      onChange={() => toggleProductSelection(prod.ID)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openBillingModalForProduct(prod)}>
-                      <div style={{ fontWeight: 600 }}>{prod.Code ? prod.Code : ""}</div>
-                      <div>{prod.Name || ''}</div>
+                  Change Layout
+                </button>
+                <button className="close-btn" onClick={handleProdClose}>❌</button>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              <input
+                type="text"
+                className="form-control search-input"
+                placeholder="Search products by name or code..."
+                value={prodsearch}
+                onChange={handleProductSearch}
+              />
+
+              {/* Layout: list (default) or grid */}
+              {productLayout === 'list' ? (
+                <div className="product-list-container">
+                  {products.map((prod) => (
+                    <div
+                      key={prod.ID}
+                      className="product-row"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.includes(prod.ID)}
+                        onChange={() => toggleProductSelection(prod.ID)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="product-info" onClick={() => openBillingModalForProduct(prod)}>
+                        <div className="code">{prod.Code ? prod.Code : ""}</div>
+                        <div className="name">{prod.Name || ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid-container">
+                  <div className="filters-row">
+                    <div className="filter-col">
+                      <SearchableSelect
+                        options={Array.from(new Set(products.map(p => (p.Category?.Name || p.CategoryName || p.Category || '').toString()).filter(Boolean)))}
+                        value={selectedCategoryFilter}
+                        onChange={(v) => { setSelectedCategoryFilter(v); setSelectedSubcategoryFilter(''); }}
+                        placeholder="Filter by Category"
+                      />
+                    </div>
+                    <div className="filter-col">
+                      <SearchableSelect
+                        options={Array.from(new Set(products
+                          .filter(p => !selectedCategoryFilter || ((p.Category?.Name || p.CategoryName || p.Category || '').toString() === selectedCategoryFilter))
+                          .map(p => (p.SubCategory?.Name || p.SubCategoryName || p.SubCategory || '').toString()).filter(Boolean)
+                        ))}
+                        value={selectedSubcategoryFilter}
+                        onChange={(v) => setSelectedSubcategoryFilter(v)}
+                        placeholder="Filter by Sub Category"
+                      />
                     </div>
                   </div>
-                </div>
-              ))
-            ) : (
-              <div>
-                <div className="filters-row" style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-                  <div style={{ flex: 1 }}>
-                    <SearchableSelect
-                      options={Array.from(new Set(products.map(p => (p.Category?.Name || p.CategoryName || p.Category || '').toString()).filter(Boolean)))}
-                      value={selectedCategoryFilter}
-                      onChange={(v) => { setSelectedCategoryFilter(v); setSelectedSubcategoryFilter(''); }}
-                      placeholder="Category"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <SearchableSelect
-                      options={Array.from(new Set(products
-                        .filter(p => !selectedCategoryFilter || ((p.Category?.Name || p.CategoryName || p.Category || '').toString() === selectedCategoryFilter))
-                        .map(p => (p.SubCategory?.Name || p.SubCategoryName || p.SubCategory || '').toString()).filter(Boolean)
-                      ))}
-                      value={selectedSubcategoryFilter}
-                      onChange={(v) => setSelectedSubcategoryFilter(v)}
-                      placeholder="Sub Category"
-                    />
-                  </div>
-                </div>
 
-                <div className="products-grid">
-                  {products
-                    .filter(p => {
-                      // text search + category + subcategory filters
-                      const q = prodsearch.trim().toLowerCase();
-                      if (q && !((p.Name || '').toString().toLowerCase().includes(q) || (p.Code || '').toString().toLowerCase().includes(q))) return false;
-                      if (selectedCategoryFilter) {
-                        const cat = (p.Category?.Name || p.CategoryName || p.Category || '').toString();
-                        if (cat !== selectedCategoryFilter) return false;
-                      }
-                      if (selectedSubcategoryFilter) {
-                        const sub = (p.SubCategory?.Name || p.SubCategoryName || p.SubCategory || '').toString();
-                        if (sub !== selectedSubcategoryFilter) return false;
-                      }
-                      return true;
-                    })
-                      .map((prod) => (
-                      <div key={prod.ID} className="product-card">
-                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedProductIds.includes(prod.ID)}
-                            onChange={() => toggleProductSelection(prod.ID)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openBillingModalForProduct(prod)}>
-                            <div className="product-thumb-wrap">
-                              { getProductImage(prod) ? (
-                                <img src={getProductImage(prod)} alt={prod.Name} className="product-thumb" />
-                              ) : (
-                                <div className="product-thumb placeholder">No Image</div>
-                              ) }
+                  <div className="products-grid">
+                    {products
+                      .filter(p => {
+                        // text search + category + subcategory filters
+                        const q = prodsearch.trim().toLowerCase();
+                        if (q && !((p.Name || '').toString().toLowerCase().includes(q) || (p.Code || '').toString().toLowerCase().includes(q))) return false;
+                        if (selectedCategoryFilter) {
+                          const cat = (p.Category?.Name || p.CategoryName || p.Category || '').toString();
+                          if (cat !== selectedCategoryFilter) return false;
+                        }
+                        if (selectedSubcategoryFilter) {
+                          const sub = (p.SubCategory?.Name || p.SubCategoryName || p.SubCategory || '').toString();
+                          if (sub !== selectedSubcategoryFilter) return false;
+                        }
+                        return true;
+                      })
+                        .map((prod) => (
+                        <div key={prod.ID} className="product-card">
+                          <div className="product-card-inner">
+                            <input
+                              type="checkbox"
+                              checked={selectedProductIds.includes(prod.ID)}
+                              onChange={() => toggleProductSelection(prod.ID)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="product-card-content" onClick={() => openBillingModalForProduct(prod)}>
+                              <div className="product-thumb-wrap">
+                                { getProductImage(prod) ? (
+                                  <img src={getProductImage(prod)} alt={prod.Name} className="product-thumb" />
+                                ) : (
+                                  <div className="product-thumb placeholder">No Image</div>
+                                ) }
+                              </div>
+                              <div className="product-name">{prod.Name}</div>
                             </div>
-                            <div className="product-name">{prod.Name}</div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            <div className="mt-12">
+            <div className="modal-footer">
               <button
                 type="button"
-                className="btn btn-success add-another"
+                className="btn--secondary mr-auto"
                 onClick={() => {
                   handleProdClose();
                   window.open(`${window.location.origin}/ManageProduct?productType=Stock`, '_blank');
                 }}
               >
-                + Add Stock Item
+                + Create New Product
               </button>
+              
               <button
                 type="button"
-                className="btn btn-primary add-another ml-8"
-                onClick={addSelectedProducts}
-                disabled={selectedProductIds.length === 0}
-                style={{ marginLeft: 8 }}
-              >
-                Add Selected ({selectedProductIds.length})
-              </button>
-              <button
-                type="button"
-                className="btn btn-success add-another ml-8"
+                className="btn--secondary"
                 onClick={() => {
                   handleProdClose();
                   setOpenAddServiceModal(true);
                 }}
               >
-                + Add Service / Non-Stock Item
+                + Add Service
+              </button>
+
+              <button
+                type="button"
+                className="btn--primary"
+                onClick={addSelectedProducts}
+                disabled={selectedProductIds.length === 0}
+              >
+                Add Selected ({selectedProductIds.length})
               </button>
             </div>
           </div>
@@ -3999,25 +4351,25 @@ const  prefillFormData = async (data) => {
       {/* Billing Item Modal (open when selecting a product) */}
       {billingModalOpen && billingModalProduct && (
         <div className="custom-modal" onClick={() => setBillingModalOpen(false)}>
-          <div className="modal-box modal-width-520 modal-scroll" onClick={(e) => e.stopPropagation()}>
+          <div className="professional-modal billing-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>Update Billing Item</h5>
-              <button className="btn" onClick={() => setBillingModalOpen(false)}>✕</button>
+              <h5>{billingEditIndex !== null ? 'Update Item' : 'Add Item'}</h5>
+              <button className="close-btn" onClick={() => setBillingModalOpen(false)}>❌</button>
             </div>
 
-            <div className="mt-8">
-              <div className="mb-8">
+            <div className="modal-body">
+              <div className="form-group">
                 <label>Item</label>
                 <input className="form-control" value={billingModalProduct.Name} readOnly />
               </div>
 
-              <div className="mb-8">
+              <div className="form-group">
                 <label>Description</label>
                 <textarea className="form-control" rows={3} value={billingModalValues.desc} onChange={(e) => setBillingModalValues(prev => ({ ...prev, desc: e.target.value }))} />
               </div>
 
               <div className="grid-3">
-                <div>
+                <div className="form-group">
                   <label>Qty</label>
                   <input type="text" className="form-control" value={billingModalValues.qty} onChange={(e) => setBillingModalValues(prev => {
                     const qty = Number(e.target.value) || 0;
@@ -4031,11 +4383,11 @@ const  prefillFormData = async (data) => {
                     return { ...prev, qty, discount: Number(discountAmt.toFixed(2)), discountPercent: Number(((total > 0) ? (discountAmt / total) * 100 : 0).toFixed(2)) };
                   })} />
                 </div>
-                <div>
+                <div className="form-group">
                   <label>Unit</label>
                   <input className="form-control" value={billingModalValues.unit} readOnly />
                 </div>
-                <div>
+                <div className="form-group">
                   <label>Rate</label>
                   <input type="text" className="form-control" value={billingModalValues.rate} onChange={(e) => setBillingModalValues(prev => {
                     const rate = Number(e.target.value) || 0;
@@ -4052,7 +4404,7 @@ const  prefillFormData = async (data) => {
               </div>
 
               <div className="grid-3">
-                <div>
+                <div className="form-group">
                   <label>Discount (₹)</label>
                   <input type="text" className="form-control" value={billingModalValues.discount} onChange={(e) => {
                     let val = Number(e.target.value) || 0;
@@ -4065,7 +4417,7 @@ const  prefillFormData = async (data) => {
                     });
                   }} />
                 </div>
-                <div>
+                <div className="form-group">
                   <label>Discount (%)</label>
                   <input type="text" className="form-control" value={billingModalValues.discountPercent} onChange={(e) => {
                     let pct = Number(e.target.value) || 0;
@@ -4077,24 +4429,24 @@ const  prefillFormData = async (data) => {
                     });
                   }} />
                 </div>
-                <div>
+                <div className="form-group">
                   <label>Lead Time</label>
                   <input className="form-control" value={billingModalValues.leadTime} onChange={(e) => setBillingModalValues(prev => ({ ...prev, leadTime: e.target.value }))} />
                 </div>
               </div>
 
               <div className="grid-2">
-                <div>
+                <div className="form-group">
                   <label>HSN/SAC</label>
                   <input className="form-control" value={billingModalValues.hsn} readOnly />
                 </div>
-                <div>
+                <div className="form-group">
                   <label>GST (%)</label>
                   <input type="text" className="form-control" value={billingModalValues.gst} readOnly />
                 </div>
               </div>
 
-              <div className="flex-center-gap-12">
+              <div className="flex-center-gap-12 mt-0">
                 <div className="highlight-box">
                   <strong>Taxable :</strong> ₹ {( (billingModalValues.rate * billingModalValues.qty) - (billingModalValues.discountPercent > 0 ? ((billingModalValues.rate * billingModalValues.qty) * (billingModalValues.discountPercent/100)) : billingModalValues.discount) ).toFixed(2)}
                 </div>
@@ -4110,13 +4462,16 @@ const  prefillFormData = async (data) => {
                     const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
                     const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
                     return taxRes.grandTotal.toFixed(2);
-                  })()}</div>
+                  })()}
+                </div>
               </div>
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setBillingModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleBillingModalSave}>Update</button>
+              <button className="btn--secondary" onClick={() => setBillingModalOpen(false)}>Cancel</button>
+              <button className="btn--primary" onClick={handleBillingModalSave}>
+                {billingEditIndex !== null ? 'Update Item' : 'Add Item'}
+              </button>
             </div>
           </div>
         </div>
@@ -4125,44 +4480,44 @@ const  prefillFormData = async (data) => {
         {/* Add Service / Non-Stock Item Modal */}
         {openAddServiceModal && (
           <div className="custom-modal" onClick={() => setOpenAddServiceModal(false)}>
-            <div className="modal-box modal-width-450 modal-scroll" onClick={(e) => e.stopPropagation()}>
+            <div className="professional-modal price-update-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h5>Add Item</h5>
-                <button className="btn" onClick={() => setOpenAddServiceModal(false)}>✕</button>
+                <button className="close-btn" onClick={() => setOpenAddServiceModal(false)}>❌</button>
               </div>
 
               <div className="modal-body">
-                <div className="mb-8">
+                <div className="form-group">
                   <label>Item Name*</label>
                   <input className="form-control" value={addServiceValues.name} onChange={(e) => setAddServiceValues(prev => ({ ...prev, name: e.target.value }))} />
                 </div>
 
-                <div className="mb-8">
+                <div className="form-group">
                   <label>Description</label>
                   <textarea className="form-control" rows={4} value={addServiceValues.description} onChange={(e) => setAddServiceValues(prev => ({ ...prev, description: e.target.value }))} />
                 </div>
 
                 <div className="grid-3">
-                  <div>
+                  <div className="form-group">
                     <label>Rate*</label>
                     <input type="text" className="form-control" value={addServiceValues.rate} onChange={(e) => setAddServiceValues(prev => ({ ...prev, rate: e.target.value }))} />
                   </div>
-                  <div>
+                  <div className="form-group">
                     <label>Unit</label>
                     <input className="form-control" value={addServiceValues.unit} onChange={(e) => setAddServiceValues(prev => ({ ...prev, unit: e.target.value }))} />
                   </div>
-                  <div>
+                  <div className="form-group">
                     <label>Qty</label>
                     <input type="text" className="form-control" value={addServiceValues.qty} onChange={(e) => setAddServiceValues(prev => ({ ...prev, qty: e.target.value }))} />
                   </div>
                 </div>
 
                 <div className="grid-2 mt-8">
-                  <div>
+                  <div className="form-group">
                     <label>HSN/SAC</label>
                     <input className="form-control" value={addServiceValues.hsn} onChange={(e) => setAddServiceValues(prev => ({ ...prev, hsn: e.target.value }))} />
                   </div>
-                  <div>
+                  <div className="form-group">
                     <label>GST (%)</label>
                     <input type="text" className="form-control" value={addServiceValues.gst} onChange={(e) => setAddServiceValues(prev => ({ ...prev, gst: e.target.value }))} />
                   </div>
@@ -4170,8 +4525,8 @@ const  prefillFormData = async (data) => {
               </div>
 
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setOpenAddServiceModal(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleSaveAddService}>Save</button>
+                <button className="btn--secondary" onClick={() => setOpenAddServiceModal(false)}>Cancel</button>
+                <button className="btn--primary" onClick={handleSaveAddService}>Save</button>
               </div>
             </div>
           </div>
@@ -4180,26 +4535,46 @@ const  prefillFormData = async (data) => {
 {/* Charges Dialog */}
 {openChargeDialog && (
   <div className="custom-modal" onClick={() => setOpenChargeDialog(false)}>
-    <div className="modal-box modal-width-450 modal-scroll" onClick={(e) => e.stopPropagation()}>
-      <h6>Add Extra Charges</h6>
-
-      {extrcharges.map((ch, i) => (
-        <div key={i} className="flex-gap-8">
-          <input className="form-control" placeholder="Title" value={ch.title} onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, title: e.target.value } : c))} />
-          <select className="form-control select-width-120" value={ch.type} onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, type: e.target.value } : c))}>
-            <option value="percent">%</option>
-            <option value="item">₹</option>
-          </select>
-          <input className="form-control" type="number" placeholder="Amount" value={ch.value} onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, value: Number(e.target.value) } : c))} />
-          <button className="btn btn-danger" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
-        </div>
-      ))}
-      <div className="mb-8">
-        <button className="btn btn-outline-secondary" onClick={() => setExtraCharges((prev) => [...prev, { title: "", type: "percent", value: '' }])}>+ Add Row</button>
+    <div className="professional-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h5>Add Extra Charges</h5>
+        <button className="close-btn" onClick={() => setOpenChargeDialog(false)}>❌</button>
       </div>
 
-      <div className="text-right mt-8">
-        <button className="btn btn-primary" onClick={() => setOpenChargeDialog(false)}>Done</button>
+      <div className="modal-body">
+        {extrcharges.map((ch, i) => (
+          <div key={i} className="charge-row">
+            <input 
+              className="form-control"
+              placeholder="Charge Title (e.g. Freight)" 
+              value={ch.title} 
+              onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, title: e.target.value } : c))} 
+            />
+            <select 
+              className="form-control"
+              value={ch.type} 
+              onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, type: e.target.value } : c))}
+            >
+              <option value="percent">Percentage (%)</option>
+              <option value="item">Fixed (₹)</option>
+            </select>
+            <input 
+              className="form-control"
+              type="number" 
+              placeholder="Amount" 
+              value={ch.value} 
+              onChange={(e) => setExtraCharges((prev) => prev.map((c, idx) => idx === i ? { ...c, value: e.target.value === '' ? '' : Number(e.target.value) } : c))} 
+            />
+            <button className="btn-remove" title="Remove row" onClick={() => setExtraCharges((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
+          </div>
+        ))}
+        <button className="btn-add-row" onClick={() => setExtraCharges((prev) => [...prev, { title: "", type: "percent", value: '' }])}>
+          + Add Charge Row
+        </button>
+      </div>
+
+      <div className="modal-footer">
+        <button className="btn--primary" onClick={() => setOpenChargeDialog(false)}>Apply Changes</button>
       </div>
     </div>
   </div>
@@ -4208,26 +4583,43 @@ const  prefillFormData = async (data) => {
 {/* Discounts Dialog */}
 {openDiscountDialog && (
   <div className="custom-modal" onClick={() => setOpenDiscountDialog(false)}>
-    <div className="modal-box modal-width-450 modal-scroll" onClick={(e) => e.stopPropagation()}>
-      <h6>Add Discounts</h6>
-
-      {additiondiscounts.map((ds, i) => (
-        <div key={i} className="flex-gap-8">
-          <input className="form-control" placeholder="Title" value={ds.title} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, title: e.target.value } : d))} />
-          <select className="form-control select-width-120" value={ds.type} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, type: e.target.value, value: sanitizeNumericValue(d.value) } : d))}>
-            <option value="percent">%</option>
-            <option value="item">₹</option>
-          </select>
-          <input className="form-control" type="number" placeholder="Amount" value={ds.value} onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, value: e.target.value === '' ? '' : Number(e.target.value) } : d))} />
-          <button className="btn btn-danger" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
-        </div>
-      ))}
-      <div className="mb-8">
-        <button className="btn btn-outline-secondary" onClick={() => setAdditiondiscounts((prev) => [...prev, { title: "", type: "percent", value: '' }])}>+ Add Row</button>
+    <div className="professional-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h5>Apply Additional Discounts</h5>
+        <button className="close-btn" onClick={() => setOpenDiscountDialog(false)}>❌</button>
       </div>
 
-      <div className="text-right mt-8">
-        <button className="btn btn-primary" onClick={() => setOpenDiscountDialog(false)}>Done</button>
+      <div className="modal-body">
+        {additiondiscounts.map((ds, i) => (
+          <div key={i} className="charge-row">
+            <input 
+              placeholder="Discount Title (e.g. Deal Discount)" 
+              value={ds.title} 
+              onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, title: e.target.value } : d))} 
+            />
+            <select 
+              value={ds.type} 
+              onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, type: e.target.value } : d))}
+            >
+              <option value="percent">Percentage (%)</option>
+              <option value="item">Fixed (₹)</option>
+            </select>
+            <input 
+              type="number" 
+              placeholder="Amount" 
+              value={ds.value} 
+              onChange={(e) => setAdditiondiscounts((prev) => prev.map((d, idx) => idx === i ? { ...d, value: e.target.value === '' ? '' : Number(e.target.value) } : d))} 
+            />
+            <button className="btn-remove" title="Remove row" onClick={() => setAdditiondiscounts((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
+          </div>
+        ))}
+        <button className="btn-add-row" onClick={() => setAdditiondiscounts((prev) => [...prev, { title: "", type: "percent", value: '' }])}>
+          + Add Discount Row
+        </button>
+      </div>
+
+      <div className="modal-footer">
+        <button className="btn--primary" onClick={() => setOpenDiscountDialog(false)}>Apply Changes</button>
       </div>
     </div>
   </div>
@@ -4235,22 +4627,16 @@ const  prefillFormData = async (data) => {
 
 {/* Bank Details Modal */}
 {openBankModal && (
-  <div className="custom-modal">
-    <div className="modal-box address-modal">
+  <div className="custom-modal" onClick={handleCloseBankModal}>
+    <div className="professional-modal" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h5>Add a Bank Detail</h5>
         <button 
           type="button" 
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '24px',
-            cursor: 'pointer',
-            color: '#999',
-          }}
+          className="close-btn"
           onClick={handleCloseBankModal}
         >
-          ×
+          ❌
         </button>
       </div>
 
@@ -4258,7 +4644,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>Title</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter title (e.g., Primary, Secondary)"
             value={bankFormValues.title}
@@ -4269,7 +4654,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>Bank Name</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter bank name"
             value={bankFormValues.bankName}
@@ -4280,7 +4664,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>Account No.</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter account number"
             value={bankFormValues.accountNo}
@@ -4291,7 +4674,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>Branch</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter branch"
             value={bankFormValues.branch}
@@ -4302,7 +4684,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>IFSC</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter IFSC code"
             value={bankFormValues.ifsc}
@@ -4313,7 +4694,6 @@ const  prefillFormData = async (data) => {
         <div className="form-group">
           <label>SWIFT Code</label>
           <input
-            className="form-control"
             type="text"
             placeholder="Enter SWIFT code"
             value={bankFormValues.swiftCode}
@@ -4324,32 +4704,16 @@ const  prefillFormData = async (data) => {
 
       <div className="modal-footer">
         <button 
-          className="btn btn-secondary" 
+          className="btn--secondary" 
           onClick={handleCloseBankModal}
-          style={{
-            background: '#f8f9fa',
-            color: '#333',
-            border: '1px solid #e6e9ef',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
         >
           Cancel
         </button>
         <button 
-          className="btn btn-success" 
+          className="btn--primary" 
           onClick={handleSaveBankDetails}
-          style={{
-            background: '#28a745',
-            color: '#fff',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
         >
-          Save
+          Save Details
         </button>
       </div>
     </div>
@@ -4357,15 +4721,15 @@ const  prefillFormData = async (data) => {
 )}
 
 {showTemplateModal && (
-  <div className="modal-overlay">
-    <div className="modal-content" style={{ width: '400px' }}>
+  <div className="custom-modal" onClick={() => setShowTemplateModal(false)}>
+    <div className="professional-modal" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
-        <h3>Save as Template</h3>
-        <button onClick={() => setShowTemplateModal(false)} className="close-btn">&times;</button>
+        <h5>Save as Template</h5>
+        <button onClick={() => setShowTemplateModal(false)} className="close-btn">❌</button>
       </div>
       <div className="modal-body">
         <div className="form-group">
-          <label>Template Name:</label>
+          <label>Template Name</label>
           <input
             type="text"
             className="form-control"
@@ -4376,8 +4740,8 @@ const  prefillFormData = async (data) => {
         </div>
       </div>
       <div className="modal-footer">
-        <button className="btn btn--back" onClick={() => setShowTemplateModal(false)}>Cancel</button>
-        <button className="btn btn--save ml-2" onClick={handleSaveAsTemplate} disabled={saving}>
+        <button className="btn--secondary" onClick={() => setShowTemplateModal(false)}>Cancel</button>
+        <button className="btn--primary" onClick={handleSaveAsTemplate} disabled={saving}>
           {saving ? 'Saving...' : 'Save Template'}
         </button>
       </div>

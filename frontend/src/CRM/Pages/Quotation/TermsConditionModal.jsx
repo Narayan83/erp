@@ -292,7 +292,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
   };
 
   return (
-    <div className="customer-info-container flex-column terms-cond">
+    <div>
       <h5>Terms & Conditions</h5>
       
       {selectedItems && selectedItems.length > 0 && (
@@ -354,7 +354,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
               ) : (
                 <>
                   <span className="term-text">{it.TandcName}</span>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div className="term-actions">
                     <button
                       type="button"
                       className="btn-edit"
@@ -365,10 +365,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                         setEditingValue(it.TandcName || "");
                       }}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" strokeWidth="0" fill="currentColor" />
-                        <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" stroke="currentColor" strokeWidth="0" fill="currentColor" />
-                      </svg>
+                      ✎
                     </button>
                     <button
                       type="button"
@@ -377,10 +374,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                       title="Remove"
                       onClick={() => setSelectedItems((prev) => prev.filter((p) => p.ID !== it.ID))}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      ✕
                     </button>
                   </div>
                 </>
@@ -396,37 +390,52 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
 
       {openModal && (
         <div className="custom-modal">
-          <div className="modal-box modal-width-450 modal-scroll">
+          <div className="modal-box modal-width-450">
             <div className="modal-header">
-              <h6>Select Terms & Conditions</h6>
-              <button className="btn btn-close" onClick={() => setOpenModal(false)}>✕</button>
+              <h6>Select Term / Condition</h6>
+              <button className="btn btn-close" onClick={() => setOpenModal(false)}>❌</button>
             </div>
             <div className="modal-body">
-              <div style={{ marginBottom: 8 }}>
-                <input className="form-control" placeholder="Search terms..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <div className="search-container">
+                <span className="search-icon">
+                  <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                  </svg>
+                </span>
+                <input 
+                  className="form-control" 
+                  placeholder="Search" 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)} 
+                />
               </div>
 
-              <div className="terms-list">
-                {filtered.length > 0 ? (
-                  filtered.map((item) => (
-                    <label className="term-item" key={item.ID}>
-                      <input type="checkbox" checked={!!selectedItems.find((p) => p.ID === item.ID)} onChange={() => toggleItem(item)} />
-                      <span className="term-name">{item.TandcName}</span>
-                    </label>
-                  ))
-                ) : (
-                  <div className="muted">No results found.</div>
-                )}
+              <div className="terms-scroll-area">
+                <div className="terms-list">
+                  {filtered.length > 0 ? (
+                    filtered.map((item) => (
+                      <label className="term-item" key={item.ID}>
+                        <input 
+                          type="checkbox" 
+                          checked={!!selectedItems.find((p) => p.ID === item.ID)} 
+                          onChange={() => toggleItem(item)} 
+                        />
+                        <span className="term-name">{item.TandcName}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="muted p-3 text-center">No results found.</div>
+                  )}
+                </div>
               </div>
-
-              <div className="modal-footer">
-                <button className="btn btn-add-new-term" onClick={() => setOpenAddModal(true)}>
-                  + Add New Term/Condition
-                </button>
-                <button className="btn btn-primary" style={{ marginLeft: 8 }} onClick={handleDone}>
-                  Done
-                </button>
-              </div>
+            </div>
+            <div className="modal-footer" style={{ gap: '12px' }}>
+              <button className="btn btn-add-new-term" onClick={() => setOpenAddModal(true)}>
+                + Add New Term / Condition
+              </button>
+              <button className="btn btn-primary" onClick={handleDone}>
+                Done
+              </button>
             </div>
           </div>
         </div>
@@ -437,7 +446,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
           <div className="modal-box modal-width-450">
             <div className="modal-header">
               <h6>Enter Term / Condition</h6>
-              <button className="btn btn-close" onClick={() => setOpenAddModal(false)}>✕</button>
+              <button className="btn btn-close" onClick={() => setOpenAddModal(false)}>❌</button>
             </div>
             <div className="modal-body">
               <div style={{ marginBottom: 12 }}>
@@ -451,7 +460,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                 />
               </div>
 
-              <div className="checkbox-group" style={{ marginBottom: 12 }}>
+              <div className="checkbox-group">
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
@@ -461,10 +470,14 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                   <span>Save for Future Use</span>
                 </label>
               </div>
-
-              <div className="modal-footer" style={{ justifyContent: "flex-start" }}>
-                <button className="btn btn-add" onClick={handleAddNewTerm}>Add</button>
-              </div>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: "flex-start", paddingTop: 0 }}>
+              <button className="btn btn-add" onClick={handleAddNewTerm}>
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                </svg>
+                Add
+              </button>
             </div>
           </div>
         </div>

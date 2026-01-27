@@ -546,7 +546,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   };
 
   const prefixOptions = ['Mr.', 'Ms.', 'Mrs.'];
-  const [sourceOptions, setSourceOptions] = useState(['Website', 'Referral', 'Social Media', 'Direct', 'Partner']);
+  const [sourceOptions, setSourceOptions] = useState([]);
   const [tagsOptions, setTagsOptions] = useState([]);
   const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
   const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
@@ -610,26 +610,43 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     }
   };
 
+  const fetchSources = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/lead-sources`);
+      if (!res.ok) throw new Error('Failed to fetch sources');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSourceOptions(data.map(s => s.name || s.Name));
+      }
+    } catch (err) {
+      console.error('Error fetching sources:', err);
+    }
+  };
+
+  const fetchTags = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/crm-tags`);
+      if (!res.ok) throw new Error('Failed to fetch tags');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setTagsOptions(data.map(t => t.title || t.Title));
+      }
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+    }
+  };
+
   useEffect(() => {
     // Always fetch live employees and merge / sanitize parent-provided options
     fetchEmployees();
   }, [parentAssignedToOptions]);
 
-  // Load saved sources and tags from localStorage on mount/open
+  // Fetch sources and tags from backend on mount/open
   useEffect(() => {
-    try {
-      const savedSources = JSON.parse(localStorage.getItem('leadSources') || '[]');
-      if (Array.isArray(savedSources) && savedSources.length > 0) {
-        // map to option labels
-        setSourceOptions(savedSources.map(s => s.name));
-      }
-    } catch (e) {}
-    try {
-      const savedTags = JSON.parse(localStorage.getItem('leadTags') || '[]');
-      if (Array.isArray(savedTags) && savedTags.length > 0) {
-        setTagsOptions(savedTags.map(t => t.name));
-      }
-    } catch (e) {}
+    if (isOpen) {
+      fetchSources();
+      fetchTags();
+    }
   }, [isOpen]);
 
   // Prepare options for react-select

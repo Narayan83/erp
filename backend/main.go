@@ -71,6 +71,11 @@ func main() {
 	handler.SetEmployeeHierarchyDB(initializers.DB)
 	handler.SetEmployeeOrgUnitDB(initializers.DB)
 
+	// CRM/Leads Config
+	handler.SetCRMTagDB(initializers.DB)
+	handler.SetLeadSourceDB(initializers.DB)
+	handler.SetRejectionReasonDB(initializers.DB)
+
 	// set up fiber
 	app := fiber.New()
 
@@ -313,6 +318,27 @@ func main() {
 
 	// Lead Timeline
 	api.Get("/lead/:id/timeline", handler.GetLeadTimeline)
+
+	// Lead Sources
+	api.Get("/lead-sources", handler.GetLeadSources)
+	api.Get("/lead-sources/:id", handler.GetLeadSource)
+	api.Post("/lead-sources", handler.CreateLeadSource)
+	api.Put("/lead-sources/:id", handler.UpdateLeadSource)
+	api.Delete("/lead-sources/:id", handler.DeleteLeadSource)
+
+	// Rejection Reasons
+	api.Post("/rejection-reasons", handler.CreateRejectionReason)
+	api.Get("/rejection-reasons", handler.GetRejectionReasons)
+	api.Get("/rejection-reasons/:id", handler.GetRejectionReason)
+	api.Put("/rejection-reasons/:id", handler.UpdateRejectionReason)
+	api.Delete("/rejection-reasons/:id", handler.DeleteRejectionReason)
+
+	// CRM Tags
+	api.Post("/crm-tags", handler.CreateCRMTag)
+	api.Get("/crm-tags", handler.GetCRMTags)
+	api.Get("/crm-tags/:id", handler.GetCRMTag)
+	api.Put("/crm-tags/:id", handler.UpdateCRMTag)
+	api.Delete("/crm-tags/:id", handler.DeleteCRMTag)
 
 	// IndiaMART Integration
 	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
