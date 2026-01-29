@@ -184,7 +184,8 @@ func UpdateProduct_variant(c *fiber.Ctx) error {
 func DeleteProduct_variant(c *fiber.Ctx) error {
 	{
 		id := c.Params("id")
-		if err := product_variantsDB.Delete(&models.ProductVariant{}, id).Error; err != nil {
+		// Hard delete the product variant
+		if err := product_variantsDB.Unscoped().Delete(&models.ProductVariant{}, id).Error; err != nil {
 			{
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}

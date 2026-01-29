@@ -1,10 +1,11 @@
 import React from "react";
 import {
   TableContainer,Table, TableHead, TableRow, TableCell,
-  TableBody, TablePagination, Button,IconButton, Paper
+  TableBody, Button,IconButton, Paper
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import Pagination from "../../../CommonComponents/Pagination";
 const SubcategoryTable = ({
   data, page, limit, total,
   onPageChange, onRowsPerPageChange,
@@ -14,12 +15,12 @@ const SubcategoryTable = ({
     <>
     <TableContainer component={Paper}>
       <Table>
-        <TableHead>
+        <TableHead sx={{ '& .MuiTableCell-root': { textAlign: 'center' } }}>
           <TableRow>
-            <TableCell>S No.</TableCell>
-            <TableCell>Cat. Name</TableCell>
-            <TableCell>Sub. Name</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell style={{ textAlign: 'left' }}>No.</TableCell>
+            <TableCell>Category Name</TableCell>
+            <TableCell>Subcategory Name</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 140 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -27,32 +28,28 @@ const SubcategoryTable = ({
             <TableRow key={sub.ID}>
         {/* page is 1-based in the parent; convert to zero-based for calculation
           guard against undefined/zero values to avoid NaN */}
-        <TableCell>{((page || 1) - 1) * (limit || 1) + i + 1}</TableCell>
+        <TableCell align="left">{((page || 1) - 1) * (limit || 1) + i + 1}</TableCell> 
              
-              <TableCell>{sub.Category.Name}</TableCell>
-               <TableCell>{sub.Name}</TableCell>
-              <TableCell align="right">
+              <TableCell align="center">{sub.Category.Name}</TableCell>
+               <TableCell align="center">{sub.Name}</TableCell>
+              <TableCell align="right" sx={{ textAlign: 'right' }}>
                 <IconButton size="small" onClick={() => onEdit(sub)}><EditIcon fontSize="small" /></IconButton>
                 <IconButton size="small" onClick={() => onDelete(sub.ID)}><DeleteIcon fontSize="small" /></IconButton>
-              </TableCell>
+              </TableCell> 
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </TableContainer>  
 
-      <TablePagination
-        component="div"
-        count={total}
-        // MUI TablePagination expects a zero-based page index.
-        // Parent `page` is 1-based, so convert here.
-        page={Math.max(0, page - 1)}
-        // newPage from MUI is zero-based; convert back to 1-based for parent.
-        onPageChange={(_, newPage) => onPageChange(newPage + 1)}
-        rowsPerPage={limit}
-        onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
-        rowsPerPageOptions={[5, 10, 20]}
-      />
+    <Pagination
+      page={page}
+      total={total}
+      rowsPerPage={limit}
+      onPageChange={onPageChange}
+      onRowsPerPageChange={onRowsPerPageChange}
+      isZeroBased={false}
+    />
     </>
   );
 };

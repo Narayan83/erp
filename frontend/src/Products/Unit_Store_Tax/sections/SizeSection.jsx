@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, TextField, Snackbar, Alert, TablePagination, CircularProgress } from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 import SizeTable from "../components/SizeTable";
 import SizeDialog from "../components/SizeDialog";
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
+import "./allinone.scss";
 
 export default function SizeSection() {
   const [sizes, setSizes] = useState([]);
@@ -71,7 +73,10 @@ export default function SizeSection() {
       fetchSizes();
     } catch (error) {
       console.error("Failed to delete size:", error);
-      setSnackbar({ open: true, message: "Failed to delete", severity: "error" });
+      // Prefer backend-provided error message if available
+      const backendMsg = error?.response?.data?.error || error?.response?.data?.message;
+      const message = backendMsg || error?.message || "Failed to delete";
+      setSnackbar({ open: true, message, severity: "error" });
     } finally {
       setConfirmOpen(false);
       setItemToDelete(null);
@@ -79,48 +84,55 @@ export default function SizeSection() {
   };
 
   return (
-    <Box mt={2}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <div className="section-container">
+      <div className="section-header">
         <h6>Size Master</h6>
-        <Button variant="contained" onClick={() => setDialogOpen(true)}>
-          Add Size
-        </Button>
-      </Box>
-
-      <TextField
-        label="Search Size"
-        size="small"
-        fullWidth
-        value={filter}
-        onChange={(e) => {
-          setFilter(e.target.value);
-          setPage(0);
-        }}
-        sx={{ mb: 2, maxWidth: 300 }}
-      />
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search Size"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+        <div className="add-button-wrapper">
+          <button
+            className="btn-add"
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
+            Add Size
+          </button>
+        </div>
+      </div>
 
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" my={5}>
-          <CircularProgress />
-        </Box>
+        <div className="loading-container">
+          <div className="spinner" />
+        </div>
       ) : (
         <>
-          <SizeTable
+          <div className="table-wrapper">
+            <SizeTable
             data={sizes}
             onEdit={handleEdit}
             onDelete={handleDelete}
             page={page}
             rowsPerPage={rowsPerPage}
           />
+          </div>
 
-          <TablePagination
-            component="div"
-            count={total}
+          <Pagination
             page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
+            total={total}
             rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value));
+            onPageChange={(newPage) => setPage(newPage)}
+            onRowsPerPageChange={(newRowsPerPage) => {
+              setRowsPerPage(newRowsPerPage);
               setPage(0);
             }}
           />
@@ -159,6 +171,6 @@ export default function SizeSection() {
       >
         <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
-    </Box>
+    </div>
   );
 }

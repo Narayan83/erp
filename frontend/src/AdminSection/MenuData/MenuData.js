@@ -1,14 +1,20 @@
 // menuData.js
-import { GrDashboard } from "react-icons/gr";
-import { GiRingmaster } from "react-icons/gi";
-import { MdOutlinePhonelinkSetup } from "react-icons/md";
-import { SiTemporal } from "react-icons/si";
+import {
+  FiHome,
+  FiBox,
+  FiUsers,
+  FiUserCheck,
+  FiBriefcase,
+  FiSettings,
+  FiTool,
+  FiFileText,
+} from "react-icons/fi";
 export const menuItems = [
   {
     id: 0,
     title: "Dashboard",
     path: "/home",
-    icon: GrDashboard,
+    icon: FiHome,
   },
   // {
   //   id: 1,
@@ -29,55 +35,45 @@ export const menuItems = [
   {
     id: 2,
     title: "Product Masters",
-    icon: GiRingmaster,
-    submenu: [
-      // { title: "User/Roles  Master", path: "/registration" },
-      // { title: "View User/Customer/supplier", path: "/registration_view" },
-      // { title: "Role Creation", path: "/rolecreation" },
-      // { title: "Roles View", path: "/rolesview" } ,
-      // { title: "Product Master", path: "/product" },
-      // { title: "Product Attributes", path: "/pattributes" },
-      // { title: "Manage Product", path: "/manage-product" },
-      // { title: "Salesman Master", path: "/" },
-      // { title: "Tax Master", path: "/" },
-
-      { title: "Category Management", path: "/ManageCategory" },
-      { title: "Subcategory Management", path: "/ManageSubcategory" },
-      { title: "Product Management", path: "/ManageProduct" },
-      { title: "Product Master", path: "/ProductMaster" },
-      { title: "Tag Management", path: "/ManageTag" },
-      { title: "Store / Unit / Tax / HSN / Size", path: "/ManageUnitStoreTax" },
-      { title: "Terms & Conditions  Management", path: "/Managetandc" },
-    ],
+    icon: FiBox,
+    submenu: [{ title: "Product Management", path: "/ProductMaster" }],
   },
 
   {
     id: 3,
     title: "Users Masters",
-    icon: GiRingmaster,
+    icon: FiUsers,
+    submenu: [{ title: "Users Management", path: "/users" }],
+  },
+
+  {
+    id: 8,
+    title: "Employee Masters",
+    icon: FiUserCheck,
     submenu: [
-      { title: "Users Management", path: "/users" },
-      { title: "User Address", path: "/address" },
-      { title: "Bank Management", path: "/ManageBank" },
+      { title: "Employee Management", path: "/employeemanagement" },
+      { title: "Deparments", path: "/departmentmaster" },
+      { title: "Designations", path: "/designation" },
+      { title: "Organization Units", path: "/orgunits" },
+      { title: "Employee Hierarchy", path: "/empHierarchy" },
     ],
   },
 
   {
     id: 6,
     title: "CRM Masters",
-    icon: GiRingmaster,
+    icon: FiBriefcase,
     submenu: [
       { title: "CRM", path: "/crm-master" },
       { title: "Account", path: "/account" },
-      { title: "Quotation", path: "/quotation" },
-      { title: "Quotation List", path: "/quotation-list" },
+      { title: "Manage QTN", path: "/quotation-list" },
     ],
   },
 
   {
     id: 7,
     title: "Admin",
-    icon: GiRingmaster,
+    icon: FiSettings,
     submenu: [
       { title: "Role Creation", path: "/rolecreation" },
       // "Role Management" here links to the list of existing roles
@@ -90,21 +86,20 @@ export const menuItems = [
       // User Mapping route (user to role mapping)
       { title: "User Mapping", path: "/usermanagement" },
       { title: "Audit Logs", path: "/auditlogs" },
-      { title: "Bank details", path: "/ManageBranch" },
     ],
   },
 
   {
     id: 4,
     title: "Setup",
-    icon: MdOutlinePhonelinkSetup,
-    submenu: [{ title: "Company/Firm setups", path: "/" }],
+    icon: FiTool,
+    submenu: [],
   },
 
   {
     id: 5,
     title: "Reports",
-    icon: MdOutlinePhonelinkSetup,
-    submenu: [{ title: "reports", path: "/" }],
+    icon: FiFileText,
+    submenu: [{ title: "reports", path: "/erpreport" }],
   },
 ];

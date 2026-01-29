@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
-import {
-  Box, Button, Typography, Snackbar, Alert, TablePagination,
-  TextField
-} from "@mui/material";
+﻿import { useEffect, useState } from "react";
+import { Snackbar, Alert } from "@mui/material";
 import TaxDialog from "../components/TaxDialog";
 import TaxTable from "../components/TaxTable";
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
+import "./allinone.scss";
 
 export default function TaxSection() {
   const [taxes, setTaxes] = useState([]);
@@ -27,11 +26,21 @@ export default function TaxSection() {
       const res = await axios.get(`${BASE_URL}/api/taxes`, {
         params: { page: page + 1, limit: rowsPerPage, filter }
       });
-      console.log(res);
-      setTaxes(res.data.data);
-      setTotal(res.data.total);
-      console.log(taxes)
-    } catch {
+
+      const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const totalRes = Number(res.data?.total ?? data.length ?? 0);
+
+      // If the current page is now beyond the last page (e.g., after deletions), reset to the last available page
+      if (page > 0 && page * rowsPerPage >= totalRes) {
+        const newPage = Math.max(0, Math.ceil(totalRes / rowsPerPage) - 1);
+        setPage(newPage);
+        return; // page state change will trigger a re-fetch
+      }
+
+      setTaxes(data);
+      setTotal(totalRes);
+    } catch (err) {
+      console.error("Failed to load taxes:", err);
       showSnackbar("Failed to load taxes", "error");
     }
   };
@@ -47,16 +56,14 @@ export default function TaxSection() {
   const handleDelete = async () => {
     try {
       await axios.delete(`${BASE_URL}/api/taxes/${taxToDelete.ID}`);
-      showSnackbar("Tax deleted");
+      showSnackbar("Deleted");
       loadTaxes();
     } catch (error) {
-      if (error.response) {
-        alert(error.response.data.error || "Server error");
-      } else if (error.request) {
-        alert("No response from server.");
-      } else {
-        alert(error.message);
-      }
+      console.error("Failed to delete tax:", error);
+      // Prefer backend-provided error message if available
+      const backendMsg = error?.response?.data?.error || error?.response?.data?.message;
+      const message = backendMsg || error?.message || "Failed to delete";
+      setSnackbar({ open: true, message, severity: "error" });
     } finally {
       setConfirmOpen(false);
       setTaxToDelete(null);
@@ -64,27 +71,33 @@ export default function TaxSection() {
   };
 
   return (
-   
-      <Box p={2}>
-        <Box display="flex" justifyContent="space-between" mb={2}>
-          <h6 >Tax Management</h6>
-          <TextField
-            label="Filter by Name"
-            variant="outlined"
-            size="small"
-            fullWidth
+    <div className="section-container">
+      <div className="section-header">
+        <h6>Tax Management</h6>
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Filter by Name"
             value={filter}
             onChange={(e) => {
               setFilter(e.target.value);
               setPage(0);
             }}
-            sx={{ maxWidth: 300, mb: 2 }}
           />
-          <Button variant="contained" onClick={() => setDialogOpen(true)}>
+        </div>
+        <div className="add-button-wrapper">
+          <button
+            className="btn-add"
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
             Add Tax
-          </Button>
-        </Box>
+          </button>
+        </div>
+      </div>
 
+      <div className="table-wrapper">
         <TaxTable
           taxes={taxes}
           page={page}
@@ -98,18 +111,17 @@ export default function TaxSection() {
             setConfirmOpen(true);
           }}
         />
+        </div>
 
-        <TablePagination
-          component="div"
-          count={total}
+        <Pagination
           page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
+          total={total}
           rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newRowsPerPage) => {
+            setRowsPerPage(newRowsPerPage);
             setPage(0);
           }}
-          rowsPerPageOptions={[5, 10, 25]}
         />
 
         <TaxDialog
@@ -142,7 +154,7 @@ export default function TaxSection() {
         >
           <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
         </Snackbar>
-      </Box>
-   
+    </div>
   );
 }
+

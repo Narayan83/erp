@@ -5,7 +5,7 @@ import Skeleton from '@mui/material/Skeleton';
 import { MdOutlineClear, MdEdit, MdDelete, MdVisibility } from "react-icons/md";
 import { IoMdMail, IoMdPerson, IoMdCall } from "react-icons/io";
 import './Registration.scss';
-import { BASE_URL } from '../../Config';
+import { BASE_URL } from '../../config/Config';
 
 const RegistrationView = () => {
   const [users, setUsers] = useState([]);

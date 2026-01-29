@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { CircularProgress, Box, Typography, Paper } from "@mui/material";
 import ProductEditForm from "../Components/ProductEditForm";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 import { DynamicDialog } from "../../../CommonComponents/DynamicDialog";
 
 export default function ProductEditPage() {
@@ -18,8 +18,11 @@ export default function ProductEditPage() {
     axios.get(`${BASE_URL}/api/products/${id}`)
       .then((res) => {
         setProduct(res.data);
-        console.log("Product loaded:", res.data);
-        // Pre-fill form data if needed
+        console.log("=== ProductEditPage - Product loaded ===");
+        console.log("Product data:", res.data);
+        console.log("CategoryID:", res.data.CategoryID);
+        console.log("SubcategoryID:", res.data.SubcategoryID);
+        console.log("Subcategory object:", res.data.Subcategory);
         setLoading(false);
       })
       .catch((err) => {
@@ -52,6 +55,12 @@ export default function ProductEditPage() {
       CategoryID: data.CategoryID != null ? Number(data.CategoryID) : null,
       StoreID: data.StoreID != null ? Number(data.StoreID) : null,
       SubcategoryID: data.SubcategoryID != null ? Number(data.SubcategoryID) : null,
+      // Ensure tag IDs are sent using the lowercase key expected by backend
+      tagIDs: Array.isArray(data.TagIDs)
+        ? data.TagIDs.map(id => Number(id))
+        : Array.isArray(data.tagIDs)
+        ? data.tagIDs.map(id => Number(id))
+        : [],
       // Add more sanitization as needed based on your product schema
     };
 
@@ -91,7 +100,7 @@ export default function ProductEditPage() {
                 <section className="right-content">
                     <Paper elevation={3} sx={{ p: 4, mb: 2 }}>
 
-                          <ProductEditForm product={product} onSubmit={handleUpdate} />
+                          <ProductEditForm product={product} onSubmit={handleUpdate} navigate={navigate} />
 
                     </Paper>
 

@@ -31,27 +31,77 @@ func main() {
 	handler.SetunitsDB(initializers.DB)
 	handler.SettaxesDB(initializers.DB)
 	handler.SetstoresDB(initializers.DB)
-	handler.SetbanksDB(initializers.DB)
+	handler.SetUserBankDB(initializers.DB)
+	handler.SetUserAddressDB(initializers.DB)
+	handler.SetUserDocumentDB(initializers.DB)
 	handler.SetproductsDB(initializers.DB)
 	handler.Setproduct_variantsDB(initializers.DB)
-	handler.SetUsersDB(initializers.DB)
-	handler.SetQuotationDB(initializers.DB)
+	handler.SetUserDB(initializers.DB)
+	// handler.SetQuotationDB(initializers.DB)
 	handler.SetHSNDB(initializers.DB)
 	handler.SetSizeDB(initializers.DB)
 	handler.SetLeadsDB(initializers.DB)
+	// Lead interactions and followups DB
+	handler.SetLeadInteractionDB(initializers.DB)
+	handler.SetLeadFollowupDB(initializers.DB)
 	handler.SetRolesDB(initializers.DB)
 	// Initialize role-management DB used by role permission handlers
 	handler.SetRolesManagementDB(initializers.DB)
 	handler.SetMenusDB(initializers.DB)
 	handler.SetQuotationTableDB(initializers.DB)
-	handler.SetAddressesDB(initializers.DB)
+
 	handler.SetTandcDB(initializers.DB)
+	handler.SetUserRelationDB(initializers.DB)
+	// handler.SetDepartmentDB(initializers.DB)
+	// handler.SetDepartmentRelationDB(initializers.DB)
+	// handler.SetEmployeeDB(initializers.DB)
+	// handler.SetEmployeeUserDB(initializers.DB)
+	handler.SetCompanyDB(initializers.DB)
+	handler.SetCompanyBranchDB(initializers.DB)
+	// Series master
+	handler.SetSeriesDB(initializers.DB)
+	handler.SetPrinterHeaderDB(initializers.DB)
+	handler.SetIntegrationDB(initializers.DB)
+	handler.SetQuotationTemplatesDB(initializers.DB)
+
+	handler.SetDepartmentDB(initializers.DB)
+	handler.SetDesignationDB(initializers.DB)
+	handler.SetOrgUnitDB(initializers.DB)
+	handler.SetEmployeeDB(initializers.DB)
+	handler.SetEmployeeHierarchyDB(initializers.DB)
+	handler.SetEmployeeOrgUnitDB(initializers.DB)
+
+	// CRM/Leads Config
+	handler.SetCRMTagDB(initializers.DB)
+	handler.SetLeadSourceDB(initializers.DB)
+	handler.SetRejectionReasonDB(initializers.DB)
+	handler.SetServiceItemDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
 
-	// Enable CORS
+	// Enable CORS (default)
 	app.Use(cors.New())
+
+	// Ensure CORS headers are present on ALL responses (including 304 responses from static files)
+	app.Use(func(c *fiber.Ctx) error {
+		// Handle preflight immediately
+		if c.Method() == "OPTIONS" {
+			c.Set("Access-Control-Allow-Origin", "*")
+			c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+			c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+
+		// Proceed to next handler
+		err := c.Next()
+
+		// Ensure the headers are always set on the response (covers static 304 responses)
+		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+		return err
+	})
 
 	//ADDING STATIC LINKING TO IMAGE
 	app.Static("/uploads", "./uploads")
@@ -63,8 +113,8 @@ func main() {
 	}{}
 
 	// Authentication (use debug wrapper to log incoming requests)
-	app.Post("/login", handler.LoginDebug)
-	routeStatus.Login = true
+	//app.Post("/login", handler.LoginDebug)
+	//routeStatus.Login = true
 
 	// setup all routes
 	app.Get("/api", func(c *fiber.Ctx) error {
@@ -76,8 +126,8 @@ func main() {
 	// Categories
 	api := app.Group("/api")
 	// Expose login under /api/login as well to match frontend calls
-	api.Post("/login", handler.LoginDebug)
-	routeStatus.APILogin = true
+	// api.Post("/login", handler.LoginDebug)
+	// routeStatus.APILogin = true
 
 	// Simple GET test for /api/login to verify route is reachable
 	api.Get("/login", func(c *fiber.Ctx) error {
@@ -128,17 +178,19 @@ func main() {
 	api.Delete("/stores/:id", handler.DeleteStore)
 
 	// Banks (bank master)
-	api.Get("/banks/from-users", handler.GetBanksFromUsers)
-	api.Get("/banks", handler.GetAllBanks)
-	api.Get("/banks/:id", handler.GetBankByID)
-	api.Post("/banks", handler.CreateBank)
-	api.Put("/banks/:id", handler.UpdateBank)
-	api.Delete("/banks/:id", handler.DeleteBank)
+	// api.Get("/banks/from-users", handler.GetBanksFromUsers)
+	// api.Get("/banks", handler.GetAllBanks)
+	// api.Get("/banks/:id", handler.GetBankByID)
+	// api.Post("/banks", handler.CreateBank)
+	// api.Put("/banks/:id", handler.UpdateBank)
+	// api.Delete("/banks/:id", handler.DeleteBank)
 
 	// Products
 	api.Post("/products", handler.CreateProduct)
 	api.Get("/products", handler.GetAllProducts)
 	api.Get("/products/:id", handler.GetProductByID)
+	// Soft delete (and restore) route for products
+	api.Delete("/products/:id", handler.DeleteProduct)
 	api.Put("/products/:id", handler.UpdateProduct)
 	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
@@ -155,15 +207,51 @@ func main() {
 	api.Delete("/product_variants/:id", handler.DeleteProduct_variant)
 
 	// Users
-
-	//users search
-	api.Get("/users/roles/:role", handler.GetUsersByType)
-
-	api.Get("/users", handler.GetAllUsers)
-	api.Get("/users/:id", handler.GetUserByID)
 	api.Post("/users", handler.CreateUser)
+	api.Get("/users", handler.GetUsers)
+
+	// Specific user routes (must come before /:id)
+	// api.Get("/users/unassigned", handler.GetUnassignedUsers)
+	api.Put("/users/restore/:id", handler.RestoreUser)
+	api.Delete("/users/force/:id", handler.ForceDeleteUser)
+
+	// Single user routes (must come after specific paths)
+	api.Get("/users/:id", handler.GetUser)
 	api.Put("/users/:id", handler.UpdateUser)
 	api.Delete("/users/:id", handler.DeleteUser)
+
+	// user - addresses
+
+	api.Post("/user-address", handler.CreateUserAddress)
+	api.Get("/user-address", handler.GetUserAddresses)
+	api.Get("/user-address/:id", handler.GetUserAddress)
+	api.Put("/user-address/:id", handler.UpdateUserAddress)
+	api.Delete("/user-address/:id", handler.DeleteUserAddress)
+
+	//user-bank
+
+	api.Post("/user-bank", handler.CreateUserBankAccount)
+	api.Get("/user-bank", handler.GetUserBankAccounts)
+	api.Get("/user-bank/:id", handler.GetUserBankAccount)
+	api.Put("/user-bank/:id", handler.UpdateUserBankAccount)
+	api.Delete("/user-bank/:id", handler.DeleteUserBankAccount)
+
+	//user documents
+
+	api.Post("/document", handler.CreateUserDocument)
+	api.Get("/document", handler.GetUserDocuments)
+	api.Get("/document/:id", handler.GetUserDocumentByID)
+	api.Put("/document/:id", handler.UpdateUserDocument)
+	api.Delete("/document/:id", handler.DeleteUserDocument)
+
+	//users search
+	// api.Get("/users/roles/:role", handler.GetUsersByType)
+
+	// api.Get("/users", handler.GetAllUsers)
+	// api.Get("/users/:id", handler.GetUserByID)
+	// api.Post("/users", handler.CreateUser)
+	// api.Put("/users/:id", handler.UpdateUser)
+	// api.Delete("/users/:id", handler.DeleteUser)
 
 	// Quotations
 	// api.Get("/quotations", handler.GetAllQuotations)
@@ -171,11 +259,18 @@ func main() {
 	// api.Post("/quotations", handler.CreateQuotation)
 	// api.Put("/quotations/:id", handler.UpdateQuotation)
 
+	app.Get("/api/quotations/count-scp/:series_id", handler.GetScpCountBySeriesID)
 	app.Post("/api/quotations", handler.CreateQuotationTable)
 	app.Get("/api/quotations", handler.GetAllQuotationsTable)
 	app.Get("/api/quotations/:id", handler.GetQuotationTable)
 	app.Put("/api/quotations/:id", handler.UpdateQuotationTable)
 	app.Delete("/api/quotations/:id", handler.DeleteQuotationTable)
+
+	// Quotation Templates
+	api.Post("/quotation-templates", handler.CreateQuotationTemplate)
+	api.Get("/quotation-templates", handler.GetAllQuotationTemplates)
+	api.Get("/quotation-templates/:id", handler.GetQuotationTemplateByID)
+	api.Delete("/quotation-templates/:id", handler.DeleteQuotationTemplate)
 
 	app.Get("/api/quotations/max-scp-count/:sales_credit_person_id", handler.GetMaxQuotationScpCount)
 
@@ -201,8 +296,67 @@ func main() {
 	api.Get("/leads", handler.GetAllLeads)
 	api.Get("/leads/:id", handler.GetLeadByID)
 	api.Post("/leads", handler.CreateLead)
+	api.Post("/leads/import", handler.ImportLeads)
 	api.Put("/leads/:id", handler.UpdateLead)
 	api.Delete("/leads/:id", handler.DeleteLead)
+
+	// Lead - interactions tied to a specific lead
+	api.Post("/leads/:id/interactions", handler.CreateLeadInteractionForLead)
+
+	// Lead Interactions
+	api.Post("/lead-interactions", handler.CreateLeadInteraction)
+	api.Get("/lead-interactions", handler.GetLeadInteractions)
+	api.Get("/lead-interactions/:id", handler.GetLeadInteraction)
+	api.Put("/lead-interactions/:id", handler.UpdateLeadInteraction)
+	api.Delete("/lead-interactions/:id", handler.DeleteLeadInteraction)
+
+	// Lead Followups
+	api.Post("/lead-followups", handler.CreateLeadFollowUp)
+	api.Get("/lead-followups", handler.GetLeadFollowUps)
+	api.Get("/lead-followups/:id", handler.GetLeadFollowUp)
+	api.Put("/lead-followups/:id", handler.UpdateLeadFollowUp)
+	api.Delete("/lead-followups/:id", handler.DeleteLeadFollowUp)
+
+	// Lead Timeline
+	api.Get("/lead/:id/timeline", handler.GetLeadTimeline)
+
+	// Lead Sources
+	api.Get("/lead-sources", handler.GetLeadSources)
+	api.Get("/lead-sources/:id", handler.GetLeadSource)
+	api.Post("/lead-sources", handler.CreateLeadSource)
+	api.Put("/lead-sources/:id", handler.UpdateLeadSource)
+	api.Delete("/lead-sources/:id", handler.DeleteLeadSource)
+
+	// Rejection Reasons
+	api.Post("/rejection-reasons", handler.CreateRejectionReason)
+	api.Get("/rejection-reasons", handler.GetRejectionReasons)
+	api.Get("/rejection-reasons/:id", handler.GetRejectionReason)
+	api.Put("/rejection-reasons/:id", handler.UpdateRejectionReason)
+	api.Delete("/rejection-reasons/:id", handler.DeleteRejectionReason)
+
+	// CRM Tags
+	api.Post("/crm-tags", handler.CreateCRMTag)
+	api.Get("/crm-tags", handler.GetCRMTags)
+	api.Get("/crm-tags/:id", handler.GetCRMTag)
+	api.Put("/crm-tags/:id", handler.UpdateCRMTag)
+	api.Delete("/crm-tags/:id", handler.DeleteCRMTag)
+
+	// IndiaMART Integration
+	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
+
+	// Printer Header
+	api.Post("/printer-headers", handler.CreatePrinterHeader)
+	api.Get("/printer-headers", handler.GetPrinterHeaders)
+	api.Get("/printer-headers/:id", handler.GetPrinterHeader)
+	api.Put("/printer-headers/:id", handler.UpdatePrinterHeader)
+	api.Delete("/printer-headers/:id", handler.DeletePrinterHeader)
+
+	// Integrations
+	api.Post("/integrations", handler.CreateIntegration)
+	api.Get("/integrations", handler.GetIntegrations)
+	api.Get("/integrations/:id", handler.GetIntegration)
+	api.Put("/integrations/:id", handler.UpdateIntegration)
+	api.Delete("/integrations/:id", handler.DeleteIntegration)
 
 	// menu
 	api.Get("/loadMenus", handler.GetAllMenus)
@@ -241,30 +395,137 @@ func main() {
 	api.Put("/tandc/:id", handler.UpdateTandc)
 	api.Delete("/tandc/:id", handler.DeleteTandc)
 
+	// Service items
+	api.Post("/service-items", handler.CreateServiceItem)
+	api.Get("/service-items", handler.GetServiceItems)
+	api.Get("/service-items/:id", handler.GetServiceItem)
+	api.Put("/service-items/:id", handler.UpdateServiceItem)
+	api.Delete("/service-items/:id", handler.DeleteServiceItem)
+
 	// Addresses (master + aggregated from users)
-	api.Get("/addresses/from-users", handler.GetAddressesFromUsers) // Must come before /:id route
-	api.Get("/addresses", handler.GetAllAddresses)
-	api.Get("/addresses/:id", handler.GetAddressByID)
-	api.Post("/addresses", handler.CreateAddress)
-	api.Put("/addresses/:id", handler.UpdateAddress)
-	api.Delete("/addresses/:id", handler.DeleteAddress)
-	api.Get("/addresses-search", handler.SearchAddresses)
+	// api.Get("/addresses/from-users", handler.GetAddressesFromUsers) // Must come before /:id route
+	// api.Get("/addresses", handler.GetAllAddresses)
+	// api.Get("/addresses/:id", handler.GetAddressByID)
+	// api.Post("/addresses", handler.CreateAddress)
+	// api.Put("/addresses/:id", handler.UpdateAddress)
+	// api.Delete("/addresses/:id", handler.DeleteAddress)
+	// api.Get("/addresses-search", handler.SearchAddresses)
 
 	// Debug endpoint to inspect route registration (quick check for 404 troubleshooting)
 	api.Get("/debug/routes", func(c *fiber.Ctx) error {
 		return c.JSON(routeStatus)
 	})
 
-	// Hierarchical Users API
+	// Hierarchical Users API (list & single)
+	// Corrected: plural endpoint should return filtered list (supports parent_id/child_id query params)
+	app.Get("/api/hierarchical-users", handler.GetUserRelations)
+	app.Get("/api/hierarchical-users/:id", handler.GetUserRelation)
+	app.Post("/api/hierarchical-users", handler.CreateUserRelation)
+	app.Put("/api/hierarchical-users/:id", handler.UpdateUserRelation)
+	app.Delete("/api/hierarchical-users/:id", handler.DeleteUserRelation)
 
-	app.Get("/api/hierarchical-users", handler.GetAllHierarchicalUsers)
-	app.Get("/api/hierarchical-users/:id", handler.GetHierarchicalUserByID)
-	app.Post("/api/hierarchical-users", handler.CreateHierarchicalUser)
-	app.Put("/api/hierarchical-users/:id", handler.UpdateHierarchicalUser)
-	app.Delete("/api/hierarchical-users/:id", handler.DeleteHierarchicalUser)
+	// Department
+	// app.Post("/departments", handler.CreateDepartment)
+	// app.Get("/departments", handler.GetDepartments)
+	// app.Get("/departments/:id", handler.GetDepartment)
+	// app.Put("/departments/:id", handler.UpdateDepartment)
+	// app.Delete("/departments/:id", handler.DeleteDepartment)
+
+	// Employee
+	// app.Post("/api/employees", handler.CreateEmployee)
+	// app.Get("/api/employees", handler.GetEmployees)
+	// // Employees not department heads
+	// api.Get("/employees/non-heads", handler.GetNonHeadEmployees)
+
+	// Employee-User assignment endpoints (must come before /:id routes)
+	// app.Post("/api/employees/assign-user", handler.AssignUserToEmployee)
+	// app.Delete("/api/employees/remove-user", handler.RemoveUserFromEmployee)
+	// app.Post("/api/employees/shift-users", handler.ShiftUsersToEmployee)
+	// app.Get("/api/employees/with-users", handler.GetEmployeesWithUsers)
+	// app.Get("/api/employees/without-users", handler.GetEmployeesWithoutUsers)
+	// app.Get("/api/employee-user-mappings", handler.GetAllEmployeeUserMappings)
+
+	// Single employee routes (must come after specific paths)
+	// app.Get("/api/employees/:id", handler.GetEmployee)
+	// app.Get("/api/employees/:id/user", handler.GetEmployeeUser)
+	// app.Put("/api/employees/:id", handler.UpdateEmployee)
+	// app.Delete("/api/employees/:id", handler.DeleteEmployee) // Department Relations (Employees)
+	// app.Post("/departments/assign", handler.AssignEmployeeToDepartment)
+	// app.Get("/departments/:id/employees", handler.GetDepartmentEmployees)
+	// app.Delete("/departments/employee/:id", handler.RemoveEmployeeFromDepartment)
+
+	// Companies
+	api.Get("/companies", handler.GetCompanies)
+	api.Get("/companies/:id", handler.GetCompany)
+	api.Post("/companies", handler.CreateCompany)
+	api.Put("/companies/:id", handler.UpdateCompany)
+	api.Delete("/companies/:id", handler.DeleteCompany)
+
+	// Company Branches
+	api.Get("/company-branches", handler.GetCompanyBranches)
+	api.Get("/company-branches/:id", handler.GetCompanyBranch)
+	api.Post("/company-branches", handler.CreateCompanyBranch)
+	api.Put("/company-branches/:id", handler.UpdateCompanyBranch)
+	api.Delete("/company-branches/:id", handler.DeleteCompanyBranch)
+
+	// Company Branch Banks
+	api.Get("/company-branch-banks", handler.GetCompanyBranchBanks)
+	api.Post("/company-branch-banks", handler.CreateCompanyBranchBank)
+	api.Put("/company-branch-banks/:id", handler.UpdateCompanyBranchBank)
+	api.Delete("/company-branch-banks/:id", handler.DeleteCompanyBranchBank)
+
+	// Series
+	api.Get("/series", handler.GetSeriesList)
+	api.Get("/series/:id", handler.GetSeries)
+	api.Post("/series", handler.CreateSeries)
+	api.Put("/series/:id", handler.UpdateSeries)
+	api.Delete("/series/:id", handler.DeleteSeries)
 
 	// Log route registration status so startup logs show if login endpoints were registered
 	fmt.Printf("Route registration: /login=%v, /api/login=%v\n", routeStatus.Login, routeStatus.APILogin)
+
+	// Departments
+	api.Post("/departments", handler.CreateDepartment)
+	api.Get("/departments", handler.GetDepartments)
+	api.Get("/departments/:id", handler.GetDepartment)
+	api.Put("/departments/:id", handler.UpdateDepartment)
+	api.Delete("/departments/:id", handler.DeleteDepartment)
+
+	// Designations
+	api.Post("/designations", handler.CreateDesignation)
+	api.Get("/designations", handler.GetDesignations)
+	api.Get("/designations/:id", handler.GetDesignation)
+	api.Put("/designations/:id", handler.UpdateDesignation)
+	api.Delete("/designations/:id", handler.DeleteDesignation)
+
+	// Organization Units
+	api.Post("/organization-units", handler.CreateOrgUnit)
+	api.Get("/organization-units", handler.GetOrgUnits)
+	api.Get("/organization-units/:id", handler.GetOrgUnit)
+	api.Put("/organization-units/:id", handler.UpdateOrgUnit)
+	api.Delete("/organization-units/:id", handler.DeleteOrgUnit)
+
+	// Employees
+	api.Post("/employees", handler.CreateEmployeeAsUser)
+	api.Get("/employees", handler.GetEmployees)
+	api.Get("/employees/non-heads", handler.GetNonHeadEmployees)
+	api.Get("/employees/:id", handler.GetEmployee)
+	api.Put("/employees/:id", handler.UpdateEmployee)
+	api.Delete("/employees/:id", handler.DeleteEmployee)
+
+	// Employee Hierarchy
+	api.Post("/employee-hierarchy", handler.CreateEmployeeHierarchy)
+	api.Get("/employee-hierarchy", handler.GetEmployeeHierarchies)
+	api.Get("/employee-hierarchy/:id", handler.GetEmployeeHierarchy)
+	api.Put("/employee-hierarchy/:id", handler.UpdateEmployeeHierarchy)
+	api.Delete("/employee-hierarchy/:id", handler.DeleteEmployeeHierarchy)
+
+	// Employee - Organization Unit Mapping
+	api.Post("/employee-org-units", handler.CreateEmployeeOrgUnit)
+	api.Get("/employee-org-units", handler.GetEmployeeOrgUnits)
+	api.Get("/employee-org-units/:id", handler.GetEmployeeOrgUnit)
+	api.Put("/employee-org-units/:id", handler.UpdateEmployeeOrgUnit)
+	api.Delete("/employee-org-units/:id", handler.DeleteEmployeeOrgUnit)
 
 	// start server
 	log.Fatal(app.Listen(":8000"))

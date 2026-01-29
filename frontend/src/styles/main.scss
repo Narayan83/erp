@@ -22,7 +22,7 @@ body {
 }
 // TOP BAR SCSS
 header {
-  background: #0072F9;
+  background: #0072f9;
   // background: linear-gradient(38deg,rgba(3, 29, 55, 1) 0%, rgba(8, 120, 206, 1) 77%);
   width: 100%;
   height: 60px;
@@ -131,7 +131,6 @@ header .rounded-circle:hover svg {
 // SIDE BAR SCSS
 
 .main {
- 
   .main-side-bar-wraper {
     width: 20%;
     flex: 0 0 20%;
@@ -146,16 +145,20 @@ header .rounded-circle:hover svg {
       position: fixed;
       top: 60px;
       left: 0;
-      background: #031D37;
-      background: linear-gradient(38deg,rgba(3, 29, 55, 1) 100%, rgba(8, 120, 206, 1) 77%);
+      background: #031d37;
+      background: linear-gradient(
+        38deg,
+        rgba(3, 29, 55, 1) 100%,
+        rgba(8, 120, 206, 1) 77%
+      );
       transition: all 0.5s ease-in-out;
 
       ul {
-          margin-left: 0 !important;
-          margin-bottom: 0 !important;
-          padding-left: 0 !important;
-          list-style: none !important;
-          border-left: none !important;
+        margin-left: 0 !important;
+        margin-bottom: 0 !important;
+        padding-left: 0 !important;
+        list-style: none !important;
+        border-left: none !important;
 
         li {
           list-style: none;
@@ -209,7 +212,9 @@ header .rounded-circle:hover svg {
           .submenu {
             opacity: 1;
             height: auto;
-            transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
+            transition:
+              opacity 0.3s ease-in-out,
+              height 0.3s ease-in-out;
             padding: 0px 25px !important;
             position: relative;
 
@@ -249,7 +254,9 @@ header .rounded-circle:hover svg {
       height: 0;
       opacity: 0;
       overflow: hidden;
-      transition: opacity 0.5s ease-in-out, height 0.5s ease-in-out;
+      transition:
+        opacity 0.5s ease-in-out,
+        height 0.5s ease-in-out;
     }
 
     .colapse {
@@ -266,14 +273,17 @@ header .rounded-circle:hover svg {
   }
 
   .content {
+    // margin-top: 60px;
     width: 80%;
     flex: 0 0 80%;
     transition: all 0.3s ease-in-out;
     background: #fff;
-    min-height: 100vh;
+    max-height: 100vh;
 
     .right-content {
-      padding: 85px 25px;
+      padding: 5px;
+      width: 100vw;
+      max-width: 100%;
     }
   }
 }
@@ -541,16 +551,20 @@ header .rounded-circle:hover svg {
 }
 
 .shadow-small {
-  box-shadow: rgba(0, 0, 0, 0.02) 0px 1px 3px 0px,
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0px 1px 3px 0px,
     rgba(27, 31, 35, 0.15) 0px 0px 0px 1px;
 }
 .shadow-medium {
   box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
 }
 .shadow-large {
-  box-shadow: rgba(0, 0, 0, 0.25) 0px 54px 55px,
-    rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px,
-    rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;
+  box-shadow:
+    rgba(0, 0, 0, 0.25) 0px 54px 55px,
+    rgba(0, 0, 0, 0.12) 0px -12px 30px,
+    rgba(0, 0, 0, 0.12) 0px 4px 6px,
+    rgba(0, 0, 0, 0.17) 0px 12px 13px,
+    rgba(0, 0, 0, 0.09) 0px -3px 5px;
 }
 
 // responsive styles

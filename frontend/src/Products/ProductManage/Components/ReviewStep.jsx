@@ -18,7 +18,7 @@ import { DynamicDialog } from "../../../CommonComponents/DynamicDialog";
 
 import axios from "axios";
 import { useState, useEffect } from "react";
-import { BASE_URL } from "../../../Config"; // Import BASE_URL
+import { BASE_URL } from "../../../config/Config"; // Import BASE_URL
 import { useNavigate } from "react-router-dom"; // Add this import for navigation
 
 // RAL colors data (complete list from color.csv)
@@ -613,23 +613,23 @@ export default function ReviewStep({
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Color Code</TableCell>
-            <TableCell>Size</TableCell>
-            <TableCell>SKU</TableCell>
-            <TableCell>Barcode</TableCell>
-            <TableCell>Purchase Cost</TableCell>
-            <TableCell>Sales Price</TableCell>
-            <TableCell>Stock</TableCell>
-            <TableCell>Lead Time</TableCell>
-            <TableCell>Images</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell align="center">Actions</TableCell>
+            <TableCell align="center">Color Code</TableCell>
+            <TableCell align="center">Size</TableCell>
+            <TableCell align="center">SKU</TableCell>
+            <TableCell align="center">Barcode</TableCell>
+            <TableCell align="center">Purchase Cost</TableCell>
+            <TableCell align="center">Sales Price</TableCell>
+            <TableCell align="center">Stock</TableCell>
+            <TableCell align="center">Lead Time</TableCell>
+            <TableCell align="center">Images</TableCell>
+            <TableCell align="center">Status</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {(variants || []).map((v, i) => (
             <TableRow key={i} sx={{ opacity: v.isActive === false ? 0.5 : 1 }}>
-              <TableCell>
+              <TableCell align="center">
                 {(() => {
                   const colorData = ralColors.find(c => c.value === v.color);
                   // Safely derive the friendly color name part if available
@@ -654,14 +654,14 @@ export default function ReviewStep({
                   );
                 })()}
               </TableCell>
-              <TableCell>{v.size}</TableCell>
-              <TableCell>{v.sku}</TableCell>
-              <TableCell>{v.barcode}</TableCell>
-              <TableCell>₹{v.purchaseCost}</TableCell>
-              <TableCell>₹{v.stdSalesPrice}</TableCell>
-              <TableCell>{v.stock}</TableCell>
-              <TableCell>{v.leadTime} days</TableCell>
-              <TableCell>
+              <TableCell align="center">{v.size}</TableCell>
+              <TableCell align="center">{v.sku}</TableCell>
+              <TableCell align="center">{v.barcode}</TableCell>
+              <TableCell align="center">₹{v.purchaseCost}</TableCell>
+              <TableCell align="center">₹{v.stdSalesPrice}</TableCell>
+              <TableCell align="center">{v.stock}</TableCell>
+              <TableCell align="center">{v.leadTime} days</TableCell>
+              <TableCell align="center">
                 {Array.isArray(v.images) && v.images.length > 0 ? (
                   <Stack direction="row" spacing={1}>
                     {v.images.map((img, j) => {
@@ -712,7 +712,7 @@ export default function ReviewStep({
                   "—"
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell align="center">
                 <Typography 
                   variant="body2" 
                   sx={{ 
@@ -723,7 +723,7 @@ export default function ReviewStep({
                   {v.isActive !== false ? 'Active' : 'Inactive'}
                 </Typography>
               </TableCell>
-              <TableCell align="center">
+              <TableCell align="right" sx={{ textAlign: 'right' }}>
                 <IconButton
                   size="small"
                   color="primary"
@@ -765,9 +765,14 @@ export default function ReviewStep({
 
       <Box mt={4} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={handleFinalSubmit}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleFinalSubmit}
+          aria-label="Submit Product"
+        >
           Submit
-        </Button>
+        </button>
       </Box>
 
       <DynamicDialog
@@ -789,9 +794,10 @@ export default function ReviewStep({
             label: "View Products",
             onClick: () => {
               setDialogOpen(false);
-              navigate("/ProductMaster"); // Now works with the added import
+              navigate("/ProductMaster");
             },
-            variant: "contained",
+            plain: true,
+            className: "btn btn-primary",
           },
         ]}
       />

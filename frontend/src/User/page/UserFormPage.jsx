@@ -3,11 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AddOrEditUserForm from "../components/AddOrEditUserForm"; // Adjust path as needed
 import { CircularProgress, Container, Typography,Paper } from "@mui/material";
-import { BASE_URL } from "../../Config"
+import { BASE_URL } from "../../config/Config"
 const UserFormPage = () => {
   const { id } = useParams(); // If `id` exists, it's edit mode
   const navigate = useNavigate();
   const [userToEdit, setUserToEdit] = useState(null);
+  const [hierarchy, setHierarchy] = useState([]);
   const [loading, setLoading] = useState(!!id); // only load if editing
 
   useEffect(() => {
@@ -15,7 +16,8 @@ const UserFormPage = () => {
       axios
         .get(`${BASE_URL}/api/users/${id}`)
         .then((res) => {
-          setUserToEdit(res.data);
+          setUserToEdit(res.data.user);
+          setHierarchy(res.data.hierarchy || []);
           console.log(res.data);
         })
         .catch((err) => {
@@ -47,7 +49,7 @@ const UserFormPage = () => {
      <section  className="right-content">
         <Paper sx={{ p: 2, mb: 2 }}>
         <Container maxWidth="xl" sx={{ mt: 5 }}>
-        <AddOrEditUserForm defaultValues={userToEdit} onSubmitUser={handleSubmit} />
+        <AddOrEditUserForm defaultValues={userToEdit} hierarchy={hierarchy} onSubmitUser={handleSubmit} />
         </Container>
         </Paper>
     </section>

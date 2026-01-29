@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  Box, Button, Typography, Snackbar, Alert, TablePagination, TextField
-} from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
 import StoreTable from "../components/StoreTable";
 import StoreDialog from "../components/StoreDialog";
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
+import "./allinone.scss";
 
 export default function StoreSection() {
   const [stores, setStores] = useState([]);
@@ -56,25 +56,34 @@ export default function StoreSection() {
 
   return (
     <section className="right-content">
-      <Box p={4}>
-        <Box display="flex" justifyContent="space-between" mb={2}>
-          <Typography variant="h6">Store Management</Typography>
-          <Button variant="contained" onClick={() => setDialogOpen(true)}>Add Store</Button>
-        </Box>
+      <div className="section-container">
+        <div className="section-header">
+          <h6>Store Management</h6>
+          <div className="search-field-wrapper">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Filter by Name"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setPage(0);
+              }}
+            />
+          </div>
+          <div className="add-button-wrapper">
+            <button
+              className="btn-add"
+              onClick={() => setDialogOpen(true)}
+              type="button"
+            >
+              Add Store
+            </button>
+          </div>
+        </div>
 
-        <TextField
-          label="Filter by Name"
-          variant="outlined"
-          size="small"
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(0);
-          }}
-          sx={{ maxWidth: 300, mb: 2 }}
-        />
-
-        <StoreTable
+        <div className="table-wrapper">
+          <StoreTable
           stores={stores}
           page={page}
           rowsPerPage={rowsPerPage}
@@ -87,18 +96,17 @@ export default function StoreSection() {
             setConfirmOpen(true);
           }}
         />
+        </div>
 
-        <TablePagination
-          component="div"
-          count={total}
+        <Pagination
           page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
+          total={total}
           rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newRowsPerPage) => {
+            setRowsPerPage(newRowsPerPage);
             setPage(0);
           }}
-          rowsPerPageOptions={[5, 10, 25]}
         />
 
         <StoreDialog
@@ -131,7 +139,7 @@ export default function StoreSection() {
         >
           <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
         </Snackbar>
-      </Box>
+      </div>
     </section>
   );
 }

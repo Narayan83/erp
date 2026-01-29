@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../../styles/menu_creation.scss";
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
 
 const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCancel }) => {
   const [menuName, setMenuName] = useState("");

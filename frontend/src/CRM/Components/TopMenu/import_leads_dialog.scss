@@ -1,0 +1,142 @@
+@use "../../Styles/_variable.scss" as *;
+
+.import-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.dialog-content {
+  background: $primary-white;
+  width: 700px !important;
+  max-width: calc(100% - 40px);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba($primary-blue, 0.06);
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: $primary-blue;
+  font-weight: 600;
+  font-size: 16px;
+  margin-left: 8px;
+}
+.close-btn {
+  background: #fff !important;
+  border: none;
+  font-size: 26px !important;
+  cursor: pointer;
+  padding: 0 !important;
+  color: $primary-black !important;
+}
+
+.dialog-body {
+  padding: 18px 20px 28px 20px;
+}
+
+.integration-section {
+  margin-bottom: 18px;
+}
+.integration-section h4 {
+  margin: 0 0 6px 0;
+  color: $primary-black;
+}
+.muted {
+  color: #666;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.tiles {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.import-tile {
+  width: 110px;
+  height: 112px;
+  padding: 12px;
+  border-radius: 8px;
+  background: $primary-white;
+  border: 1px solid rgba($primary-blue, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.import-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.tile-icon-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  display: block;
+}
+.tile-label {
+  font-size: 13px;
+  color: $primary-black;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Ensure dialog-content spans dialog width when used */
+.dialog-content {
+  width: 100%;
+
+  &.integration-view {
+    width: 90vw !important;
+    max-width: calc(100% - 40px);
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+
+    .dialog-header {
+      padding: 5px 20px;
+      border-bottom: 1px solid #e0e0e0;
+
+      .back-btn {
+        background: none;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        color: $primary-blue;
+        padding: 0;
+        margin-right: 12px;
+        font-weight: 600;
+
+        &:hover {
+          color: darken($primary-blue, 10%);
+        }
+      }
+    }
+  }
+}
+
+/* Integration view layout */
+.indiamart-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}

@@ -3,7 +3,7 @@ import axios from "axios";
 import "../../styles/menu_management.scss";
 import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
-import { BASE_URL } from "../../../Config"; // Add this import
+import { BASE_URL } from "../../../config/Config"; // Add this import
 
 const defaultOnEdit = () => {};
 

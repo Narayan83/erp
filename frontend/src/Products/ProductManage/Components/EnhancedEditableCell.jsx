@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, TextField, TableCell } from "@mui/material";
+import { Box, TextField, TableCell, Autocomplete } from "@mui/material";
 
 // Enhanced editable cell component with case-insensitive column matching
 const EnhancedEditableCell = ({ 
@@ -15,7 +15,9 @@ const EnhancedEditableCell = ({
   units,
   sizes,
   tags,
-  taxes
+  taxes,
+  error, // boolean - whether this cell has an error
+  errorMessages // optional array of error messages for tooltip/reporting
 }) => {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -95,6 +97,13 @@ const EnhancedEditableCell = ({
   const isTag = normalizedColumnKey === 'tag' || normalizedColumnKey === 'tags';
   const isSize = normalizedColumnKey === 'size';
   const isTax = normalizedColumnKey === 'tax';
+
+  // Columns that should be center aligned (case-insensitive, normalized)
+  const centerColumns = [
+    'minstock', 'minimumstock', 'min_stock', 'minimum_stock',
+    'moq', 'tax', 'gst', 'purchasecost', 'salesprice', 'stock', 'leadtime'
+  ];
+  const isCenterAligned = centerColumns.includes(normalizedColumnKey);
   
   // Debugging in useEffect to not interfere with rendering
   useEffect(() => {
@@ -149,67 +158,84 @@ const EnhancedEditableCell = ({
   // Get dropdown options based on field type
   let options = [];
   
-  if (isCategory && Array.isArray(categories)) {
-    options = categories.map(cat => {
-      const name = cat.Name || cat.name || '';
-      return { 
-        value: name, 
-        label: name 
-      };
-    }).filter(opt => opt.value);
-  } else if (isSubcategory && Array.isArray(allSubcategories)) {
-    // Try to find category column using different possible names
-    const possibleCategoryKeys = [
-      'Category', 'category', 'CategoryName', 'categoryName', 
-      'category_name', 'CATEGORY', 'Category *'
-    ];
-    
-    let categoryValue = null;
-    for (const key of possibleCategoryKeys) {
-      if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-        categoryValue = row[key];
-        break;
-      }
+  // For Category - always provide options (empty array is fine, text input will work)
+  if (isCategory) {
+    if (Array.isArray(categories)) {
+      options = categories.map(cat => {
+        const name = cat.Name || cat.name || '';
+        return { 
+          value: name, 
+          label: name 
+        };
+      }).filter(opt => opt.value);
     }
-    
-    if (categoryValue && Array.isArray(categories)) {
-      // Try to find the category by name or ID
-      const category = categories.find(c => {
-        const catName = c.Name || c.name || '';
-        const catId = String(c.ID || c.id || '');
-        return catName === categoryValue || catId === String(categoryValue);
-      });
+    // Even if no categories, options will be [] which allows text input
+  } else if (isSubcategory) {
+    // For Subcategory - always provide options (filtered or all)
+    if (Array.isArray(allSubcategories)) {
+      // Try to find category column using different possible names
+      const possibleCategoryKeys = [
+        'Category', 'category', 'CategoryName', 'categoryName', 
+        'category_name', 'CATEGORY', 'Category *'
+      ];
       
-      if (category) {
-        const categoryId = category.ID || category.id;
-        // Filter subcategories that belong to this category
-        const filteredSubcategories = allSubcategories.filter(sub => {
-          const subCatId = sub.CategoryID || sub.categoryID || sub.category_id;
-          return String(subCatId) === String(categoryId);
+      let categoryValue = null;
+      for (const key of possibleCategoryKeys) {
+        if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+          categoryValue = row[key];
+          break;
+        }
+      }
+      
+      if (categoryValue && Array.isArray(categories)) {
+        // Try to find the category by name or ID
+        const category = categories.find(c => {
+          const catName = c.Name || c.name || '';
+          const catId = String(c.ID || c.id || '');
+          return catName === categoryValue || catId === String(categoryValue);
         });
         
-        options = filteredSubcategories.map(sub => { 
+        if (category) {
+          const categoryId = category.ID || category.id;
+          // Filter subcategories that belong to this category
+          const filteredSubcategories = allSubcategories.filter(sub => {
+            const subCatId = sub.CategoryID || sub.categoryID || sub.category_id;
+            return String(subCatId) === String(categoryId);
+          });
+          
+          options = filteredSubcategories.map(sub => { 
+            const name = sub.Name || sub.name || '';
+            return { 
+              value: name, 
+              label: name 
+            };
+          }).filter(opt => opt.value);
+          
+          console.log(`Subcategory options for category '${categoryValue}': ${options.length} items`);
+        } else {
+          // Category specified but not found - show all subcategories as suggestions
+          console.warn(`Category '${categoryValue}' not found, showing all subcategories`);
+          options = allSubcategories.map(sub => { 
+            const name = sub.Name || sub.name || '';
+            return { 
+              value: name, 
+              label: name 
+            };
+          }).filter(opt => opt.value);
+        }
+      } else {
+        // No category selected - show all subcategories as suggestions
+        console.log('No category selected, showing all subcategories as suggestions');
+        options = allSubcategories.map(sub => { 
           const name = sub.Name || sub.name || '';
           return { 
             value: name, 
             label: name 
           };
         }).filter(opt => opt.value);
-        
-        // If no subcategories found for this category, show empty dropdown
-        if (options.length === 0) {
-          console.warn(`No subcategories found for category: ${categoryValue} (ID: ${categoryId})`);
-        }
-      } else {
-        // Category specified but not found - show empty dropdown to prompt user to select valid category
-        console.warn(`Category '${categoryValue}' not found in available categories`);
-        options = [];
       }
-    } else {
-      // No category selected - show empty dropdown to prompt user to select category first
-      console.log('No category selected for subcategory dropdown');
-      options = [];
     }
+    // Even if no subcategories, options will be [] which allows text input
   } else if (isStore && Array.isArray(stores)) {
     options = stores.map(store => {
       const name = store.Name || store.name || '';
@@ -327,12 +353,14 @@ const EnhancedEditableCell = ({
     console.log("Generated Tax options:", options.length > 0 ? options.slice(0, 5) : "No options");
   }
   
-  // Debugging for empty options
-  if ((isCategory || isSubcategory || isStore || isHsnCode || isUnit || isSize || isTax) && options.length === 0) {
+  // Debugging for empty options (but not warning for fields that support free text like Category/Subcategory/HSN/Tax/Size)
+  if ((isStore || isUnit) && options.length === 0) {
     console.warn(`No options found for dropdown field: ${columnKey} (${normalizedColumnKey})`);
   }
   
-  const isDropdown = options.length > 0;
+  // Category, Subcategory, Size, HSN and Tax are ALWAYS treated as combo-boxes (free-text + suggestions)
+  // so users can either pick an existing value or enter a new one
+  const isDropdown = (isCategory || isSubcategory || isSize || isHsnCode || isTax) || options.length > 0;
   
   const handleSave = () => {
     onUpdate(rowIndex, columnKey, editValue);
@@ -359,37 +387,110 @@ const EnhancedEditableCell = ({
       sx={{ 
         cursor: !editing ? 'pointer' : 'default',
         padding: editing ? '4px' : undefined,
+        minWidth: '140px', // ensure minimum column width for th/td
+        textAlign: isCenterAligned ? 'center' : undefined,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        // Visual error indicator: left red border + light red background
+        borderLeft: error ? '4px solid rgba(244,67,54,0.6)' : undefined,
+        backgroundColor: error ? 'rgba(255,235,238,0.6)' : undefined,
         '&:hover': !editing ? { 
-          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+          backgroundColor: error ? 'rgba(255,235,238,0.65)' : 'rgba(0, 0, 0, 0.04)',
         } : {}
       }}
+      // keep content from shrinking too small when table layout is tight
     >
       {editing ? (
         isDropdown ? (
           <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <select
-              autoFocus
-              value={editValue || ""}
-              onChange={(e) => setEditValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleSave}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #1976d2', // Blue border to make it more visible
-                borderRadius: '4px',
-                backgroundColor: '#f5f9ff', // Light blue background
-                fontSize: '14px',
-                color: '#333'
-              }}
-            >
-              <option value="">-- Select --</option>
-              {options.map((option, idx) => (
-                <option key={idx} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {/* For Category, Subcategory, and Size, use Autocomplete (combo box: dropdown + free text) */}
+              {(isCategory || isSubcategory || isSize || isHsnCode || isTax) ? (
+              <Autocomplete
+                freeSolo
+                autoFocus
+                options={options.map(opt => opt.value)}
+                value={editValue || ""}
+                onChange={(event, newValue) => {
+                  setEditValue(newValue || "");
+                }}
+                onInputChange={(event, newInputValue) => {
+                  setEditValue(newInputValue);
+                }}
+                onBlur={handleSave}
+                onKeyDown={handleKeyDown}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    inputProps={{ ...(params.inputProps || {}), style: { textAlign: isCenterAligned ? 'center' : 'left' } }}
+                    placeholder={options.length > 0 
+                      ? `Type new or select ${isCategory ? 'category' : isSubcategory ? 'subcategory' : isHsnCode ? 'HSN code' : isTax ? 'tax' : 'size'}` 
+                      : `Type ${isCategory ? 'category' : isSubcategory ? 'subcategory' : isHsnCode ? 'HSN code' : isTax ? 'tax' : 'size'} name`}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      minWidth: '120px',
+                      width: '100%',
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f1f8e9',
+                        '& fieldset': {
+                          borderColor: '#4caf50',
+                          borderWidth: '2px',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#4caf50',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#4caf50',
+                        },
+                      },
+                      '& .MuiInputBase-input': {
+                        padding: '8px !important',
+                        fontSize: '14px',
+                      },
+                    }}
+                  />
+                )}
+                sx={{ 
+                  minWidth: '120px',
+                  width: '100%',
+                  '& .MuiAutocomplete-inputRoot': {
+                    padding: '0 !important',
+                  }
+                }}
+                ListboxProps={{
+                  style: {
+                    maxHeight: '200px',
+                  }
+                }}
+              />
+            ) : (
+              <select
+                autoFocus
+                value={editValue || ""}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={handleSave}
+                style={{
+                  minWidth: '120px',
+                  width: '100%',
+                  textAlign: isCenterAligned ? 'center' : 'left',
+                  padding: '8px',
+                  border: '1px solid #1976d2',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f9ff',
+                  fontSize: '14px',
+                  color: '#333'
+                }}
+              >
+                <option value="">-- Select --</option>
+                {options.map((option, idx) => (
+                  <option key={idx} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </Box>
         ) : (
           <TextField
@@ -399,6 +500,7 @@ const EnhancedEditableCell = ({
             variant="outlined"
             value={editValue || ""}
             onChange={(e) => setEditValue(e.target.value)}
+            inputProps={{ style: { textAlign: isCenterAligned ? 'center' : 'left' } }}
             onKeyDown={handleKeyDown}
             onBlur={handleSave}
             sx={{ margin: '-8px 0' }}

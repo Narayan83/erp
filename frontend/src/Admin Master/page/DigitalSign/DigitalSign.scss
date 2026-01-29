@@ -1,0 +1,151 @@
+.digital-sign-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.digital-sign-modal {
+  width: 500px;
+  max-width: 100%;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eee;
+}
+
+.ds-header h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.ds-close {
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  cursor: pointer;
+  color: #333;
+}
+
+.ds-body {
+  padding: 22px 18px;
+}
+.upload-area {
+  text-align: center;
+}
+.hidden-file {
+  display: none;
+}
+.btn-upload {
+  background: #f7f7f7;
+  border: 1px dashed #ccc;
+  padding: 10px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #444;
+}
+.btn-upload .icon {
+  font-size: 14px;
+}
+
+.recommended {
+  margin-top: 10px;
+  color: #666;
+  font-size: 13px;
+}
+
+.thumb-wrap {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-direction: column;
+}
+.thumb {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  padding: 6px;
+  border-radius: 4px;
+}
+.file-name {
+  font-size: 12px;
+  color: #777;
+  margin-top: 8px;
+}
+
+.thumb-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.thumb-actions button {
+  background: transparent;
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.btn-crop {
+  color: #333;
+}
+.btn-remove {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.ds-footer {
+  padding: 12px 18px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-save {
+  background: #28a745;
+  border: 0;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-save[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Make clickable cards noticeable */
+.config-card.clickable {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.config-card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}

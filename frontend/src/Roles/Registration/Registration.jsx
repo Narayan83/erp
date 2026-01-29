@@ -16,7 +16,7 @@ import { FaUserTie, FaIndustry, FaIdCard } from "react-icons/fa";
 import Skeleton from "@mui/material/Skeleton";
 import { Today } from "@mui/icons-material";
 // import "./Registration.scss";
-import { BASE_URL } from "../../Config";
+import { BASE_URL } from "../../config/Config";
 
 function Registration() {
   const navigate = useNavigate();

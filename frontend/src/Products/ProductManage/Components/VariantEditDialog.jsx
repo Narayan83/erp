@@ -1,31 +1,88 @@
-import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Box, Typography, IconButton, Autocomplete
-} from "@mui/material";
-import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { Delete } from "@mui/icons-material";
-import Cropper from 'react-easy-crop';
-import Slider from '@mui/material/Slider';
-import CloseIcon from '@mui/icons-material/Close';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import { BASE_URL } from "../../../Config"; // Import BASE_URL from Config
+import { useEffect, useState, useCallback, useRef } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../../config/Config"; // adjust if needed
+import ImageEditor from "./ImageEditor";
+import "./varianteditdialog.scss";
 
-export default function VariantEditDialog({ open, onClose, onSave, defaultValues, sizes = [] }) {
-  const { register, handleSubmit, reset, setValue, getValues } = useForm();
+export default function VariantEditDialog({ open, onClose, onSave, defaultValues = null, sizes = [] }) {
+  // Remove sku from defaultValues to ensure it starts empty
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
+    mode: 'onSubmit',
+    defaultValues: {
+      sku: '', // Start empty so SKU is optional
+      barcode: '',
+      purchaseCost: '',
+      stdSalesPrice: '',
+      stock: '',
+      leadTime: '',
+      isActive: true
+    }
+  });
   const [imagesPreview, setImagesPreview] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [variantID, setVariantID] = useState(null);
+  const [sizeOptions, setSizeOptions] = useState([]);
+  const [sizesLoading, setSizesLoading] = useState(false);
+  const [sizesError, setSizesError] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(null);
-  const [cropDialogOpen, setCropDialogOpen] = useState(false);
-  const [cropSrc, setCropSrc] = useState(null);
-  const [cropIndex, setCropIndex] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [colorQuery, setColorQuery] = useState('');
+  const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
+  const colorWrapperRef = useRef(null);
+  const [selectedSize, setSelectedSize] = useState('');
   const [mainImageIndex, setMainImageIndex] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // Image editor integration
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingSrc, setEditingSrc] = useState(null);
+
+  const openEditorForImage = (index) => {
+    setEditingIndex(index);
+    setEditingSrc(imageFiles[index]?.preview || null);
+    setEditorOpen(true);
+  };
+
+  const dataURLtoFile = async (dataUrl, filename) => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: blob.type });
+  };
+
+  const handleEditedSave = async (payload) => {
+    if (editingIndex == null) return;
+    const idx = editingIndex;
+    const filename = imageFiles[idx]?.name ? `edited_${imageFiles[idx].name}` : `edited_${Date.now()}.png`;
+
+    const previewDataUrl = typeof payload === 'string' ? payload : (payload && payload.css) ? payload.css : null;
+    const uploadDataUrl = typeof payload === 'string' ? payload : (payload && payload.hi) ? payload.hi : previewDataUrl;
+
+    try {
+      const file = await dataURLtoFile(uploadDataUrl, filename);
+      setImageFiles(prev => {
+        const copy = [...prev];
+        const prevEntry = copy[idx];
+        if (prevEntry && prevEntry.file && prevEntry.preview) {
+          try { URL.revokeObjectURL(prevEntry.preview); } catch(e) {}
+        }
+        copy[idx] = { file, preview: previewDataUrl || uploadDataUrl, original: null, name: file.name };
+        setImagesPreview(prev => {
+          const newPrev = [...prev];
+          newPrev[idx] = previewDataUrl || uploadDataUrl;
+          return newPrev;
+        });
+        return copy;
+      });
+    } catch (e) {
+      console.error("Failed to convert edited image", e);
+    } finally {
+      setEditorOpen(false);
+      setEditingIndex(null);
+      setEditingSrc(null);
+    }
+  }; 
 
   // Define RAL colors from CSV data
   const ralColors = [
@@ -246,124 +303,115 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
     { name: 'RAL 9022 - Pearl light grey', value: 'RAL 9022', hex: '#858583' },
     { name: 'RAL 9023 - Pearl dark grey', value: 'RAL 9023', hex: '#787B7A' },
   ];
-  // Populate form on defaultValues change
   useEffect(() => {
-    console.log("defaultValues changed:", defaultValues);
-    if (defaultValues) {
-       const mappedDefaults = {
-        color: defaultValues.Color,
-        size: defaultValues.Size,
-        sku: defaultValues.SKU,
-        barcode: defaultValues.Barcode,
-        purchaseCost: defaultValues.PurchaseCost,
-        stdSalesPrice: defaultValues.StdSalesPrice,
-        stock: defaultValues.Stock,
-        leadTime: defaultValues.LeadTime,
-        isActive: defaultValues.IsActive ?? true,
-        images: defaultValues.Images || [],
-     };
-     // Build structured entries for images
-     const initFiles = (mappedDefaults.images || []).map(img => {
-       if (typeof img === 'string') {
-         const normalized = img.replace(/\\/g, '/');
-         const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:'))
-           ? normalized
-           : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
-         return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
-       }
-       return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
-     });
-     reset(mappedDefaults);
-     setImagesPreview(initFiles.map(f => f.preview));
-     setImageFiles(initFiles);
-     setVariantID(defaultValues.ID || null);
-     const colorMatch = ralColors.find(c => c.value === defaultValues.Color);
-     setSelectedColor(colorMatch || null);
-     
-     // Initialize selected size
-     if (defaultValues.Size && Array.isArray(sizes)) {
-       const sizeMatch = sizes.find(s => s.code === defaultValues.Size);
-       if (sizeMatch) {
-         setSelectedSize({ id: sizeMatch.id, code: sizeMatch.code });
-       }
-     } else {
-       setSelectedSize(null);
-     }
+    if (!open) return;
+    const fetchAllSizes = async () => {
+      setSizesLoading(true);
+      setSizesError(null);
+      try {
+        if (Array.isArray(sizes) && sizes.length > 0) {
+          setSizeOptions(sizes);
+        } else {
+          const res = await axios.get(`${BASE_URL}/api/sizes`, { params: { page: 1, limit: 500, filter: "" } });
+          setSizeOptions(res.data?.data || []);
+        }
+      } catch (e) {
+        setSizesError("Failed to load sizes");
+        setSizeOptions([]);
+      } finally {
+        setSizesLoading(false);
+      }
+    };
+    fetchAllSizes();
+  }, [open, sizes]);
 
-     // Initialize main image selection from backend values
-     let initialMainIndex = null;
-     // Prefer explicit index from backend if valid
-     if (typeof defaultValues.MainImageIndex === 'number' && initFiles.length > 0) {
-       const idx = defaultValues.MainImageIndex;
-       if (idx >= 0 && idx < initFiles.length) {
-         initialMainIndex = idx;
-       }
-     }
-     // Fallback to find by MainImage path/name
-     if (initialMainIndex === null && defaultValues.MainImage) {
-       const target = String(defaultValues.MainImage).replace(/\\/g, '/');
-       const byPathIdx = initFiles.findIndex(f => {
-         if (!f) return false;
-         if (f.original) {
-           const orig = String(f.original).replace(/\\/g, '/');
-           // match full or basename
-           return orig === target || orig.endsWith('/' + target.split('/').pop());
-         }
-         return false;
-       });
-       if (byPathIdx >= 0) initialMainIndex = byPathIdx;
-     }
-     // Default to first image if still not set
-     if (initialMainIndex === null && initFiles.length > 0) initialMainIndex = 0;
-     setMainImageIndex(initialMainIndex);
-    } else {
-     reset({});
-     setImagesPreview([]);
-     setVariantID(null);
-     setSelectedColor(null);
-     setSelectedSize(null);
-     setMainImageIndex(null);
+  // Ensure that when dialog opens for "Add" (no meaningful defaultValues)
+  // the form is cleared. Treat presence of ID or SKU as indication of Edit mode.
+  useEffect(() => {
+    const isEditing = Boolean(defaultValues && (defaultValues.ID || defaultValues.id || defaultValues.SKU || defaultValues.sku));
+    if (open && !isEditing) {
+      const blank = {
+        sku: '',
+        barcode: '',
+        purchaseCost: '',
+        stdSalesPrice: '',
+        stock: '',
+        leadTime: '',
+        isActive: true,
+      };
+      reset(blank);
+      setImageFiles([]);
+      setImagesPreview([]);
+      setSelectedColor(null);
+      setColorQuery('');
+      setSelectedSize('');
+      setMainImageIndex(null);
+      setVariantID(null);
     }
-  }, [defaultValues, reset]);
+  }, [open, defaultValues, reset]);
 
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
+  useEffect(() => {
+    if (defaultValues) {
+      // Map incoming backend fields to form field names and reset form
+      const mappedDefaults = {
+        sku: defaultValues.SKU || defaultValues.sku || '',
+        barcode: defaultValues.Barcode || defaultValues.barcode || '',
+        purchaseCost: defaultValues.PurchaseCost || defaultValues.purchaseCost || '',
+        stdSalesPrice: defaultValues.StdSalesPrice || defaultValues.stdSalesPrice || '',
+        stock: defaultValues.Stock || defaultValues.stock || '',
+        leadTime: defaultValues.LeadTime || defaultValues.leadTime || '',
+        isActive: defaultValues.IsActive ?? defaultValues.isActive ?? true,
+      };
+      reset(mappedDefaults);
+      setVariantID(defaultValues.ID || defaultValues.id || null);
+      
+      // Initialize file entries from defaultValues.images (may be strings referencing uploads)
+      const initFiles = (defaultValues.images || defaultValues.Images || []).map(img => {
+        if (typeof img === 'string') {
+          const normalized = img.replace(/\\/g, '/');
+          const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
+            ? normalized
+            : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+          return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
+        }
+        return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
+      });
+      setImageFiles(initFiles);
+      setImagesPreview(initFiles.map(f => f.preview));
+      const colorMatch = ralColors.find(c => c.value === (defaultValues.color || defaultValues.Color));
+      setSelectedColor(colorMatch || null);
+      setColorQuery(colorMatch ? colorMatch.name : '');
+      setSelectedSize(defaultValues.size || defaultValues.Size || '');
 
-  const getCroppedImg = async (imageSrc, pixelCrop) => {
-    const image = await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = (e) => reject(e);
-      img.src = imageSrc;
-    });
+      // Determine initial main image: prefer explicit defaultValues.mainImage, else default to first image if any
+      let initialMain = null;
+      if (defaultValues.mainImage || defaultValues.MainImage) {
+        const mainVal = defaultValues.mainImage || defaultValues.MainImage;
+        const found = initFiles.findIndex(f => (f.original && f.original === mainVal) || f.name === mainVal);
+        if (found >= 0) initialMain = found;
+      }
+      if (initialMain === null && initFiles.length > 0) {
+        initialMain = 0;
+      }
+      setMainImageIndex(initialMain);
+    } else {
+      reset();
+      setImagesPreview([]);
+      setSelectedColor(null);
+      setColorQuery('');
+      setSelectedSize('');
+      setMainImageIndex(null);
+    }
+  }, [defaultValues, open, reset]);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-    const ctx = canvas.getContext('2d');
 
-    ctx.drawImage(
-      image,
-      pixelCrop.x,
-      pixelCrop.y,
-      pixelCrop.width,
-      pixelCrop.height,
-      0,
-      0,
-      pixelCrop.width,
-      pixelCrop.height
-    );
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) return resolve(null);
-        const file = new File([blob], `cropped_${Date.now()}.png`, { type: blob.type });
-        resolve(file);
-      }, 'image/png');
-    });
+  // Backwards-compatible file upload handler name used in JSX
+  const handleFileUpload = (e) => {
+    // reuse handleImageUpload implementation
+    handleImageUpload(e);
   };
+
+  
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
@@ -416,7 +464,7 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
     const payload = {
       ID: variantID,
       Color: selectedColor?.value || defaultValues?.Color || '',
-      Size: selectedSize?.code || '',
+      Size: selectedSize || '',
       SKU: skuValue,
       Barcode: data.barcode,
       PurchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : Number(data.purchaseCost || 0),
@@ -456,290 +504,245 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
     }
   };
 
-  // When component mounts, debug images
+  // keep query in sync when selectedColor changed externally
   useEffect(() => {
-    if (imagesPreview && imagesPreview.length > 0) {
-      console.log(`VariantEditDialog has ${imagesPreview.length} images to display`);
-      imagesPreview.forEach(debugImage);
-    }
-  }, [imagesPreview]);
+    setColorQuery(selectedColor ? selectedColor.name : '');
+  }, [selectedColor]);
+
+  // close color dropdown when clicking outside
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (!colorDropdownOpen) return;
+      if (colorWrapperRef.current && !colorWrapperRef.current.contains(e.target)) {
+        setColorDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [colorDropdownOpen]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>Edit Variant</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent>
-          <Grid container spacing={2}>
-            <Grid size={4}>
-              <Autocomplete
-                options={ralColors}
-                getOptionLabel={(option) => option.name}
-                value={selectedColor}
-                onChange={(event, newValue) => setSelectedColor(newValue)}
-                renderInput={(params) => <TextField {...params} label="Color" size="small" />}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          backgroundColor: option.hex,
-                          border: '1px solid #ccc',
-                          marginRight: 8,
-                        }}
+    <div className="variant-form-dialog">
+      {/* Dialog Overlay and Background */}
+      {open && (
+        <div className="dialog-overlay" onClick={onClose}>
+          <div className="dialog-wrapper" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h2>{defaultValues ? "Edit Variant" : "Add Variant"}</h2>
+            </div>
+            
+            {/* Error Message */}
+            {errorMessage && (
+              <div className="error-message show">
+                {errorMessage}
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="form-grid">
+                <div className="form-field col-33">
+                  <label className="field-label">Color</label>
+                  <div ref={colorWrapperRef} className="color-picker-wrapper">
+                    <div className="color-input-wrapper">
+                      <input
+                        type="text"
+                        className="color-search-input"
+                        placeholder="Search color..."
+                        value={colorQuery}
+                        onChange={(e) => { setColorQuery(e.target.value); setColorDropdownOpen(true); }}
+                        onClick={() => setColorDropdownOpen(open => !open)}
                       />
-                      {option.name}
+                      <div className="color-selected-preview">
+                        {selectedColor ? (
+                          <div className="color-preview" style={{ backgroundColor: selectedColor.hex }} />
+                        ) : null}
+                      </div>
                     </div>
-                  </li>
-                )}
-                sx={{ width: '100%' }}
-              />
-            </Grid>
 
-            <Grid size={4}>
-              <Autocomplete
-                options={Array.isArray(sizes) ? sizes.map(size => ({ id: size.id, code: size.code })) : []}
-                getOptionLabel={(option) => option.code || ""}
-                value={selectedSize}
-                onChange={(event, newValue) => {
-                  setSelectedSize(newValue);
-                  setValue("size", newValue?.code || "");
-                }}
-                renderInput={(params) => <TextField {...params} label="Size" size="small" />}
-                clearOnBlur={false}
-                clearOnEscape
-                clearIcon={<CloseIcon fontSize="small" />}
-                isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                sx={{ width: '100%' }}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="SKU (Optional)"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.sku || ""}
-                helperText="Leave empty to auto-generate"
-                {...register("sku")}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="Barcode"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.barcode || ""}
-                {...register("barcode")}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="Purchase Cost"
-                type="number"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.purchaseCost || ""}
-                {...register("purchaseCost", { valueAsNumber: true })}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="Sales Price"
-                type="number"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.stdSalesPrice || ""}
-                {...register("stdSalesPrice", { valueAsNumber: true })}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="Stock"
-                type="number"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.stock || ""}
-                {...register("stock", { valueAsNumber: true })}
-              />
-            </Grid>
-
-            <Grid size={4}>
-              <TextField
-                label="Lead Time (days)"
-                type="number"
-                fullWidth
-                size="small"
-                defaultValue={defaultValues?.leadTime || ""}
-                {...register("leadTime", { valueAsNumber: true })}
-              />
-            </Grid>
-
-            <Grid size={12}>
-              <Button variant="outlined" component="label">
-                Upload Files
-                <input
-                  type="file"
-                  multiple
-                  hidden
-                  onChange={handleImageUpload}
-                />
-              </Button>
-              {imageFiles.length > 0 && (
-                <Box display="flex" flexWrap="wrap" gap={1} alignItems="center" mt={1}>
-                  {imageFiles.map((entry, i) => {
-                    // Try direct URL if it's a string that looks like a URL
-                    const file = entry;
-                    const isDirectUrl = typeof file.preview === "string" && (
-                      file.preview.startsWith("http://") || 
-                      file.preview.startsWith("https://") || 
-                      file.preview.startsWith("data:")
-                    );
-                    let imgPath = '';
-                    if (typeof file.preview === 'string') {
-                      imgPath = file.preview;
-                    } else if (file.file instanceof File) {
-                      imgPath = file.preview;
-                    } else {
-                      imgPath = 'https://via.placeholder.com/60?text=No+Image';
-                    }
-
-                    return (
-                      <Box key={i} position="relative">
-                        <img
-                          src={imgPath}
-                          alt={`preview-${i}`}
-                          style={{
-                            width: 60,
-                            height: 60,
-                            objectFit: 'cover',
-                            borderRadius: 4,
-                            border: '1px solid #ccc',
-                          }}
-                          onError={(e) => {
-                            if (file.original && !isDirectUrl) {
-                              const altPath = `/uploads/${file.original.replace(/\\/g, '/')}`;
-                              e.target.src = altPath;
-                            } else {
-                              e.target.src = 'https://via.placeholder.com/60?text=Not+Found';
-                            }
-                          }}
-                          data-original={file.original || (file.file && file.file.name) || 'file-object'}
-                        />
-
-                        {/* Main image star */}
-                        { (file.preview) && (
-                          <IconButton
-                            size="small"
-                            onClick={() => setMainImageIndex(i)}
-                            title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
-                            sx={{
-                              position: 'absolute',
-                              right: -6,
-                              top: -6,
-                              backgroundColor: 'rgba(255,255,255,0.8)'
-                            }}
-                          >
-                            {i === mainImageIndex ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
-                          </IconButton>
-                        )}
-
-                        {/* Edit button for image files */}
-                        {entry.file && entry.file.type && entry.file.type.startsWith('image/') && (
-                          <Button size="small" sx={{ position: 'absolute', bottom: 4, left: 4 }} onClick={() => {
-                            setCropIndex(i);
-                            setCropSrc(entry.preview);
-                            setCropDialogOpen(true);
-                          }}>Edit</Button>
-                        )}
-
-                        <IconButton 
-                          size="small" 
-                          sx={{ 
-                            position: 'absolute', 
-                            top: -8, 
-                            left: -8,
-                            backgroundColor: 'rgba(255,255,255,0.8)',
-                            '&:hover': { backgroundColor: 'rgba(255,0,0,0.1)' }
-                          }}
-                          onClick={() => removeImage(i)}
+                    {colorDropdownOpen && (
+                      <div className="color-dropdown">
+                        <div
+                          key="__clear__"
+                          className="color-option clear-option"
+                          onClick={() => { setSelectedColor(null); setColorQuery(''); setColorDropdownOpen(false); }}
                         >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              )}
-              {/* Crop dialog */}
-              <Dialog open={cropDialogOpen} onClose={() => setCropDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ m: 0, p: 2 }}>
-                  Edit Image
-                  <IconButton
-                    aria-label="close"
-                    onClick={() => setCropDialogOpen(false)}
-                    sx={{ position: 'absolute', right: 8, top: 8 }}
-                  >
-                    <CloseIcon />
-                  </IconButton>
-                </DialogTitle>
-                <DialogContent sx={{ position: 'relative', height: 400, bgcolor: '#111' }}>
-                  {cropSrc && (
-                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                      <Cropper
-                        image={cropSrc}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={1}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={onCropComplete}
-                      />
-                    </div>
-                  )}
-                </DialogContent>
-                <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
-                  <Slider value={zoom} min={1} max={3} step={0.1} onChange={(e, v) => setZoom(v)} />
-                  <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
-                    <Button onClick={() => setCropDialogOpen(false)}>Cancel</Button>
-                    <Button variant="contained" onClick={async () => {
-                      if (cropIndex == null || !croppedAreaPixels) return;
-                      const src = imageFiles[cropIndex].preview;
-                      const croppedFile = await getCroppedImg(src, croppedAreaPixels);
-                      if (croppedFile) {
-                        const newEntry = { file: croppedFile, preview: URL.createObjectURL(croppedFile), original: null, name: croppedFile.name };
-                        setImageFiles(prev => prev.map((it, idx) => idx === cropIndex ? newEntry : it));
-                        setImagesPreview(prev => prev.map((p, idx) => idx === cropIndex ? newEntry.preview : p));
-                      }
-                      setCropDialogOpen(false);
-                      setCropIndex(null);
-                      setCropSrc(null);
-                      setZoom(1);
-                    }}>Apply</Button>
-                  </div>
-                </DialogActions>
-              </Dialog>
-            </Grid>
+                          <div className="color-name">Clear selection</div>
+                        </div>
 
-            <Grid size={4}>
-              <FormControlLabel
-                control={<Checkbox defaultChecked={defaultValues?.isActive ?? true} {...register("isActive")} />}
-                label="Is Active"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">Save</Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+                        {ralColors
+                          .filter(c => (c.name + ' ' + c.value).toLowerCase().includes((colorQuery || '').toLowerCase()))
+                          .map((color) => (
+                            <div
+                              key={color.value}
+                              className={`color-option ${selectedColor?.value === color.value ? 'selected' : ''}`}
+                              onClick={() => { setSelectedColor(color); setColorQuery(color.name); setColorDropdownOpen(false); }}
+                            >
+                              <div className="color-box" style={{ backgroundColor: color.hex }} />
+                              <div className="color-name">{color.name}</div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Size</label>
+                  <select
+                    value={selectedSize}
+                    onChange={(e) => setSelectedSize(e.target.value)}
+                  >
+                    <option value="">
+                      {sizesLoading ? "Loading sizes..." : "None (Clear selection)"}
+                    </option>
+                    {!sizesLoading && sizeOptions.map((size) => (
+                      <option key={size.id} value={size.code}>
+                        {size.code}
+                      </option>
+                    ))}
+                  </select>
+                  {sizesError && <div className="size-error">{sizesError}</div>}
+                </div>
+                <div className="form-field col-33"> 
+                  <label className="field-label">SKU</label>
+                  <input
+                    type="text"
+                    {...register("sku", { required: false })}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Barcode</label>
+                  <input
+                    type="text"
+                    {...register("barcode")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Purchase Cost</label>
+                  <input
+                    type="number"
+                    {...register("purchaseCost")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Sales Price</label>
+                  <input
+                    type="number"
+                    {...register("stdSalesPrice")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Stock</label>
+                  <input
+                    type="number"
+                    {...register("stock")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Lead Time (days)</label>
+                  <input
+                    type="number"
+                    {...register("leadTime")}
+                  />
+                </div>
+                <div className="form-field full-width image-upload-section">
+                  <div className="upload-button-wrapper">
+                    <label className="upload-button">
+                      Upload Files
+                      <input type="file" multiple onChange={handleFileUpload} />
+                    </label>
+                  </div>
+                  <div className="images-preview">
+                    {imageFiles.map((entry, i) => {
+                      const isImage = entry.preview && (entry.file ? entry.file.type && entry.file.type.startsWith('image/') : /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.preview));
+                      return (
+                        <div key={i} className="image-item">
+                          {isImage ? (
+                            <img
+                              src={entry.preview}
+                              alt={entry.name || 'file'}
+                              className="image-preview"
+                            />
+                          ) : (
+                            <div className="file-preview">
+                              {entry.name || 'file'}
+                            </div>
+                          )}
+
+                          {/* main image star badge for images */}
+                          {isImage && (
+                            <button
+                              type="button"
+                              className={`main-image-badge ${i === mainImageIndex ? 'active' : 'inactive'}`}
+                              onClick={() => setMainImageIndex(i)}
+                              title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
+                            >
+                              ★
+                            </button>
+                          )}
+
+                          <div className="image-actions">
+                            <button
+                              type="button"
+                              className="image-action-btn edit-btn"
+                              onClick={() => openEditorForImage(i)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="image-action-btn remove-btn"
+                              onClick={() => removeImage(i)}
+                            >
+                              Remove
+                            </button>
+                          </div> 
+                          <div className="image-name">
+                            {entry.name || (entry.file && entry.file.name)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                
+
+                <div className="form-field col-33">
+                  <div className="checkbox-wrapper">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      {...register("isActive")}
+                    />
+                    <label htmlFor="isActive">Is Active</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={onClose}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  {defaultValues ? "Update Variant" : "Add Variant"}
+                </button>
+              </div>
+            </form>
+
+            {/* Image editor modal */}
+            <ImageEditor open={editorOpen} initialSrc={editingSrc} onSave={handleEditedSave} onClose={() => setEditorOpen(false)} />
+
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

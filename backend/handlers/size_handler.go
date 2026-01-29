@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"strings"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -103,6 +106,30 @@ func UpdateSize(c *fiber.Ctx) error {
 // DELETE /sizes/:id
 func DeleteSize(c *fiber.Ctx) error {
 	id := c.Params("id")
+
+	// Ensure size exists
+	var size models.Size
+	if err := sizeDB.First(&size, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Size not found"})
+	}
+
+	// Check references in product variants (Size field stored as string)
+	var pvCount int64
+	if err := sizeDB.Model(&models.ProductVariant{}).Where("size = ? OR size = ?", size.Code, size.Name).Count(&pvCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if pvCount > 0 {
+		msg := "Cannot delete Size: it is used"
+		details := []string{}
+		if pvCount > 0 {
+			details = append(details, fmt.Sprintf("%d product variant(s)", pvCount))
+		}
+		if len(details) > 0 {
+			msg = msg + " in " + strings.Join(details, " and ")
+		}
+		return c.Status(400).JSON(fiber.Map{"error": msg})
+	}
 
 	if err := sizeDB.Delete(&models.Size{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})

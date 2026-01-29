@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  Box, Button, Typography, Snackbar, Alert,TablePagination,FormControl, InputLabel,
-  Select, MenuItem,TextField
-} from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
 import CategoryTable from "../components/CategoryTable";
 import CategoryDialog from "../components/CategoryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
+import "./category.scss";
 
 export default function CategoryPage() {
   const [categories, setCategories] = useState([]);
@@ -70,25 +69,16 @@ export default function CategoryPage() {
   const handleDelete = async () => {
     try {
       await axios.delete(`${BASE_URL}/api/categories/${categoryToDelete.ID}`);
-      showSnackbar("Category deleted");
+      showSnackbar("Deleted");
       loadCategories();
     } 
     catch (error) {
-    if (error.response) {
-      // Server responded with a status code outside 2xx
-      console.error("Response error:", error.response.data);
-      
-      alert(error.response.data.error || "Server error");
-    } else if (error.request) {
-      // Request was made but no response
-      console.error("No response:", error.request);
-      alert("No response from server.");
-    } else {
-      // Something else went wrong
-      console.error("Error:", error.message);
-      alert(error.message);
-    }
-  }  
+      console.error("Failed to delete category:", error);
+      // Prefer backend-provided error message if available
+      const backendMsg = error?.response?.data?.error || error?.response?.data?.message;
+      const message = backendMsg || error?.message || "Failed to delete";
+      setSnackbar({ open: true, message, severity: "error" });
+    }  
     
     finally {
       setConfirmOpen(false);
@@ -97,31 +87,34 @@ export default function CategoryPage() {
   };
 
   return (
+    <section className="right-content">
+      <div className="category-page-header">
+        <h6>Category Management</h6>
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Filter by Name"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+        <div className="add-button-wrapper">
+          <button 
+            className="btn-add" 
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
+            Add Category
+          </button>
+        </div>
+      </div>
 
-     <section className="right-content">
-            <Box p={4}>
-            <Box display="flex" justifyContent="space-between" mb={2}>
-                <h6>Category Management</h6>
-                <TextField
-                label="Filter by Name"
-                variant="outlined"
-                size="small"
-                fullWidth
-                value={filter}
-                onChange={(e) => {
-                    setFilter(e.target.value);
-                    setPage(0);
-                }}
-                sx={{ maxWidth: 300, mb: 2 }}
-                />
-                <Button variant="contained" onClick={() => setDialogOpen(true)}>
-                    Add Category
-                </Button>
-            </Box>
-
-            
-
-            <CategoryTable
+      <div className="table-wrapper">
+        <CategoryTable
                 categories={categories}
                 page={page}
                 rowsPerPage={rowsPerPage}
@@ -133,53 +126,50 @@ export default function CategoryPage() {
                 setCategoryToDelete(cat);
                 setConfirmOpen(true);
                 }}
-            />
+        />
+      </div>
 
-             <TablePagination
-                component="div"
-                count={total}
-                page={page}
-                onPageChange={(e, newPage) => setPage(newPage)}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-                }}
-                rowsPerPageOptions={[5, 10, 25]}
-            />
+      <Pagination
+        page={page}
+        total={total}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+      />
 
-            <CategoryDialog
-                open={dialogOpen}
-                onClose={() => {
-                setDialogOpen(false);
-                setEditingCategory(null);
-                }}
-                category={editingCategory}
-                onSuccess={() => {
-                loadCategories();
-                setDialogOpen(false);
-                setEditingCategory(null);
-                showSnackbar("Category saved");
-                }}
-            />
+      <CategoryDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingCategory(null);
+        }}
+        category={editingCategory}
+        onSuccess={() => {
+          loadCategories();
+          setDialogOpen(false);
+          setEditingCategory(null);
+          showSnackbar("Category saved");
+        }}
+      />
 
-            <ConfirmDialog
-                open={confirmOpen}
-                title="Delete Category"
-                message={`Are you sure you want to delete "${categoryToDelete?.Name}"?`}
-                onCancel={() => setConfirmOpen(false)}
-                onConfirm={handleDelete}
-            />
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${categoryToDelete?.Name}"?`}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleDelete}
+      />
 
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={3000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-            >
-                <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
-            </Snackbar>
-            </Box>
-
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
     </section>
   );
 }

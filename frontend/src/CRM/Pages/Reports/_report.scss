@@ -3,7 +3,6 @@
 .reports-container {
   max-width: 100%;
   width: 100vw;
-  margin-top: 50px;
   padding: 20px;
   height: auto;
   
@@ -44,8 +43,8 @@
 
   .reports-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 30px 20px;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 10px;
     
     
     .report-card {
@@ -78,16 +77,16 @@
 
         h3 {
           font-size: 18px;
-          font-weight: 600;
+          font-weight: 500;
           color: $primary-white;
           margin: 0;
         }
       }
 
       p {
+        text-align: center;
         padding: 35px 20px;
         color: $primary-black;
-        font-weight: 500;
         font-size: 14px;
         line-height: 1.4;
         margin: 0;

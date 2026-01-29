@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  Box, Button, Typography, Snackbar, Alert,TablePagination,FormControl, InputLabel,
-  Select, MenuItem,TextField
-} from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
 import TagDialog from "../components/TagDialog";
 import TagTable from "../components/TagTable";
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
+import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
+import "./tagpage.scss";
 
 export default function TagPage() {
   const [tags, setTags] = useState([]);
@@ -23,7 +22,7 @@ export default function TagPage() {
   // pagination state
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0); // 0-based for MUI
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
 
     const [filter, setFilter] = useState("");
@@ -70,25 +69,16 @@ export default function TagPage() {
   const handleDelete = async () => {
     try {
       await axios.delete(`${BASE_URL}/api/tags/${tagToDelete.ID}`);
-      showSnackbar("Tag deleted");
+      showSnackbar("Deleted");
       loadTags();
     } 
     catch (error) {
-    if (error.response) {
-      // Server responded with a status code outside 2xx
-      console.error("Response error:", error.response.data);
-      
-      alert(error.response.data.error || "Server error");
-    } else if (error.request) {
-      // Request was made but no response
-      console.error("No response:", error.request);
-      alert("No response from server.");
-    } else {
-      // Something else went wrong
-      console.error("Error:", error.message);
-      alert(error.message);
-    }
-  }  
+      console.error("Failed to delete tag:", error);
+      // Prefer backend-provided error message if available
+      const backendMsg = error?.response?.data?.error || error?.response?.data?.message;
+      const message = backendMsg || error?.message || "Failed to delete";
+      setSnackbar({ open: true, message, severity: "error" });
+    }  
     
     finally {
       setConfirmOpen(false);
@@ -97,31 +87,34 @@ export default function TagPage() {
   };
 
   return (
+    <section className="right-content">
+      <div className="tag-page-header">
+        <h6>Tags Management</h6>
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Filter by Name"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+        <div className="add-button-wrapper">
+          <button
+            className="btn-add"
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
+            Add Tag
+          </button>
+        </div>
+      </div>
 
-     <section className="right-content">
-            <Box p={4}>
-            <Box display="flex" justifyContent="space-between" mb={2}>
-                <h6>Tags Management</h6>
-                <TextField
-                label="Filter by Name"
-                variant="outlined"
-                size="small"
-                fullWidth
-                value={filter}
-                onChange={(e) => {
-                    setFilter(e.target.value);
-                    setPage(0);
-                }}
-                sx={{ maxWidth: 300, mb: 2 }}
-                />
-                <Button variant="contained" onClick={() => setDialogOpen(true)}>
-                    Add Tag
-                </Button>
-            </Box>
-
-            
-
-            <TagTable
+      <div className="table-wrapper">
+        <TagTable
                 tags={tags}
                 page={page}
                 rowsPerPage={rowsPerPage}
@@ -134,52 +127,49 @@ export default function TagPage() {
                 setConfirmOpen(true);
                 }}
             />
+      </div>
 
-             <TablePagination
-                component="div"
-                count={total}
-                page={page}
-                onPageChange={(e, newPage) => setPage(newPage)}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-                }}
-                rowsPerPageOptions={[5, 10, 25]}
-            />
+      <Pagination
+        page={page}
+        total={total}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+      />
 
-            <TagDialog
-                open={dialogOpen}
-                onClose={() => {
-                setDialogOpen(false);
-                setEditingTag(null);
-                }}
-                tag={editingTag}
-                onSuccess={() => {
-                loadTags();
-                setDialogOpen(false);
-                setEditingTag(null);
-                showSnackbar("Tag saved");
-                }}
-            />
+      <TagDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingTag(null);
+        }}
+        tag={editingTag}
+        onSuccess={() => {
+          loadTags();
+          setDialogOpen(false);
+          setEditingTag(null);
+          showSnackbar("Tag saved");
+        }}
+      />
 
-            <ConfirmDialog
-                open={confirmOpen}
-                title="Delete Category"
-                message={`Are you sure you want to delete "${tagToDelete?.Name}"?`}
-                onCancel={() => setConfirmOpen(false)}
-                onConfirm={handleDelete}
-            />
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${tagToDelete?.Name}"?`}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleDelete}
+      />
 
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={3000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-            >
-                <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
-            </Snackbar>
-            </Box>
-
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
     </section>
   );
 }

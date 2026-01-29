@@ -1,18 +1,9 @@
-import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Grid, TextField, MenuItem, Checkbox, FormControlLabel, Select, FormControl, InputLabel, Autocomplete,
-  Alert, Snackbar
-} from "@mui/material";
 import { useForm } from "react-hook-form";
-import { useEffect, useState, useCallback } from "react";
-import Cropper from 'react-easy-crop';
-import Slider from '@mui/material/Slider';
-import IconButton from '@mui/material/IconButton';
-import CloseIcon from '@mui/icons-material/Close';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
+import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
-import { BASE_URL } from "../../../Config"; // adjust if needed
+import { BASE_URL } from "../../../config/Config"; // adjust if needed
+import ImageEditor from "./ImageEditor";
+import "./variantformdialog.scss";
 
 export default function VariantFormDialog({ open, onClose, onSave, initialData = null, sizes = [] }) {
   // Remove sku from defaultValues to ensure it starts empty
@@ -34,16 +25,83 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   const [sizesLoading, setSizesLoading] = useState(false);
   const [sizesError, setSizesError] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [colorQuery, setColorQuery] = useState('');
+  const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
+  const colorWrapperRef = useRef(null);
   const [selectedSize, setSelectedSize] = useState('');
-  const [cropDialogOpen, setCropDialogOpen] = useState(false);
-  const [cropSrc, setCropSrc] = useState(null);
-  const [cropIndex, setCropIndex] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [mainImageIndex, setMainImageIndex] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // Image editor integration
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingSrc, setEditingSrc] = useState(null);
+  const [originalEditSrc, setOriginalEditSrc] = useState(null);
+
+  const openEditorForImage = (index) => {
+    setEditingIndex(index);
+    const src = imageFiles[index]?.preview || null;
+    setEditingSrc(src);
+    setOriginalEditSrc(src);
+    setEditorOpen(true);
+  };
+
+  const dataURLtoFile = async (dataUrl, filename) => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: blob.type });
+  };
+
+  const handleEditedSave = async (payload) => {
+    if (editingIndex == null) return;
+    const idx = editingIndex;
+    const filename = imageFiles[idx]?.name ? `edited_${imageFiles[idx].name}` : `edited_${Date.now()}.png`;
+
+    // payload may be a string (legacy) or object { css, hi }
+    const previewDataUrl = typeof payload === 'string' ? payload : (payload && payload.css) ? payload.css : null;
+    const uploadDataUrl = typeof payload === 'string' ? payload : (payload && payload.hi) ? payload.hi : previewDataUrl;
+
+    try {
+      const file = await dataURLtoFile(uploadDataUrl, filename);
+      setImageFiles(prev => {
+        const copy = [...prev];
+        const prevEntry = copy[idx];
+        if (prevEntry && prevEntry.file && prevEntry.preview) {
+          try { URL.revokeObjectURL(prevEntry.preview); } catch(e) {}
+        }
+        copy[idx] = { file, preview: previewDataUrl || uploadDataUrl, original: originalEditSrc, name: file.name };
+        setImagesPreview(prev => {
+          const newPrev = [...prev];
+          newPrev[idx] = previewDataUrl || uploadDataUrl;
+          return newPrev;
+        });
+        return copy;
+      });
+    } catch (e) {
+      console.error("Failed to convert edited image", e);
+    } finally {
+      setEditorOpen(false);
+      setEditingIndex(null);
+      setEditingSrc(null);
+      setOriginalEditSrc(null);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    handleImageUpload(e);
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
+    setImageFiles(prev => {
+      const result = [...prev, ...newFiles];
+      if (mainImageIndex == null && result.length > 0) setMainImageIndex(0);
+      return result;
+    });
+    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
+  }; 
 
   useEffect(() => {
     if (!open) return;
@@ -77,9 +135,11 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const initFiles = (initialData.images || []).map(img => {
         if (typeof img === 'string') {
           const normalized = img.replace(/\\/g, '/');
-          const displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
+          let displayUrl = (normalized.startsWith('http://') || normalized.startsWith('https://'))
             ? normalized
             : `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+          // Add cache-busting query so edits immediately reflect in the UI
+          displayUrl = displayUrl.includes('?') ? `${displayUrl}&t=${Date.now()}` : `${displayUrl}?t=${Date.now()}`;
           return { file: null, preview: displayUrl, original: img, name: normalized.split('/').pop() };
         }
         return { file: img, preview: URL.createObjectURL(img), original: null, name: img.name };
@@ -88,6 +148,7 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       setImagesPreview(initFiles.map(f => f.preview));
       const colorMatch = ralColors.find(c => c.value === initialData.color);
       setSelectedColor(colorMatch || null);
+      setColorQuery(colorMatch ? colorMatch.name : '');
   setSelectedSize(initialData.size || '');
 
       // Determine initial main image: prefer explicit initialData.mainImage, else default to first image if any
@@ -104,10 +165,28 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       reset();
       setImagesPreview([]);
       setSelectedColor(null);
+      setColorQuery('');
       setSelectedSize('');
       setMainImageIndex(null);
     }
   }, [initialData, open, reset]);
+
+  // keep query in sync when selectedColor changed externally
+  useEffect(() => {
+    setColorQuery(selectedColor ? selectedColor.name : '');
+  }, [selectedColor]);
+
+  // close color dropdown when clicking outside
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (!colorDropdownOpen) return;
+      if (colorWrapperRef.current && !colorWrapperRef.current.contains(e.target)) {
+        setColorDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [colorDropdownOpen]);
 
   const onSubmit = (data) => {
     // Prepare images/files: keep original strings, and Files for uploads
@@ -121,125 +200,34 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
       const s = String(v).trim();
       return s === '' ? null : Number(s);
     };
+    
     // generate SKU when not provided by user
     const generateSku = () => `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     const skuValue = data.sku && String(data.sku).trim() !== '' ? data.sku : generateSku();
     
-    const formData = {
-      // keep raw data but normalize a few fields
+    // Compute main image string based on current selection
+    const mainImgStr = (typeof mainImageIndex === 'number' && imageFiles[mainImageIndex])
+      ? (imageFiles[mainImageIndex].original || images[mainImageIndex])
+      : null;
+    
+    const payload = {
+      color: selectedColor?.value || '',
+      size: selectedSize || '',
       sku: skuValue,
-      barcode: data.barcode || '',
+      barcode: data.barcode,
       purchaseCost: sanitizeNumber(data.purchaseCost),
       stdSalesPrice: sanitizeNumber(data.stdSalesPrice),
       stock: sanitizeNumber(data.stock),
       leadTime: sanitizeNumber(data.leadTime),
-      size: selectedSize || '',
-      color: selectedColor?.value || '',
-      images, // mixture of strings (existing) and File objects (new)
-      files, // only File objects for convenience
-      mainImage: mainImageIndex != null ? images[mainImageIndex] : null,
-      mainImageIndex: mainImageIndex,
-      isActive: !!data.isActive,
+      isActive: Boolean(data.isActive),
+      images: images,
+      Files: files,
+      mainImage: mainImgStr,
+      mainImageIndex: (typeof mainImageIndex === 'number') ? mainImageIndex : null,
     };
-
-    try {
-      onSave(formData);
-      
-      // cleanup object URLs
-      imageFiles.forEach(entry => {
-        try { if (entry.preview && entry.file) URL.revokeObjectURL(entry.preview); } catch (e) {}
-      });
-      reset();
-      setImageFiles([]);
-      setImagesPreview([]);
-      setSelectedColor(null);
-      setSelectedSize('');
-    } catch (error) {
-      console.error("Error saving variant:", error);
-      setErrorMessage("Failed to save variant. Please try again.");
-      setSnackbarOpen(true);
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    // Create entries: always store file; preview is an object URL (useful for images) for all files
-    const newFiles = files.map((file) => ({ file, preview: URL.createObjectURL(file), original: null, name: file.name }));
-    setImageFiles(prev => {
-      const result = [...prev, ...newFiles];
-      // if no main image selected yet, set first uploaded as main
-      if (mainImageIndex == null && result.length > 0) {
-        setMainImageIndex(0);
-      }
-      return result;
-    });
-    setImagesPreview(prev => [...prev, ...newFiles.map(f => f.preview)]);
-  };
-
-  const openCropDialog = (index) => {
-    const entry = imageFiles[index];
-    if (!entry) return;
-    // Only allow cropping for actual image File entries (not existing server-path strings)
-    const isImageFile = entry.file && entry.file.type && entry.file.type.startsWith('image/');
-    if (!isImageFile) return;
-    setCropIndex(index);
-    setCropSrc(entry.preview);
-    setCropDialogOpen(true);
-  };
-
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  // helper to create a cropped file from image and area
-  const getCroppedImg = async (imageSrc, pixelCrop) => {
-    const image = await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = (e) => reject(e);
-      img.src = imageSrc;
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(
-      image,
-      pixelCrop.x,
-      pixelCrop.y,
-      pixelCrop.width,
-      pixelCrop.height,
-      0,
-      0,
-      pixelCrop.width,
-      pixelCrop.height
-    );
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) return resolve(null);
-        const file = new File([blob], `cropped_${Date.now()}.png`, { type: blob.type });
-        resolve(file);
-      }, 'image/png');
-    });
-  };
-
-  const applyCrop = async () => {
-    if (cropIndex == null || !croppedAreaPixels) return;
-    const src = imageFiles[cropIndex].preview;
-    const croppedFile = await getCroppedImg(src, croppedAreaPixels);
-    if (croppedFile) {
-      const newEntry = { file: croppedFile, preview: URL.createObjectURL(croppedFile) };
-      setImageFiles(prev => prev.map((it, idx) => idx === cropIndex ? newEntry : it));
-      setImagesPreview(prev => prev.map((p, idx) => idx === cropIndex ? newEntry.preview : p));
-    }
-    setCropDialogOpen(false);
-    setCropIndex(null);
-    setCropSrc(null);
-    setZoom(1);
+    
+    onSave(payload);
+    onClose();
   };
 
   const removeImage = (index) => {
@@ -485,190 +473,227 @@ export default function VariantFormDialog({ open, onClose, onSave, initialData =
   ];
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{initialData ? "Edit Variant" : "Add Variant"}</DialogTitle>
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbarOpen(false)} severity="error" sx={{ width: '100%' }}>
-          {errorMessage}
-        </Alert>
-      </Snackbar>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent>
-          <Grid container spacing={2}>
-            <Grid size={4}>
-              <Autocomplete
-                options={ralColors}
-                getOptionLabel={(option) => option.name}
-                value={selectedColor}
-                onChange={(event, newValue) => setSelectedColor(newValue)}
-                renderInput={(params) => <TextField {...params} label="Color" size="small" />}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          backgroundColor: option.hex,
-                          border: '1px solid #ccc',
-                          marginRight: 8,
-                          borderRadius: 2,
-                        }}
-                      />
-                      {option.name}
-
-                    </div>
-                  </li>
-                )}
-                sx={{ width: '100%' }}
-              />
-            </Grid>
-            <Grid size={4}>
-              <TextField
-                label="Size"
-                select
-                fullWidth
-                size="small"
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
-                helperText={sizesError || ""}
-                error={Boolean(sizesError)}
-              >
-                <MenuItem value="">
-                  {sizesLoading ? "Loading sizes..." : "None (Clear selection)"}
-                </MenuItem>
-                {!sizesLoading && sizeOptions.map((size) => (
-                  <MenuItem key={size.id} value={size.code}>
-                    {size.code}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid size={4}>
-              <TextField 
-                label="SKU" 
-                fullWidth 
-                size="small" 
-                {...register("sku", { required: false })}
-              />
-            </Grid>
-            <Grid size={4}>
-              <TextField label="Barcode" fullWidth size="small" {...register("barcode")} />
-            </Grid>
-            <Grid size={4}>
-              <TextField label="Purchase Cost" type="number" fullWidth size="small" {...register("purchaseCost")} />
-            </Grid>
-            <Grid size={4}>
-              <TextField label="Sales Price" type="number" fullWidth size="small" {...register("stdSalesPrice")} />
-            </Grid>
-            <Grid size={4}>
-              <TextField label="Stock" type="number" fullWidth size="small" {...register("stock")} />
-            </Grid>
-            <Grid size={4}>
-              <TextField label="Lead Time (days)" type="number" fullWidth size="small" {...register("leadTime")} />
-            </Grid>
-            <Grid size={12}>
-              <Button variant="outlined" component="label">
-                Upload Files
-                <input type="file" multiple hidden onChange={handleFileUpload} />
-              </Button>
-              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {imageFiles.map((entry, i) => {
-                  const isImage = entry.preview && (entry.file ? entry.file.type && entry.file.type.startsWith('image/') : /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.preview));
-                  return (
-                    <div key={i} style={{ width: 120, textAlign: 'center', position: 'relative' }}>
-                      {isImage ? (
-                        <img src={entry.preview} alt={entry.name || 'file'} width={120} height={80} style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc' }} />
-                      ) : (
-                        <div style={{ width: 120, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ccc', borderRadius: 4 }}>
-                          <div style={{ fontSize: 12 }}>{entry.name || 'file'}</div>
-                        </div>
-                      )}
-
-                      {/* main image star overlay for images */}
-                      {isImage && (
-                        <IconButton
-                          size="small"
-                          onClick={() => setMainImageIndex(i)}
-                          title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
-                          sx={{
-                            position: 'absolute',
-                            right: 6,
-                            top: 6,
-                            background: 'rgba(255,255,255,0.8)'
-                          }}
-                        >
-                          {i === mainImageIndex ? <StarIcon fontSize="small" color="warning" /> : <StarBorderIcon fontSize="small" />}
-                        </IconButton>
-                      )}
-
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
-                        {isImage && entry.file && <Button size="small" onClick={() => openCropDialog(i)}>Edit</Button>}
-                        <Button size="small" color="error" onClick={() => removeImage(i)}>Remove</Button>
-                      </div>
-                      <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name || (entry.file && entry.file.name)}</div>
-                    </div>
-                  );
-                })}
+    <div className="variant-form-dialog">
+      {/* Dialog Overlay and Background */}
+      {open && (
+        <div className="dialog-overlay" onClick={onClose}>
+          <div className="dialog-wrapper" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h2>{initialData ? "Edit Variant" : "Add Variant"}</h2>
+            </div>
+            
+            {/* Error Message */}
+            {errorMessage && (
+              <div className="error-message show">
+                {errorMessage}
               </div>
-            </Grid>
+            )}
+            
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="form-grid">
+                <div className="form-field col-33">
+                  <label className="field-label">Color</label>
+                  <div ref={colorWrapperRef} className="color-picker-wrapper">
+                    <div className="color-input-wrapper">
+                      <input
+                        type="text"
+                        className="color-search-input"
+                        placeholder="Search color..."
+                        value={colorQuery}
+                        onChange={(e) => { setColorQuery(e.target.value); setColorDropdownOpen(true); }}
+                        onClick={() => setColorDropdownOpen(open => !open)}
+                      />
+                      <div className="color-selected-preview">
+                        {selectedColor ? (
+                          <div className="color-preview" style={{ backgroundColor: selectedColor.hex }} />
+                        ) : null}
+                      </div>
+                    </div>
 
-            {/* Crop dialog */}
-            <Dialog open={cropDialogOpen} onClose={() => setCropDialogOpen(false)} maxWidth="sm" fullWidth>
-              <DialogTitle sx={{ m: 0, p: 2 }}>
-                Edit Image
-                <IconButton
-                  aria-label="close"
-                  onClick={() => setCropDialogOpen(false)}
-                  sx={{ position: 'absolute', right: 8, top: 8 }}
-                >
-                  <CloseIcon />
-                </IconButton>
-              </DialogTitle>
-              <DialogContent sx={{ position: 'relative', height: 400, bgcolor: '#111' }}>
-                {cropSrc && (
-                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    <Cropper
-                      image={cropSrc}
-                      crop={crop}
-                      zoom={zoom}
-                      aspect={1}
-                      onCropChange={setCrop}
-                      onZoomChange={setZoom}
-                      onCropComplete={onCropComplete}
-                    />
+                    {colorDropdownOpen && (
+                      <div className="color-dropdown">
+                        <div
+                          key="__clear__"
+                          className="color-option clear-option"
+                          onClick={() => { setSelectedColor(null); setColorQuery(''); setColorDropdownOpen(false); }}
+                        >
+                          <div className="color-name">Clear selection</div>
+                        </div>
+
+                        {ralColors
+                          .filter(c => (c.name + ' ' + c.value).toLowerCase().includes((colorQuery || '').toLowerCase()))
+                          .map((color) => (
+                            <div
+                              key={color.value}
+                              className={`color-option ${selectedColor?.value === color.value ? 'selected' : ''}`}
+                              onClick={() => { setSelectedColor(color); setColorQuery(color.name); setColorDropdownOpen(false); }}
+                            >
+                              <div className="color-box" style={{ backgroundColor: color.hex }} />
+                              <div className="color-name">{color.name}</div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </DialogContent>
-              <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
-                <Slider value={zoom} min={1} max={3} step={0.1} onChange={(e, v) => setZoom(v)} />
-                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
-                  <Button onClick={() => setCropDialogOpen(false)}>Cancel</Button>
-                  <Button variant="contained" onClick={applyCrop}>Apply</Button>
                 </div>
-              </DialogActions>
-            </Dialog>
-            <Grid size={4}>
-              <FormControlLabel
-                control={<Checkbox {...register("isActive")} defaultChecked />}
-                label="Is Active"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">
-            {initialData ? "Update Variant" : "Add Variant"}
-          </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+                <div className="form-field col-33">
+                  <label className="field-label">Size</label>
+                  <select
+                    value={selectedSize}
+                    onChange={(e) => setSelectedSize(e.target.value)}
+                  >
+                    <option value="">
+                      {sizesLoading ? "Loading sizes..." : "None (Clear selection)"}
+                    </option>
+                    {!sizesLoading && sizeOptions.map((size) => (
+                      <option key={size.id} value={size.code}>
+                        {size.code}
+                      </option>
+                    ))}
+                  </select>
+                  {sizesError && <div className="size-error">{sizesError}</div>}
+                </div>
+                <div className="form-field col-33"> 
+                  <label className="field-label">SKU</label>
+                  <input
+                    type="text"
+                    {...register("sku", { required: false })}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Barcode</label>
+                  <input
+                    type="text"
+                    {...register("barcode")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Purchase Cost</label>
+                  <input
+                    type="number"
+                    {...register("purchaseCost")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Sales Price</label>
+                  <input
+                    type="number"
+                    {...register("stdSalesPrice")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Stock</label>
+                  <input
+                    type="number"
+                    {...register("stock")}
+                  />
+                </div>
+                <div className="form-field col-33">
+                  <label className="field-label">Lead Time (days)</label>
+                  <input
+                    type="number"
+                    {...register("leadTime")}
+                  />
+                </div>
+                <div className="form-field full-width image-upload-section">
+                  <div className="upload-button-wrapper">
+                    <label className="upload-button">
+                      Upload Files
+                      <input type="file" multiple onChange={handleFileUpload} />
+                    </label>
+                  </div>
+                  <div className="images-preview">
+                    {imageFiles.map((entry, i) => {
+                      const isImage = entry.preview && (entry.file ? entry.file.type && entry.file.type.startsWith('image/') : /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.preview));
+                      return (
+                        <div key={i} className="image-item">
+                          {isImage ? (
+                            <img
+                              src={entry.preview}
+                              alt={entry.name || 'file'}
+                              className="image-preview"
+                            />
+                          ) : (
+                            <div className="file-preview">
+                              {entry.name || 'file'}
+                            </div>
+                          )}
+
+                          {/* main image star badge for images */}
+                          {isImage && (
+                            <button
+                              type="button"
+                              className={`main-image-badge ${i === mainImageIndex ? 'active' : 'inactive'}`}
+                              onClick={() => setMainImageIndex(i)}
+                              title={i === mainImageIndex ? 'Main image' : 'Set as main image'}
+                            >
+                              ★
+                            </button>
+                          )}
+
+                          <div className="image-actions">
+                            <button
+                              type="button"
+                              className="image-action-btn edit-btn"
+                              onClick={() => openEditorForImage(i)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="image-action-btn remove-btn"
+                              onClick={() => removeImage(i)}
+                            >
+                              Remove
+                            </button>
+                          </div> 
+                          <div className="image-name">
+                            {entry.name || (entry.file && entry.file.name)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                
+
+                <div className="form-field col-33">
+                  <div className="checkbox-wrapper">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      {...register("isActive")}
+                      defaultChecked
+                    />
+                    <label htmlFor="isActive">Is Active</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={onClose}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  {initialData ? "Update Variant" : "Add Variant"}
+                </button>
+              </div>
+            </form>
+
+            {/* Image editor modal */}
+            <ImageEditor open={editorOpen} initialSrc={editingSrc} onSave={handleEditedSave} onClose={() => setEditorOpen(false)} />
+
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-

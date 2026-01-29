@@ -1,0 +1,364 @@
+// Unit, Store, Tax, HSN, Size Sections - Unified Styles
+
+.section-container {
+  margin-top: 16px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+
+  h6 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+  }
+}
+
+.search-field-wrapper {
+  display: flex;
+  flex: 1;
+  min-width: 250px;
+  max-width: 300px;
+
+  .search-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    color: #333;
+    outline: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+
+    &:focus {
+      border-color: #1976d2;
+      background-color: #fff;
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+    }
+
+    &:hover:not(:disabled) {
+      border-color: #999;
+    }
+
+    &::placeholder {
+      color: #999;
+    }
+
+    &:disabled {
+      background-color: #f5f5f5;
+      color: #999;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.add-button-wrapper {
+  flex-shrink: 0;
+
+  .btn-add {
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    background-color: #1976d2;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+
+    &:hover {
+      background-color: #1565c0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active {
+      background-color: #0d47a1;
+    }
+
+    &:disabled {
+      background-color: #bdbdbd;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Table wrapper
+.table-wrapper {
+  width: 100%;
+  margin-bottom: 24px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+
+    thead {
+      background-color: #f5f5f5;
+      border-bottom: 2px solid #e0e0e0;
+
+      th {
+        padding: 12px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid #e0e0e0;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: #f9f9f9;
+        }
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        td {
+          padding: 12px;
+          font-size: 14px;
+          color: #333;
+        }
+      }
+    }
+  }
+}
+
+// Loading spinner
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1976d2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+// Pagination
+.pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  font-size: 14px;
+  color: #666;
+
+  .pagination-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    select {
+      padding: 6px 8px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.3s ease;
+      font-family: inherit;
+
+      &:focus {
+        border-color: #1976d2;
+        box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+      }
+    }
+  }
+
+  .pagination-buttons {
+    display: flex;
+    gap: 8px;
+
+    button {
+      padding: 6px 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      background-color: white;
+      color: #333;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+
+      &:hover:not(:disabled) {
+        border-color: #1976d2;
+        color: #1976d2;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+// Snackbar notification
+.snackbar-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+
+  .snackbar-content {
+    padding: 12px 16px;
+    border-radius: 4px;
+    background-color: #323232;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+
+    &.success {
+      background-color: #4caf50;
+    }
+
+    &.error {
+      background-color: #f44336;
+    }
+
+    &.warning {
+      background-color: #ff9800;
+    }
+
+    &.info {
+      background-color: #2196f3;
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 1200px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+
+    h6 {
+      width: 100%;
+    }
+  }
+
+  .search-field-wrapper {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .section-header {
+    gap: 12px;
+  }
+
+  .search-field-wrapper {
+    min-width: auto;
+    max-width: 100%;
+  }
+
+  .add-button-wrapper {
+    width: 100%;
+
+    .btn-add {
+      width: 100%;
+    }
+  }
+
+  .table-wrapper {
+    table {
+      font-size: 12px;
+
+      th,
+      td {
+        padding: 8px;
+      }
+    }
+  }
+
+  .pagination-wrapper {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+
+    .pagination-buttons {
+      width: 100%;
+
+      button {
+        flex: 1;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .section-header {
+    h6 {
+      font-size: 16px;
+    }
+  }
+
+  .search-field-wrapper {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .table-wrapper {
+    table {
+      font-size: 11px;
+
+      th,
+      td {
+        padding: 6px;
+      }
+    }
+  }
+
+  .pagination-wrapper {
+    font-size: 12px;
+
+    .pagination-info {
+      gap: 8px;
+
+      select {
+        padding: 4px 6px;
+        font-size: 12px;
+      }
+    }
+
+    .pagination-buttons {
+      button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+    }
+  }
+}

@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { BASE_URL } from '../../../Config';
+import Select from 'react-select';
+import { BASE_URL } from '../../../config/Config';
+import countries from '../../../User/utils/countries.js';
+import stateList from '../../../User/utils/state_list.json';
+import cities from '../../../User/utils/cities-name-list.json';
 import './_add_lead.scss';
 
-const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
+const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentProducts = [], assignedToOptions: parentAssignedToOptions = [] }) => {
   const [formData, setFormData] = useState({
     business: '',
     prefix: 'Mr.',
@@ -123,7 +127,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         website: '',
         addressLine1: '',
         addressLine2: '',
-        country: 'India',
+        country: '',
         city: '',
         state: '',
         gstin: '',
@@ -143,17 +147,48 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let newValue = value;
     if (name === 'mobile') {
-      const numericValue = value.replace(/[^0-9]/g, '');
-      setFormData({
-        ...formData,
-        [name]: numericValue.slice(0, 10)
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value      });
+      newValue = value.replace(/[^0-9]/g, '').slice(0, 10);
     }
+
+    // Update form value
+    setFormData(prev => ({ ...prev, [name]: newValue }));
+
+    // Clear related error if the field becomes valid/fills
+    setErrors(prev => {
+      const next = { ...prev };
+      // Name uses two fields
+      if (name === 'firstName' || name === 'lastName') {
+        const first = name === 'firstName' ? newValue : formData.firstName;
+        const last = name === 'lastName' ? newValue : formData.lastName;
+        if (String(first).trim() && String(last).trim()) delete next.name;
+        return next;
+      }
+
+      if (name === 'mobile') {
+        if (/^[0-9]{10}$/.test(newValue)) delete next.mobile;
+        return next;
+      }
+
+      if (name === 'email') {
+        if (/\S+@\S+\.\S+/.test(newValue)) delete next.email;
+        return next;
+      }
+
+      // Required text fields: clear when non-empty
+      if (name === 'business') {
+        if (String(newValue).trim()) delete next.business;
+        return next;
+      }
+
+      // Generic: if the field had an error and now has content, remove it
+      if (next[name] && String(newValue).trim()) {
+        delete next[name];
+      }
+
+      return next;
+    });
   };
 
   const validateForm = () => {
@@ -178,11 +213,44 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
-    
-    // Validate assignedTo if provided
-    if (formData.assignedTo && 
-        !assignedToOptions.some(opt => String(opt.id) === String(formData.assignedTo))) {
-      newErrors.assignedTo = 'Please select a valid assignee';
+
+    // Validate source (required)
+    if (!formData.source || String(formData.source).trim() === '') {
+      newErrors.source = 'Source is required';
+    }
+
+    // Validate since (required)
+    if (!formData.since || String(formData.since).trim() === '') {
+      newErrors.since = 'Since (date) is required';
+    } else {
+      const d = new Date(formData.since);
+      if (isNaN(d)) {
+        newErrors.since = 'Enter a valid date for Since';
+      }
+    }
+
+    // Validate assignedTo (required). Allow matching by id or name (case-insensitive)
+    if (!formData.assignedTo || !String(formData.assignedTo).trim()) {
+      newErrors.assignedTo = 'Assignee is required';
+    } else {
+      const matchAssigned = assignedToOptions.some(opt =>
+        String(opt.id) === String(formData.assignedTo) ||
+        (opt.name && opt.name.toLowerCase() === String(formData.assignedTo).toLowerCase())
+      );
+      if (!matchAssigned) newErrors.assignedTo = 'Please select a valid assignee';
+    }
+
+    // Validate product (required). Allow matching by id or name (case-insensitive)
+    if (!formData.product || !String(formData.product).trim()) {
+      newErrors.product = 'Product is required';
+    } else {
+      const matchProduct = products.some(p =>
+        String(p.ID) === String(formData.product) ||
+        String(p.id) === String(formData.product) ||
+        (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
+        (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
+      );
+      if (!matchProduct) newErrors.product = 'Please select a valid product';
     }
     
     setErrors(newErrors);
@@ -213,7 +281,12 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
 
   useEffect(() => {
     fetchLeads();
-    fetchProducts();
+    // Prefer products passed from parent; fallback to fetching if parentProducts empty
+    if (Array.isArray(parentProducts) && parentProducts.length > 0) {
+      setProducts(parentProducts);
+    } else {
+      fetchProducts();
+    }
   }, []);
 
   // Add new lead to backend
@@ -224,36 +297,57 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
       try {
         const contact = `${formData.prefix} ${formData.firstName} ${formData.lastName}`.trim();
         
-        // Only set assigned_to_id if valid - improved validation
+        // Resolve assigned_to_id from numeric id or name
         let assigned_to_id = undefined;
         if (formData.assignedTo && formData.assignedTo !== '') {
-          const assignedToId = Number(formData.assignedTo);
-          if (!isNaN(assignedToId) && 
-              assignedToOptions.some(opt => Number(opt.id) === assignedToId)) {
-            assigned_to_id = assignedToId;
+          const asNum = Number(formData.assignedTo);
+          if (!isNaN(asNum) && assignedToOptions.some(opt => Number(opt.id) === asNum)) {
+            assigned_to_id = asNum;
+          } else {
+            const found = assignedToOptions.find(opt => opt.name && opt.name.toLowerCase() === String(formData.assignedTo).toLowerCase());
+            if (found) assigned_to_id = found.id;
           }
         }
-        
-        let product_id = formData.product ? Number(formData.product) : undefined;
-        if (isNaN(product_id)) {
-          // try to resolve by product name from the products list
-          const found = products.find(p => (p.ID && String(p.ID) === String(formData.product)) || (p.id && String(p.id) === String(formData.product)) || (p.Name && p.Name === formData.product) || (p.name && p.name === formData.product));
-          product_id = found ? (found.ID || found.id) : undefined;
+
+        // Resolve product_id from numeric id or name
+        let product_id = undefined;
+        let productName = '';
+        if (formData.product && formData.product !== '') {
+          const asNum = Number(formData.product);
+          if (!isNaN(asNum)) {
+            product_id = asNum;
+            // Find product name by ID
+            const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
+            productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+          } else {
+            const found = products.find(p =>
+              String(p.ID) === String(formData.product) ||
+              String(p.id) === String(formData.product) ||
+              (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
+              (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
+            );
+            if (found) {
+              product_id = found.ID || found.id;
+              productName = found.Name || found.name || '';
+            }
+          }
         }
         
         let potential = parseFloat(formData.potential);
         if (isNaN(potential)) potential = 0;
 
+        // Ensure manual submissions record their source
         let payload = {
           business: formData.business,
           contact,
+          name: contact, // Include both for backend compatibility
           designation: formData.designation,
           mobile: formData.mobile,
           email: formData.email,
           city: formData.city,
           state: formData.state,
           country: formData.country,
-          source: formData.source,
+          source: formData.source || 'Filling Form',
           stage: formData.stage,
           potential,
           since: formData.since ? new Date(formData.since).toISOString() : new Date().toISOString(),
@@ -274,6 +368,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         
         if (product_id !== undefined) {
           payload.product_id = product_id;
+        }
+        
+        // Include productName for display
+        if (productName) {
+          payload.productName = productName;
         }
 
         // Remove empty string, undefined, or null fields
@@ -333,8 +432,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 // ignore localStorage errors
               }
               if (typeof onAddLeadSubmit === 'function') {
-                // let parent refresh or handle newly added lead
-                onAddLeadSubmit();
+                // pass created lead back to parent so it can update its table immediately
+                onAddLeadSubmit(created || null);
               }
               setFormData({
                 business: '',
@@ -396,10 +495,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
         }
         
         if (res && res.ok) {
+          const created = await res.json().catch(() => null);
           await fetchLeads();
           setFormData({
             business: '',
-            prefix: 'Mr.',
+            prefix: '',
             firstName: '',
             lastName: '',
             designation: '',
@@ -408,7 +508,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
             website: '',
             addressLine1: '',
             addressLine2: '',
-            country: 'India',
+            country: '',
             city: '',
             state: '',
             gstin: '',
@@ -426,15 +526,17 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
           setErrors({});
           setSaveError('');
           if (typeof onAddLeadSubmit === 'function') {
-            onAddLeadSubmit();
+            onAddLeadSubmit(created || null);
           }
           onClose();
         } else if (res && !res.ok) {
           const errorData = await res.json().catch(() => ({ error: 'Failed to save lead' }));
           const errorMessage = errorData.error || 'Failed to save lead';
-          setSaveError(errorMessage.includes('foreign key constraint') ? 
-            'Error: Invalid assignment. Please select a valid assignee.' : 
-            errorMessage);
+          const detail = errorData.detail ? `: ${errorData.detail}` : '';
+          const combined = errorMessage + detail;
+          setSaveError(combined.includes('foreign key constraint') ?
+            'Error: Invalid assignment. Please select a valid assignee.' :
+            combined);
         }
       } catch (err) {
         console.error('Error saving lead:', err);
@@ -444,16 +546,129 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
   };
 
   const prefixOptions = ['Mr.', 'Ms.', 'Mrs.'];
-  const stateOptions = ['Delhi', 'Maharashtra', 'Karnataka', 'Tamil Nadu', 'Uttar Pradesh', 'Gujarat'];
-  const sourceOptions = ['Website', 'Referral', 'Social Media', 'Direct', 'Partner'];
+  const [sourceOptions, setSourceOptions] = useState([]);
+  const [tagsOptions, setTagsOptions] = useState([]);
   const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
-  const stageOptions = ['Proposal', 'Discussion', 'Demo', 'Decided', 'Raw (Unqualified)', 'Inactive'];
-  // Use the same assignedToOptions structure as TopMenu
-  const assignedToOptions = [
-    { id: 1, name: 'ABC' },
-    { id: 2, name: 'XYZ' },
-    { id: 3, name: '123' }
-  ];
+  const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
+  // Use assignedToOptions passed from parent (TopMenu) or fetch employees if not provided
+  const [assignedToOptions, setAssignedToOptions] = useState(Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : []);
+
+  // Fetch employees to populate the Assigned To dropdown.
+  // Always fetch from backend and merge any valid parent-provided options,
+  // but filter out obvious sample/test placeholder entries.
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
+      const json = await res.json();
+      const list = json.data || [];
+
+      const mapped = list.map(u => ({
+        id: u.id,
+        name: [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || String(u.id)
+      }));
+
+      // Merge parentProvided options if valid and not duplicates
+      const finalMap = new Map();
+      mapped.forEach(m => finalMap.set(String(m.id), m));
+
+      if (Array.isArray(parentAssignedToOptions)) {
+        parentAssignedToOptions.forEach(p => {
+          const pid = String(p?.id || '');
+          const pname = (p?.name || '').trim();
+          // Accept parent-provided option only if it has a numeric id and non-empty name
+          if (pid && !isNaN(Number(pid)) && pname) {
+            if (!finalMap.has(pid)) finalMap.set(pid, { id: Number(pid), name: pname });
+          }
+        });
+      }
+
+      // Filter out placeholder/sample entries and obvious dummy values (abc, xyz, numeric-only like 123)
+      const PLACEHOLDERS = new Set(['sample','test','example','abc','xyz','demo','123','000']);
+
+      const filtered = Array.from(finalMap.values()).filter(item => {
+        const name = (item.name || '').toLowerCase().trim();
+        if (!name) return false;
+
+        // Direct placeholder matches
+        if (PLACEHOLDERS.has(name)) return false;
+
+        // Numeric-only values (eg. "123")
+        if (/^[0-9]+$/.test(name)) return false;
+
+        // Common short placeholder patterns (e.g., 'abc', 'xyz') already covered above.
+        // Also exclude gibberish single-letter or 2-letter uppercase tokens if needed
+        // (but be conservative to avoid removing real short names):
+        if (/^[a-z]{1,2}$/.test(name)) return false;
+
+        return true;
+      });
+
+      setAssignedToOptions(filtered);
+    } catch (err) {
+      // fallback to empty
+      setAssignedToOptions([]);
+    }
+  };
+
+  const fetchSources = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/lead-sources`);
+      if (!res.ok) throw new Error('Failed to fetch sources');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSourceOptions(data.map(s => s.name || s.Name));
+      }
+    } catch (err) {
+      console.error('Error fetching sources:', err);
+    }
+  };
+
+  const fetchTags = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/crm-tags`);
+      if (!res.ok) throw new Error('Failed to fetch tags');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setTagsOptions(data.map(t => t.title || t.Title));
+      }
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+    }
+  };
+
+  useEffect(() => {
+    // Always fetch live employees and merge / sanitize parent-provided options
+    fetchEmployees();
+  }, [parentAssignedToOptions]);
+
+  // Fetch sources and tags from backend on mount/open
+  useEffect(() => {
+    if (isOpen) {
+      fetchSources();
+      fetchTags();
+    }
+  }, [isOpen]);
+
+  // Prepare options for react-select
+  const countryOptions = countries.map(c => ({ value: c.name, label: c.name }));
+  const stateOptions = Object.entries(stateList).map(([code, name]) => ({ value: name, label: name }));
+  const cityOptions = cities.map(city => ({ value: city, label: city }));
+
+  const productOptions = products.map(p => ({
+    value: p.ID || p.id || (p.Name || p.name) || '',
+    label: `${p.Name || p.name || p.ID || p.id}${p.Code ? ` (${p.Code})` : ''}`
+  }));
+
+  const assignedOptions = assignedToOptions.map(a => ({
+    value: a.id,
+    label: a.name || String(a.id)
+  }));
+
+  const selectedCountryOption = countryOptions.find(o => o.value === formData.country) || null;
+  const selectedStateOption = stateOptions.find(o => o.value === formData.state) || null;
+  const selectedCityOption = cityOptions.find(o => o.value === formData.city) || null;
+  const selectedProductOption = productOptions.find(o => String(o.value) === String(formData.product)) || null;
+  const selectedAssignedOption = assignedOptions.find(o => String(o.value) === String(formData.assignedTo) || String(o.label).toLowerCase() === String(formData.assignedTo).toLowerCase()) || null;
 
   if (!isOpen) return null;
 
@@ -479,8 +694,9 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                       value={formData.business}
                       onChange={handleChange}
                       className={errors.business ? 'error' : ''}
+                      aria-invalid={errors.business ? 'true' : 'false'}
                     />
-                    {errors.business && <span className="error-message">{errors.business}</span>}
+                    {errors.business && <span className="input-error-inside">{errors.business}</span>}
                   </div>
                   
                   <div className="form-group">
@@ -502,6 +718,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                         value={formData.firstName}
                         onChange={handleChange}
                         className={errors.name ? 'error' : ''}
+                        aria-invalid={errors.name ? 'true' : 'false'}
                       />
                       <input
                         type="text"
@@ -510,9 +727,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                         value={formData.lastName}
                         onChange={handleChange}
                         className={errors.name ? 'error' : ''}
+                        aria-invalid={errors.name ? 'true' : 'false'}
                       />
+                      {errors.name && <span className="input-error-inside">{errors.name}</span>}
                     </div>
-                    {errors.name && <span className="error-message">{errors.name}</span>}
                   </div>
                 </div>
                 
@@ -538,9 +756,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                         onChange={handleChange}
                         maxLength="10"
                         className={errors.mobile ? 'error' : ''}
+                        aria-invalid={errors.mobile ? 'true' : 'false'}
                       />
                     </div>
-                    {errors.mobile && <span className="error-message">{errors.mobile}</span>}
+                    {errors.mobile && <span className="input-error-inside">{errors.mobile}</span>}
                   </div>
                 </div>
                 
@@ -554,9 +773,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                         value={formData.email}
                         onChange={handleChange}
                         className={errors.email ? 'error' : ''}
+                        aria-invalid={errors.email ? 'true' : 'false'}
                       />
                     </div>
-                    {errors.email && <span className="error-message">{errors.email}</span>}
+                    {errors.email && <span className="input-error-inside">{errors.email}</span>}
                   </div>
                   
                   <div className="form-group">
@@ -595,38 +815,70 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Country</label>
-                    <input
-                      type="text"
-                      name="country"
-                      value={formData.country}
-                      onChange={handleChange}
+                    <Select
+                      options={countryOptions}
+                      value={selectedCountryOption}
+                      onChange={(opt) => setFormData(prev => ({ ...prev, country: opt ? opt.value : '' }))}
+                      isSearchable
+                      placeholder="Select country"
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                      menuPortalTarget={document.body}
+                      isClearable
                     />
                   </div>
                   
                   <div className="form-group">
                     <label>City</label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                    />
+                    {formData.country === 'India' ? (
+                      <Select
+                        options={cityOptions}
+                        value={selectedCityOption}
+                        onChange={(opt) => setFormData(prev => ({ ...prev, city: opt ? opt.value : '' }))}
+                        isSearchable
+                        placeholder="Select city"
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                        menuPortalTarget={document.body}
+                        isClearable
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleChange}
+                      />
+                    )}
                   </div>
                 </div>
                 
                 <div className="form-row">
                   <div className="form-group">
                     <label>State</label>
-                    <select
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                    >
-                      <option value="">Select State</option>
-                      {stateOptions.map(option => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
+                    {formData.country === 'India' ? (
+                      <Select
+                        options={stateOptions}
+                        value={selectedStateOption}
+                        onChange={(opt) => setFormData(prev => ({ ...prev, state: opt ? opt.value : '' }))}
+                        isSearchable
+                        placeholder="Select state"
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                        menuPortalTarget={document.body}
+                        isClearable
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                      />
+                    )}
                   </div>
                   
                   <div className="form-group">
@@ -646,27 +898,26 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 <h3>Business Opportunity</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Source</label>
-                    <select
-                      name="source"
-                      value={formData.source}
-                      onChange={handleChange}
-                    >
+                    <label>Source <span className="required">*</span></label>
+                    <select name="source" value={formData.source} onChange={handleChange} className={errors.source ? 'error' : ''}>
                       <option value="">Select Source</option>
                       {sourceOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
+                    {errors.source && <span className="input-error-inside">{errors.source}</span>}
                   </div>
                   
                   <div className="form-group">
-                    <label>Since</label>
+                    <label>Since <span className="required">*</span></label>
                     <input
                       type="date"
                       name="since"
                       value={formData.since ? formData.since.slice(0, 10) : ''}
                       onChange={handleChange}
+                      className={errors.since ? 'error' : ''}
                     />
+                    {errors.since && <span className="input-error-inside">{errors.since}</span>}
                   </div>
                 </div>
                 
@@ -697,23 +948,30 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 </div>
                 
                 <div className="form-row">
-                  <div className="form-group">
-                    <label>Product</label>
-                    <div className="product-input">
-                      <select
-                        name="product"
-                        value={formData.product}
-                        onChange={handleChange}
-                      >
-                        <option value="">Select Product</option>
-                        {products.map((product) => (
-                          <option key={product.ID || product.id} value={product.ID || product.id}>
-                            {product.Name || product.name} {product.Code ? `(${product.Code})` : ''}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="form-group">
+                      <label>Product <span className="required">*</span></label>
+                        <div className="product-input">
+                          <Select
+                            options={productOptions}
+                            value={selectedProductOption}
+                            onChange={(opt) => {
+                              setFormData(prev => ({ ...prev, product: opt ? opt.value : '' }));
+                              if (opt) setErrors(prev => { const n = { ...prev }; delete n.product; return n; });
+                            }}
+                            isSearchable
+                            placeholder={"Search or select product"}
+                            className={errors.product ? 'react-select-container error' : 'react-select-container'}
+                            classNamePrefix={'react-select'}
+                            styles={{
+                              menuPortal: base => ({ ...base, zIndex: 9999 }),
+                              placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
+                            }}
+                            menuPortalTarget={document.body}
+                            isClearable={false}
+                          />
+                        </div>
+                      {errors.product && <span className="input-error-inside">{errors.product}</span>}
                     </div>
-                  </div>
                   
                   <div className="form-group">
                     <label>Potential (Rs.)</label>
@@ -730,19 +988,26 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Assigned To</label>
-                    <select
-                      name="assignedTo"
-                      value={formData.assignedTo}
-                      onChange={handleChange}
-                      className={errors.assignedTo ? 'error' : ''}
-                    >
-                      <option value="">Select Assignee</option>
-                      {assignedToOptions.map(option => (
-                        <option key={option.id} value={option.id}>{option.name}</option>
-                      ))}
-                    </select>
-                    {errors.assignedTo && <span className="error-message">{errors.assignedTo}</span>}
+                    <label>Assigned To <span className="required">*</span></label>
+                    <Select
+                      options={assignedOptions}
+                      value={selectedAssignedOption}
+                      onChange={(opt) => {
+                        setFormData(prev => ({ ...prev, assignedTo: opt ? opt.value : '' }));
+                        if (opt) setErrors(prev => { const n = { ...prev }; delete n.assignedTo; return n; });
+                      }}
+                      isSearchable
+                      placeholder={"Search or select assignee"}
+                      className={errors.assignedTo ? 'react-select-container error' : 'react-select-container'}
+                      classNamePrefix={'react-select'}
+                      styles={{
+                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                        placeholder: base => ({ ...base, color: errors.assignedTo ? '#d9534f' : base.color })
+                      }}
+                      menuPortalTarget={document.body}
+                      isClearable={false}
+                    />
+                    {errors.assignedTo && <span className="input-error-inside">{errors.assignedTo}</span>}
                   </div>
                   
                   <div className="form-group">
@@ -763,17 +1028,15 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData }) => {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tags</label>
-                    <div className="tags-input">
-                      <input
-                        type="text"
-                        name="tags"
-                        value={formData.tags}
-                        onChange={handleChange}
-                      />
-                      <button type="button" className="add-button">+</button>
-                    </div>
+                    <select name="tags" value={formData.tags} onChange={handleChange}>
+                      <option value="">Select Tag</option>
+                      {tagsOptions.map(option => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
                   </div>
-
+                </div>
+                <div className="form-row">
                   <div className="form-group">
                     <label>Notes</label>
                     <input

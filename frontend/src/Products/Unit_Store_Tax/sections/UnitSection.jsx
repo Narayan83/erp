@@ -1,9 +1,11 @@
-import { Box, Typography, TextField, Button, TablePagination, Snackbar, Alert } from "@mui/material";
 import { useEffect, useState } from "react";
+import { Snackbar, Alert } from "@mui/material";
 import axios from "axios";
 import UnitTable from "../components/UnitTable";
 import UnitDialog from "../components/UnitDialog";
-import { BASE_URL }  from "../../../Config";
+import Pagination from "../../../CommonComponents/Pagination";
+import { BASE_URL }  from "../../../config/Config";
+import "./allinone.scss";
 export default function UnitSection() {
   const [units, setUnits] = useState([]);
   const [filter, setFilter] = useState("");
@@ -55,43 +57,49 @@ export default function UnitSection() {
   };
 
   return (
-    <Box mt={2}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <div className="section-container">
+      <div className="section-header">
         <h6>Unit Master</h6>
-        <Button variant="contained" onClick={() => setDialogOpen(true)}>
-           Add Unit
-        </Button>
-      </Box>
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search Unit"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+        <div className="add-button-wrapper">
+          <button
+            className="btn-add"
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
+            Add Unit
+          </button>
+        </div>
+      </div>
 
-      <TextField
-        label="Search Unit"
-        size="small"
-        fullWidth
-        value={filter}
-        onChange={(e) => {
-          setFilter(e.target.value);
-          setPage(0);
-        }}
-        sx={{ mb: 2, maxWidth: 300 }}
-      />
-
-      <UnitTable
+      <div className="table-wrapper">
+        <UnitTable
         units={units}
         onEdit={handleEdit}
         onDelete={handleDelete}
         page={page}
         rowsPerPage={rowsPerPage}
       />
+      </div>
 
-      <TablePagination
-        component="div"
-        count={total}
+      <Pagination
         page={page}
-        onPageChange={(e, newPage) => setPage(newPage)}
+        total={total}
         rowsPerPage={rowsPerPage}
-        rowsPerPageOptions={[10, 25, 50, 100]} // Added standard options
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value));
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
           setPage(0);
         }}
       />
@@ -116,6 +124,6 @@ export default function UnitSection() {
       >
         <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
-    </Box>
+    </div>
   );
 }

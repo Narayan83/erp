@@ -1,39 +1,18 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import images from "../../../assets/images";
-import Button from "@mui/material/Button";
 import { MdOutlineMenuOpen } from "react-icons/md";
 import { MdOutlineMenu } from "react-icons/md";
 import AdminTopSearchBar from "../AdminTopSearchBar/AdminTopSearchBar";
 import { CiLight } from "react-icons/ci";
-import { CiDark } from "react-icons/ci";
 import { IoIosNotificationsOutline } from "react-icons/io";
-
-// drop down menu
-
-import Box from "@mui/material/Box";
-// Avatar removed (not used for Profile menu icon)
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import Divider from "@mui/material/Divider";
-import IconButton from "@mui/material/IconButton";
-import Typography from "@mui/material/Typography";
-import Tooltip from "@mui/material/Tooltip";
-import PersonAdd from "@mui/icons-material/PersonAdd";
-import Settings from "@mui/icons-material/Settings";
-import PowerSettingsNew from "@mui/icons-material/PowerSettingsNew";
+import { FiUser, FiSettings, FiLogOut } from "react-icons/fi";
 import { myContext } from "../../../App";
+import "./Header.scss";
 
 function Header() {
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const open = Boolean(anchorEl);
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const context = useContext(myContext) || { isToggleSideBar: false, setIsToggleSideBar: () => {} };
   const navigate = useNavigate();
@@ -67,110 +46,112 @@ function Header() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleProfile = () => {
-    handleClose();
+    setIsProfileMenuOpen(false);
     navigate("/profile");
   };
 
   const handleSettings = () => {
-    handleClose();
+    setIsProfileMenuOpen(false);
     navigate("/settings");
   };
 
   const handleLogout = () => {
-    handleClose();
+    setIsProfileMenuOpen(false);
     if (context && typeof context.logout === "function") {
       context.logout();
     } else {
-      // fallback: navigate to login
       navigate("/login");
     }
   };
 
   return (
-    <>
-      <header>
-        <div className="container-fluid w-100 ">
-          <div className="row d-flex align-items-center">
-            {/* logo */}
-            <div className="col-sm-2 logo-part">
-              <Link to={"/"} className="d-flex align-items-center logo">
-                {/* <img src={images.logo} alt="" /> */}
-                <span className='ml-2'>ERP</span>
-              </Link>
-            </div>
+    <header className="header">
+      <div className="header-container">
+        <div className="header-left">
+          {/* Logo */}
+          <Link to="/" className="logo-link">
+            <span className="logo-text">ERP</span>
+          </Link>
 
-            {/* Search Box */}
-            <div className="col-sm-2 d-flex align-items-center menu-btn-part">
-              <Button className="rounded-circle mr-3" onClick={()=>context.setIsToggleSideBar(!context.isToggleSideBar)}>
-                {context.isToggleSideBar === false ? <MdOutlineMenuOpen /> : <MdOutlineMenu />}
-              </Button>
-              <AdminTopSearchBar />
-            </div>
+          {/* Menu Toggle (moved slightly to right) */}
+          <button
+            className="menu-toggle-btn"
+            onClick={() => context.setIsToggleSideBar(!context.isToggleSideBar)}
+            title="Hide Menu"
+            aria-label="Toggle menu"
+          >
+            {context.isToggleSideBar ? <MdOutlineMenu /> : <MdOutlineMenuOpen />}
+          </button>
+        </div>
 
-            {/* right buttons */}
-            <div className="col-sm-8 d-flex align-items-center justify-content-end gap-2  other-btn-part">
-              <Button className="rounded-circle mr-3">
-                              <CiLight />
-              </Button>
-              <Button className="rounded-circle mr-3">
-                
-                <IoIosNotificationsOutline />
-              </Button>
-              {/* <Button className='rounded-circle mr-3'> <MdOutlineMenuOpen /> </Button>
-                     <Button className='rounded-circle mr-3'> <MdOutlineMenuOpen /> </Button>
-                     <Button className='rounded-circle mr-3'> <MdOutlineMenuOpen /> </Button> */}
+        {/* Centered Search */}
+        <div className="header-center">
+          <AdminTopSearchBar />
+        </div>
 
-              <Button className="my-account d-flex align-items-center" onClick={handleClick}>
-                <div className="user-image">
-                  <span className="rounded-circle">
-                    <img src={profile.avatar || images.userIcon} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '50%' }} />
-                  </span>
-                </div>
-                <div className="user-info">
-                  <h4>{profile.name}</h4>
-                  <p>{profile.role}</p>
-                </div>
-              </Button>
+        {/* Header Right - Actions */}
+        <div className="header-right">
+          <button className="header-icon-btn" aria-label="Toggle theme">
+            <CiLight />
+          </button>
 
-              <Menu
-                anchorEl={anchorEl}
-                id="account-menu"
-                open={open}
-                onClose={handleClose}
-                slotProps={{
-                  paper: {
-                    elevation: 0,
-                    className: "account-menu-paper",
-                  },
-                }}
-                transformOrigin={{ horizontal: "right", vertical: "top" }}
-                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-              >
-                <MenuItem onClick={handleProfile}>
-                  <ListItemIcon>
-                    <PersonAdd fontSize="small" />
-                  </ListItemIcon>
-                  Profile
-                </MenuItem>
-                <MenuItem onClick={handleSettings}>
-                  <ListItemIcon>
-                    <Settings fontSize="small" />
-                  </ListItemIcon>
-                  Settings
-                </MenuItem>
-                <MenuItem onClick={handleLogout}>
-                  <ListItemIcon>
-                    <PowerSettingsNew fontSize="small" />
-                  </ListItemIcon>
-                  Logout
-                </MenuItem>
-              </Menu>
-            </div>
+          <button className="header-icon-btn" aria-label="Notifications">
+            <IoIosNotificationsOutline />
+          </button>
+
+          {/* Profile Menu */}
+          <div className="profile-menu-wrapper" ref={menuRef}>
+            <button
+              className="profile-btn"
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              title="Profile Menu"
+              aria-label="Profile menu"
+            >
+              <img
+                src={profile.avatar || images.userIcon}
+                alt="User avatar"
+                className="profile-avatar"
+              />
+              <div className="profile-info">
+                <h4 className="profile-name">{profile.name}</h4>
+                <p className="profile-role">{profile.role}</p>
+              </div>
+            </button>
+
+            {/* Dropdown Menu */}
+            {isProfileMenuOpen && (
+              <div className="profile-dropdown">
+                <button className="dropdown-item" onClick={handleProfile}>
+                  <FiUser className="dropdown-icon" />
+                  <span>Profile</span>
+                </button>
+                <button className="dropdown-item" onClick={handleSettings}>
+                  <FiSettings className="dropdown-icon" />
+                  <span>Settings</span>
+                </button>
+                <div className="dropdown-divider"></div>
+                <button className="dropdown-item logout" onClick={handleLogout}>
+                  <FiLogOut className="dropdown-icon" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }
 

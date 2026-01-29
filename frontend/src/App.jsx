@@ -1,17 +1,10 @@
 import { createContext, useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes, useLocation, Outlet } from "react-router-dom";
 import "./styles/main.scss";
-// import HomePage from "./AdminSection/AdminPages/HomePage/HomePage";
  import Header from "./AdminSection/AdminComponents/Header/Header";
  import MainSideBar from "./AdminSection/AdminComponents/MainSideBar/MainSideBar";
-// import AddProduct from "./AdminSection/AdminPages/AddProduct/AddProduct";
-// import ManageProduct from "./AdminSection/AdminPages/ManageProduct/ManageProduct";
-// import LoginPage from "./AdminSection/Login/Login";
-// import Registration from "./AdminSection/Login/Registration";
 
 import HomePage from "./AdminSection/AdminPages/HomePage/HomePage";
-// import AddProduct from "./Products/AddProduct/AddProduct";
-// import ManageProduct from "./Products/ManageProduct/ManageProduct";
 import LoginPage from "./AdminSection/AdminPages/Login/Login";
 import Registration from "./Roles/Registration/Registration";
 import RegistrationView from "./Roles/Registration/RegistrationView";
@@ -23,26 +16,45 @@ import CategoryPage from "./Products/Category/page/CategoryPage";
 import SubcategoryPage from "./Products/Subcategory/page/SubcategoryPage";
 import TagPage from "./Products/Tags/page/TagPage";
 import UnitStoreTaxMasterPage from "./Products/Unit_Store_Tax/page/UnitStoreTaxMasterPage";
+import UnitPage from "./Products/Unit_Store_Tax/page/UnitPage";
+import TaxPage from "./Products/Unit_Store_Tax/page/TaxPage";
+import StorePage from "./Products/Unit_Store_Tax/page/StorePage";
+import HsnPage from "./Products/Unit_Store_Tax/page/HsnPage";
+import SizePage from "./Products/Unit_Store_Tax/page/SizePage";
 import ProductMultiStepForm from "./Products/ProductManage/Components/ProductMultiStepForm";
 import ProductListPage from "./Products/ProductManage/page/product_list_page";
 import ProductEditPage from "./Products/ProductManage/page/ProductEditPage";
 import ProductVariantManager from "./Products/ProductManage/Components/ProductVariantManager";
-import Bank from "./Bank/Bank";
+import ProductConfig from "./Products/ProductManage/Components/ProductConfig/ProductConfig";
 import UserFormPage from "./User/page/UserFormPage";
 import UserListPage from "./User/page/user_list_page";
-import Address from "./User/page/Address";
-import Branch from "./Branch/Branch";
+import Series from "./Admin Master/page/Series/Series";
 // import ProductAtributesPage from "./Products/ProductAtributesPage/ProductAtributesPage";
 
+import EmployeeListPage from "./Employee/page/employee_list_page";
+import EmployeeFormPage from "./Employee/page/EmployeeFormPage";
+import Department from "./Department/page/Department";
+import Designations from "./Designation/pages/Designations";
+import AssignUserToEmployee from "./AssignUserToEmployee/AssignUserToEmployee";
+import OrganizationUnits from "./OrganizationUnit/Pages/OrganizationUnits";
+import EmployeeHierarchyPage from "./EmployeeHierarchy/pages/EmployeeHierarchyPage";
+
 import CrmPage from "./CRM/Components/TopMenu/TopMenu";
+import LeadsDashboard from "./CRM/Components/LeadsDashboard/Dashboard";
 import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
-import QuotationNewForm from './CRM/Pages/Quotation/QuotationForm';
+import SalesInteractions from './CRM/Pages/Reports/SalesInteractions';
+import Followup from './CRM/Pages/Reports/Followup';
+import NoReports from './CRM/Pages/Reports/NoReports';
+import TravelReport from "./CRM/Pages/Reports/TravelReport";
 // import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
-import QutationList from "./Qutation/QutationList";
-import AddQutation from "./Qutation/AddQutation";
+import Salesconfiguration from "./SalesConfiguration/Salesconfiguration";
+
+import QutationList from "./CRM/Pages/Quotation/QuotationList";
+import AddQutation from "./CRM/Pages/Quotation/AddQutation";
+import ItemSummary from "./CRM/Pages/Quotation/ItemSummary";
 
 import RoleCreation from "./Admin Master/page/RoleCreation/RoleCreation";
 import MenuCreation from "./Admin Master/page/MenuCreation/MenuCreation";
@@ -55,7 +67,8 @@ import ExistingMenus from './Admin Master/page/MenuManagement/MenuManagement';
 // User management component is UserMappingtoRoles/UserMappingtoRoles.jsx
 import UserManagement from './Admin Master/page/UserMappingtoRoles/UserMappingtoRoles';
 import AuditLogs from "./Admin Master/page/AuditLogs/AuditLogs";
-import TandCManager from "./TANDC/TandCManager";
+
+import ERPreport from "./ERPreport/ERPreport.jsx";
 
 const myContext = createContext();
 
@@ -133,10 +146,15 @@ function App() {
           <Route path="/ManageSubcategory" element={< SubcategoryPage /> } />
           <Route path="/ManageTag" element={ < TagPage /> } />
           <Route path="/ManageUnitStoreTax" element={ < UnitStoreTaxMasterPage / > } />
+          <Route path="/ManageUnit" element={<UnitPage />} />
+          <Route path="/ManageTax" element={<TaxPage />} />
+          <Route path="/ManageStore" element={<StorePage />} />
+          <Route path="/ManageHSN" element={<HsnPage />} />
+          <Route path="/ManageSize" element={<SizePage />} />
           <Route path="/ManageProduct" element={< ProductMultiStepForm /> } />
-          <Route path="/ManageBranch" element={<Branch />} />
-          <Route path="/ManageBank" element={<Bank />} />
+          <Route path="/ManageSeries" element={<Series />} />
           <Route path="/ProductMaster" element={< ProductListPage /> } />
+          <Route path="/product-config" element={<ProductConfig />} />
           <Route path="/products/:id/edit" element={<ProductEditPage />} />
           <Route path="/products/:id/variants" element={<ProductVariantManager />} />
 
@@ -144,14 +162,35 @@ function App() {
           <Route path="/users/:id/edit" element={<UserFormPage />} />
           <Route path="/users" element={< UserListPage />} />
           
-          <Route path="/address" element={< Address />} />
+          <Route path="/employeemaster" element={< EmployeeFormPage />} />
+          <Route path="/employeemaster/:id" element={< EmployeeFormPage />} />
+          <Route path="/employeemanagement" element={< EmployeeListPage />} />
+          <Route path="/assignusertoemployee" element={<AssignUserToEmployee />} />
+          <Route path="/orgunits" element={<OrganizationUnits />} />
+          <Route path="/empHierarchy" element={<EmployeeHierarchyPage />} />
+          
+          <Route path="/departmentmaster" element={< Department />} />
+          
+          <Route path="/designation" element={<Designations />} />
+          
+          {/* <Route path="/address" element={< Address />} />
           <Route path="/address/create" element={< Address />} />
-          <Route path="/address/edit/:id" element={< Address />} />
+          <Route path="/address/edit/:id" element={< Address />} /> */}
 
           <Route path="/crm-master" element={<CrmPage />} />
+          <Route path="/leads-dashboard" element={<LeadsDashboard />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/customize" element={<Customize />} />
           <Route path="/reports" element={<Report />} />
+          <Route path="/reports/sales-interactions" element={<SalesInteractions />} />
+          <Route path="/reports/followups" element={<Followup />} />
+          <Route path="/reports/no-reports" element={<NoReports />} />
+          <Route path="/reports/travel-report" element={<TravelReport />} />
+
+
+          
+         
+          <Route path="/sales-configuration" element={<Salesconfiguration />} />
           
 
            {/* <Route path="/quotation" element={<QuotationNewForm />} /> */}
@@ -161,6 +200,7 @@ function App() {
           {/* <Route path="/quotation-list" element={<QuotationList />} /> */}
 
            <Route path="/quotation-list" element={<QutationList />} />
+           <Route path="/quotation-item-summary" element={<ItemSummary />} />
           
           {/* Quotation nested routes */}
           {/* <Route path="/quotation" element={<QuotationLayout />}>
@@ -175,9 +215,9 @@ function App() {
           <Route path="/existingmenus" element={<ExistingMenus />} />
           <Route path="/usermanagement" element={<UserManagement />} />
           <Route path="/auditlogs" element={<AuditLogs />} />
-          <Route path="/Managetandc" element={<TandCManager />} />
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
+          <Route path="/erpreport" element={<ERPreport />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>

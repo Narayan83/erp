@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type ProductVariant struct {
 	ID            uint `gorm:"primaryKey"`
@@ -19,6 +21,7 @@ type ProductVariant struct {
 	MainImageIndex *int   `gorm:"default:null"`
 	IsActive       bool   `gorm:"default:true"`
 	CreatedAt      time.Time
+	UpdatedAt      time.Time
 
 	Product Product `gorm:"constraint:OnDelete:CASCADE"`
 }

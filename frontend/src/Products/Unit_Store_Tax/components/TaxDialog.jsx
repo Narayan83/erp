@@ -1,6 +1,6 @@
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete, IconButton, InputAdornment
+  Dialog, DialogTitle, DialogContent,
+  TextField, Autocomplete, IconButton, InputAdornment, Grid
 } from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -9,7 +9,7 @@ import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 
 export default function TaxDialog({ open, onClose, tax, onSuccess }) {
   const { control, handleSubmit, setValue } = useForm();
@@ -55,11 +55,24 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
 
   useEffect(() => {
     if (tax) {
-      setValue("name", tax.Name || "");
-      setValue("percentage", parseFloat(tax.Percentage) || "");
+      setValue("name", tax.Name || tax.name || "");
+      const perc = (tax.Percentage ?? tax.percentage ?? "") !== "" ? parseFloat(tax.Percentage ?? tax.percentage) : "";
+      setValue("percentage", perc);
+      if (perc !== "") {
+        setValue("igst", perc);
+        setValue("cgst", perc / 2);
+        setValue("sgst", perc / 2);
+      } else {
+        setValue("igst", "");
+        setValue("cgst", "");
+        setValue("sgst", "");
+      }
     } else {
       setValue("name", "");
       setValue("percentage", "");
+      setValue("igst", "");
+      setValue("cgst", "");
+      setValue("sgst", "");
     }
   }, [tax, setValue]);
 
@@ -70,6 +83,14 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
         name: data.name,
         percentage: Number(data.percentage),
       };
+
+      // Compute and include split values so they are persisted.
+      const perc = Number(data.percentage);
+      if (Number.isFinite(perc)) {
+        payload.igst = Number.isFinite(Number(data.igst)) ? Number(data.igst) : perc;
+        payload.cgst = Number.isFinite(Number(data.cgst)) ? Number(data.cgst) : perc / 2;
+        payload.sgst = Number.isFinite(Number(data.sgst)) ? Number(data.sgst) : perc / 2;
+      }
 
       if (tax?.ID) {
         await axios.put(`${BASE_URL}/api/taxes/${tax.ID}`, payload);
@@ -157,15 +178,100 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
                 margin="dense"
                 size="small"
                 required
+                onChange={(e) => {
+                  const v = e.target.value;
+                  field.onChange(v);
+                  const num = v === "" ? "" : parseFloat(v);
+                  if (num === "") {
+                    setValue("igst", "");
+                    setValue("cgst", "");
+                    setValue("sgst", "");
+                  } else {
+                    setValue("igst", num);
+                    setValue("cgst", num / 2);
+                    setValue("sgst", num / 2);
+                  }
+                }}
+              />
+            )}
+          />
+          <Controller
+            name="igst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="IGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
+              />
+            )}
+          />
+          <Controller
+            name="cgst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="CGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
+              />
+            )}
+          />
+          <Controller
+            name="sgst"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="SGST (%)"
+                type="number"
+                fullWidth
+                margin="dense"
+                size="small"
+                disabled
               />
             )}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">Save</Button>
-        </DialogActions>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#1976d2',
+              padding: '6px 16px',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            style={{
+              background: '#1976d2',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: 4,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Save
+          </button>
+        </div>
       </form>
-    </Dialog>
+    </Dialog> 
   );
 }

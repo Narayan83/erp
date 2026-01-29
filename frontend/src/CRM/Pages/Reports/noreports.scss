@@ -1,0 +1,258 @@
+@use "../../Styles/variable" as *;
+
+.no-reports-page {
+  margin-top: 10px;
+  width: 100vw;
+  max-width: 100%;
+  padding: 10px;
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+
+    h2 {
+      font-size: 28px;
+      font-weight: 400;
+      color: $primary-black;
+    }
+
+    .tools {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .search {
+        position: relative;
+        input {
+          padding: 7px 10px 7px 12px;
+          border-radius: 4px;
+          border: 1px solid rgba($primary-black, 0.1);
+          width: 300px;
+          outline: none;
+        }
+        .icon {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: rgba($primary-black, 0.4);
+        }
+      }
+
+      .export {
+        background: $primary-blue;
+        color: $primary-white;
+        border: 1px solid $primary-blue;
+        padding: 8px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        svg {
+          font-size: 16px;
+        }
+      }
+    }
+  }
+
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+
+    .periods {
+      display: flex;
+      gap: 8px;
+
+      button {
+        padding: 4px 12px;
+        border-radius: 4px;
+        border: 1px solid rgba($primary-black, 0.2);
+        background: $primary-white;
+        color: $primary-orange;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.active {
+        background: $primary-orange;
+        color: $primary-white;
+        border-color: $primary-orange;
+      }
+
+      .inline-selectors {
+        display: inline-flex;
+        gap: 8px;
+        margin-left: 12px;
+        align-items: center;
+
+        select.month,
+        select.year {
+          padding: 6px 10px;
+          border-radius: 4px;
+          border: 1px solid rgba($primary-black, 0.12);
+          background: $primary-white;
+        }
+
+        select.month {
+          min-width: 160px;
+        }
+        select.year {
+          min-width: 70px;
+        }
+      }
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+
+      button {
+        padding: 4px 12px;
+        border-radius: 6px;
+        border: 1px solid rgba($primary-blue, 0.15);
+        background: $primary-white;
+        color: $primary-blue;
+        cursor: pointer;
+      }
+
+      button.active {
+        background: $primary-blue;
+        color: $primary-white;
+        border-color: $primary-blue;
+      }
+    }
+  }
+
+  .report-table {
+    background: $primary-white;
+    border-radius: 6px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+
+      thead tr {
+        background: #f8f8f8;
+      }
+
+      th,
+      td {
+        padding: 14px 12px;
+        border-bottom: 1px solid rgba($primary-black, 0.06);
+        font-size: 14px;
+        color: $primary-black;
+      }
+
+      th {
+        font-weight: 600;
+      }
+
+      th.left {
+        text-align: left;
+      }
+      th.right,
+      td.right {
+        text-align: right;
+      }
+
+      td.center {
+        text-align: center;
+      }
+      td.left {
+        text-align: left;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      tbody tr:hover {
+        background: rgba($primary-black, 0.02);
+      }
+
+      .no-data {
+        text-align: center;
+        padding: 28px 12px;
+        color: rgba($primary-black, 0.6);
+        font-style: italic;
+      }
+
+      .search-highlight {
+        background: #fff59d; /* subtle yellow */
+        padding: 0 4px;
+        border-radius: 3px;
+        color: inherit;
+      }
+    }
+
+    /* Pagination styles (shared) */
+    .si-pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #fff;
+      border-top: 1px solid #eef0f2;
+      margin-top: 8px;
+    }
+
+    .si-pagination .page-size {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ps-btn {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 6px;
+      border: 1px solid #dcdfe2;
+      background: #fff;
+      color: $primary-black;
+      cursor: pointer;
+    }
+
+    .ps-btn.active {
+      background: #153646;
+      color: #fff;
+      border-color: #153646;
+    }
+
+    .pager {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .pager-nav,
+    .pager-page {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #dcdfe2;
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .pager-nav:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pager-page.active {
+      background: #153646;
+      color: #fff;
+      border-color: #153646;
+    }
+
+    .pager-ellipsis {
+      padding: 0 6px;
+      color: #777;
+    }
+  }
+}

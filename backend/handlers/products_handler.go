@@ -23,6 +23,14 @@ func SetproductsDB(db *gorm.DB) {
 	}
 }
 
+// httpError is used to return HTTP status aware errors from DB transaction closures
+type httpError struct {
+	Status int
+	Msg    string
+}
+
+func (h *httpError) Error() string { return h.Msg }
+
 // Handler: Create Product with Variants & Uploaded Images
 func CreateProduct(c *fiber.Ctx) error {
 	form, err := c.MultipartForm()
@@ -101,6 +109,15 @@ func CreateProduct(c *fiber.Ctx) error {
 		}
 	}
 
+	// Parse tagIDs from form data
+	var tagIDs []uint
+	if tagIDsJson := c.FormValue("tagIDs"); tagIDsJson != "" {
+		if err := json.Unmarshal([]byte(tagIDsJson), &tagIDs); err != nil {
+			fmt.Printf("Warning: Failed to parse tagIDs: %v\n", err)
+			// Continue without tags rather than failing the entire request
+		}
+	}
+
 	// Attach variants to product
 	product.Variants = variants
 	product.CreatedAt = time.Now()
@@ -156,6 +173,13 @@ func CreateProduct(c *fiber.Ctx) error {
 					// Try the insert again after fixing the sequence
 					if retryErr := productsDB.Create(&product).Error; retryErr == nil {
 						fmt.Printf("Product creation successful after sequence fix!\n")
+						// Associate tags after successful creation
+						if len(tagIDs) > 0 {
+							var tags []models.Tag
+							if err := productsDB.Where("id IN ?", tagIDs).Find(&tags).Error; err == nil {
+								productsDB.Model(&product).Association("Tags").Replace(tags)
+							}
+						}
 						return c.JSON(product)
 					} else {
 						fmt.Printf("Product creation still failed after sequence fix: %s\n", retryErr.Error())
@@ -171,24 +195,16 @@ func CreateProduct(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": errStr})
 	}
 
-	// After creating the product, check for tagIDs sent in the multipart form and associate tags
-	if tagIDsStr := c.FormValue("tagIDs"); tagIDsStr != "" {
-		var tagIDs []uint
-		if err := json.Unmarshal([]byte(tagIDsStr), &tagIDs); err == nil && len(tagIDs) > 0 {
-			var tags []models.Tag
-			if err := productsDB.Where("id IN ?", tagIDs).Find(&tags).Error; err == nil {
-				// Use GORM association replace to set many2many relationship
-				errAssoc := productsDB.Model(&product).Association("Tags").Replace(&tags)
-				if errAssoc != nil {
-					fmt.Printf("Failed to associate tags for product %d: %v\n", product.ID, errAssoc)
-				}
+	// Associate tags with the product after successful creation
+	if len(tagIDs) > 0 {
+		var tags []models.Tag
+		if err := productsDB.Where("id IN ?", tagIDs).Find(&tags).Error; err == nil {
+			if err := productsDB.Model(&product).Association("Tags").Replace(tags); err != nil {
+				fmt.Printf("Warning: Failed to associate tags: %v\n", err)
 			}
+		} else {
+			fmt.Printf("Warning: Failed to fetch tags: %v\n", err)
 		}
-	}
-
-	// Reload product with Tags preloaded to include them in response
-	if err := productsDB.Preload("Tags").Preload("Variants").First(&product, product.ID).Error; err != nil {
-		return c.JSON(product)
 	}
 
 	return c.JSON(product)
@@ -252,16 +268,6 @@ func GetAllProducts(c *fiber.Ctx) error {
 	if importance := c.Query("importance"); importance != "" {
 		query = query.Where("importance = ?", importance)
 	}
-	if description := c.Query("description"); description != "" {
-		query = query.Where("description ILIKE ?", "%"+description+"%")
-	}
-	if tag := c.Query("tag"); tag != "" {
-		// Join with Tags table to filter by tag name
-		query = query.Joins("JOIN product_tags ON product_tags.product_id = products.id").
-			Joins("JOIN tags ON tags.id = product_tags.tag_id").
-			Where("tags.name ILIKE ?", "%"+tag+"%").
-			Distinct()
-	}
 
 	// Sorting
 	sortBy := c.Query("sort_by", "")
@@ -322,6 +328,62 @@ func GetAllProducts(c *fiber.Ctx) error {
 			Note:        p.InternalNotes,
 			ProductType: p.ProductType,
 		})
+	}
+
+	// Global filter: if provided, perform an in-memory OR search across multiple fields
+	if globalFilter := c.Query("filter"); globalFilter != "" {
+		lf := strings.ToLower(strings.TrimSpace(globalFilter))
+		filtered := make([]ProductWithStock, 0)
+		for _, p := range productsWithStock {
+			matched := false
+
+			// Product-level fields
+			if strings.Contains(strings.ToLower(p.Name), lf) || strings.Contains(strings.ToLower(p.Code), lf) || strings.Contains(strings.ToLower(p.InternalNotes), lf) {
+				matched = true
+			}
+
+			// Category/Subcategory/Store names (preloaded may be nil)
+			if !matched {
+				if p.Category.ID != 0 && strings.Contains(strings.ToLower(p.Category.Name), lf) {
+					matched = true
+				}
+			}
+			if !matched {
+				if p.Subcategory.ID != 0 && strings.Contains(strings.ToLower(p.Subcategory.Name), lf) {
+					matched = true
+				}
+			}
+			if !matched {
+				if p.Store.ID != 0 && strings.Contains(strings.ToLower(p.Store.Name), lf) {
+					matched = true
+				}
+			}
+
+			// Tags
+			if !matched && len(p.Tags) > 0 {
+				for _, t := range p.Tags {
+					if strings.Contains(strings.ToLower(t.Name), lf) {
+						matched = true
+						break
+					}
+				}
+			}
+
+			// Variant-level fields
+			if !matched && len(p.Variants) > 0 {
+				for _, v := range p.Variants {
+					if strings.Contains(strings.ToLower(v.SKU), lf) || strings.Contains(strings.ToLower(v.Barcode), lf) || strings.Contains(strings.ToLower(v.Color), lf) || strings.Contains(strings.ToLower(v.Size), lf) {
+						matched = true
+						break
+					}
+				}
+			}
+
+			if matched {
+				filtered = append(filtered, p)
+			}
+		}
+		productsWithStock = filtered
 	}
 
 	// In-memory filtering for stock
@@ -744,34 +806,6 @@ func GetProductAutocomplete(c *fiber.Ctx) error {
 			}
 		}
 
-	case "tags":
-		var tags []models.Tag
-		if err := productsDB.Select("DISTINCT name").
-			Where("name ILIKE ?", "%"+query+"%").
-			Limit(limit).
-			Find(&tags).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-		}
-		for _, tag := range tags {
-			if tag.Name != "" {
-				results = append(results, tag.Name)
-			}
-		}
-
-	case "descriptions":
-		var products []models.Product
-		if err := productsDB.Select("DISTINCT description").
-			Where("description ILIKE ?", "%"+query+"%").
-			Limit(limit).
-			Find(&products).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-		}
-		for _, p := range products {
-			if p.Description != "" {
-				results = append(results, p.Description)
-			}
-		}
-
 	default:
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid field parameter"})
 	}
@@ -822,23 +856,40 @@ func UpdateProduct(c *fiber.Ctx) error {
 
 	var req Request
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
+		fmt.Printf("UpdateProduct: Failed to parse request body: %v\n", err)
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid input", "details": err.Error()})
 	}
+
+	fmt.Printf("UpdateProduct: Received request for product ID %s\n", id)
+	fmt.Printf("UpdateProduct: Request data: %+v\n", req)
 
 	var product models.Product
 	if err := productsDB.Preload("Variants").Preload("Tags").First(&product, id).Error; err != nil {
+		fmt.Printf("UpdateProduct: Product not found: %v\n", err)
 		return c.Status(404).JSON(fiber.Map{"error": "Product not found"})
+	}
+
+	// Normalize nullable foreign keys: treat zero values as NULL so we don't violate FK constraints.
+	// Helper to convert *uint -> interface{} where nil stays nil and 0 becomes nil as well.
+	normalizeID := func(p *uint) interface{} {
+		if p == nil {
+			return nil
+		}
+		if *p == 0 {
+			return nil
+		}
+		return *p
 	}
 
 	// Update main product fields using map to ensure boolean fields like IsActive are updated even when false
 	updateData := map[string]interface{}{
 		"Name":          req.Name,
 		"Code":          req.Code,
-		"CategoryID":    req.CategoryID,
-		"SubcategoryID": req.SubcategoryID,
-		"UnitID":        req.UnitID,
-		"StoreID":       req.StoreID,
-		"TaxID":         req.TaxID,
+		"CategoryID":    normalizeID(req.CategoryID),
+		"SubcategoryID": normalizeID(req.SubcategoryID),
+		"UnitID":        normalizeID(req.UnitID),
+		"StoreID":       normalizeID(req.StoreID),
+		"TaxID":         normalizeID(req.TaxID),
 		"Importance":    req.Importance,
 		"ProductMode":   req.ProductMode,
 		"ProductType":   req.ProductType,
@@ -851,17 +902,24 @@ func UpdateProduct(c *fiber.Ctx) error {
 		"Moq":           req.Moq,
 	}
 
+	fmt.Printf("UpdateProduct: Updating product with data: %+v\n", updateData)
 	if err := productsDB.Model(&product).Updates(updateData).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update product"})
+		fmt.Printf("UpdateProduct: Database update failed: %v\n", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update product", "details": err.Error()})
 	}
+	fmt.Printf("UpdateProduct: Product updated successfully\n")
 
-	// If TagIDs were provided, update the many2many association
-	if len(req.TagIDs) > 0 {
+	// Update tag associations if tagIDs are provided
+	if req.TagIDs != nil {
 		var tags []models.Tag
-		if err := productsDB.Where("id IN ?", req.TagIDs).Find(&tags).Error; err == nil {
-			if errAssoc := productsDB.Model(&product).Association("Tags").Replace(&tags); errAssoc != nil {
-				fmt.Printf("Failed to update tags association for product %d: %v\n", product.ID, errAssoc)
+		if len(req.TagIDs) > 0 {
+			if err := productsDB.Where("id IN ?", req.TagIDs).Find(&tags).Error; err != nil {
+				fmt.Printf("Warning: Failed to fetch tags for update: %v\n", err)
 			}
+		}
+		// Replace existing tag associations (empty slice will clear all tags)
+		if err := productsDB.Model(&product).Association("Tags").Replace(tags); err != nil {
+			fmt.Printf("Warning: Failed to update tag associations: %v\n", err)
 		}
 	}
 
@@ -1167,111 +1225,236 @@ func ImportProducts(c *fiber.Ctx) error {
 			product.ProductMode = "Physical"
 		}
 
-		// Handle category with case-insensitive lookup
+		// Handle category with case-insensitive lookup - Auto-create if not found
 		if categoryName != "" {
 			var category models.Category
 			// Try case-insensitive match
 			if err := tx.Where("LOWER(name) = LOWER(?)", categoryName).First(&category).Error; err != nil {
-				fmt.Printf("Row %d: Category lookup failed for '%s': %v\n", rowNum, categoryName, err)
-				// If not found, list available categories for debugging
-				var categories []models.Category
-				tx.Limit(10).Find(&categories)
-				categoryNames := []string{}
-				for _, c := range categories {
-					categoryNames = append(categoryNames, c.Name)
-				}
-				fmt.Printf("Row %d: Available categories: %s\n", rowNum, strings.Join(categoryNames, ", "))
-
-				errors = append(errors, fmt.Sprintf("Row %d: Category '%s' not found", rowNum, categoryName))
-				tx.Rollback()
-				continue
-			}
-			fmt.Printf("Row %d: Category '%s' found with ID %d\n", rowNum, categoryName, category.ID)
-			product.CategoryID = &category.ID
-
-			// Handle subcategory if category exists
-			if subcategoryName != "" {
-				var subcategory models.Subcategory
-				if err := tx.Where("name = ? AND category_id = ?", subcategoryName, category.ID).First(&subcategory).Error; err != nil {
-					if err == gorm.ErrRecordNotFound {
-						errors = append(errors, fmt.Sprintf("Row %d: Subcategory '%s' not found in category '%s'", rowNum, subcategoryName, categoryName))
-						tx.Rollback()
-						continue
-					} else {
-						errors = append(errors, fmt.Sprintf("Row %d: Error finding subcategory %s: %v", rowNum, subcategoryName, err))
+				if err == gorm.ErrRecordNotFound {
+					// Category not found - create it automatically
+					fmt.Printf("Row %d: Category '%s' not found, creating automatically\n", rowNum, categoryName)
+					category = models.Category{
+						Name: categoryName,
+					}
+					if createErr := tx.Create(&category).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create category '%s': %v\n", rowNum, categoryName, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create category '%s': %v", rowNum, categoryName, createErr))
 						tx.Rollback()
 						continue
 					}
+					fmt.Printf("Row %d: Successfully created category '%s' with ID %d\n", rowNum, categoryName, category.ID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: Category lookup error for '%s': %v\n", rowNum, categoryName, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up category '%s': %v", rowNum, categoryName, err))
+					tx.Rollback()
+					continue
+				}
+			} else {
+				fmt.Printf("Row %d: Category '%s' found with ID %d\n", rowNum, categoryName, category.ID)
+			}
+			product.CategoryID = &category.ID
+
+			// Handle subcategory if category exists - Auto-create if not found
+			if subcategoryName != "" {
+				var subcategory models.Subcategory
+				if err := tx.Where("LOWER(name) = LOWER(?) AND category_id = ?", subcategoryName, category.ID).First(&subcategory).Error; err != nil {
+					if err == gorm.ErrRecordNotFound {
+						// Subcategory not found - create it automatically
+						fmt.Printf("Row %d: Subcategory '%s' not found in category '%s', creating automatically\n", rowNum, subcategoryName, categoryName)
+						subcategory = models.Subcategory{
+							Name:       subcategoryName,
+							CategoryID: category.ID,
+						}
+						if createErr := tx.Create(&subcategory).Error; createErr != nil {
+							fmt.Printf("Row %d: Failed to auto-create subcategory '%s': %v\n", rowNum, subcategoryName, createErr)
+							errors = append(errors, fmt.Sprintf("Row %d: Failed to create subcategory '%s' in category '%s': %v", rowNum, subcategoryName, categoryName, createErr))
+							tx.Rollback()
+							continue
+						}
+						fmt.Printf("Row %d: Successfully created subcategory '%s' with ID %d in category '%s'\n", rowNum, subcategoryName, subcategory.ID, categoryName)
+					} else {
+						// Database error
+						fmt.Printf("Row %d: Subcategory lookup error for '%s': %v\n", rowNum, subcategoryName, err)
+						errors = append(errors, fmt.Sprintf("Row %d: Database error looking up subcategory '%s': %v", rowNum, subcategoryName, err))
+						tx.Rollback()
+						continue
+					}
+				} else {
+					fmt.Printf("Row %d: Subcategory '%s' found with ID %d\n", rowNum, subcategoryName, subcategory.ID)
 				}
 				product.SubcategoryID = &subcategory.ID
 			}
 		}
 
-		// Handle unit with case-insensitive lookup
+		// Handle unit with case-insensitive lookup - Auto-create if not found
 		if unitName != "" {
 			var unit models.Unit
 			// Try case-insensitive match
 			if err := tx.Where("LOWER(name) = LOWER(?)", unitName).First(&unit).Error; err != nil {
-				fmt.Printf("Row %d: Unit lookup failed for '%s': %v\n", rowNum, unitName, err)
-				// If not found, list available units for debugging
-				var units []models.Unit
-				tx.Limit(10).Find(&units)
-				unitNames := []string{}
-				for _, u := range units {
-					unitNames = append(unitNames, u.Name)
+				if err == gorm.ErrRecordNotFound {
+					// Unit not found - create it automatically
+					fmt.Printf("Row %d: Unit '%s' not found, creating automatically\n", rowNum, unitName)
+					unit = models.Unit{
+						Name: unitName,
+					}
+					if createErr := tx.Create(&unit).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create unit '%s': %v\n", rowNum, unitName, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create unit '%s': %v", rowNum, unitName, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created unit '%s' with ID %d\n", rowNum, unitName, unit.ID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: Unit lookup error for '%s': %v\n", rowNum, unitName, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up unit '%s': %v", rowNum, unitName, err))
+					tx.Rollback()
+					continue
 				}
-				fmt.Printf("Row %d: Available units: %s\n", rowNum, strings.Join(unitNames, ", "))
-
-				// TEMPORARILY continue without unit for debugging
-				fmt.Printf("Row %d: WARNING - Continuing without unit for debugging\n", rowNum)
-				// Don't fail the import for unit issues temporarily
-				//errors = append(errors, fmt.Sprintf("Row %d: Unit '%s' not found", rowNum, unitName))
-				//tx.Rollback()
-				//continue
 			} else {
 				fmt.Printf("Row %d: Unit '%s' found with ID %d\n", rowNum, unitName, unit.ID)
-				product.UnitID = &unit.ID
 			}
-		} // Handle store with case-insensitive lookup
+			product.UnitID = &unit.ID
+		} // Handle store with case-insensitive lookup - Auto-create if not found
 		if storeName != "" {
 			var store models.Store
 			// Try case-insensitive match
 			if err := tx.Where("LOWER(name) = LOWER(?)", storeName).First(&store).Error; err != nil {
-				fmt.Printf("Row %d: Store lookup failed for '%s': %v\n", rowNum, storeName, err)
-				// If not found, list available stores for debugging
-				var stores []models.Store
-				tx.Limit(10).Find(&stores)
-				storeNames := []string{}
-				for _, s := range stores {
-					storeNames = append(storeNames, s.Name)
+				if err == gorm.ErrRecordNotFound {
+					// Store not found - create it automatically
+					fmt.Printf("Row %d: Store '%s' not found, creating automatically\n", rowNum, storeName)
+					store = models.Store{
+						Name: storeName,
+					}
+					if createErr := tx.Create(&store).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create store '%s': %v\n", rowNum, storeName, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create store '%s': %v", rowNum, storeName, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created store '%s' with ID %d\n", rowNum, storeName, store.ID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: Store lookup error for '%s': %v\n", rowNum, storeName, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up store '%s': %v", rowNum, storeName, err))
+					tx.Rollback()
+					continue
 				}
-				fmt.Printf("Row %d: Available stores: %s\n", rowNum, strings.Join(storeNames, ", "))
-
-				// TEMPORARILY continue without store for debugging
-				fmt.Printf("Row %d: WARNING - Continuing without store for debugging\n", rowNum)
-				// Don't fail the import for store issues temporarily
-				//errors = append(errors, fmt.Sprintf("Row %d: Store '%s' not found", rowNum, storeName))
-				//tx.Rollback()
-				//continue
 			} else {
 				fmt.Printf("Row %d: Store '%s' found with ID %d\n", rowNum, storeName, store.ID)
-				product.StoreID = &store.ID
 			}
-		} // Handle tax
+			product.StoreID = &store.ID
+		} // Handle tax with case-insensitive lookup - Auto-create if not found
 		if taxName != "" {
 			var tax models.Tax
 			if err := tx.Where("name = ?", taxName).First(&tax).Error; err != nil {
 				if err == gorm.ErrRecordNotFound {
-					errors = append(errors, fmt.Sprintf("Row %d: Tax '%s' not found", rowNum, taxName))
-					tx.Rollback()
-					continue
+					// Tax not found - create it automatically
+					fmt.Printf("Row %d: Tax '%s' not found, creating automatically\n", rowNum, taxName)
+
+					// Use the GST % value if provided, otherwise default to 0
+					taxPercentage := gstPercent
+					if taxPercentage == 0 {
+						fmt.Printf("Row %d: GST %% not provided or zero, using 0%% for tax '%s'\n", rowNum, taxName)
+					}
+
+					tax = models.Tax{
+						Name:       taxName,
+						Percentage: taxPercentage,
+					}
+					if createErr := tx.Create(&tax).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create tax '%s': %v\n", rowNum, taxName, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create tax '%s': %v", rowNum, taxName, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created tax '%s' with percentage %.2f%%\n", rowNum, taxName, taxPercentage)
 				} else {
-					errors = append(errors, fmt.Sprintf("Row %d: Error finding tax %s: %v", rowNum, taxName, err))
+					// Database error
+					fmt.Printf("Row %d: Tax lookup error for '%s': %v\n", rowNum, taxName, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up tax '%s': %v", rowNum, taxName, err))
 					tx.Rollback()
 					continue
 				}
+			} else {
+				fmt.Printf("Row %d: Tax '%s' found with ID %d\n", rowNum, taxName, tax.ID)
 			}
 			product.TaxID = &tax.ID
+		}
+
+		// Handle HSN Code - auto-create HSN master if it doesn't exist
+		if hsnCode != "" {
+			var hsn models.HsnCode
+			if err := tx.Where("LOWER(code) = LOWER(?)", hsnCode).First(&hsn).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					fmt.Printf("Row %d: HSN '%s' not found, creating automatically\n", rowNum, hsnCode)
+
+					// Determine TaxID to associate with HSN
+					var taxForHsnID uint
+					if product.TaxID != nil {
+						taxForHsnID = *product.TaxID
+					} else if taxName != "" {
+						// Try to find or create tax by name
+						var txTax models.Tax
+						if err2 := tx.Where("name = ?", taxName).First(&txTax).Error; err2 != nil {
+							if err2 == gorm.ErrRecordNotFound {
+								txTax = models.Tax{Name: taxName, Percentage: gstPercent}
+								if createErr := tx.Create(&txTax).Error; createErr != nil {
+									fmt.Printf("Row %d: Failed to auto-create tax '%s' for HSN: %v\n", rowNum, taxName, createErr)
+									errors = append(errors, fmt.Sprintf("Row %d: Failed to create tax '%s' for HSN: %v", rowNum, taxName, createErr))
+									tx.Rollback()
+									continue
+								}
+							}
+							taxForHsnID = txTax.ID
+						} else {
+							fmt.Printf("Row %d: Tax lookup error for '%s' while preparing HSN: %v\n", rowNum, taxName, err2)
+							errors = append(errors, fmt.Sprintf("Row %d: Database error looking up tax '%s' for HSN: %v", rowNum, taxName, err2))
+							tx.Rollback()
+							continue
+						}
+					} else {
+						// No tax info provided - ensure a default GST 0% exists and use it
+						var zeroTax models.Tax
+						if err3 := tx.Where("percentage = ?", 0).First(&zeroTax).Error; err3 != nil {
+							if err3 == gorm.ErrRecordNotFound {
+								zeroTax = models.Tax{Name: "GST 0%", Percentage: 0}
+								if createErr := tx.Create(&zeroTax).Error; createErr != nil {
+									fmt.Printf("Row %d: Failed to create default 0%% tax for HSN creation: %v\n", rowNum, createErr)
+									errors = append(errors, fmt.Sprintf("Row %d: Failed to create default tax for HSN: %v", rowNum, createErr))
+									tx.Rollback()
+									continue
+								}
+							}
+							taxForHsnID = zeroTax.ID
+						} else {
+							fmt.Printf("Row %d: Error looking up default 0%% tax for HSN: %v\n", rowNum, err3)
+							errors = append(errors, fmt.Sprintf("Row %d: Database error looking up default tax for HSN: %v", rowNum, err3))
+							tx.Rollback()
+							continue
+						}
+					}
+
+					// Create HSN record
+					hsn = models.HsnCode{Code: hsnCode, TaxID: taxForHsnID}
+					if createErr := tx.Create(&hsn).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create HSN '%s': %v\n", rowNum, hsnCode, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create HSN '%s': %v", rowNum, hsnCode, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created HSN '%s' with TaxID %d\n", rowNum, hsnCode, taxForHsnID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: HSN lookup error for '%s': %v\n", rowNum, hsnCode, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up HSN '%s': %v", rowNum, hsnCode, err))
+					tx.Rollback()
+					continue
+				}
+			} else {
+				fmt.Printf("Row %d: HSN '%s' found with ID %d\n", rowNum, hsnCode, hsn.ID)
+			}
 		}
 
 		// Create the product
@@ -1288,6 +1471,54 @@ func ImportProducts(c *fiber.Ctx) error {
 				if img = strings.TrimSpace(img); img != "" {
 					images = append(images, img)
 				}
+			}
+		}
+
+		// Handle size with case-insensitive lookup - Auto-create in Size master if not found
+		if size != "" {
+			var sizeModel models.Size
+			// Try case-insensitive match on CODE field (since imported size goes to Code)
+			if err := tx.Where("LOWER(code) = LOWER(?)", size).First(&sizeModel).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					// Size not found in master table - create it automatically
+					fmt.Printf("Row %d: Size '%s' not found in master table, creating automatically\n", rowNum, size)
+
+					// The imported value IS the code
+					sizeCode := size
+
+					// Check if code already exists (case-insensitive)
+					var existingSize models.Size
+					if tx.Where("LOWER(code) = LOWER(?)", sizeCode).First(&existingSize).Error == nil {
+						// This should not happen since we just checked above, but be safe
+						fmt.Printf("Row %d: Size code '%s' already exists after check\n", rowNum, sizeCode)
+						errors = append(errors, fmt.Sprintf("Row %d: Size code '%s' already exists", rowNum, sizeCode))
+						tx.Rollback()
+						continue
+					}
+
+					// Create Size with the imported value as Code
+					// Name and Description can be the same as Code, or set to a readable format
+					sizeModel = models.Size{
+						Name:        size, // Use the code as name as well
+						Code:        size, // This is the main field - the imported value
+						Description: size, // Use the code as description
+					}
+					if createErr := tx.Create(&sizeModel).Error; createErr != nil {
+						fmt.Printf("Row %d: Failed to auto-create size '%s': %v\n", rowNum, size, createErr)
+						errors = append(errors, fmt.Sprintf("Row %d: Failed to create size '%s': %v", rowNum, size, createErr))
+						tx.Rollback()
+						continue
+					}
+					fmt.Printf("Row %d: Successfully created size with code '%s' (ID: %d) in master table\n", rowNum, size, sizeModel.ID)
+				} else {
+					// Database error
+					fmt.Printf("Row %d: Size lookup error for '%s': %v\n", rowNum, size, err)
+					errors = append(errors, fmt.Sprintf("Row %d: Database error looking up size '%s': %v", rowNum, size, err))
+					tx.Rollback()
+					continue
+				}
+			} else {
+				fmt.Printf("Row %d: Size code '%s' found in master table with ID %d\n", rowNum, size, sizeModel.ID)
 			}
 		}
 
@@ -1336,52 +1567,6 @@ func ImportProducts(c *fiber.Ctx) error {
 		}
 
 		fmt.Printf("Row %d: Successfully created variant with ID %d\n", rowNum, variant.ID)
-
-		// Handle tags if provided in the import row (support 'Tag' or 'Tags' column names)
-		tagFieldVal := getStringValue(getFieldValue("Tag"))
-		if tagFieldVal == "" {
-			tagFieldVal = getStringValue(getFieldValue("Tags"))
-		}
-		if tagFieldVal != "" {
-			// Split by comma or semicolon and trim
-			parts := strings.FieldsFunc(tagFieldVal, func(r rune) bool { return r == ',' || r == ';' })
-			var tagNames []string
-			for _, p := range parts {
-				if t := strings.TrimSpace(p); t != "" {
-					tagNames = append(tagNames, t)
-				}
-			}
-
-			if len(tagNames) > 0 {
-				var tagsToAssoc []models.Tag
-				for _, tn := range tagNames {
-					var existing models.Tag
-					// Case-insensitive lookup
-					if err := tx.Where("LOWER(name) = LOWER(?)", tn).First(&existing).Error; err != nil {
-						if err == gorm.ErrRecordNotFound {
-							// Create new tag
-							newTag := models.Tag{Name: tn}
-							if cErr := tx.Create(&newTag).Error; cErr == nil {
-								tagsToAssoc = append(tagsToAssoc, newTag)
-							} else {
-								fmt.Printf("Row %d: Failed to create tag '%s': %v\n", rowNum, tn, cErr)
-							}
-						} else {
-							fmt.Printf("Row %d: Error finding tag '%s': %v\n", rowNum, tn, err)
-						}
-					} else {
-						// Found existing
-						tagsToAssoc = append(tagsToAssoc, existing)
-					}
-				}
-
-				if len(tagsToAssoc) > 0 {
-					if assocErr := tx.Model(&product).Association("Tags").Replace(&tagsToAssoc); assocErr != nil {
-						fmt.Printf("Row %d: Failed to associate tags for product %d: %v\n", rowNum, product.ID, assocErr)
-					}
-				}
-			}
-		}
 
 		// Commit this row's transaction
 		if err := tx.Commit().Error; err != nil {
@@ -1508,4 +1693,91 @@ func FixProductSequence(c *fiber.Ctx) error {
 			"variants_next_value": maxVariantID + 1,
 		},
 	})
+}
+
+func DeleteProduct(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// Perform deletion in a transaction for safety
+	txErr := productsDB.Transaction(func(tx *gorm.DB) error {
+		// Pre-check: if product is referenced by transactional items, block deletion with a clear message
+		var cnt int64
+		if err := tx.Table("quotation_items").Where("product_id = ?", id).Count(&cnt).Error; err == nil && cnt > 0 {
+			return &httpError{Status: 409, Msg: "This product is used in quotations. Please remove it from those quotations before deleting."}
+		}
+		cnt = 0
+		if err := tx.Table("sales_order_items").Where("product_id = ?", id).Count(&cnt).Error; err == nil && cnt > 0 {
+			return &httpError{Status: 409, Msg: "This product is used in sales orders. Please remove it from those sales orders before deleting."}
+		}
+		cnt = 0
+		if err := tx.Table("purchase_order_items").Where("product_id = ?", id).Count(&cnt).Error; err == nil && cnt > 0 {
+			return &httpError{Status: 409, Msg: "This product is used in purchase orders. Please remove it from those purchase orders before deleting."}
+		}
+		cnt = 0
+		if err := tx.Table("leads").Where("product_id = ?", id).Count(&cnt).Error; err == nil && cnt > 0 {
+			return &httpError{Status: 409, Msg: "This product is linked to leads. Please remove the product reference from those leads before deleting."}
+		}
+
+		// 1) Load variants to remove associated image files
+		var variants []models.ProductVariant
+		if err := tx.Where("product_id = ?", id).Find(&variants).Error; err != nil {
+			return err
+		}
+
+		// 2) Delete image files for each variant if present
+		for _, v := range variants {
+			// v.Images stored as JSON array of paths
+			for _, img := range v.Images {
+				if strings.TrimSpace(img) == "" {
+					continue
+				}
+				// Normalize backslashes and ensure local path
+				p := strings.ReplaceAll(img, "\\", "/")
+				// Only delete if file exists locally under uploads/
+				if !strings.HasPrefix(strings.ToLower(p), "http://") && !strings.HasPrefix(strings.ToLower(p), "https://") && !strings.HasPrefix(strings.ToLower(p), "data:") {
+					if _, err := os.Stat(p); err == nil {
+						_ = os.Remove(p)
+					} else {
+						// Also try prefixed with ./ in case stored as relative without leading folder
+						joined := filepath.Join("uploads", filepath.Base(p))
+						if _, err2 := os.Stat(joined); err2 == nil {
+							_ = os.Remove(joined)
+						}
+					}
+				}
+			}
+			if v.MainImage != "" {
+				p := strings.ReplaceAll(v.MainImage, "\\", "/")
+				if !strings.HasPrefix(strings.ToLower(p), "http://") && !strings.HasPrefix(strings.ToLower(p), "https://") && !strings.HasPrefix(strings.ToLower(p), "data:") {
+					if _, err := os.Stat(p); err == nil {
+						_ = os.Remove(p)
+					}
+				}
+			}
+		}
+
+		// 3) Explicitly delete variants (hard delete) and join table rows before deleting product
+		if err := tx.Unscoped().Where("product_id = ?", id).Delete(&models.ProductVariant{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM product_tags WHERE product_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// 4) Finally, hard delete the product
+		if err := tx.Unscoped().Delete(&models.Product{}, id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if txErr != nil {
+		if he, ok := txErr.(*httpError); ok {
+			return c.Status(he.Status).JSON(fiber.Map{"error": he.Msg})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": txErr.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "Product deleted successfully"})
 }

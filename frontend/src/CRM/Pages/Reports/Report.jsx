@@ -4,8 +4,14 @@ import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrow
 import { MdMissedVideoCall } from 'react-icons/md';
 import './_report.scss';
 
-const ReportCard = ({ title, description, icon }) => (
-  <div className="report-card">
+const ReportCard = ({ title, description, icon, onClick }) => (
+  <div
+    className="report-card"
+    role="button"
+    tabIndex={0}
+    onClick={onClick}
+    onKeyPress={(e) => { if (e.key === 'Enter') onClick?.(); }}
+  >
     <div className="card-header">
       <div className="icon">{icon}</div>
       <h3>{title}</h3>
@@ -25,32 +31,26 @@ const Report = () => {
     {
       title: "Sales Interactions",
       description: "Monitor interaction efforts by your team with your leads.",
-      icon: <FaChartLine />
+      icon: <FaChartLine />,
+      path: '/reports/sales-interactions'
     },
     {
       title: "No Interactions",
-      description: "Identify team members who have not engaged with assigned leads.",
-      icon: <FaUsersCog />
+      description: "Identify team members who have no interactions , no appointments , or missed appointments.",
+      icon: <FaUsersCog />,
+      path: '/reports/no-reports'
     },
     {
       title: "Follow-ups",
       description: "Track scheduled follow-ups to ensure timely engagement.",
-      icon: <FaCalendarCheck />
-    },
-    {
-      title: "No Appointments",
-      description: "View sales team performance by tracking leads without scheduled appointments.",
-      icon: <FaUserClock />
-    },
-    {
-      title: "Missed Appointments",
-      description: "Analyze missed meetings per salesperson to improve scheduling and follow-ups.",
-      icon: <MdMissedVideoCall />
+      icon: <FaCalendarCheck />,
+      path: '/reports/followups'
     },
     {
       title: "Travel History",
       description: "Track travel record of sales team.",
-      icon: <FaRoute />
+      icon: <FaRoute />,
+      path: '/reports/travel-report'
     }
   ];
 
@@ -58,14 +58,18 @@ const Report = () => {
     <div className="reports-container">
       <div className="header">
         <h2>Lead Reports</h2>
-        <button className="back-btn" onClick={handleBack}>
+        {/* <button className="back-btn" onClick={handleBack}>
           <FaArrowLeft style={{ marginRight: '5px' }} />
           Back
-        </button>
+        </button> */}
       </div>
       <div className="reports-grid">
         {reports.map((report, index) => (
-          <ReportCard key={index} {...report} />
+          <ReportCard
+            key={index}
+            {...report}
+            onClick={() => report.path ? navigate(report.path) : null}
+          />
         ))}
       </div>
     </div>

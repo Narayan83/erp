@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BASE_URL } from '../../Config';
+import { BASE_URL } from '../../config/Config';
 import {
   Table,
   TableBody,

@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete, IconButton, InputAdornment } from "@mui/material";
-import ClearIcon from '@mui/icons-material/Clear';
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import { Dialog, DialogTitle, DialogContent, Autocomplete, TextField, IconButton, InputAdornment } from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
-import Tooltip from '@mui/material/Tooltip';
+import "./SizeDialog.scss";
 import { useForm, Controller } from "react-hook-form";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 
 export default function SizeDialog({ open, onClose, size, onSuccess, onError }) {
   const { control, handleSubmit, setValue } = useForm();
@@ -86,22 +85,29 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
             rules={{ required: true }}
             render={({ field: { onChange, value, ref } }) => {
               // Extract size codes from the sizes array
-              const sizeOptions = Array.isArray(sizes) ? 
-                sizes.map(size => {
-                  return size?.code || "";
-                }).filter(code => code !== "") : [];
-              
+              const sizeOptions = Array.isArray(sizes) ?
+                sizes.map(s => s?.code || "").filter(Boolean) : [];
+
               return (
                 <Autocomplete
-                  options={sizeOptions}
                   freeSolo
+                  autoSelect
+                  options={sizeOptions}
                   loading={loading}
                   open={autocompleteOpen}
                   onOpen={() => setAutocompleteOpen(true)}
                   onClose={() => setAutocompleteOpen(false)}
-                  autoSelect
                   value={value || ""}
                   onChange={(_, newValue) => onChange(newValue)}
+                  onInputChange={(_, newInput) => {
+                    onChange(newInput);
+                    setAutocompleteOpen(true);
+                  }}
+                  filterOptions={(options, { inputValue }) => {
+                    if (!inputValue) return options;
+                    const lower = inputValue.toLowerCase();
+                    return options.filter(opt => (opt || "").toLowerCase().includes(lower));
+                  }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -119,22 +125,9 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
                           <>
                             {params.InputProps.endAdornment}
                             <InputAdornment position="end">
-                              {/* Toggle dropdown icon (chevron) */}
                               <Tooltip title={autocompleteOpen ? 'Close suggestions' : 'Open suggestions'}>
-                                <IconButton
-                                  size="small"
-                                  aria-label={autocompleteOpen ? 'close suggestions' : 'open suggestions'}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAutocompleteOpen((o) => !o);
-                                  }}
-                                  sx={{ color: 'primary.main' }}
-                                >
-                                  {autocompleteOpen ? (
-                                    <ArrowDropUpIcon fontSize="small" />
-                                  ) : (
-                                    <ArrowDropDownIcon fontSize="small" />
-                                  )}
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAutocompleteOpen(o => !o); }} sx={{ color: 'primary.main' }}>
+                                  {autocompleteOpen ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
                                 </IconButton>
                               </Tooltip>
                             </InputAdornment>
@@ -151,21 +144,45 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
             name="description"
             control={control}
             render={({ field }) => (
-              <TextField
+              <input
                 {...field}
-                label="Description"
-                fullWidth
-                margin="dense"
-                size="small"
+                className="size-dialog__input"
+                placeholder="Description"
               />
             )}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">Save</Button>
-        </DialogActions>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#1976d2',
+              padding: '6px 16px',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            style={{
+              background: '#1976d2',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: 4,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Save
+          </button>
+        </div>
       </form>
-    </Dialog>
+    </Dialog> 
   );
 }

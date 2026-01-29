@@ -1,21 +1,134 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { 
-  Button, 
-  Grid, 
-  MenuItem, 
-  TextField,
-  Autocomplete,
-  FormControl,
-  InputLabel,
-  Select,
-  CircularProgress,
-  Checkbox,
-  ListItemText,
-  FormControlLabel
-} from "@mui/material";
+import CircularProgress from "@mui/material/CircularProgress";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
+import "./productstepform.scss";
+
+// Local multi-select dropdown for Tags (chips + dropdown)
+function TagMultiSelect({ tags, selectedTagIDs, setValue, getValues }) {
+  const wrapperRef = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleOpen = () => setOpen(v => !v);
+
+  const toggleTag = (tag) => {
+    const actualId = tag.ID ?? tag.id;
+    const current = getValues('tagIDs') || [];
+    const included = current.map(String).includes(String(actualId));
+    if (included) {
+      const next = current.filter(v => String(v) !== String(actualId));
+      setValue('tagIDs', next);
+    } else {
+      setValue('tagIDs', [...current, actualId]);
+    }
+  };
+
+  const removeTag = (id) => {
+    const current = getValues('tagIDs') || [];
+    setValue('tagIDs', current.filter(v => String(v) !== String(id)));
+  };
+
+  const selectedObjects = (selectedTagIDs || []).map(id => tags.find(t => String(t.ID ?? t.id) === String(id))).filter(Boolean);
+
+  return (
+    <div className="autocomplete-wrapper" ref={wrapperRef}>
+      <div className="selected-items" onClick={toggleOpen} role="button" tabIndex={0}>
+        {selectedObjects.length === 0 ? (
+          <div className="placeholder">Select tags</div>
+        ) : (
+          selectedObjects.map(t => (
+            <div className="chip" key={t.ID ?? t.id}>
+              <span>{t.Name ?? t.name}</span>
+              <button type="button" className="remove-btn" onClick={(e) => { e.stopPropagation(); removeTag(t.ID ?? t.id); }}>×</button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="dropdown-menu" style={{ display: open ? 'block' : 'none' }}>
+        {tags.length > 0 ? (
+          tags.map(tag => {
+            const id = tag.ID ?? tag.id;
+            const selected = (selectedTagIDs || []).map(String).includes(String(id));
+            return (
+              <div key={id} className={`dropdown-item ${selected ? 'selected' : ''}`} onClick={() => toggleTag(tag)}>
+                {tag.Name ?? tag.name}
+              </div>
+            );
+          })
+        ) : (
+          <div className="dropdown-item disabled">No Tags Available</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Local autocomplete input for name and code
+function AutocompleteInput({ options, value, onChange, onSelect, placeholder }) {
+  const wrapperRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [filtered, setFiltered] = useState([]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    const filt = options.filter(opt => opt.toLowerCase().includes(val.toLowerCase()));
+    setFiltered(filt);
+    setOpen(filt.length > 0 && val !== '');
+  };
+
+  const handleSelect = (item) => {
+    onChange(item);
+    setOpen(false);
+    if (onSelect) onSelect(item);
+  };
+
+  const handleFocus = () => {
+    setFiltered(options);
+    setOpen(options.length > 0);
+  };
+
+  return (
+    <div className="autocomplete-wrapper" ref={wrapperRef}>
+      <input
+        type="text"
+        value={value}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        placeholder={placeholder}
+      />
+      <div className="dropdown-menu" style={{ display: open ? 'block' : 'none' }}>
+        {filtered.map(item => (
+          <div key={item} className="dropdown-item" onClick={() => handleSelect(item)}>
+            {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   const { register, handleSubmit, watch, setValue, reset, getValues } = useForm({});
@@ -118,6 +231,10 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
     fetchData();
   }, []);
 
+  // Compute unique names and codes for autocomplete
+  const uniqueNames = [...new Set(productsList.map(p => p.name || p.Name).filter(n => n))];
+  const uniqueCodes = [...new Set(productsList.map(p => p.code || p.Code).filter(c => c))];
+
   // Fetch subcategories when category changes
   useEffect(() => {
     if (selectedCategoryID) {
@@ -133,7 +250,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   // Update GST percentage when tax is selected (manual tax change)
   useEffect(() => {
     if (selectedTaxID) {
-      const selectedTax = taxes.find((t) => (t.ID || t.id) === selectedTaxID);
+      const selectedTax = taxes.find((t) => String(t.ID || t.id) === String(selectedTaxID));
       if (selectedTax) {
         setValue("gstPercent", selectedTax.Percentage ?? selectedTax.percentage ?? '');
       }
@@ -145,11 +262,11 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   // When HSN selected, auto-populate tax + gst
   useEffect(() => {
     if (!selectedHsnID) return;
-    const selHsn = hsnCodes.find(h => (h.id || h.ID) === selectedHsnID);
+    const selHsn = hsnCodes.find(h => String(h.id || h.ID) === String(selectedHsnID));
     if (selHsn) {
-      // Find tax either embedded or via tax_id
-      let taxObj = null;
-      if (selHsn.tax) taxObj = selHsn.tax; else if (selHsn.tax_id) taxObj = taxes.find(t => (t.ID || t.id) === selHsn.tax_id);
+    // Find tax either embedded or via tax_id
+    let taxObj = null;
+    if (selHsn.tax) taxObj = selHsn.tax; else if (selHsn.tax_id) taxObj = taxes.find(t => String(t.ID || t.id) === String(selHsn.tax_id));
       if (taxObj) {
         const taxId = taxObj.ID || taxObj.id;
         setValue('taxID', taxId, { shouldValidate: true });
@@ -187,8 +304,11 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-        <CircularProgress />
+      <div className="loading-wrapper">
+        <div className="spinner">
+          <CircularProgress />
+          <div className="loading-text">Loading form data...</div>
+        </div>
       </div>
     );
   }
@@ -220,244 +340,176 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
   };
 
   return (
-    <>
+    <div className="product-step-form">
       {formError && (
-        <div style={{ color: 'red', marginBottom: 10 }}>{formError}</div>
+        <div className="form-error">{formError}</div>
       )}
       <form onSubmit={handleSubmit(handleFormSubmit)}>
-        <Grid container spacing={2}>
-          {/* Product Name (Autocomplete) */}
-          <Grid item xs={12} md={4}>
-            <Autocomplete
-              freeSolo
-              options={productsList}
-              getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || option.Name || option.code || option.Code || '')}
-              value={(() => {
-                const val = getValues('name');
-                // find object for current name if exists
-                const found = productsList.find(p => (p.name || p.Name) === val || (p.code || p.Code) === val);
-                return found || (val ? val : null);
-              })()}
-              onChange={(event, newValue) => {
-                if (!newValue) {
-                  setValue('name', '');
-                  setValue('code', '');
-                  return;
-                }
-                if (typeof newValue === 'string') {
-                  setValue('name', newValue);
-                } else {
-                  const name = newValue.name || newValue.Name || '';
-                  const code = newValue.code || newValue.Code || '';
-                  setValue('name', name);
-                  setValue('code', code);
+        <div className="form-grid">
+          {/* Product Name */}
+          <div className="form-field">
+            <label className="field-label">Product Name</label>
+            <AutocompleteInput
+              options={uniqueNames}
+              value={getValues('name') || ''}
+              onChange={(val) => setValue('name', val)}
+              onSelect={(selectedName) => {
+                const found = productsList.find(p => (p.name || p.Name) === selectedName);
+                if (found) {
+                  setValue('code', found.code || found.Code || '');
                 }
               }}
-              onInputChange={(e, newInput) => {
-                // keep form value in sync when user types
-                setValue('name', newInput);
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Product Name" size="small" sx={{ width: '260px' }} />
-              )}
+              placeholder="Enter product name"
             />
-          </Grid>
-          {/* Code (Autocomplete) */}
-          <Grid item xs={12} md={4}>
-            <Autocomplete
-              freeSolo
-              options={productsList}
-              getOptionLabel={(option) => (typeof option === 'string' ? option : option.code || option.Code || option.name || option.Name || '')}
-              value={(() => {
-                const val = getValues('code');
-                const found = productsList.find(p => (p.code || p.Code) === val || (p.name || p.Name) === val);
-                return found || (val ? val : null);
-              })()}
-              onChange={(event, newValue) => {
-                if (!newValue) {
-                  setValue('code', '');
-                  setValue('name', '');
-                  return;
-                }
-                if (typeof newValue === 'string') {
-                  setValue('code', newValue);
-                } else {
-                  const name = newValue.name || newValue.Name || '';
-                  const code = newValue.code || newValue.Code || '';
-                  setValue('name', name);
-                  setValue('code', code);
+          </div>
+          {/* Code */}
+          <div className="form-field">
+            <label className="field-label">Code</label>
+            <AutocompleteInput
+              options={uniqueCodes}
+              value={getValues('code') || ''}
+              onChange={(val) => setValue('code', val)}
+              onSelect={(selectedCode) => {
+                const found = productsList.find(p => (p.code || p.Code) === selectedCode);
+                if (found) {
+                  setValue('name', found.name || found.Name || '');
                 }
               }}
-              onInputChange={(e, newInput) => {
-                setValue('code', newInput);
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Code" size="small" sx={{ width: '260px' }} />
-              )}
+              placeholder="Enter product code"
             />
-          </Grid>
+          </div>
           {/* HSN Dropdown */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>HSN Code</InputLabel>
-              <Select
-                label="HSN Code"
-                value={watch('hsnID') || ''}
-                {...register('hsnID')}
-                onChange={(e) => setValue('hsnID', e.target.value)}
-                sx={{ width: '260px' }}
-              >
-                {hsnCodes.map(h => (
-                  <MenuItem key={h.id || h.ID} value={h.id || h.ID}>
-                    {h.code}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">HSN Code</label>
+            <select 
+              value={watch('hsnID') || ''}
+              {...register('hsnID')}
+              onChange={(e) => setValue('hsnID', e.target.value)}
+            >
+              <option value="">Select HSN Code</option>
+              {hsnCodes.map(h => (
+                <option key={h.id || h.ID} value={h.id || h.ID}>
+                  {h.code}
+                </option>
+              ))}
+            </select>
+          </div>
           {/* Importance */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Importance</InputLabel>
-              <Select label="Importance" defaultValue="Normal" {...register("importance", { required: true })} sx={{ width: '260px' }}>
-                {['Normal','High','Critical'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Importance</label>
+            <select {...register("importance", { required: true })} defaultValue="Normal">
+              {['Normal','High','Critical'].map(level => <option key={level} value={level}>{level}</option>)}
+            </select>
+          </div>
           {/* Product Type */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Product Type</InputLabel>
-              <Select label="Product Type" defaultValue="All" {...register("productType", { required: true })} sx={{ width: '260px' }}>
-                {['All','Finished Goods','Semi-Finished Goods','Raw Materials'].map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Product Type</label>
+            <select {...register("productType", { required: true })} defaultValue="All">
+              {['All','Finished Goods','Semi-Finished Goods','Raw Materials'].map(type => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </div>
           {/* Minimum Stock */}
-          <Grid item xs={12} md={4}>
-            <TextField label="Minimum Stock" type="number" size="small" sx={{ width: '260px' }} {...register("minimumStock", { valueAsNumber: true })} />
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Minimum Stock</label>
+            <input type="number" placeholder="0" {...register("minimumStock", { valueAsNumber: true })} />
+          </div>
           {/* Category */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Category *</InputLabel>
-              <Select label="Category *" value={watch("categoryID") || ''} {...register("categoryID", { required: true })} sx={{ width: '260px' }}>
-                {categories.map(cat => <MenuItem key={cat.ID || cat.id} value={cat.ID || cat.id}>{cat.Name || cat.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label required">Category</label>
+            <select value={watch("categoryID") || ''} {...register("categoryID", { required: true })}>
+              <option value="">Select Category</option>
+              {categories.map(cat => <option key={cat.ID || cat.id} value={cat.ID || cat.id}>{cat.Name || cat.name}</option>)}
+            </select>
+          </div>
           {/* Subcategory */}
-            <Grid item xs={12} md={4}>
-              <FormControl size="small" InputLabelProps={{ shrink: true }}>
-                <InputLabel>Subcategory</InputLabel>
-                <Select label="Subcategory" value={watch("subcategoryID") || ''} {...register("subcategoryID")} sx={{ width: '260px' }}> 
-                  {subcategories.length > 0 ? (
-                    subcategories.map(sub => <MenuItem key={sub.ID || sub.id} value={sub.ID || sub.id}>{sub.Name || sub.name}</MenuItem>)
-                  ) : (
-                    <MenuItem disabled value="">No Subcategories Available</MenuItem>
-                  )}
-                </Select>
-              </FormControl>
-            </Grid>
+          <div className="form-field">
+            <label className="field-label">Subcategory</label>
+            <select value={watch("subcategoryID") || ''} {...register("subcategoryID")}>
+              <option value="">Select Subcategory</option>
+              {subcategories.length > 0 ? (
+                subcategories.map(sub => <option key={sub.ID || sub.id} value={sub.ID || sub.id}>{sub.Name || sub.name}</option>)
+              ) : (
+                <option disabled>No Subcategories Available</option>
+              )}
+            </select>
+          </div>
           {/* Unit */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Unit</InputLabel>
-              <Select label="Unit" value={watch("unitID") || ''} {...register("unitID")} sx={{ width: '260px' }}> 
-                {units.map(unit => <MenuItem key={unit.ID || unit.id} value={unit.ID || unit.id}>{unit.Name || unit.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Unit</label>
+            <select value={watch("unitID") || ''} {...register("unitID")}>
+              <option value="">Select Unit</option>
+              {units.map(unit => <option key={unit.ID || unit.id} value={unit.ID || unit.id}>{unit.Name || unit.name}</option>)}
+            </select>
+          </div>
           {/* Product Mode */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Product Mode</InputLabel>
-              <Select label="Product Mode" value={watch('product_mode') || ''} {...register("product_mode")} sx={{ width: '260px' }} onChange={(e) => setValue('product_mode', e.target.value)}>
-                <MenuItem value="Purchase">Purchase</MenuItem>
-                <MenuItem value="Internal Manufacturing">Internal Manufacturing</MenuItem>
-                <MenuItem value="Both">Both</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          {/* MOQ (added after Product Mode) */}
-          <Grid item xs={12} md={4}>
-            <TextField 
-              label="MOQ" 
-              type="number" 
-              size="small" 
-              sx={{ 
-                width: '260px',
-                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { display: 'none' },
-                '& input[type=number]': { '-moz-appearance': 'textfield' }
-              }} 
-              {...register("moq", { valueAsNumber: true })} 
-            />
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Product Mode</label>
+            <select value={watch('product_mode') || ''} {...register("product_mode")} onChange={(e) => setValue('product_mode', e.target.value)}>
+              <option value="">Select Mode</option>
+              <option value="Purchase">Purchase</option>
+              <option value="Internal Manufacturing">Internal Manufacturing</option>
+              <option value="Both">Both</option>
+            </select>
+          </div>
+          {/* MOQ */}
+          <div className="form-field">
+            <label className="field-label">MOQ</label>
+            <input type="number" placeholder="0" {...register("moq", { valueAsNumber: true })} />
+          </div>
           {/* Store */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Store</InputLabel>
-              <Select label="Store" value={watch("storeID") || ''} {...register("storeID")} sx={{ width: '260px' }}> 
-                {stores.map(store => <MenuItem key={store.ID || store.id} value={store.ID || store.id}>{store.Name || store.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
-          {/* Tag (after Store) */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Tag</InputLabel>
-              <Select
-                label="Tag"
-                multiple
-                value={watch('tagIDs') || []}
-                onChange={(e) => setValue('tagIDs', e.target.value)}
-                renderValue={(selected) => {
-                  if (!selected || selected.length === 0) return '';
-                  const names = tags.filter(t => (selected || []).includes(t.ID || t.id)).map(t => t.Name || t.name);
-                  return names.join(', ');
-                }}
-                sx={{ width: '260px' }}
-              >
-                {tags.length > 0 ? (
-                  tags.map(tag => (
-                    <MenuItem key={tag.ID || tag.id} value={tag.ID || tag.id}>
-                      <ListItemText primary={tag.Name || tag.name} />
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem disabled value="">No Tags Available</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Store</label>
+            <select value={watch("storeID") || ''} {...register("storeID")}>
+              <option value="">Select Store</option>
+              {stores.map(store => <option key={store.ID || store.id} value={store.ID || store.id}>{store.Name || store.name}</option>)}
+            </select>
+          </div>
           {/* Tax */}
-          <Grid item xs={12} md={4}>
-            <FormControl size="small" InputLabelProps={{ shrink: true }}>
-              <InputLabel>Tax</InputLabel>
-              <Select label="Tax" value={watch("taxID") || ''} {...register("taxID")} sx={{ width: '260px' }}> 
-                {taxes.map(tax => <MenuItem key={tax.ID || tax.id} value={tax.ID || tax.id}>{tax.Name || tax.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Tax</label>
+            <select value={watch("taxID") || ''} {...register("taxID")}>
+              <option value="">Select Tax</option>
+              {taxes.map(tax => <option key={tax.ID || tax.id} value={tax.ID || tax.id}>{tax.Name || tax.name}</option>)}
+            </select>
+          </div>
           {/* GST % */}
-          <Grid item xs={12} md={4}>
-            <TextField label="GST %" size="small" InputProps={{ readOnly: true }} InputLabelProps={{ shrink: true }} sx={{ width: '260px' }} {...register("gstPercent", { valueAsNumber: true })} />
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">GST %</label>
+            <input type="number" readOnly {...register("gstPercent")} />
+          </div>
+          {/* Tag (custom multi-select dropdown with chips) */}
+          <div className="form-field">
+            <label className="field-label">Tag</label>
+            <TagMultiSelect
+              tags={tags}
+              selectedTagIDs={watch('tagIDs') || []}
+              setValue={setValue}
+              getValues={getValues}
+            />
+          </div>
           {/* Description */}
-          <Grid item xs={12} md={4}>
-            <TextField label="Description" multiline rows={2} size="small" sx={{ width: '260px' }} {...register("description")} />
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Description</label>
+            <textarea placeholder="Enter product description" {...register("description")} />
+          </div>
           {/* Internal Notes */}
-          <Grid item xs={12} md={4}>
-            <TextField label="Internal Notes" multiline rows={2} size="small" sx={{ width: '260px' }} {...register("internalNotes")} />
-          </Grid>
+          <div className="form-field">
+            <label className="field-label">Internal Notes</label>
+            <textarea placeholder="Enter internal notes" {...register("internalNotes")} />
+          </div>
           {/* Active */}
-          <Grid item xs={12} md={4}>
-            <FormControlLabel control={<Checkbox defaultChecked {...register("isActive")} />} label="Is Active" />
-          </Grid>
-        </Grid>
-        <Button type="submit" variant="contained" sx={{ mt: 2 }}>Next</Button>
+          <div className="form-field">
+            <div className="checkbox-wrapper">
+              <input type="checkbox" id="isActive" defaultChecked {...register("isActive")} />
+              <label htmlFor="isActive">Is Active</label>
+            </div>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button type="submit" className="btn-primary">Next</button>
+        </div>
       </form>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -113,28 +115,31 @@ func UpdateStore(c *fiber.Ctx) error {
 }
 
 func DeleteStore(c *fiber.Ctx) error {
-	{
-		id := c.Params("id")
-		if id == "" || id == "undefined" {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID: empty or undefined"})
-		}
-
-		// First check if the store exists
-		var store models.Store
-		if err := storesDB.First(&store, id).Error; err != nil {
-			return c.Status(404).JSON(fiber.Map{"error": "Store not found"})
-		}
-
-		// Find products using this store and set their store_id to NULL
-		if err := storesDB.Model(&models.Product{}).Where("store_id = ?", id).Update("store_id", nil).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to update products: " + err.Error()})
-		}
-
-		// Now, delete the store
-		if err := storesDB.Delete(&store).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete store: " + err.Error()})
-		}
-
-		return c.SendStatus(204)
+	id := c.Params("id")
+	if id == "" || id == "undefined" {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID: empty or undefined"})
 	}
+
+	// First check if the store exists
+	var store models.Store
+	if err := storesDB.First(&store, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Store not found"})
+	}
+
+	// Check references in products
+	var prodCount int64
+	if err := storesDB.Model(&models.Product{}).Where("store_id = ?", id).Count(&prodCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if prodCount > 0 {
+		return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Cannot delete Store: it is used in %d product(s)", prodCount)})
+	}
+
+	// Now, delete the store
+	if err := storesDB.Delete(&store).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete store: " + err.Error()})
+	}
+
+	return c.SendStatus(204)
 }

@@ -1,6 +1,6 @@
 // Import dependencies
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 // Import icons
 import { 
   FaSearch, FaCog, FaTh, FaChartBar, 
@@ -12,12 +12,15 @@ import * as XLSX from 'xlsx';
 import './_top_menu.scss';
 import DisplayPref from '../../Pages/DisplayPref/DisplayPref';
 import AddLead from '../../Pages/AddLead/AddLead';
+import ImportLeadsDialog from './ImportLeadsDialog';
+import LeadDetails from '../LeadDetails/LeadDetails';
+import Pagination from '../../../CommonComponents/Pagination';
 
+import {BASE_URL} from '../../../config/Config' 
 
-import {BASE_URL} from '../../../Config'
-
-// Assigned to options
-const assignedToOptions = [
+// Assigned to options will be loaded from backend users
+// (fallback to a small static list while loading)
+const DEFAULT_ASSIGNED = [
   { id: 1, name: 'ABC' },
   { id: 2, name: 'XYZ' },
   { id: 3, name: '123' }
@@ -34,11 +37,11 @@ const FIELD_OPTIONS = [
   { key: 'city', label: 'City' },
   { key: 'state', label: 'State' },
   { key: 'country', label: 'Country' },
+  { key: 'gstin', label: 'GSTIN' },
   { key: 'source', label: 'Source' },
   { key: 'stage', label: 'Stage' },
   { key: 'potential', label: 'Potential (₹)' },
   { key: 'since', label: 'Since' },
-  { key: 'gstin', label: 'GSTIN' },
   { key: 'category', label: 'Category' },
   { key: 'product', label: 'Product' },
   { key: 'website', label: 'Website' },
@@ -66,7 +69,10 @@ const TopMenu = () => {
   const [activeFiltersBtn, setActiveFiltersBtn] = useState(false);
   const [showDisplayPref, setShowDisplayPref] = useState(false);
   const [showAddLead, setShowAddLead] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [editLead, setEditLead] = useState(null);
+  const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [leadDetails, setLeadDetails] = useState(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const fileInputRef = useRef(null);
@@ -83,14 +89,66 @@ const TopMenu = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-
   // Add products state to TopMenu
   const [products, setProducts] = useState([]);
+
+  // Assigned to options (fetched from backend users)
+  const [assignedToOptions, setAssignedToOptions] = useState(DEFAULT_ASSIGNED);
+
+  // Interactions and followups for lookup maps
+  const [interactions, setInteractions] = useState([]);
+  const [followups, setFollowups] = useState([]);
 
   // -------------------- Effects --------------------
   // Fetch leads from backend
   useEffect(() => {
     fetchLeads();
+  }, []);
+
+  // Fetch interactions and followups to build lookup maps for lastTalk and nextTalk
+  useEffect(() => {
+    const loadInteractionsAndFollowups = async () => {
+      try {
+        const [interRes, followRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/lead-interactions`),
+          fetch(`${BASE_URL}/api/lead-followups`)
+        ]);
+        const interData = await interRes.json();
+        const followData = await followRes.json();
+        const interArr = Array.isArray(interData) ? interData : (interData && interData.data ? interData.data : []);
+        const followArr = Array.isArray(followData) ? followData : (followData && followData.data ? followData.data : []);
+        console.log('Fetched interactions:', interArr);
+        console.log('Fetched followups:', followArr);
+        setInteractions(interArr);
+        setFollowups(followArr);
+      } catch (err) {
+        console.error('Failed to load interactions or followups', err);
+      }
+    };
+    loadInteractionsAndFollowups();
+    const handler = () => { loadInteractionsAndFollowups(); };
+    window.addEventListener('lead:interaction.saved', handler);
+    return () => { window.removeEventListener('lead:interaction.saved', handler); };
+  }, []);
+
+  // Listen for leads import events (same-tab via CustomEvent and cross-tab via storage events)
+  useEffect(() => {
+    const onLeadsImported = (e) => {
+      console.log('Detected leads:imported event', e && e.detail);
+      fetchLeads();
+    };
+    const onStorage = (e) => {
+      if (e.key === 'leads:imported') {
+        console.log('Detected leads:imported via storage event', e.newValue);
+        fetchLeads();
+      }
+    };
+    window.addEventListener('leads:imported', onLeadsImported);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('leads:imported', onLeadsImported);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   // Fetch products on mount
@@ -106,6 +164,63 @@ const TopMenu = () => {
     };
     fetchProducts();
   }, []);
+
+  // Fetch employees to populate assignedToOptions
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        // try to fetch many employees; backend returns { data: [...] }
+        const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
+        const data = await res.json();
+        // Support both shapes: { data: [...] } or direct array
+        const employeesList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+
+        const opts = employeesList.map(u => {
+          const name = [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || u.email || String(u.id);
+          return { id: u.id, name };
+        });
+
+        // Filter out obvious placeholders
+        const placeholders = new Set(['abc','xyz','123','sample','test','example','demo']);
+        const filtered = opts.filter(o => {
+          const n = (o.name || '').toLowerCase().trim();
+          if (!n) return false;
+          if (placeholders.has(n)) return false;
+          if (/^[0-9]+$/.test(n)) return false;
+          return true;
+        });
+
+        if (filtered.length > 0) setAssignedToOptions(filtered);
+      } catch (err) {
+        // keep default assignedToOptions
+      }
+    };
+    fetchEmployees();
+  }, []);
+
+  // If assignedToOptions load later, update existing leads to show resolved assignedTo names
+  useEffect(() => {
+    if (!assignedToOptions || assignedToOptions.length === 0) return;
+    setLeads(prev => prev.map(l => {
+      const cur = l.assignedTo;
+      // If it's a non-numeric string (already a name), keep it
+      if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) return l;
+      // Determine candidate id from multiple possible fields
+      let idCandidate;
+      if (cur && (typeof cur === 'number' || (typeof cur === 'string' && /^\d+$/.test(cur.trim())))) {
+        idCandidate = Number(cur);
+      } else if (l.assigned_to_id !== undefined && l.assigned_to_id !== null && l.assigned_to_id !== '') {
+        idCandidate = Number(l.assigned_to_id);
+      } else if (l.assignedToId !== undefined && l.assignedToId !== null && l.assignedToId !== '') {
+        idCandidate = Number(l.assignedToId);
+      }
+      if (idCandidate === undefined || isNaN(idCandidate)) return l;
+      const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
+      const resolved = found ? found.name : String(idCandidate);
+      if (String(resolved) === String(cur)) return l;
+      return { ...l, assignedTo: resolved };
+    }));
+  }, [assignedToOptions]);
 
   // Collapse dropdowns when clicking outside
   useEffect(() => {
@@ -130,6 +245,16 @@ const TopMenu = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showStatusDropdown, showViewDropdown]);
 
+  // If navigated here from dashboard with state, apply requested filters
+  const location = useLocation();
+  useEffect(() => {
+    if (location && location.state && location.state.statusFilter) {
+      setActiveStatusFilter(location.state.statusFilter);
+      // clear state so it doesn't reapply on history navigation
+      try { window.history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (e) { /* ignore */ }
+    }
+  }, [location && location.state]);
+
   // Update displayFields when DisplayPref modal closes
   useEffect(() => {
     if (!showDisplayPref) {
@@ -149,19 +274,39 @@ const TopMenu = () => {
       const data = await res.json();
 
       const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
-      const backendLeads = (data.data || []).map(lead => ({
-        ...lead,
-        starred: !!starredMap[lead.id],
-        assignedTo: assignedToOptions.find(opt => opt.id === lead.assigned_to_id)?.name || '',
-        // Normalize field names to match case-sensitive keys
-        addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
-        addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
-        category: lead.category || lead.Category || lead.formData?.category || '',
-        tags: lead.tags || lead.Tags || lead.formData?.tags || '',
-        // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
-        createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
-        updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
-      }));
+      const backendLeads = (data.data || []).map(lead => {
+        // Normalize assigned fields: id and display name from multiple possible backend shapes
+        const assignedId = lead.assigned_to_id || lead.assignedToId || (lead.assignedTo && typeof lead.assignedTo === 'number' ? lead.assignedTo : undefined);
+        let assignedName = '';
+        if (lead.assignedTo && typeof lead.assignedTo === 'string') {
+          assignedName = lead.assignedTo;
+        } else if (lead.assignedTo && typeof lead.assignedTo === 'object') {
+          assignedName = lead.assignedTo.name || lead.assignedTo.Name || '';
+        } else if (lead.assignedToName) {
+          assignedName = lead.assignedToName;
+        } else if (lead.assigned_to_name) {
+          assignedName = lead.assigned_to_name;
+        } else if (assignedId !== undefined && assignedId !== null) {
+          const found = assignedToOptions.find(opt => Number(opt.id) === Number(assignedId));
+          assignedName = found ? found.name : String(assignedId);
+        }
+
+        return {
+          ...lead,
+          starred: !!starredMap[lead.id],
+          product: lead.productName || '',
+          assignedTo: assignedName,
+          assigned_to_id: assignedId,
+          // Normalize field names to match case-sensitive keys
+          addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
+          addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
+          category: lead.category || lead.Category || lead.formData?.category || '',
+          tags: lead.tags || lead.Tags || lead.formData?.tags || '',
+          // Normalize timestamps from backend (created_at / createdAt / CreatedAt)
+          createdAt: lead.createdAt || lead.CreatedAt || lead.created_at || lead.created_at_time || null,
+          updatedAt: lead.updatedAt || lead.UpdatedAt || lead.updated_at || lead.updated_at_time || null
+        };
+      });
 
       // Get imported leads from localStorage (those without backend id)
       const importedLeadsRaw = (JSON.parse(localStorage.getItem('importedLeads') || '[]') || []);
@@ -199,8 +344,12 @@ const TopMenu = () => {
   };
 
   // Navigation
-  const handleReportsClick = () => navigate('/reports');
-  const handleCustomizeClick = () => navigate('/customize');
+  const handleReportsClick = () => window.open(`${window.location.origin}/reports`, '_blank');
+  const handleCustomizeClick = () => window.open(`${window.location.origin}/customize`, '_blank');
+  // Navigate to Sales Configuration and request the CRM-only section
+  const handleSalesConfigClick = () => window.open(`${window.location.origin}/sales-configuration?section=crm`, '_blank');
+  // Open leads dashboard
+  const handleDashboardClick = () => navigate('/leads-dashboard');
 
   // Lead actions
   const handleAddLeadSubmit = async (newLeadData) => {
@@ -218,11 +367,27 @@ const TopMenu = () => {
         }
       }
       // Resolve product to a valid numeric product_id when possible to avoid FK errors
-      let product_id = newLeadData.product ? Number(newLeadData.product) : undefined;
-      if (isNaN(product_id)) {
-        // try to find by product name in products list
-        const foundProduct = products.find(p => (p.ID && String(p.ID) === String(newLeadData.product)) || (p.id && String(p.id) === String(newLeadData.product)) || (p.Name && p.Name === newLeadData.product) || (p.name && p.name === newLeadData.product));
-        product_id = foundProduct ? (foundProduct.ID || foundProduct.id) : undefined;
+      let product_id = undefined;
+      let productNameForPayload = newLeadData.product;
+      if (newLeadData.product) {
+        // If product is an object, extract ID and Name
+        if (typeof newLeadData.product === 'object' && newLeadData.product !== null) {
+          product_id = newLeadData.product.ID || newLeadData.product.id;
+          productNameForPayload = newLeadData.product.Name || newLeadData.product.name || newLeadData.product.Code || '';
+        } else {
+          // Try to parse as number first
+          const numProduct = Number(newLeadData.product);
+          if (!isNaN(numProduct) && numProduct !== 0) {
+            product_id = numProduct;
+          } else {
+            // try to find by product name in products list
+            const foundProduct = products.find(p => (p.ID && String(p.ID) === String(newLeadData.product)) || (p.id && String(p.id) === String(newLeadData.product)) || (p.Name && p.Name === newLeadData.product) || (p.name && p.name === newLeadData.product));
+            if (foundProduct) {
+              product_id = foundProduct.ID || foundProduct.id;
+              productNameForPayload = foundProduct.Name || foundProduct.name || foundProduct.Code || newLeadData.product;
+            }
+          }
+        }
       }
 
       const payload = {
@@ -234,11 +399,11 @@ const TopMenu = () => {
         city: newLeadData.city,
         state: newLeadData.state,
         country: newLeadData.country,
+        gstin: newLeadData.gstin,
         source: newLeadData.source,
         stage: newLeadData.stage,
         potential: parseFloat(newLeadData.potential) || 0,
         since: newLeadData.since || new Date().toISOString(),
-        gstin: newLeadData.gstin,
         website: newLeadData.website,
         requirements: newLeadData.requirement,
         notes: newLeadData.notes,
@@ -246,11 +411,16 @@ const TopMenu = () => {
         addressLine1: newLeadData.addressLine1,
         addressLine2: newLeadData.addressLine2,
         category: newLeadData.category,
-        tags: newLeadData.tags
+        tags: newLeadData.tags,
+        productName: productNameForPayload
       };
 
       if (product_id !== undefined) payload.product_id = product_id;
       if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+      // Only include productName in payload if we have a name text and no product_id
+      if (!product_id && productNameForPayload) {
+        payload.productName = productNameForPayload;
+      }
 
       // Strip empty/undefined/null values to avoid backend parse/validation issues
       Object.keys(payload).forEach((k) => {
@@ -260,11 +430,18 @@ const TopMenu = () => {
       });
       if (editLead && editLead.id) {
         // Backend lead: update via API
-        await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
+        const res = await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        if (res.ok) {
+          // Update leads state immediately for instant UI
+          setLeads(prev => prev.map(l => l.id === editLead.id ? { ...l, ...data, product: productNameForPayload, assignedTo: assignedToOptions.find(opt => opt.id === assigned_to_id)?.name || '' } : l));
+        } else {
+          console.error('Failed to update lead:', data);
+        }
         await fetchLeads();
       } else if (editLead && (!editLead.id || typeof editLead.id !== 'number')) {
         // Imported lead: create on backend, then remove from local importedLeads
@@ -312,11 +489,21 @@ const TopMenu = () => {
         setEditLead(null);
       } else {
         // New lead: add via API
-        await fetch(`${BASE_URL}/api/leads`, {
+        const res = await fetch(`${BASE_URL}/api/leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        if (res.ok) {
+          // Update leads state immediately for instant UI
+          setLeads(prev => {
+            const newLead = { ...data, starred: false, product: productNameForPayload, assignedTo: assignedToOptions.find(opt => opt.id === assigned_to_id)?.name || '' };
+            return [newLead, ...prev];
+          });
+        } else {
+          console.error('Failed to add lead:', data);
+        }
         await fetchLeads();
       }
       setShowAddLead(false);
@@ -346,7 +533,7 @@ const TopMenu = () => {
     );
   };
 
-  const handleImportClick = () => fileInputRef.current.click();
+  const handleImportClick = () => setShowImportDialog(true);
 
   const handleDeleteRow = async (leadId) => {
     if (window.confirm('Are you sure you want to delete this lead?')) {
@@ -383,6 +570,11 @@ const TopMenu = () => {
       const found = assignedToOptions.find(opt => opt.id === assignedToName);
       assignedToName = found ? found.name : '';
     }
+    // Extract product name from object if needed
+    let productName = lead.product;
+    if (typeof productName === 'object' && productName !== null) {
+      productName = productName.Name || productName.name || productName.Code || '';
+    }
     setEditLead({
       ...lead,
       assignedTo: assignedToName,
@@ -390,7 +582,7 @@ const TopMenu = () => {
       addressLine1: lead.addressLine1 || '',
       addressLine2: lead.addressLine2 || '',
       category: lead.category || '',
-      product: lead.product || '',
+      product: productName,
       tags: lead.tags || '',
       code: lead.code || '',
       requirement: lead.requirements || lead.requirement || '',
@@ -433,15 +625,66 @@ const TopMenu = () => {
   };
 
   // -------------------- Helpers --------------------
-  const formatDate = (dateStr) => {
+  // Get the most recent interaction timestamp for a lead
+  const getLastTalkForLead = (leadId) => {
+    const leadIdStr = String(leadId);
+    const leadInteractions = interactions.filter(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+    if (leadInteractions.length === 0) return '';
+    const mapped = leadInteractions.map(i => {
+      const ts = i.timestamp || i.Timestamp || i.created_at || i.createdAt || '';
+      return ts ? new Date(ts) : null;
+    }).filter(d => d && !isNaN(d));
+    if (mapped.length === 0) return '';
+    mapped.sort((a, b) => b - a);
+    return mapped[0].toISOString();
+  };
+
+  // Get the next pending followup date for a lead (nearest future or earliest overall)
+  const getNextTalkForLead = (leadId) => {
+    const leadIdStr = String(leadId);
+    const leadFollowups = followups.filter(f => {
+      const lid = String(f.lead_id || f.LeadID || (f.lead && f.lead.id) || f.lead || '');
+      const status = (f.status || f.Status || '').toString().toLowerCase();
+      return lid === leadIdStr && (status === 'pending' || status === '' || status === undefined);
+    });
+    if (leadFollowups.length === 0) return '';
+    const mapped = leadFollowups.map(f => {
+      const dt = f.followup_on || f.FollowUpOn || f.followupOn || '';
+      return dt ? new Date(dt) : null;
+    }).filter(d => d && !isNaN(d));
+    if (mapped.length === 0) return '';
+    const now = new Date();
+    let candidates = mapped.filter(d => d >= now);
+    if (candidates.length === 0) candidates = mapped;
+    candidates.sort((a, b) => a - b);
+    return candidates[0].toISOString();
+  };
+
+  // Strict date formatter: returns empty string for falsy, invalid or placeholder dates.
+  // Optionally hides dates that are effectively 'now' (within 2 minutes) which often come from imported/default values.
+  const formatDateStrict = (dateStr, { hideIfNow = false } = {}) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    if (isNaN(date)) return dateStr;
+    if (isNaN(date)) return '';
+
+    const year = date.getFullYear();
+    const currentYear = new Date().getFullYear();
+    // Hide clearly invalid or placeholder years (too old or far future)
+    if (year < 1900 || year > currentYear + 5) return '';
+
+    if (hideIfNow) {
+      const now = Date.now();
+      // if date is within 2 minutes of now, treat it as default and hide
+      if (Math.abs(now - date.getTime()) < 2 * 60 * 1000) return '';
+    }
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
     return `${day}-${month}-${year}`;
-  };
+  }; 
+
+  // Backwards-compatible alias for fields where we want to show recent dates as well
+  const formatDate = (dateStr) => formatDateStrict(dateStr, { hideIfNow: false });
 
   const parseExcelDate = (value) => {
     if (!value) return '';
@@ -490,6 +733,18 @@ const TopMenu = () => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
           const nowIso = new Date().toISOString();
+
+          // Sanitize imported date values: return ISO string or empty to avoid bogus placeholder years
+          const sanitizeImportDate = (val) => {
+            if (!val) return '';
+            const d = new Date(val);
+            if (isNaN(d)) return '';
+            const y = d.getFullYear();
+            const currentYear = new Date().getFullYear();
+            if (y < 1900 || y > currentYear + 5) return '';
+            return d.toISOString();
+          };
+
           const newLeads = jsonData.map((row, index) => ({
             // Remove id or use a string id to avoid collision with backend ids
             id: `imported_${Date.now()}_${index}`,
@@ -506,17 +761,17 @@ const TopMenu = () => {
             city: row.City || row.city || '',
             state: row.State || row.state || '',
             country: row.Country || row.country || '',
-            source: row.Source || row.source || '',
+            gstin: row.GSTIN || row.gstin || '',
+            source: row.Source || row.source || 'Import from CSV',
             stage: row.Stage || row.stage || '',
             potential: (row.Potential || row['Potential (₹)'] || row.potential || '0').toString().replace(/[^\d]/g, ''),
-            since: row.Since || row.since || nowIso,
+            since: sanitizeImportDate(row.Since || row.since || '') || nowIso,
             assignedTo: row['Assigned to'] || row['AssignedTo'] || row['Assigned To'] || '',
             product: row.Product || row.product || '',
-            gstin: row.GSTIN || row.gstin || '',
             website: row.Website || row.website || '',
-            lastTalk: row['Last Talk'] || row.LastTalk || nowIso,
-            nextTalk: row['Next Talk'] || row.NextTalk || row.Next || '',
-            transferredOn: row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || nowIso,
+            lastTalk: sanitizeImportDate(row['Last Talk'] || row.LastTalk || ''),
+            nextTalk: sanitizeImportDate(row['Next Talk'] || row.NextTalk || row.Next || ''),
+            transferredOn: sanitizeImportDate(row['Transferred on'] || row['TransferredOn'] || row['Transfer Date'] || ''),
             // Category and tags
             category: row.Category || row.category || '',
             tags: row.Tags || row.tags || row.Tag || row.tag || '',
@@ -560,58 +815,67 @@ const TopMenu = () => {
     for (const l of leadsBatch) {
       try {
         // Resolve assigned_to_id only if valid in our limited options
+        // Accept both `assignedTo` and `assignedToName` from imported objects
         let assigned_to_id;
-        if (l.assignedTo !== undefined && l.assignedTo !== null && l.assignedTo !== '') {
-          const num = Number(l.assignedTo);
+        const assignedRaw = (l.assignedToName !== undefined && l.assignedToName !== null) ? l.assignedToName : l.assignedTo;
+        if (assignedRaw !== undefined && assignedRaw !== null && assignedRaw !== '') {
+          const num = Number(assignedRaw);
           if (!isNaN(num) && assignedToOptions.some(opt => Number(opt.id) === num)) {
             assigned_to_id = num;
           } else {
-            const match = assignedToOptions.find(opt => opt.name === l.assignedTo);
+            const match = assignedToOptions.find(opt => opt.name === assignedRaw);
             if (match) assigned_to_id = match.id;
           }
         }
 
         // Resolve product id if possible (by id or by name from loaded products)
+        // Accept both `product` and `productName` from imported objects
         let product_id;
-        if (l.product !== undefined && l.product !== null && l.product !== '') {
-          const pnum = Number(l.product);
+        const productRaw = (l.productName !== undefined && l.productName !== null) ? l.productName : l.product;
+        if (productRaw !== undefined && productRaw !== null && productRaw !== '') {
+          const pnum = Number(productRaw);
           if (!isNaN(pnum)) {
             product_id = pnum;
           } else {
-            const foundProduct = products.find(p => (p.ID && (String(p.ID) === String(l.product) || p.Name === l.product)) || (p.id && (String(p.id) === String(l.product) || p.name === l.product)));
+            const foundProduct = products.find(p => (p.ID && (String(p.ID) === String(productRaw) || p.Name === productRaw)) || (p.id && (String(p.id) === String(productRaw) || p.name === productRaw)));
             if (foundProduct) product_id = foundProduct.ID || foundProduct.id;
           }
         }
 
         // Build payload
         const payload = {
-          business: l.business,
-          contact: l.contact || l.name || [l.prefix, l.firstName, l.lastName].filter(Boolean).join(' '),
+          business: l.business || l.SENDER_COMPANY || '',
+          contact: l.contact || l.name || l.SENDER_NAME || [l.prefix, l.firstName, l.lastName].filter(Boolean).join(' '),
           designation: l.designation,
-          mobile: l.mobile,
-          email: l.email,
-          city: l.city,
-          state: l.state,
-          country: l.country,
-          source: l.source,
-          stage: l.stage,
-          potential: parseFloat((l.potential || '0').toString()) || 0,
+          mobile: l.mobile || l.SENDER_MOBILE || '',
+          email: l.email || l.SENDER_EMAIL || '',
+          city: l.city || l.SENDER_CITY || '',
+          state: l.state || l.SENDER_STATE || '',
+          country: l.country || l.buyer_country || '',
+          gstin: l.gstin || '',
+          source: l.source || l.enquiry_source || 'Import from CSV',
+          stage: l.stage || l.lead_stage || l.STATUS || 'New',
+          potential: parseFloat((l.potential || l.estimated_value || '0').toString()) || 0,
           since: (() => {
-            const d = new Date(l.since || l.createdAt);
+            const d = new Date(l.since || l.QUERY_TIME || l.enquiry_date || l.createdAt);
             return isNaN(d) ? new Date().toISOString() : d.toISOString();
           })(),
-          gstin: l.gstin,
-          website: l.website,
-          requirements: l.requirements || l.requirement,
-          notes: l.notes,
-          addressLine1: l.addressLine1,
-          addressLine2: l.addressLine2,
-          category: l.category,
-          tags: l.tags,
+          website: l.website || '',
+          requirements: l.requirements || l.requirement || l.QUERY_MESSAGE || l.buyer_requirement || '',
+          notes: l.notes || l.remarks || '',
+          addressLine1: l.addressLine1 || l.buyer_address || '',
+          addressLine2: l.addressLine2 || '',
+          category: l.category || l.lead_category || l.QUERY_CATEGORY_NAME || '',
+          tags: l.tags || (Array.isArray(l.lead_tags) ? l.lead_tags.join(',') : ''),
         };
 
         if (product_id !== undefined) payload.product_id = product_id;
         if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
+        // Also send textual values so backend can store exact CSV text when IDs are not resolvable
+        const sendProductText = (l.productName !== undefined && l.productName !== null && l.productName !== '') ? l.productName : l.product;
+        if (sendProductText !== undefined && sendProductText !== null && sendProductText !== '') payload.productName = sendProductText;
+        const sendAssignedText = (l.assignedToName !== undefined && l.assignedToName !== null && l.assignedToName !== '') ? l.assignedToName : l.assignedTo;
+        if (sendAssignedText !== undefined && sendAssignedText !== null && sendAssignedText !== '') payload.assignedToName = sendAssignedText;
         if (l.createdAt) payload.created_at = l.createdAt;
         if (l.updatedAt) payload.updated_at = l.updatedAt;
         // also include name explicitly for backend compatibility
@@ -688,16 +952,18 @@ const TopMenu = () => {
               : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
         } else if (field.key === 'potential') {
           value = lead.potential || '';
-        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
-          value = formatDate(lead[field.key]);
+        } else if (field.key === 'since') {
+          value = formatDate(lead.since);
+        } else if (field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
+          value = formatDateStrict(lead[field.key], { hideIfNow: true });
         } else if (field.key === 'assignedTo') {
-          value = typeof lead.assignedTo === 'object' && lead.assignedTo !== null
-            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
-            : (lead.assignedTo || '');
+          value = lead.assignedToName || (typeof lead.assignedTo === 'object' && lead.assignedTo !== null
+            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || '')
+            : (lead.assignedTo || ''));
         } else if (field.key === 'product') {
-          value = typeof lead.product === 'object' && lead.product !== null
-            ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
-            : (lead.product || '');
+          value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
+            ? (lead.product.Name || lead.product.name || lead.product.Code || '')
+            : (lead.product || ''));
         } else if (field.key === 'addressLine1') {
           value = lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '';
         } else if (field.key === 'addressLine2') {
@@ -707,11 +973,14 @@ const TopMenu = () => {
         } else if (field.key === 'tags') {
           value = lead.tags || lead.Tags || lead.formData?.tags || '';
         } else if (field.key === 'lastTalk') {
-          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+          const recentInteraction = getLastTalkForLead(lead.id);
+          // Show very recent interactions immediately (don't hide 'now')
+          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: false });
         } else if (field.key === 'nextTalk') {
-          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+          const nextFollowup = getNextTalkForLead(lead.id);
+          value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
         } else if (field.key === 'transferredOn') {
-          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
         } else if (field.key === 'assignedToId') {
           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
         } else if (field.key === 'productId') {
@@ -758,6 +1027,7 @@ const TopMenu = () => {
   const filterLeadsByStatus = (leads, status) => {
     if (status === 'All Active Leads') return leads;
     if (status === 'Discussion') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'discussion');
+    if (status === 'Appointment') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'appointment');
     if (status === 'Demo') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'demo');
     if (status === 'Proposal') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'proposal');
     if (status === 'Decided') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'decided');
@@ -800,8 +1070,55 @@ const TopMenu = () => {
   // Calculate total pages based on filtered leads
   const totalPages = Math.max(1, Math.ceil(displayedLeads.length / rowsPerPage));
 
+  // -------------------- Lead Stats --------------------
+  const isSameDay = (d) => {
+    if (!d) return false;
+    const dt = new Date(d);
+    if (isNaN(dt)) return false;
+    const today = new Date();
+    return dt.getFullYear() === today.getFullYear() && dt.getMonth() === today.getMonth() && dt.getDate() === today.getDate();
+  };
+
+  const totalLeads = leads.length;
+  const todaysLeads = leads.filter(l => isSameDay(l.createdAt || l.created_at || l.CreatedAt)).length;
+  const contactedCount = leads.filter(l => {
+    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+    if (['discussion', 'appointment', 'demo', 'proposal', 'decided', 'contacted'].includes(stage)) return true;
+    if (l.lastTalk || l.last_talk || l.last_contacted) return true;
+    return false;
+  }).length;
+  const pendingCount = leads.filter(l => {
+    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+    return stage === 'pending' || stage === 'new' || stage === '' || stage === 'open';
+  }).length;
+  const rejectedCount = leads.filter(l => {
+    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+    return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
+  }).length;
+
+  const convertedCount = leads.filter(l => {
+    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+    return ['decided', 'converted', 'won'].includes(stage);
+  }).length;
+
+  const isConverted = (lead) => {
+    const stage = (lead.stage || lead.Stage || '').toString().toLowerCase();
+    return ['decided', 'converted', 'won'].includes(stage);
+  };
+
+  const isRejected = (lead) => {
+    const stage = (lead.stage || lead.Stage || '').toString().toLowerCase();
+    return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
+  }; 
+
   // Paginated leads for current page
   const paginatedLeads = displayedLeads.slice((pageNo - 1) * rowsPerPage, pageNo * rowsPerPage);
+
+  // Force table re-render when interactions or followups data loads by depending on their length
+  const [, forceUpdate] = React.useState();
+  React.useEffect(() => {
+    forceUpdate({});
+  }, [interactions.length, followups.length]);
 
   // Pagination handlers
   const handlePrevPage = () => setPageNo(prev => Math.max(prev - 1, 1));
@@ -812,8 +1129,8 @@ const TopMenu = () => {
   };
 
   // Add this function before the return statement
-  const handleAddLeadModalSubmit = (leadOrNothing) => {
-    // If leadOrNothing is an object, it's an imported lead update
+  const handleAddLeadModalSubmit = async (leadOrNothing) => {
+    // If leadOrNothing is an object and appears to be an imported lead, update local importedLeads
     if (leadOrNothing && (!leadOrNothing.id || typeof leadOrNothing.id !== 'number' || String(leadOrNothing.id).startsWith('imported_'))) {
       // Get product name from products list
       let productName = leadOrNothing.product;
@@ -846,8 +1163,47 @@ const TopMenu = () => {
       setShowAddLead(false);
       setEditLead(null);
     } else {
-      // For backend leads, just refresh from backend
-      fetchLeads();
+      // If parent passed the created backend lead object, prepend it to the leads list for immediacy
+      if (leadOrNothing && leadOrNothing.id && typeof leadOrNothing.id === 'number') {
+        const created = leadOrNothing;
+        const assignedToName = assignedToOptions.find(opt => opt.id === created.assigned_to_id)?.name || created.assignedTo || '';
+        
+        // Extract product name properly
+        let productName = '';
+        if (created.productName) {
+          productName = created.productName;
+        } else if (created.product) {
+          if (typeof created.product === 'object' && created.product !== null) {
+            productName = created.product.Name || created.product.name || created.product.Code || '';
+          } else if (typeof created.product === 'string' && created.product) {
+            productName = created.product;
+          }
+        } else if (created.product_id) {
+          // Try to find product name from products list
+          const foundProduct = products.find(p => p.ID === created.product_id || p.id === created.product_id);
+          productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+        }
+        
+        const normalized = {
+          ...created,
+          starred: false,
+          assignedTo: assignedToName,
+          product: productName,
+          addressLine1: created.addressLine1 || created.addressline1 || created.address_line1 || created.formData?.addressLine1 || '',
+          addressLine2: created.addressLine2 || created.addressline2 || created.address_line2 || created.formData?.addressLine2 || '',
+          category: created.category || created.Category || created.formData?.category || '',
+          tags: created.tags || created.Tags || created.formData?.tags || '',
+          createdAt: created.createdAt || created.created_at || new Date().toISOString(),
+          updatedAt: created.updatedAt || created.updated_at || created.createdAt || new Date().toISOString()
+        };
+        setLeads(prev => {
+          // remove any existing lead with same id (avoid duplicates from imported list)
+          const filtered = prev.filter(l => !(l.id && l.id === normalized.id));
+          return [normalized, ...filtered];
+        });
+      } else {
+        await fetchLeads();
+      }
       setShowAddLead(false);
       setEditLead(null);
     }
@@ -871,7 +1227,7 @@ const TopMenu = () => {
             </button>
             {showStatusDropdown && (
               <div className="status-dropdown">
-                {['All Active Leads', 'Discussion', 'Demo', 'Proposal', 'Decided', 'Inactive'].map((filter) => (
+                {['All Active Leads', 'Discussion','Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'].map((filter) => (
                   <div
                     key={filter}
                     className={`dropdown-item${activeStatusFilter === filter ? ' active' : ''}`}
@@ -919,10 +1275,10 @@ const TopMenu = () => {
           </div>
           {/* Utility Buttons */}
           <div className="utility-buttons">
-            <button className="icon-btn" title="Sales Configuration"><FaCog /></button>
+            <button className="icon-btn" title="Sales Configuration" onClick={handleSalesConfigClick}><FaCog /></button>
             <button className="icon-btn" title="Display Preferences" onClick={() => setShowDisplayPref(true)}><FaBars /></button>
             <button className="icon-btn" title="Export to Excel" onClick={handleExportToExcel}><FaFileExport /></button>
-            <button className="icon-btn" title="Show Leads Dashboard"><FaTh /></button>
+            <button className="icon-btn" title="Show Leads Dashboard" onClick={handleDashboardClick}><FaTh /></button>
             <button className="icon-btn" title="Reports" onClick={handleReportsClick}><FaChartBar /></button>
           </div>
         </div>
@@ -953,9 +1309,13 @@ const TopMenu = () => {
           </div>
           {/* Right: Stats section */}
           <div className="stats-section">
-            <div className="count">Count: {leads.length}</div>
-            <div className="selected-count">Selected: {selectedLeadsCount}</div>
-            <div className="potential">Potential: {formatIndianRupees(leads.reduce((sum, lead) => sum + parseInt(lead.potential || "0"), 0))}</div>
+            <div className="stat-box total">Total: {totalLeads}</div>
+            <div className="stat-box today">Today: {todaysLeads}</div>
+            <div className="stat-box contacted">Contacted: {contactedCount}</div>
+            <div className="stat-box converted">Converted: {convertedCount}</div>
+            <div className="stat-box pending">Pending: {pendingCount}</div>
+            <div className="stat-box rejected">Rejected: {rejectedCount}</div>
+            <div className="stat-box potential">Potential: {formatIndianRupees(leads.reduce((sum, lead) => sum + parseInt(lead.potential || "0"), 0))}</div> 
           </div>
         </div>
       </div>
@@ -991,10 +1351,11 @@ const TopMenu = () => {
               </tr>
             ) : (
               Array.isArray(paginatedLeads) && paginatedLeads.map((lead, index) => (
-                <tr key={lead.id || index}>
+                <tr key={lead.id || index} className={isRejected(lead) ? 'rejected-row' : ''} onClick={() => { setLeadDetails(lead); setShowLeadDetails(true); }}>
                   <td className="checkbox-cell">
                     <input
                       type="checkbox"
+                      onClick={e => e.stopPropagation()}
                       checked={!!lead.selected}
                       onChange={() => handleSelectRow(lead.id)}
                     />
@@ -1003,7 +1364,7 @@ const TopMenu = () => {
                     <span
                       className={`star-icon ${lead.starred ? 'starred' : ''}`}
                       title={lead.starred ? 'Unmark as Star' : 'Mark as Star'}
-                      onClick={() => handleToggleStar(lead.id)}
+                      onClick={(e) => { e.stopPropagation(); handleToggleStar(lead.id); }}
                     >
                       <FaStar />
                     </span>
@@ -1023,16 +1384,36 @@ const TopMenu = () => {
                               : [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
                         } else if (field.key === 'potential') {
                           value = `₹${lead.potential || ''}`;
-                        } else if (field.key === 'since' || field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
-                          value = formatDate(lead[field.key]);
+                        } else if (field.key === 'since') {
+                          // 'since' can be shown even if it's today
+                          value = formatDate(lead.since);
+                        } else if (field.key === 'lastTalk') {
+                          const recentInteraction = getLastTalkForLead(lead.id);
+                          // Show very recent interactions immediately (don't hide 'now')
+                          value = formatDateStrict(recentInteraction || lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: false });
+                        } else if (field.key === 'nextTalk') {
+                          const nextFollowup = getNextTalkForLead(lead.id);
+                          value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
+                        } else if (field.key === 'transferredOn') {
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
                         } else if (field.key === 'assignedTo') {
-                          value = typeof lead.assignedTo === 'object' && lead.assignedTo !== null
-                            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || JSON.stringify(lead.assignedTo))
-                            : (lead.assignedTo || '');
+                          // Resolve name even when stored as numeric id or numeric string
+                          const cur = lead.assignedTo;
+                          if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) {
+                            value = cur;
+                          } else {
+                            const idCandidate = (cur && !isNaN(Number(cur))) ? Number(cur) : (lead.assigned_to_id ? Number(lead.assigned_to_id) : undefined);
+                            if (idCandidate !== undefined && !isNaN(idCandidate)) {
+                              const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
+                              value = found ? found.name : String(idCandidate);
+                            } else {
+                              value = '';
+                            }
+                          }
                         } else if (field.key === 'product') {
-                          value = typeof lead.product === 'object' && lead.product !== null
+                          value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
                             ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
-                            : (lead.product || '');
+                            : (lead.product || ''));
                         } else if (field.key === 'addressLine1') {
                           value = lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '';
                         } else if (field.key === 'addressLine2') {
@@ -1042,11 +1423,11 @@ const TopMenu = () => {
                         } else if (field.key === 'tags') {
                           value = lead.tags || lead.Tags || lead.formData?.tags || '';
                         } else if (field.key === 'lastTalk') {
-                          value = formatDate(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '');
+                          value = formatDateStrict(lead.lastTalk || lead.LastTalk || lead.last_talk || lead.lasttalk || lead.createdAt || '', { hideIfNow: true });
                         } else if (field.key === 'nextTalk') {
-                          value = formatDate(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '');
+                          value = formatDateStrict(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
                         } else if (field.key === 'transferredOn') {
-                          value = formatDate(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '');
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
                         } else if (field.key === 'assignedToId') {
                           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
                         } else if (field.key === 'productId') {
@@ -1096,17 +1477,14 @@ const TopMenu = () => {
 
       {/* Pagination Section */}
       <div className="pagination-section">
-        <button onClick={handlePrevPage} disabled={pageNo === 1}>Previous</button>
-        <span>Page {pageNo} of {totalPages}</span>
-        <span>
-          Rows per page:
-          <select value={rowsPerPage} onChange={handleRowsPerPageChange}>
-            {[5, 10, 25, 50].map(n => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </span>
-        <button onClick={handleNextPage} disabled={pageNo === totalPages}>Next</button>
+        <Pagination
+          page={pageNo}
+          total={displayedLeads.length}
+          rowsPerPage={rowsPerPage}
+          isZeroBased={false}
+          onPageChange={(newPage) => setPageNo(newPage)}
+          onRowsPerPageChange={(newRowsPerPage) => { setRowsPerPage(newRowsPerPage); setPageNo(1); }}
+        />
       </div>
 
       {/* Display Preferences Modal */}
@@ -1121,7 +1499,123 @@ const TopMenu = () => {
         onAddLeadSubmit={handleAddLeadModalSubmit}
         leadData={editLead}
         products={products}
+        assignedToOptions={assignedToOptions}
       />
+      {/* Import Leads Dialog */}
+      {showImportDialog && (
+        <ImportLeadsDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onExcelClick={() => { if (fileInputRef.current) fileInputRef.current.click(); }}
+          onLeadsImport={async (importedLeads) => {
+            console.log('Imported leads received:', importedLeads);
+            if (importedLeads && importedLeads.length > 0) {
+              try {
+                // Filter out leads with missing required fields (now requiring Source, Since, Assigned To)
+                const validLeads = importedLeads.filter(lead => {
+                  const business = lead.company || lead.business || '';
+                  const name = lead.name || lead.contact || '';
+                  const email = lead.email || '';
+                  const mobile = lead.phone || lead.mobile || '';
+                  const source = lead.source || lead.Source || lead.enquiry_source || '';
+                  const since = lead.since || lead.Since || lead.QUERY_TIME || lead.enquiry_date || '';
+                  const assigned = lead.assignedTo || lead.assignedToName || lead.assigned_to || '';
+
+                  if (!business || !name || !email || !mobile || !source || !since || !assigned) {
+                    console.warn('Skipping lead with missing required fields:', {
+                      business,
+                      name,
+                      email,
+                      mobile,
+                      source,
+                      since,
+                      assigned,
+                      lead
+                    });
+                    return false;
+                  }
+                  return true;
+                });
+
+                if (validLeads.length === 0) {
+                  alert('No valid leads to import. Make sure each lead has company, name, email, mobile, source, since, and assigned to.');
+                  setShowImportDialog(false);
+                  return;
+                }
+
+                // Prepare leads for backend import
+                const leadsToImport = validLeads.map(lead => ({
+                  business: lead.company || lead.business || '',
+                  name: lead.name || lead.contact || 'Unknown',
+                  email: lead.email || '',
+                  mobile: lead.phone || lead.mobile || '',
+                  product: lead.product || lead.productName || '',
+                  requirements: lead.message || lead.requirement || lead.requirements || '',
+                  source: lead.source || 'IndiaMART',
+                  stage: lead.stage || 'New',
+                  category: lead.category || '',
+                  city: lead.city || '',
+                  state: lead.state || '',
+                  country: lead.country || '',
+                  gstin: lead.gstin || '',
+                  addressLine1: lead.addressLine1 || '',
+                  addressLine2: lead.addressLine2 || '',
+                  designation: lead.designation || '',
+                  potential: parseInt(lead.estimatedValue || lead.potential || '0') || 0,
+                  tags: lead.tags || ''
+                }));
+
+                // Call backend import endpoint with array directly
+                console.log('Sending leads to backend import endpoint:', leadsToImport);
+                const response = await fetch(`${BASE_URL}/api/leads/import`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(leadsToImport)
+                });
+
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('Import successful:', result);
+                  console.log('Import details - Created:', result.created, 'Failed:', result.failed);
+                  if (result.errors && result.errors.length > 0) {
+                    console.error('Import errors:', result.errors);
+                  }
+                  
+                  alert(`Successfully imported ${result.created || validLeads.length} lead(s)${result.failed > 0 ? `, ${result.failed} failed` : ''}`);
+                  
+                  // Add small delay to ensure backend has committed the data
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  // Refresh leads list after successful import and wait for it to complete
+                  console.log('Refreshing leads list...');
+                  await fetchLeads();
+                  console.log('Leads list refreshed');
+
+                  // Notify other components and tabs that leads were imported
+                  try {
+                    const importedCount = (result && (result.created || result.created === 0)) ? result.created : validLeads.length;
+                    window.dispatchEvent(new CustomEvent('leads:imported', { detail: { count: importedCount } }));
+                    // Use localStorage to trigger storage events across tabs
+                    localStorage.setItem('leads:imported', JSON.stringify({ ts: Date.now(), count: importedCount }));
+                  } catch (e) { /* ignore */ }
+                  
+                  // Close dialog after refresh is complete
+                  setShowImportDialog(false);
+                } else {
+                  const error = await response.json();
+                  console.error('Import failed:', error);
+                  alert('Failed to import leads: ' + (error.error || 'Unknown error'));
+                }
+              } catch (err) {
+                console.error('Error during import:', err);
+                alert('Error importing leads: ' + err.message);
+              }
+            } else {
+              setShowImportDialog(false);
+            }
+          }}
+        />
+      )}
       <input
         type="file"
         ref={fileInputRef}
@@ -1129,6 +1623,16 @@ const TopMenu = () => {
         accept=".xlsx,.xls"
         onChange={handleFileUpload}
       />
+      {/* Lead Details Modal */}
+      {showLeadDetails && (
+        <LeadDetails
+          isOpen={showLeadDetails}
+          lead={leadDetails}
+          onClose={() => { setShowLeadDetails(false); setLeadDetails(null); }}
+          onEdit={(lead) => { handleEditRow(lead); setShowLeadDetails(false); setLeadDetails(null); }}
+          onStatusUpdate={fetchLeads}
+        />
+      )}
     </div>
   );
 };

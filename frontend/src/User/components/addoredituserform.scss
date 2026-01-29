@@ -1,0 +1,1108 @@
+// ============================================
+// USER FORM STYLES
+// ============================================
+
+// ============ BASE VARIABLES ============
+$primary-color: #1976d2;
+$primary-dark: #1565c0;
+$primary-light: #42a5f5;
+$error-color: #d32f2f;
+$error-light: #ef5350;
+$success-color: #388e3c;
+$border-color: #e0e0e0;
+$bg-light: #f5f5f5;
+$text-primary: #212121;
+$text-secondary: #757575;
+$text-disabled: #bdbdbd;
+$shadow-light: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.15);
+$radius: 4px;
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+// ============ FORM CONTAINER ============
+.user-form-container {
+  width: 100vw;
+  max-width: 100%;
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-lg;
+  }
+}
+
+/* Neutralize MUI Container margin-top when a generated class is present */
+.css-uowltm-MuiContainer-root {
+  margin-top: 0 !important;
+}
+
+// ============ TABS ============
+.form-tabs-wrapper {
+  border-bottom: 2px solid $border-color;
+  margin-bottom: $spacing-lg;
+  display: flex;
+  gap: 0;
+}
+
+.form-tab {
+  padding: $spacing-md $spacing-lg;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-secondary;
+  position: relative;
+  transition: color 0.3s ease;
+
+  &:hover {
+    color: $text-primary;
+  }
+
+  &.active {
+    color: $primary-color;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background-color: $primary-color;
+    }
+  }
+
+  &:disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
+.tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+
+  h6 {
+    font-size: 16px;
+    color: $primary-color;
+  }
+
+  &.active {
+    display: block;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// ============ FORM GRID ============
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ensure additional account type rows appear below the primary account type
+   and span the full width of the form grid. */
+.additional-account-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+
+  > div {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+  }
+
+  .form-select {
+    min-width: 220px;
+    max-width: 100%;
+  }
+
+  .btn-danger {
+    margin-left: auto;
+  }
+}
+
+.form-group {
+  display: contents;
+
+  .grid-col {
+    &.xs-12 {
+      grid-column: span 12;
+    }
+    &.xs-6 {
+      grid-column: span 6;
+    }
+    &.xs-4 {
+      grid-column: span 4;
+    }
+    &.xs-3 {
+      grid-column: span 3;
+    }
+    &.xs-2 {
+      grid-column: span 2;
+    }
+
+    @media (max-width: 768px) {
+      &.md-12 {
+        grid-column: span 6;
+      }
+      &.md-6 {
+        grid-column: span 6;
+      }
+      &.md-4 {
+        grid-column: span 6;
+      }
+      &.md-3 {
+        grid-column: span 6;
+      }
+      &.md-2 {
+        grid-column: span 6;
+      }
+    }
+
+    @media (max-width: 480px) {
+      grid-column: span 1 !important;
+    }
+  }
+}
+
+.grid-col {
+  display: flex;
+  flex-direction: column;
+}
+
+// ============ FORM FIELDS ============
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-primary;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  .required {
+    color: $error-color;
+  }
+
+  &.disabled {
+    color: $text-disabled;
+  }
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid $border-color;
+  border-radius: $radius;
+  background-color: #fff;
+  color: $text-primary;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  margin: 0 !important;
+
+  &:hover {
+    border-color: #bdbdbd;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  }
+
+  &:disabled {
+    background-color: $bg-light;
+    color: $text-disabled;
+    cursor: not-allowed;
+    border-color: $border-color;
+  }
+
+  &.error {
+    border-color: $error-color;
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
+    }
+  }
+}
+
+.form-textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: "Courier New", monospace;
+}
+
+.form-helper-text {
+  font-size: 12px;
+  color: $text-secondary;
+  margin-top: 2px;
+
+  &.error {
+    color: $error-color;
+  }
+}
+
+.error-message {
+  color: $error-color;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+// Select Wrapper (used in personal tab for consistency with employee form)
+.form-select-wrapper {
+  position: relative;
+  display: block;
+
+  select {
+    width: 100%;
+    appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23333' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-color: white;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    width: 12px;
+    height: 8px;
+  }
+}
+
+// ============ CHECKBOXES & RADIOS ============
+.form-checkbox,
+.form-radio {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  cursor: pointer;
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: $primary-color;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  label {
+    cursor: pointer;
+    font-size: 14px;
+    color: $text-primary;
+  }
+}
+
+// ============ TOGGLES/SWITCHES ============
+.form-switch {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+
+  input[type="checkbox"] {
+    appearance: none;
+    width: 44px;
+    height: 24px;
+    background-color: #ccc;
+    border-radius: 24px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.3s ease;
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: white;
+      top: 2px;
+      left: 2px;
+      transition: left 0.3s ease;
+    }
+
+    &:checked {
+      background-color: $primary-color;
+
+      &::before {
+        left: 22px;
+      }
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  label {
+    font-size: 14px;
+    color: $text-primary;
+    cursor: pointer;
+  }
+}
+
+// ============ PASSWORD INPUT ============
+.password-wrapper {
+  position: relative;
+
+  /* ensure the input inside a password wrapper has room for the toggle */
+  .form-input {
+    padding-right: 44px;
+  }
+
+  /* Keep compatibility with both class names used across forms */
+  .password-toggle,
+  .password-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $primary-color;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+
+    &:hover {
+      opacity: 0.7;
+    }
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+/* ============ INPUT WITH ACTION (e.g., GSTIN GET button) ============ */
+.input-with-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .form-input {
+    /* give room for the button inside the input area */
+    padding-right: 64px;
+  }
+
+  .input-action-btn {
+    position: absolute;
+    right: 2px;
+    top: 10%;
+    padding: 6px 10px;
+    border-radius: $radius;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      outline: none;
+      transform: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .input-action-btn {
+      right: 6px;
+    }
+  }
+}
+
+// ============ AUTOCOMPLETE/SEARCHABLE SELECT ============
+.autocomplete-wrapper {
+  position: relative;
+
+  .autocomplete-input {
+    position: relative;
+  }
+
+  .autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid $border-color;
+    border-top: none;
+    border-radius: 0 0 $radius $radius;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: $shadow-medium;
+    display: none;
+
+    &.open {
+      display: block;
+    }
+
+    .autocomplete-option {
+      padding: $spacing-sm $spacing-md;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+
+      &:hover,
+      &.selected {
+        background-color: $bg-light;
+        color: $primary-color;
+      }
+
+      &.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .autocomplete-clear {
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $text-secondary;
+    padding: 4px;
+
+    &:hover {
+      color: $text-primary;
+    }
+  }
+}
+
+// ============ SECTION HEADERS ============
+.section-header {
+  font-size: 18px;
+  font-weight: 600;
+  color: $text-primary;
+  margin: $spacing-lg 0 $spacing-md 0;
+  padding-bottom: $spacing-md;
+  border-bottom: 2px solid $border-color;
+}
+
+.subsection-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+  margin: $spacing-md 0 $spacing-sm 0;
+}
+
+// ============ BUTTONS ============
+.btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: $radius;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.btn-primary {
+  background-color: $primary-color;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: $primary-dark;
+    box-shadow: $shadow-medium;
+  }
+
+  &:active:not(:disabled) {
+    background-color: darken($primary-dark, 10%);
+  }
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: $primary-color;
+  border: 1px solid $primary-color;
+
+  &:hover:not(:disabled) {
+    background-color: rgba($primary-color, 0.05);
+  }
+}
+
+.btn-danger {
+  background-color: transparent;
+  color: $error-color;
+  border: 1px solid $error-color;
+
+  &:hover:not(:disabled) {
+    background-color: rgba($error-color, 0.05);
+  }
+}
+
+.btn-small {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+// ============ ADDITIONAL ADDRESSES ============
+.addresses-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+  margin: $spacing-md 0;
+}
+
+.address-card {
+  flex: 1 1 calc(50% - #{$spacing-md / 2});
+  min-width: 280px;
+  border: 1px solid $border-color;
+  border-radius: $radius;
+  padding: $spacing-md;
+  position: relative;
+  background: white;
+  box-shadow: $shadow-light;
+
+  @media (max-width: 768px) {
+    flex: 1 1 100%;
+  }
+
+  .address-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: $spacing-md;
+    color: $text-primary;
+  }
+
+  .address-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $spacing-sm;
+
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .address-field {
+    grid-column: span 1;
+  }
+
+  .remove-btn {
+    position: absolute;
+    top: $spacing-sm;
+    right: $spacing-sm;
+  }
+
+  .key-values {
+    margin-top: $spacing-md;
+    padding-top: $spacing-md;
+    border-top: 1px solid $border-color;
+
+    .key-value-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: $spacing-sm;
+      margin-bottom: $spacing-sm;
+      align-items: flex-end;
+    }
+  }
+
+  .add-field-btn {
+    margin-top: $spacing-sm;
+  }
+}
+
+.add-address-box {
+  flex: 1 1 calc(50% - #{$spacing-md / 2});
+  min-width: 280px;
+  border: 2px dashed $border-color;
+  border-radius: $radius;
+  padding: $spacing-lg;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  gap: $spacing-sm;
+
+  @media (max-width: 768px) {
+    flex: 1 1 100%;
+  }
+
+  &:hover {
+    border-color: $primary-color;
+    background-color: rgba($primary-color, 0.02);
+  }
+
+  .add-icon {
+    font-size: 24px;
+    font-weight: bold;
+    color: $primary-color;
+  }
+
+  .add-text {
+    color: $primary-color;
+    font-weight: 500;
+  }
+}
+
+// ============ BANK INFO ============
+.bank-info-card {
+  flex: 1 1 calc(50% - #{$spacing-md / 2});
+  min-width: 280px;
+  border: 1px solid $border-color;
+  border-radius: $radius;
+  padding: $spacing-md;
+  position: relative;
+  background: white;
+  box-shadow: $shadow-light;
+
+  @media (max-width: 768px) {
+    flex: 1 1 100%;
+  }
+
+  .bank-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: $spacing-md;
+    color: $text-primary;
+  }
+
+  .bank-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $spacing-sm;
+
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .bank-field {
+    grid-column: span 1;
+  }
+
+  .remove-btn {
+    position: absolute;
+    top: $spacing-sm;
+    right: $spacing-sm;
+  }
+}
+
+// ============ DOCUMENTS ============
+.documents-wrapper {
+  margin: $spacing-lg 0;
+}
+
+.upload-btn-wrapper {
+  margin-bottom: $spacing-md;
+
+  input[type="file"] {
+    display: none;
+  }
+}
+
+.documents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: $spacing-md;
+  margin: $spacing-md 0;
+}
+
+.document-card {
+  border: 1px solid $border-color;
+  border-radius: $radius;
+  overflow: hidden;
+  background: white;
+  box-shadow: $shadow-light;
+  transition: box-shadow 0.3s ease;
+
+  &:hover {
+    box-shadow: $shadow-medium;
+  }
+
+  .document-preview {
+    width: 100%;
+    height: 140px;
+    background-color: $bg-light;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .file-type {
+      font-size: 12px;
+      font-weight: 600;
+      color: $text-secondary;
+    }
+  }
+
+  .document-content {
+    padding: $spacing-sm;
+  }
+
+  .document-field {
+    margin-bottom: $spacing-sm;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .document-actions {
+    display: flex;
+    gap: $spacing-xs;
+    justify-content: space-around;
+    padding: $spacing-sm;
+    border-top: 1px solid $border-color;
+
+    /* Make action buttons more visible and easier to tap/click */
+    button {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: $primary-color;
+      padding: 0px !important;
+      min-width: 40px;
+      min-height: 40px;
+      border-radius: $radius;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition:
+        background-color 0.12s ease,
+        color 0.12s ease,
+        transform 0.06s ease;
+
+      &:hover {
+        background: rgba($primary-color, 0.08);
+        color: $primary-dark;
+      }
+
+      &:focus {
+        outline: 2px solid rgba($primary-color, 0.18);
+        outline-offset: 2px;
+      }
+
+      &.delete {
+        color: $error-color;
+
+        &:hover {
+          background: rgba($error-color, 0.08);
+          color: $error-light;
+        }
+      }
+
+      /* Larger icons for better visibility */
+      svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+      }
+    }
+  }
+}
+
+// ============ MODALS/DIALOGS ============
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 99999; // increased to ensure overlay is above app layers
+  align-items: center;
+  justify-content: center;
+
+  &.open {
+    display: flex;
+  }
+}
+
+.modal {
+  background: white;
+  border-radius: $radius;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 700px;
+  max-height: 670px;
+  overflow-y: auto;
+  z-index: 100000; // sit above the overlay and other elements
+  padding: 20px;
+}
+
+/* Ensure local modal is visible when inside our overlay even if a global
+   library (e.g. Bootstrap) defines .modal { display: none } elsewhere. */
+.modal-overlay .modal {
+  display: block !important;
+  position: relative !important;
+  margin: 0 auto !important;
+  z-index: 100000 !important;
+}
+
+.modal-header {
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $border-color;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: $text-primary;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $text-secondary;
+    padding: 4px;
+
+    &:hover {
+      color: $text-primary;
+    }
+  }
+}
+
+.modal-content,
+.modal-body {
+  padding: 10px;
+  margin: 0 auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between !important;
+  margin-top: 20px !important;
+}
+
+// ============ CROPPER (removed) ============
+// Cropper-related styles removed; ImageEditor component provides its own styling and controls.
+
+// ============ FORM ACTIONS ============
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-xl;
+  padding-top: $spacing-lg;
+  border-top: 1px solid $border-color;
+
+  .actions-left {
+    flex: 1;
+  }
+
+  .actions-right {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: flex-end;
+  }
+}
+
+// ============ LOADING STATES ============
+.loading-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+
+  .spinner {
+    border: 2px solid $bg-light;
+    border-top-color: $primary-color;
+    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ============ UTILITY CLASSES ============
+.full-width {
+  width: 100%;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  gap: $spacing-md;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.gap-sm {
+  gap: $spacing-sm;
+}
+
+.gap-md {
+  gap: $spacing-md;
+}
+
+.mb-sm {
+  margin-bottom: $spacing-sm;
+}
+
+.mb-md {
+  margin-bottom: $spacing-md;
+}
+
+.mt-md {
+  margin-top: $spacing-md;
+}
+
+.p-md {
+  padding: $spacing-md;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-error {
+  color: $error-color;
+}
+
+.text-success {
+  color: $success-color;
+}
+
+.text-secondary {
+  color: $text-secondary;
+}
+
+// ============ RESPONSIVE ADJUSTMENTS ============
+@media (max-width: 768px) {
+  .form-tabs-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .form-tab {
+    white-space: nowrap;
+  }
+
+  .addresses-wrapper,
+  .documents-grid {
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .user-form-container {
+    padding: $spacing-md;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: $spacing-sm;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+
+    .actions-left,
+    .actions-right {
+      width: 100%;
+
+      button {
+        width: 100%;
+      }
+    }
+  }
+
+  .documents-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+}

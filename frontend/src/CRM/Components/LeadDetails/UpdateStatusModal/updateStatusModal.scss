@@ -1,0 +1,218 @@
+.update-status-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+}
+
+.update-status-modal {
+  width: 90%;
+  max-width: 500px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.update-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.update-status-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.update-status-header .close-btn {
+  background: none !important;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666 !important;
+  border-radius: 6px;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.08s ease;
+}
+
+.update-status-header .close-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: currentColor;
+}
+
+.update-status-header .close-btn svg path {
+  fill: currentColor;
+}
+
+.update-status-header .close-btn:hover {
+  color: #333;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.update-status-header .close-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(27, 114, 54, 0.12);
+}
+
+.update-status-body {
+  padding: 16px;
+}
+
+.current-stage {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-left: 3px solid #1b7236;
+  font-size: 14px;
+}
+
+.current-stage strong {
+  margin-right: 8px;
+}
+
+.status-option {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.status-option label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-option input[type="radio"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.option-content {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.option-content select {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.option-content select:focus {
+  outline: none;
+  border-color: #1b7236;
+  box-shadow: 0 0 0 2px rgba(27, 114, 54, 0.1);
+}
+
+/* Inline edit controls for rejection reasons */
+.reason-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.reason-inline .edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1b6bca;
+  padding: 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-edit input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.inline-edit .btn.save-btn,
+.inline-edit .btn.cancel-btn {
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  min-width: 32px;
+  min-height: 32px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-edit .btn.save-btn svg,
+.inline-edit .btn.cancel-btn svg {
+  width: 18px;
+  height: 18px;
+  color: #666;
+}
+
+/* Group the action buttons and remove gap between them */
+.inline-edit .inline-actions {
+  display: flex;
+  gap: 0; /* no spacing between save & cancel */
+}
+.inline-edit .inline-actions .btn {
+  margin-left: 0;
+  padding: 0 !important; /* small horizontal hit area */
+}
+
+.btn {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn.update-btn {
+  background: #1b7236;
+  color: #fff;
+  border-color: #156026;
+}
+
+.btn.update-btn:hover {
+  background: #156026;
+}
+
+.btn.reject-btn {
+  background: #dc3545;
+  color: #fff;
+  border-color: #bb2d3b;
+}
+
+.btn.reject-btn:hover {
+  background: #bb2d3b;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../../styles/user_mapping.scss";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 
 const users = [
   { label: "admin assignor (admin@cag.com)", value: "admin@cag.com" },

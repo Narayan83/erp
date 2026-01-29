@@ -1,11 +1,10 @@
 import React, { useContext, useState } from "react";
-import Button from "@mui/material/Button";
-import { GrDashboard } from "react-icons/gr";
 import { MdKeyboardArrowRight } from "react-icons/md";
 import { MdKeyboardArrowDown } from "react-icons/md";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { menuItems } from "../../MenuData/MenuData";
 import { myContext } from "../../../App";
+import "./MainSideBar.scss";
 const MainSideBar = () => {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -15,118 +14,82 @@ const MainSideBar = () => {
   };
 
   const context = useContext(myContext) || { isToggleSideBar: false, setIsToggleSideBar: () => {} };
-  
+
   return (
-    <div className="sidebar">
-      <ul>
-        {/* <li>
-          <Link to={"/"}>
-            <Button className={`w-100 ${activeTab === 0 ? "active" : ""} `}>
-              <span className="icon">
-                <GrDashboard />
-              </span>
-              Dashboard
-              <span className="arrow-right">
-                <MdKeyboardArrowRight />
-              </span>
-            </Button>
-          </Link>
-        </li>
-
-        <li>
-          <Button
-            className={`w-100 ${activeTab === 1 ? "active" : ""} `}
-             onClick={() => isOpenSubmenu(1)}
-           
-          >
-            <span className="icon">
-              <GrDashboard />
-            </span>
-            Product
-            <span className="arrow-right">
-               {activeTab === 1 ? <MdKeyboardArrowDown /> : <MdKeyboardArrowRight />}
-            </span>
-          </Button>
-          <div
-            className={`sub-menu-wraper ${
-              activeTab === 1 ? "colapse" : "colapsed"
-            }`}
-          >
-            <ul className="submenu">
-              <li>
-                <Link to={"/"}>Add Product</Link>
-              </li>
-              <li>
-                <Link to={"/"}>Manage Product</Link>
-              </li>
-              <li>
-                <Link to={"/"}>Update Product</Link>
-              </li>
-              <li>
-                <Link to={"/"}>Remove Product</Link>
-              </li>
-            </ul>
-          </div>
-        </li> */}
-
+    <nav className="sidebar">
+      <ul className="sidebar-menu">
         {menuItems.map((item) => {
           const Icon = item.icon || (() => null);
 
           return (
-            <li key={item.id}>
+            <li key={item.id} className="menu-item">
               {item.submenu ? (
                 <>
-                  <Button
-                    className={`w-100 ${activeTab === item.id ? "active" : ""}`}
+                  <button
+                    className={`menu-btn ${activeTab === item.id ? "active open" : ""}`}
                     onClick={() => isOpenSubmenu(item.id)}
+                    aria-expanded={activeTab === item.id}
+                    aria-controls={`submenu-${item.id}`}
                   >
-                    <span className="icon">
-                      <Icon />
+                    <span className="menu-icon">
+                      <span className="menu-icon-bg" aria-hidden>
+                        <Icon />
+                      </span>
                     </span>
-                    {item.title}
-                    <span className="arrow-right">
+                    <span className="menu-title">{item.title}</span>
+                    <span className="menu-arrow" aria-hidden>
                       {activeTab === item.id ? (
                         <MdKeyboardArrowDown />
                       ) : (
                         <MdKeyboardArrowRight />
                       )}
                     </span>
-                  </Button>
+                  </button>
                   <div
-                    className={`sub-menu-wraper ${
-                      activeTab === item.id ? "colapse" : "colapsed"
+                    className={`submenu-wrapper ${
+                      activeTab === item.id ? "open" : "closed"
                     }`}
                   >
                     <ul className="submenu">
                       {item.submenu.map((sub, idx) => (
-                        <li key={idx}>
-                          <Link to={sub.path}>{sub.title}</Link>
+                        <li key={idx} className="submenu-item">
+                          <NavLink
+                            to={sub.path}
+                            className={({ isActive }) =>
+                              "submenu-link" + (isActive ? " active" : "")
+                            }
+                          >
+                            {sub.title}
+                          </NavLink>
                         </li>
                       ))}
                     </ul>
                   </div>
                 </>
               ) : (
-                <Link to={item.path}>
-                  <Button
-                    className={`w-100 ${activeTab === item.id ? "active" : ""}`}
+                <Link to={item.path} className="menu-link">
+                  <button
+                    className={`menu-btn ${activeTab === item.id ? "active" : ""}`}
                     onClick={() => setActiveTab(item.id)}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
                   >
-                    <span className="icon">
-                      <Icon />
+                    <span className="menu-icon">
+                      <span className="menu-icon-bg" aria-hidden>
+                        <Icon />
+                      </span>
                     </span>
-                    {item.title}
-                    <span className="arrow-right">
+                    <span className="menu-title">{item.title}</span>
+                    <span className="menu-arrow" aria-hidden>
                       <MdKeyboardArrowRight />
                     </span>
-                  </Button>
+                  </button>
                 </Link>
               )}
             </li>
           );
         })}
       </ul>
-    </div>
+    </nav>
   );
 };
 

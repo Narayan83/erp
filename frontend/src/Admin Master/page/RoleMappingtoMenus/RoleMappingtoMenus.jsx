@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../../styles/role_mapping.scss";
 
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
 
 export default function RoleManagement() {
   // Simple console capture setup

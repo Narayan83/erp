@@ -7,27 +7,27 @@ import DeleteIcon from "@mui/icons-material/Delete";
 export default function UnitTable({ units, onEdit, onDelete, page, rowsPerPage }) {
   return (
     <TableContainer component={Paper}>
-      <Table size="small">
+      <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
         <TableHead>
           <TableRow>
-            <TableCell>S.No.</TableCell>
-            <TableCell>Unit</TableCell>
-            <TableCell>Description</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell style={{ textAlign: 'left', width: 60 }}>S.No.</TableCell>
+            <TableCell align="center" sx={{ width: 200 }}>Unit</TableCell>
+            <TableCell align="center" sx={{ width: 'auto' }}>Description</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 120 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {units.map((unit, index) => (
             <TableRow key={unit.ID || index} sx={{ height: 36 }}>
-              <TableCell sx={{ py: 0.5 }}>
+              <TableCell align="left" sx={{ py: 0.5, width: 60 }}>
                 {(page * rowsPerPage) + index + 1}
               </TableCell>
-              <TableCell sx={{ py: 0.5 }}>{unit.name || unit.Name}</TableCell>
-              <TableCell sx={{ py: 0.5 }}>{unit.description || unit.Description}</TableCell>
-              <TableCell align="right" sx={{ py: 0.5 }}>
+              <TableCell align="center" sx={{ py: 0.5, width: 200 }}>{unit.name || unit.Name}</TableCell>
+              <TableCell align="center" sx={{ py: 0.5, width: 'auto' }}>{unit.description || unit.Description}</TableCell>
+              <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
                 <IconButton size="small" onClick={() => onEdit(unit)}><EditIcon fontSize="small" /></IconButton>
                 <IconButton size="small" onClick={() => onDelete(unit)}><DeleteIcon fontSize="small" /></IconButton>
-              </TableCell>
+              </TableCell> 
             </TableRow>
           ))}
         </TableBody>

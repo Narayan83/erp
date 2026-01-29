@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
-import {
-  Box, Button, TextField, Typography
-} from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
 import axios from "axios";
 
 import SubcategoryDialog from "../components/SubcategoryDialog";
 import SubcategoryTable from "../components/SubcategoryTable";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
+import "./subcategory.scss";
 
 const SubcategoryPage = () => {
   const [subcategories, setSubcategories] = useState([]);
@@ -19,6 +18,7 @@ const SubcategoryPage = () => {
 
   const [openDialog, setOpenDialog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
     loadSubcategories();
@@ -106,33 +106,45 @@ const handleOpenDialog = async (item = { id: null, name: "" }) => {
   const handleDelete = async () => {
     try {
       await axios.delete(`${BASE_URL}/api/subcategories/${confirmDelete.id}`);
+      setSnackbar({ open: true, message: "Deleted", severity: "success" });
       setConfirmDelete({ open: false, id: null });
       loadSubcategories();
     } catch (err) {
       console.error("Failed to delete subcategory:", err);
+      // Prefer backend-provided error message if available
+      const backendMsg = err?.response?.data?.error || err?.response?.data?.message;
+      const message = backendMsg || err?.message || "Failed to delete";
+      setSnackbar({ open: true, message, severity: "error" });
+      setConfirmDelete({ open: false, id: null });
     }
   };
 
   return (
-     <section className="right-content">
-    <Box p={3}>
-      
-
-      <Box display="flex" justifyContent="space-between" mb={2}>
+    <section className="right-content">
+      <div className="subcategory-page-header">
         <h6>Manage Subcategories</h6>
-        <TextField
-          label="Filter by Name"
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(1);
-          }}
-          size="small"
-        />
-        <Button variant="contained" onClick={() => handleOpenDialog()}>
-          Add Subcategory
-        </Button>
-      </Box>
+        <div className="search-field-wrapper">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Filter by Name"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="add-button-wrapper">
+          <button
+            className="btn-add"
+            onClick={() => handleOpenDialog()}
+            type="button"
+          >
+            Add Subcategory
+          </button>
+        </div>
+      </div>
 
       <SubcategoryTable
         data={subcategories}
@@ -163,7 +175,14 @@ const handleOpenDialog = async (item = { id: null, name: "" }) => {
         onCancel={() => setConfirmDelete({ open: false, id: null })}
         onConfirm={handleDelete}
       />
-    </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
     </section>
   );
 };
