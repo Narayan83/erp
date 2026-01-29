@@ -334,6 +334,7 @@ func main() {
 		&models.CRMTag{},
 		&models.LeadSource{},
 		&models.RejectionReason{},
+		&models.ServiceItem{},
 	)
 
 	if err != nil {

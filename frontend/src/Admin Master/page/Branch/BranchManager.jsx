@@ -338,11 +338,40 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
     });
   };
 
+  const formatDeleteError = (err) => {
+    try {
+      const data = err?.response?.data || {};
+      if (data.error) {
+        let msg = data.error;
+        if (data.details) {
+          const d = data.details;
+          const parts = [];
+          if (d.bank_count) parts.push(`${d.bank_count} bank(s)`);
+          if (d.quotation_count) parts.push(`${d.quotation_count} quotation(s)`);
+          if (d.series_count) parts.push(`${d.series_count} series`);
+          if (parts.length) msg += ` — referenced by: ${parts.join(', ')}`;
+        }
+        return msg;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return err?.response?.data?.error || err?.message || 'Error deleting branch';
+  };
+
   const handleSave = async () => {
     try {
       for (const it of items) {
-        if (it._deleted && it.ID) await axios.delete(`${BASE_URL}/api/company-branches/${it.ID}`);
-        else if (it.ID) {
+        if (it._deleted && it.ID) {
+          try {
+            await axios.delete(`${BASE_URL}/api/company-branches/${it.ID}`);
+          } catch (err) {
+            const msg = formatDeleteError(err);
+            alert(msg);
+            // stop processing to avoid partial changes
+            return;
+          }
+        } else if (it.ID) {
           if (it._edited) await axios.put(`${BASE_URL}/api/company-branches/${it.ID}`, { name: it.BranchName });
         } else {
           if (it.BranchName && it.BranchName.trim()) await axios.post(`${BASE_URL}/api/company-branches`, { name: it.BranchName });
@@ -408,7 +437,18 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
                       await fetchItems();
                     } catch (err) {
                       console.error(err);
-                      alert('Error deleting branch');
+                      // show friendly message if backend provided details
+                      const data = err?.response?.data || {};
+                      let msg = data.error || err?.message || 'Error deleting branch';
+                      if (data.details) {
+                        const d = data.details;
+                        const parts = [];
+                        if (d.bank_count) parts.push(`${d.bank_count} bank(s)`);
+                        if (d.quotation_count) parts.push(`${d.quotation_count} quotation(s)`);
+                        if (d.series_count) parts.push(`${d.series_count} series`);
+                        if (parts.length) msg += ` — referenced by: ${parts.join(', ')}`;
+                      }
+                      alert(msg);
                     }
                   }}>
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">

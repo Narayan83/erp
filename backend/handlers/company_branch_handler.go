@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"erp.local/backend/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -155,7 +157,29 @@ func UpdateCompanyBranch(c *fiber.Ctx) error {
 func DeleteCompanyBranch(c *fiber.Ctx) error {
 	id := c.Params("id")
 
+	// Check for related records that would block deletion
+	var bankRefs int64
+	companyBranchDB.Model(&models.CompanyBranchBank{}).Where("company_branch_id = ?", id).Count(&bankRefs)
+	var quoteRefs int64
+	companyBranchDB.Model(&models.QuotationTable{}).Where("company_branch_id = ?", id).Count(&quoteRefs)
+	var seriesRefs int64
+	companyBranchDB.Model(&models.Series{}).Where("company_branch_id = ? OR company_branch_ids @> ?", id, fmt.Sprintf("[%s]", id)).Count(&seriesRefs)
+
+	if bankRefs > 0 || quoteRefs > 0 || seriesRefs > 0 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Cannot delete company branch: referenced by other records",
+			"details": fiber.Map{
+				"bank_count":      bankRefs,
+				"quotation_count": quoteRefs,
+				"series_count":    seriesRefs,
+			},
+		})
+	}
+
+	// Safe to delete
 	if err := companyBranchDB.Delete(&models.CompanyBranch{}, id).Error; err != nil {
+		// log and return friendly error
+		fmt.Printf("Failed to delete company branch %s: %v\n", id, err)
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 

@@ -23,6 +23,7 @@ import TermsConditionSelector from "./TermsConditionModal";
 import PrintSettingsDialog from "../../../PrintSettings/Print";
 import SavedTemplate from "../../../Admin Master/page/SavedTemplate/SavedTemplate";
 import { useParams } from "react-router-dom"; 
+import AddNonStockModal from "../../../Admin Master/page/NonStock/AddNonStockModal";
 import {
   TextField,
   SearchableSelect,
@@ -76,6 +77,71 @@ const AddQutation = () => {
   const [selectedBranch, setSelectedBranch] = useState(null);
 
 
+  const [nonStockItems, setNonStockItems] = useState([]);
+  const [nonStockSearch, setNonStockSearch] = useState("");
+  const [selectedNonStockIds, setSelectedNonStockIds] = useState([]);
+
+  const toggleNonStockSelection = (id) => {
+    setSelectedNonStockIds(prev => {
+      const exists = prev.includes(id);
+      if (exists) return prev.filter(x => x !== id);
+      return [...prev, id];
+    });
+  };
+
+  const clearNonStockSelections = () => setSelectedNonStockIds([]);
+
+  const addSelectedNonStockItems = () => {
+    if (!nonStockItems || nonStockItems.length === 0) return;
+    const toAdd = nonStockItems.filter(p => selectedNonStockIds.includes(p.id || p.ID));
+    toAdd.forEach(p => {
+      try {
+        handleSelectNonStockItem(p);
+      } catch (e) {
+        console.error('Failed to add selected non-stock item', e);
+      }
+    });
+    clearNonStockSelections();
+    setOpenAddServiceModal(false);
+  };
+
+  const handleSelectNonStockItem = (item) => {
+    const qty = 1;
+    const rate = Number(item.rate) || 0;
+    const gstPercent = Number(item.gst) || 0;
+
+    const taxable = qty * rate;
+    const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
+    const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
+    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
+
+    const newItem = {
+      id: `service-${item.id || item.ID}-${Date.now()}`,
+      name: item.item_name || item.ItemName || '',
+      description: item.description || item.Description || '',
+      qty,
+      unit: item.unit || item.Unit || 'no.s',
+      hsn: item.hsn_sac || item.HSNSAC || '',
+      rate,
+      gst: gstPercent,
+      taxable: taxRes.amount,
+      cgst: taxRes.cgst,
+      sgst: taxRes.sgst,
+      igst: taxRes.igst,
+      amount: taxRes.grandTotal,
+      variantId: null,
+      _isService: true,
+      _rowId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+
+    setTableItems((prev) => {
+      const next = [...prev, newItem];
+      const total = next.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      setGrandTotal(+total.toFixed(2));
+      return next;
+    });
+  };
+
   const [openProdTable, setOpenProdTable] = useState(false); // modal state
   const [prodsearch, setProdSearch] = useState(""); // search text
   const [products, setProducts] = useState([]); // fetched products
@@ -85,6 +151,8 @@ const AddQutation = () => {
   const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState('');
   const [tableItems, setTableItems] = useState([]); // items in main table
   const [grandTotal , setGrandTotal] = useState(0);
+  const [totalTaxable, setTotalTaxable] = useState(0);
+  const [totalTaxAmount, setTotalTaxAmount] = useState(0);
   const [printerHeader, setPrinterHeader] = useState(null);
 
   const [isGSTStateMatch, setIsGSTStateMatch]  = useState(true);
@@ -138,60 +206,7 @@ const [productSelections, setProductSelections] = useState({});
 
     // Add Service modal state
     const [openAddServiceModal, setOpenAddServiceModal] = useState(false);
-    const [addServiceValues, setAddServiceValues] = useState({
-      name: '',
-      description: '',
-      qty: 1,
-      rate: 0,
-      unit: 'no.s',
-      hsn: '',
-      gst: 0,
-    });
-
-    const handleSaveAddService = () => {
-      if (!addServiceValues || !addServiceValues.name) {
-        alert('Please provide a service name.');
-        return;
-      }
-
-      const qty = Number(addServiceValues.qty) || 0;
-      const rate = Number(addServiceValues.rate) || 0;
-      const gstPercent = Number(addServiceValues.gst) || 0;
-
-      const taxable = qty * rate;
-      const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
-      const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-      const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
-
-      const newItem = {
-        id: `service-${Date.now()}`,
-        name: addServiceValues.name,
-        description: addServiceValues.description || '',
-        qty,
-        unit: addServiceValues.unit || 'no.s',
-        hsn: addServiceValues.hsn || '',
-        rate,
-        gst: gstPercent,
-        taxable: taxRes.amount,
-        cgst: taxRes.cgst,
-        sgst: taxRes.sgst,
-        igst: taxRes.igst,
-        amount: taxRes.grandTotal,
-        variantId: null,
-          _isService: true,
-          _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      }; 
-
-      setTableItems((prev) => {
-        const next = [...prev, newItem];
-        const total = next.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-        setGrandTotal(+total.toFixed(2));
-        return next;
-      });
-
-      setAddServiceValues({ name: '', description: '', qty: 1, rate: 0, unit: 'no.s', hsn: '', gst: 0 });
-      setOpenAddServiceModal(false);
-    };
+    const [showCreateNonStockModal, setShowCreateNonStockModal] = useState(false);
 
 const [tandc,setTandc]=useState([]);
 const [openTandCModal, setOpenTandCModal] = useState(false);
@@ -429,6 +444,18 @@ useEffect(()=>{console.log(customers)},[customers]);
   };
 
 
+  // Fetch non-stock items from API
+  const fetchNonStockItems = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/service-items`);
+      const data = await res.json();
+      setNonStockItems(Array.isArray(data) ? data : (data.data || []));
+    } catch (err) {
+      console.error("Error fetching non-stock items:", err);
+    }
+  };
+
+
   // Fetch products from API
   const fetchProducts = async (query = "") => {
     try {
@@ -475,7 +502,14 @@ useEffect(()=>{console.log(customers)},[customers]);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch branches');
       const raw = Array.isArray(data.data) ? data.data : data;
-      const list = Array.isArray(raw) ? raw.map(b => ({ id: b.id || b.ID, name: b.name || b.Name, city: b.city || b.City, state: b.state || b.State })) : [];
+      const list = Array.isArray(raw) ? raw.map(b => ({
+        id: b.id || b.ID,
+        name: b.name || b.Name,
+        city: b.city || b.City,
+        state: b.state || b.State,
+        // normalize GST fields (various APIs use different keys)
+        gst_number: b.gst_number || b.GSTNumber || b.gstin || b.GST || b.gst || b.GSTIN || ''
+      })) : [];
       setBranches(list);
     } catch (err) {
       console.error("Error fetching branches:", err);
@@ -580,6 +614,7 @@ useEffect(()=>{console.log(customers)},[customers]);
     fetchCustomers();
     fetchEmployees();
     fetchProducts();
+    fetchNonStockItems();
     fetchTandC();
     fetchBranches();
     fetchSeries();
@@ -707,18 +742,34 @@ useEffect(()=>{console.log(customers)},[customers]);
   const handleTandCOpen = () => setOpenTandCModal(true);
 const handleTandCClose = () => setOpenTandCModal(false);
 
-   useEffect(()=>{
-     const grandTotal = tableItems.reduce((sum, item) => sum + item.amount, 0);
-     setGrandTotal(grandTotal);
-   },[tableItems])
-
   // When document type (or branch/address) changes we need to refresh rates/fixedRates and recompute taxes
   useEffect(() => {
     if (!tableItems || tableItems.length === 0) return;
 
     setTableItems(prev => prev.map((item) => {
-      // skip services/non-product rows
-      if (item._isService) return item;
+      // if it's a service item, we only need to recompute taxes (rates don't depend on branch/docType usually, 
+      // or if they do, they are already set in the item)
+      if (item._isService) {
+        const qty = Number(item.qty) || 0;
+        const rate = Number(item.rate) || 0;
+        const discountAmount = Number(item.discount || 0);
+        const gstPercent = Number(item.gst) || 0;
+        const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
+        const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
+
+        const taxable = (rate * qty) - discountAmount;
+        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
+
+        return {
+          ...item,
+          taxable: taxRes.amount,
+          cgst: taxRes.cgst,
+          sgst: taxRes.sgst,
+          igst: taxRes.igst,
+          amount: taxRes.grandTotal,
+          gst: gstPercent,
+        };
+      }
 
       // try to resolve product/variant from current state or the item itself
       const prodFromList = products.find(p => String(p.ID) === String(item.id)) || item.product || null;
@@ -734,11 +785,11 @@ const handleTandCClose = () => setOpenTandCModal(false);
       const qty = Number(item.qty) || 0;
       const discountAmount = Number(item.discount || 0);
       const gstPercent = Number(item.gst ?? item.gst_percent ?? item.gstPercent ?? (prodFromList?.Tax?.Percentage ?? 0)) || 0;
-      const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+      const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
       const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
 
       const taxable = (newRate * qty) - discountAmount;
-      const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+      const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
 
       return {
         ...item,
@@ -793,17 +844,17 @@ const handleTandCClose = () => setOpenTandCModal(false);
         const newQty = (Number(existing.qty) || 0) + qtyToAdd;
         const taxable = (rate * newQty) - (existing.discount || 0);
         const gstPercent = prod.Tax?.Percentage || existing.gst || 0;
-        const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+        const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
         const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
         copy[existingIndex] = { ...existing, qty: newQty, rate, fixedRate: (existing.fixedRate !== undefined ? existing.fixedRate : rate), taxable, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
       } else { 
         // either not found or forced new row -> push a new line
         const taxable = rate * qtyToAdd - discount;
         const gstPercent = prod.Tax?.Percentage || 0;
-        const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+        const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
         const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+        const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
 
         copy.push({
           _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
@@ -857,6 +908,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         Name: prod.name || prod.desc || '',
         Code: prod.sku || prod.Code || '',
         ID: prod.id || prod.product_id || null,
+        _isService: !!prod._isService,
       };
 
       setBillingModalProduct(billingProd);
@@ -911,9 +963,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
     const taxable = rate * qty - discountAmount;
     const gstPercent = Number(vals.gst) || 0;
-    const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
+    const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
     const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
     const cgst = taxRes.cgst;
     const sgst = taxRes.sgst;
     const igst = taxRes.igst;
@@ -922,6 +974,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const newItem = {
       _rowId: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
       id: billingModalProduct.ID,
+      _isService: !!billingModalProduct._isService,
       name: vals.desc || billingModalProduct.Name,
       hsn: vals.hsn,
       unit: vals.unit,
@@ -1065,19 +1118,25 @@ const handleTandCClose = () => setOpenTandCModal(false);
     if (addr.title && /perman/i.test(String(addr.title))) {
       return getCustomerLegalGstin(selectedCustomer);
     }
-    return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || '';
+    return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || addr.gst_number || addr.gst_no || addr.gstNo || '';
   };
 
   // GST calculation helper: returns cgst, sgst, igst, totalTax and grandTotal (rounded to 2 decimals)
-  const gstCalculation = (amount, gstPercent = 0, sellerGSTIN = '', buyerGSTIN = '') => {
-    const sellerState = (sellerGSTIN || '').toString().slice(0, 2);
-    const buyerStateRaw = (buyerGSTIN || '').toString();
-    const buyerState = (buyerStateRaw && buyerStateRaw.trim().length >= 2) ? buyerStateRaw.slice(0,2) : sellerState;
+  const gstCalculation = (amount, gstPercent = 0, sellerGSTIN = '', buyerGSTIN = '', isMatch = null) => {
     const pct = Number(gstPercent) || 0;
     let cgst = 0, sgst = 0, igst = 0;
 
-    // If buyer GSTIN missing or empty, treat as same state
-    if (!buyerStateRaw || buyerStateRaw.trim() === '' || sellerState === buyerState) {
+    let isSameState = true;
+    if (isMatch !== null) {
+      isSameState = isMatch;
+    } else {
+      const sellerState = (sellerGSTIN || '').toString().slice(0, 2);
+      const buyerStateRaw = (buyerGSTIN || '').toString();
+      const buyerState = (buyerStateRaw && buyerStateRaw.trim().length >= 2) ? buyerStateRaw.slice(0, 2) : sellerState;
+      isSameState = (!buyerStateRaw || buyerStateRaw.trim() === '' || sellerState === buyerState);
+    }
+
+    if (isSameState) {
       cgst = (amount * pct) / 100 / 2;
       sgst = (amount * pct) / 100 / 2;
     } else {
@@ -2060,36 +2119,42 @@ const onSelectTemplate = (template) => {
 
 
   useEffect(() => {
-  // compute subtotal and tax amount same way as the UI display
-  const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
-  const taxAmount = tableItems.reduce((sum, item) => {
-    if (isGSTStateMatch) return sum + (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
-    const taxable = Number(item.taxable) || 0;
-    const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
-    const pct = Math.round(pctRaw);
-    const igstVal = +(taxable * (pct / 100));
-    return sum + igstVal;
-  }, 0);
+    // 1. Calculate base components from table items
+    const taxable = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
+    const tax = tableItems.reduce((sum, item) => {
+      if (isGSTStateMatch) {
+        return sum + (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
+      }
+      return sum + (Number(item.igst) || 0);
+    }, 0);
 
-  // base amount (subtotal + tax)
-  const base = subtotal + taxAmount;
+    const base = taxable + tax;
+    
+    setTotalTaxable(taxable);
+    setTotalTaxAmount(tax);
+    setGrandTotal(base);
 
-  // sum percent and fixed charges/discounts on the SAME base to avoid compounding
-  const percentCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? Number(ch.value) : 0), 0);
-  const fixedCharges = extrcharges.reduce((s, ch) => s + (ch.type === 'percent' ? 0 : Number(ch.value) || 0), 0);
-  const percentDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? Number(ds.value) : 0), 0);
-  const fixedDiscounts = additiondiscounts.reduce((s, ds) => s + (ds.type === 'percent' ? 0 : Number(ds.value) || 0), 0);
+    // 2. Calculate sum of additional charges
+    const extraChargesAmt = extrcharges.reduce((s, ch) => {
+      const val = Number(ch.value) || 0;
+      return s + (ch.type === 'percent' ? (base * val / 100) : val);
+    }, 0);
 
-  let total = base + (base * (percentCharges / 100)) + fixedCharges - (base * (percentDiscounts / 100)) - fixedDiscounts;
+    // 3. Calculate sum of additional discounts
+    const additionalDiscountsAmt = additiondiscounts.reduce((s, ds) => {
+      const val = Number(ds.value) || 0;
+      return s + (ds.type === 'percent' ? (base * val / 100) : val);
+    }, 0);
 
-  if (includeRoundOff) {
-    // Round to nearest unit (e.g., nearest rupee)
-    setFinalTotal(Math.round(Number(total)));
-  } else {
-    // keep two decimals for display
-    setFinalTotal(Number(total.toFixed(2)));
-  }
-}, [tableItems, isGSTStateMatch, extrcharges, additiondiscounts, includeRoundOff]);
+    // 4. Calculate Final Grand Total
+    let total = base + extraChargesAmt - additionalDiscountsAmt;
+
+    if (includeRoundOff) {
+      setFinalTotal(Math.round(total));
+    } else {
+      setFinalTotal(Number(total.toFixed(2)));
+    }
+  }, [tableItems, isGSTStateMatch, extrcharges, additiondiscounts, includeRoundOff]);
 
 
 // edit mode
@@ -2328,13 +2393,22 @@ const onSelectTemplate = (template) => {
   // GST state comparing: update match when billing address or branch changes
   useEffect(()=>{
     if (selectedBillingAddress && selectedBranch) {
-      const sellerGST = selectedBranch?.gst || selectedBranch?.GST || selectedBranch?.gst_number || selectedBranch?.gstin || '';
+      const sellerGST = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || selectedBranch?.gstin || '';
       const custGst = gstForAddr(selectedBillingAddress);
-      if (custGst && custGst.toString().trim() !== '') {
+
+      if (custGst && custGst.toString().trim().length >= 2 && sellerGST && sellerGST.toString().trim().length >= 2) {
         const match = doGSTsMatchState(custGst, sellerGST);
         setIsGSTStateMatch(match);
       } else {
-        setIsGSTStateMatch(true);
+        // fallback to state matching if GSTINs are not fully available
+        const sState = (selectedBranch?.state || '').toString().toLowerCase().trim();
+        const bState = (selectedBillingAddress?.state || '').toString().toLowerCase().trim();
+        if (sState && bState) {
+          setIsGSTStateMatch(sState === bState);
+        } else {
+          // default to true (Intra-state)
+          setIsGSTStateMatch(true);
+        }
       }
       setBranchGstNumber(sellerGST);
       setCustAddressGst(custGst);
@@ -2397,7 +2471,7 @@ const  prefillFormData = async (data) => {
       id: data.company_branch.ID || data.company_branch.id,
       name: data.company_branch.Name || data.company_branch.name || '',
       state: data.company_branch.State || data.company_branch.state || '',
-      gst: data.company_branch.GST || data.company_branch.gst || ''
+      gst_number: data.company_branch.GSTNumber || data.company_branch.gst_number || data.company_branch.GST || data.company_branch.gst || ''
     };
     console.log('Setting branch:', normalizedBranch);
     setSelectedBranch(normalizedBranch);
@@ -2891,7 +2965,7 @@ const  prefillFormData = async (data) => {
               <option value="">-- Select --</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.name}{b.city ? ` - ${b.city}` : ''}{b.state ? ` (${b.state})` : ''}
+                  {b.name} - {b.state ? ` ${b.state}` : ''} - {(b.gst_number || b.gst || b.GST || b.gstin) ? ` ${(b.gst_number || b.gst || b.GST || b.gstin)}` : ''}
                 </option>
               ))}
             </select>
@@ -3009,9 +3083,10 @@ const  prefillFormData = async (data) => {
                         <option value="">--Select--</option>
                         {(selectedCustomer.addresses || []).map((addr) => {
                           const gst = gstForAddr(addr);
+                          const stateName = addr.state || addr.State || addr.state_name || addr.StateName || '';
                           return (
                             <option key={addr.id} value={addr.id}>
-                              {(addr.title ? addr.title : (addr.address1 || ''))}{gst ? ' - ' + gst : ''}
+                              {(addr.title ? addr.title : (addr.address1 || ''))}{stateName ? ` - ${stateName}` : ''}{gst ? ' - ' + gst : ''}
                             </option>
                           );
                         })}
@@ -3036,7 +3111,7 @@ const  prefillFormData = async (data) => {
                 {selectedBillingAddress && (
                   <div className="address-display-box">
                     <div className="address-display-header">
-                      <h6 className="address-title">{(selectedBillingAddress.title || selectedBillingAddress.address1 || 'Address')}{gstForAddr(selectedBillingAddress) ? ' - ' + gstForAddr(selectedBillingAddress) : ''}</h6>
+                      <h6 className="address-title">{(selectedBillingAddress.title || selectedBillingAddress.address1 || 'Address')}</h6>
                       <button
                         type="button"
                         className="btn-edit-address"
@@ -3106,9 +3181,10 @@ const  prefillFormData = async (data) => {
                         <option value="none">None</option>
                         {(selectedCustomer.addresses || []).map((addr) => {
                           const gst = gstForAddr(addr);
+                          const stateName = addr.state || addr.State || addr.state_name || addr.StateName || '';
                           return (
                             <option key={addr.id} value={addr.id}>
-                              {(addr.title ? addr.title : (addr.address1 || ''))}{gst ? ' - ' + gst : ''}
+                              {(addr.title ? addr.title : (addr.address1 || ''))}{stateName ? ` - ${stateName}` : ''}{gst ? ' - ' + gst : ''}
                             </option>
                           );
                         })}
@@ -3365,7 +3441,7 @@ const  prefillFormData = async (data) => {
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent };
               }))
             }
@@ -3390,7 +3466,7 @@ const  prefillFormData = async (data) => {
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }));
             }}
@@ -3411,7 +3487,7 @@ const  prefillFormData = async (data) => {
                 const gstPercent = it.gst || (taxable > 0 ? (((it.cgst || 0) + (it.sgst || 0) + (it.igst || 0)) / taxable) * 100 : 0);
                 const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                 const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
                 return { ...it, qty, taxable, discount: discountAmt, discountPercent: discPct, cgst: taxRes.cgst, sgst: taxRes.sgst, igst: taxRes.igst, amount: taxRes.grandTotal, gst: gstPercent }; 
               }))
             }
@@ -3444,7 +3520,7 @@ const  prefillFormData = async (data) => {
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
               const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
               newItems[index].taxable = taxRes.amount;
               newItems[index].cgst = taxRes.cgst;
               newItems[index].sgst = taxRes.sgst;
@@ -3476,7 +3552,7 @@ const  prefillFormData = async (data) => {
               const gstPercent = newItems[index].gst || (taxable > 0 ? (((newItems[index].cgst || 0) + (newItems[index].sgst || 0) + (newItems[index].igst || 0)) / taxable) * 100 : 0);
               const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
               const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+              const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
               newItems[index].taxable = taxRes.amount;
               newItems[index].cgst = taxRes.cgst;
               newItems[index].sgst = taxRes.sgst;
@@ -3642,7 +3718,7 @@ const  prefillFormData = async (data) => {
                   {bankDetails && bankDetails.length > 0 ? (
                     bankDetails.map((bank) => (
                       <option key={bank.id} value={bank.id}>
-                        {bank.title || `${bank.bankName} - ${bank.accountNo}`}
+                        {bank.bankName} - {bank.accountNo}
                       </option>
                     ))
                   ) : null}
@@ -3757,8 +3833,14 @@ const  prefillFormData = async (data) => {
                     <strong>₹ 0.00</strong>
                   </div>
                 )}
+
+                <div className="total-row">
+                  <span>Total Tax :</span>
+                  <strong>₹ 0.00</strong>
+                </div>
+
                 <div className="total-row total-amount-line">
-                  <span>Total:</span>
+                  <span>Total Amount :</span>
                   <strong>₹ 0.00</strong>
                 </div>
 
@@ -3811,67 +3893,36 @@ const  prefillFormData = async (data) => {
             ) : (
               <div className="totals-content">
                 <div className="total-row">
-                  <span>Untaxed Amount:</span>
-                  <strong>₹ {tableItems.reduce((acc, item) => acc + (Number(item.taxable) || 0), 0).toFixed(2)}</strong>
+                  <span>Total Amount before Tax :</span>
+                  <strong>₹ {totalTaxable.toFixed(2)}</strong>
                 </div>
 
                 {isGSTStateMatch ? (
                   <>
                     <div className="total-row">
-                      <span>CGST:</span>
-                      <strong>₹ {tableItems.reduce((sum, item) => {
-                        const taxable = Number(item.taxable) || 0;
-                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
-                        const pctHalf = Math.round(gstRaw/2);
-                        const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
-                        return sum + cgstVal;
-                      }, 0).toFixed(2)}</strong>
+                      <span>CGST :</span>
+                      <strong>₹ {tableItems.reduce((sum, item) => sum + (Number(item.cgst) || 0), 0).toFixed(2)}</strong>
                     </div>
                     <div className="total-row">
-                      <span>SGST:</span>
-                      <strong>₹ {tableItems.reduce((sum, item) => {
-                        const taxable = Number(item.taxable) || 0;
-                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
-                        const pctHalf = Math.round(gstRaw/2);
-                        const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
-                        return sum + sgstVal;
-                      }, 0).toFixed(2)}</strong>
+                      <span>SGST :</span>
+                      <strong>₹ {tableItems.reduce((sum, item) => sum + (Number(item.sgst) || 0), 0).toFixed(2)}</strong>
                     </div>
                   </>
                 ) : (
                   <div className="total-row">
-                    <span>IGST:</span>
-                    <strong>₹ {tableItems.reduce((sum, item) => {
-                      const taxable = Number(item.taxable) || 0;
-                      const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
-                      const pct = Math.round(pctRaw);
-                      const igstVal = (Number(item.igst) && Number(item.igst) > 0) ? Number(item.igst) : +(taxable * (pct / 100));
-                      return sum + igstVal;
-                    }, 0).toFixed(2)}</strong>
+                    <span>IGST :</span>
+                    <strong>₹ {tableItems.reduce((sum, item) => sum + (Number(item.igst) || 0), 0).toFixed(2)}</strong>
                   </div>
                 )}
 
+                <div className="total-row">
+                  <span>Total Tax :</span>
+                  <strong>₹ {totalTaxAmount.toFixed(2)}</strong>
+                </div>
+
                 <div className="total-row total-amount-line">
-                  <span>Total:</span>
-                  <strong>₹ {(() => {
-                    const subtotal = tableItems.reduce((s, it) => s + (Number(it.taxable) || 0), 0);
-                    const taxAmount = tableItems.reduce((sum, item) => {
-                      if (isGSTStateMatch) {
-                        const taxable = Number(item.taxable) || 0;
-                        const gstRaw = Number(item.gst) || (taxable > 0 ? (((Number(item.cgst)||0) + (Number(item.sgst)||0)) / taxable) * 100 : 0);
-                        const pctHalf = Math.round(gstRaw/2);
-                        const cgstVal = (Number(item.cgst) && Number(item.cgst) > 0) ? Number(item.cgst) : +(taxable * (pctHalf / 100));
-                        const sgstVal = (Number(item.sgst) && Number(item.sgst) > 0) ? Number(item.sgst) : +(taxable * (pctHalf / 100));
-                        return sum + cgstVal + sgstVal;
-                      }
-                      const taxable = Number(item.taxable) || 0;
-                      const pctRaw = Number(item.gst) || (taxable > 0 ? ((Number(item.igst) || 0) / taxable) * 100 : 0);
-                      const pct = Math.round(pctRaw);
-                      const igstVal = (Number(item.igst) && Number(item.igst) > 0) ? Number(item.igst) : +(taxable * (pct / 100));
-                      return sum + igstVal;
-                    }, 0);
-                    return (subtotal + taxAmount).toFixed(2);
-                  })()}</strong>
+                  <span>Total :</span>
+                  <strong>₹ {grandTotal.toFixed(2)}</strong>
                 </div>
 
                 {(extrcharges.length > 0 || additiondiscounts.length > 0) && (
@@ -4329,10 +4380,12 @@ const  prefillFormData = async (data) => {
                 className="btn--secondary"
                 onClick={() => {
                   handleProdClose();
+                  setSelectedNonStockIds([]);
+                  setNonStockSearch("");
                   setOpenAddServiceModal(true);
                 }}
               >
-                + Add Service
+                + Service / Non-Stock Item
               </button>
 
               <button
@@ -4460,7 +4513,7 @@ const  prefillFormData = async (data) => {
                     const gstPercent = Number(billingModalValues.gst) || 0;
                     const sellerGSTIN = selectedBranch?.gst || selectedBranch?.GST || '';
                     const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
-                    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN);
+                    const taxRes = gstCalculation(taxable, gstPercent, sellerGSTIN, buyerGSTIN, isGSTStateMatch);
                     return taxRes.grandTotal.toFixed(2);
                   })()}
                 </div>
@@ -4480,57 +4533,87 @@ const  prefillFormData = async (data) => {
         {/* Add Service / Non-Stock Item Modal */}
         {openAddServiceModal && (
           <div className="custom-modal" onClick={() => setOpenAddServiceModal(false)}>
-            <div className="professional-modal price-update-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="professional-modal product-selection-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h5>Add Item</h5>
+                <h5>Select Service / Non-Stock Item</h5>
                 <button className="close-btn" onClick={() => setOpenAddServiceModal(false)}>❌</button>
               </div>
 
               <div className="modal-body">
-                <div className="form-group">
-                  <label>Item Name*</label>
-                  <input className="form-control" value={addServiceValues.name} onChange={(e) => setAddServiceValues(prev => ({ ...prev, name: e.target.value }))} />
-                </div>
+                <input
+                  type="text"
+                  className="form-control search-input"
+                  placeholder="Search services by name..."
+                  value={nonStockSearch}
+                  onChange={(e) => setNonStockSearch(e.target.value)}
+                />
 
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea className="form-control" rows={4} value={addServiceValues.description} onChange={(e) => setAddServiceValues(prev => ({ ...prev, description: e.target.value }))} />
-                </div>
-
-                <div className="grid-3">
-                  <div className="form-group">
-                    <label>Rate*</label>
-                    <input type="text" className="form-control" value={addServiceValues.rate} onChange={(e) => setAddServiceValues(prev => ({ ...prev, rate: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Unit</label>
-                    <input className="form-control" value={addServiceValues.unit} onChange={(e) => setAddServiceValues(prev => ({ ...prev, unit: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Qty</label>
-                    <input type="text" className="form-control" value={addServiceValues.qty} onChange={(e) => setAddServiceValues(prev => ({ ...prev, qty: e.target.value }))} />
-                  </div>
-                </div>
-
-                <div className="grid-2 mt-8">
-                  <div className="form-group">
-                    <label>HSN/SAC</label>
-                    <input className="form-control" value={addServiceValues.hsn} onChange={(e) => setAddServiceValues(prev => ({ ...prev, hsn: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>GST (%)</label>
-                    <input type="text" className="form-control" value={addServiceValues.gst} onChange={(e) => setAddServiceValues(prev => ({ ...prev, gst: e.target.value }))} />
-                  </div>
+                <div className="product-list-container" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                  {nonStockItems
+                    .filter(item => (item.item_name || item.ItemName || "").toLowerCase().includes(nonStockSearch.toLowerCase()))
+                    .map((item) => (
+                    <div
+                      key={item.id || item.ID}
+                      className="product-row"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedNonStockIds.includes(item.id || item.ID)}
+                        onChange={() => toggleNonStockSelection(item.id || item.ID)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="product-info" onClick={() => {
+                        handleSelectNonStockItem(item);
+                        setOpenAddServiceModal(false);
+                      }}>
+                        <div className="code">{item.item_name || item.ItemName || ''}</div>
+                        <div className="price" style={{marginLeft: 'auto', fontWeight: 'bold'}}>₹ {item.rate} / {item.unit}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {nonStockItems.filter(item => (item.item_name || item.ItemName || "").toLowerCase().includes(nonStockSearch.toLowerCase())).length === 0 && (
+                    <div className="muted text-center p-3">No service items found.</div>
+                  )}
                 </div>
               </div>
 
               <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn--secondary mr-auto"
+                  onClick={() => {
+                    setOpenAddServiceModal(false);
+                    setShowCreateNonStockModal(true);
+                  }}
+                >
+                  + Create New Service
+                </button>
                 <button className="btn--secondary" onClick={() => setOpenAddServiceModal(false)}>Cancel</button>
-                <button className="btn--primary" onClick={handleSaveAddService}>Save</button>
+                <button 
+                  className="btn--primary" 
+                  onClick={addSelectedNonStockItems}
+                  disabled={selectedNonStockIds.length === 0}
+                >
+                  Add Selected ({selectedNonStockIds.length})
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Create New Non-Stock Item Modal */}
+        <AddNonStockModal
+          isOpen={showCreateNonStockModal}
+          onClose={() => {
+            setShowCreateNonStockModal(false);
+            setOpenAddServiceModal(true);
+          }}
+          onSaved={(newItem) => {
+            fetchNonStockItems();
+            setShowCreateNonStockModal(false);
+            setOpenAddServiceModal(true);
+          }}
+        />
 
 {/* Charges Dialog */}
 {openChargeDialog && (

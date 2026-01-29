@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import axios from 'axios';
+import { BASE_URL } from '../../../config/Config';
 
-export default function AddNonStockModal({ isOpen = false, onClose = () => {}, onSaved = () => {}, item = null }) {
+export default function AddNonStockModal({ isOpen = false, onClose = () => {}, onSaved = () => {}, item = null, zIndex = 2000 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [rate, setRate] = useState("");
@@ -12,11 +14,11 @@ export default function AddNonStockModal({ isOpen = false, onClose = () => {}, o
 
   useEffect(() => {
     if (item) {
-      setName(item.name || "");
+      setName(item.item_name || "");
       setDescription(item.description || "");
       setRate(item.rate || "");
       setUnit(item.unit || "");
-      setHsn(item.hsn || "");
+      setHsn(item.hsn_sac || "");
       setGst(item.gst || "");
       setError("");
     } else if (isOpen) {
@@ -31,7 +33,7 @@ export default function AddNonStockModal({ isOpen = false, onClose = () => {}, o
     }
   }, [item, isOpen]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setError("");
     if (!name || !name.trim()) {
       setError("Please enter an item name");
@@ -42,27 +44,32 @@ export default function AddNonStockModal({ isOpen = false, onClose = () => {}, o
       return;
     }
 
+    const payload = {
+      item_name: name.trim(),
+      description: description.trim(),
+      rate: parseFloat(rate),
+      unit: unit,
+      hsn_sac: hsn.trim(),
+      gst: parseFloat(gst) || 0,
+      active: true
+    };
+
     setLoading(true);
     try {
-      const newItem = {
-        id: item && item.id ? item.id : Date.now(),
-        name: name.trim(),
-        description: description.trim(),
-        rate: String(rate).trim(),
-        unit: unit,
-        hsn: hsn.trim(),
-        gst: gst.trim(),
-        // convenience display field
-        price: `₹ ${String(rate).trim()} / ${unit}`,
-      };
+      let res;
+      if (item && item.id) {
+        res = await axios.put(`${BASE_URL}/api/service-items/${item.id}`, payload);
+      } else {
+        res = await axios.post(`${BASE_URL}/api/service-items`, payload);
+      }
 
-      onSaved(newItem);
+      onSaved(res.data);
       // reset and close
       setLoading(false);
       onClose();
     } catch (err) {
       console.error(err);
-      setError("Error saving item");
+      setError("Error saving item: " + (err.response?.data?.error || err.message));
       setLoading(false);
     }
   };
@@ -75,7 +82,7 @@ export default function AddNonStockModal({ isOpen = false, onClose = () => {}, o
   if (!isOpen) return null;
 
   return (
-    <div className="tandc-overlay">
+    <div className="tandc-overlay" style={{ zIndex }}>
       <div className="tandc-dialog large">
         <div className="tandc-dialog-header">
           <div className="title">{item ? 'Edit Service / Non-Stock Item' : 'Add Service / Non-Stock Item'}</div>

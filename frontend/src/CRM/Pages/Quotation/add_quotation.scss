@@ -3011,7 +3011,8 @@ select.form-control::-ms-expand {
       flex-direction: row;
       flex-wrap: wrap;
       gap: 30px;
-      margin-bottom: 10px;
+      margin: 10px;
+      justify-content: center;
 
       .form-check {
         margin-bottom: 0;
@@ -3021,7 +3022,7 @@ select.form-control::-ms-expand {
     .final-actions-footer {
       margin-top: 25px;
       flex-direction: row;
-      justify-content: flex-start;
+      justify-content: space-between;
       gap: 16px;
 
       .btn--save,
@@ -3293,9 +3294,9 @@ select.form-control::-ms-expand {
 }
 
 /* Hide number input spinner controls (cross-browser) */
-input[type="number"] {
-  -moz-appearance: textfield; /* Firefox */
-}
+// input[type="number"] {
+//   -moz-appearance: textfield; /* Firefox */
+// }
 
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {

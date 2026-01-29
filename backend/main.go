@@ -75,6 +75,7 @@ func main() {
 	handler.SetCRMTagDB(initializers.DB)
 	handler.SetLeadSourceDB(initializers.DB)
 	handler.SetRejectionReasonDB(initializers.DB)
+	handler.SetServiceItemDB(initializers.DB)
 
 	// set up fiber
 	app := fiber.New()
@@ -393,6 +394,13 @@ func main() {
 	api.Post("/tandc", handler.CreateTandc)
 	api.Put("/tandc/:id", handler.UpdateTandc)
 	api.Delete("/tandc/:id", handler.DeleteTandc)
+
+	// Service items
+	api.Post("/service-items", handler.CreateServiceItem)
+	api.Get("/service-items", handler.GetServiceItems)
+	api.Get("/service-items/:id", handler.GetServiceItem)
+	api.Put("/service-items/:id", handler.UpdateServiceItem)
+	api.Delete("/service-items/:id", handler.DeleteServiceItem)
 
 	// Addresses (master + aggregated from users)
 	// api.Get("/addresses/from-users", handler.GetAddressesFromUsers) // Must come before /:id route

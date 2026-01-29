@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import axios from 'axios';
+import { BASE_URL } from '../../../config/Config';
 import './NonStock.scss';
 import AddNonStockModal from './AddNonStockModal';
 
@@ -9,13 +11,37 @@ export default function NonStock({ isOpen = false, onClose = () => {} }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
-  const filtered = useMemo(() => items.filter(it => it.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
+  useEffect(() => {
+    if (isOpen) {
+      fetchItems();
+    }
+  }, [isOpen]);
+
+  const fetchItems = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/service-items`);
+      setItems(res.data);
+    } catch (err) {
+      console.error("Error fetching service items:", err);
+    }
+  };
+
+  const filtered = useMemo(() => 
+    items.filter(it => (it.item_name || "").toLowerCase().includes(query.toLowerCase())), 
+    [items, query]
+  );
 
   if (!isOpen) return null;
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     if (!confirm('Delete this non-stock item?')) return;
-    setItems(prev => prev.filter(it => it.id !== id));
+    try {
+      await axios.delete(`${BASE_URL}/api/service-items/${id}`);
+      setItems(prev => prev.filter(it => it.id !== id));
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      alert("Failed to delete item");
+    }
   }
 
   return (
@@ -31,7 +57,7 @@ export default function NonStock({ isOpen = false, onClose = () => {} }) {
 
         <div className="tandc-dialog-body">
           <div className="ns-search">
-            <input placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input placeholder="SearchBy Name" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
 
           {/* Open modal for add/edit */}
@@ -56,8 +82,8 @@ export default function NonStock({ isOpen = false, onClose = () => {} }) {
             {filtered.map(item => (
               <div className="tandc-item ns-item" key={item.id}>
                 <div className="ns-item-left">
-                  <div className="ns-item-name">{item.name}</div>
-                  <div className="ns-item-price">{item.price}</div>
+                  <div className="ns-item-name">{item.item_name}</div>
+                  <div className="ns-item-price">₹ {item.rate} / {item.unit}</div>
                 </div>
                 <div className="item-actions ns-item-actions">
                   <button className="icon-button edit" title="Edit" onClick={() => { setEditingItem(item); setIsAddOpen(true); }}>
