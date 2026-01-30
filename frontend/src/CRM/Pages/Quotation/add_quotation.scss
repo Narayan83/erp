@@ -3754,9 +3754,7 @@ input[type="number"] {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
+    padding: 10px !important;
 
     h3 {
       margin: 0;

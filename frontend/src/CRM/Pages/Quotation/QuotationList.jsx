@@ -9,7 +9,7 @@ import "./quotationlist.scss";
 import Pagination from "../../../CommonComponents/Pagination";
 import { getProductImage } from "./utils";
 
-import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt } from 'react-icons/fa';
+import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt, FaTimes } from 'react-icons/fa';
 
 const QuotationList = () => {
   const navigate = useNavigate();
@@ -35,6 +35,66 @@ const QuotationList = () => {
   const [exporting, setExporting] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [printerHeader, setPrinterHeader] = useState(null);
+
+  const getDefaultPrintConfig = (type = 'Quotation') => ({
+    header: true,
+    footer: false,
+    digitalSignature: false,
+    orgDupTrip: false,
+    partyInformation: true,
+    gstin: true,
+    gstSummary: true,
+    branch: true,
+    bankDetails: type === 'Invoice',
+    disclaimer: false,
+    totalQuantity: true,
+    validTill: type === 'Quotation',
+    mobile: true,
+    email: true,
+    contactPersonName: true,
+    companyBeforePOC: false,
+    totalBeforeRoundOff: false,
+    itemCode: true,
+    notes: false,
+    discountRate: true,
+    discountAmt: true,
+    taxableAmt: true,
+    hsnSac: true,
+    gstAmounts: true,
+    leadTime: false,
+    qtyInServices: false,
+    itemFixedRate: false,
+    itemRate: true,
+    nonStockItemCode: false,
+    autoPadSmallDocs: false,
+  });
+
+  const [printConfig, setPrintConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('printConfig_Quotation');
+      return saved ? JSON.parse(saved) : getDefaultPrintConfig('Quotation');
+    } catch (e) {
+      return getDefaultPrintConfig('Quotation');
+    }
+  });
+
+  useEffect(() => {
+    if (selectedQuotation) {
+       const type = getDocType(selectedQuotation);
+       const key = `printConfig_${type}`;
+       const saved = localStorage.getItem(key);
+       if (saved) setPrintConfig(JSON.parse(saved));
+       else setPrintConfig(getDefaultPrintConfig(type));
+    }
+  }, [selectedQuotation]);
+
+  const handleSavePrintConfig = (newCfg) => {
+    const type = selectedQuotation ? getDocType(selectedQuotation) : 'Quotation';
+    const key = `printConfig_${type}`;
+    localStorage.setItem(key, JSON.stringify(newCfg));
+    setPrintConfig(newCfg);
+    setShowPrintSettings(false);
+  };
 
   const getDiscountPercentage = (item) => {
     const pct = item.discount_percentage ?? item.discountPercent ?? item.discount_percent ?? item.discountRate ?? item.discount_rate ?? 0;
@@ -295,6 +355,7 @@ const QuotationList = () => {
     const igst = (q.igst_amount || 0);
     const totalTax = q.tax_amount || (cgst + sgst + igst);
     const grandTotal = q.grand_total || (taxableAmount + totalTax);
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 0), 0);
     
     const extraChargesArr = Array.isArray(q.extra_charges) ? q.extra_charges : [];
     const discountsArr = Array.isArray(q.discounts) ? q.discounts : [];
@@ -317,26 +378,30 @@ const QuotationList = () => {
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center;">${imgHtml}</td>
           <td>${item.product_name || item.name || item.description || '-'}</td>
-          <td>${item.product_code || item.item_code || '-'}</td>
-          <td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>
+          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
-          <td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${Math.round(discountPct)}%</td>
-          <td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${(item.gst || 0)}%</td>
+          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
           <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
         </tr>
       `;
     }).join('');
     
+    // Count columns for the "No items" row
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Quotation ${q.quotation_number}</title>
+        <title>${getDocType(q)} ${q.quotation_number}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; }
@@ -382,8 +447,9 @@ const QuotationList = () => {
         </style>
       </head>
       <body>
-        <div class="doc-title">QUOTATION</div>
+        <div class="doc-title">${getDocType(q).toUpperCase()}</div>
 
+        ${printConfig.header ? `
         <div class="header">
           ${headerAlignment === 'right' ? `
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
@@ -410,14 +476,16 @@ const QuotationList = () => {
           `}
           <div class="quotation-details" style="flex: 0 0 auto; min-width: 250px;">
             <table>
-              <tr><td>Quotation No.</td><td>${q.quotation_number || '-'}</td></tr>
+              <tr><td>${getDocType(q)} No.</td><td>${q.quotation_number || '-'}</td></tr>
               <tr><td>Date</td><td>${q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
-              <tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>
+              ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
               <tr><td>Ref.</td><td>${q.reference || q.quotation_number || '-'}</td></tr>
             </table>
           </div>
         </div>
+        ` : ''}
 
+        ${printConfig.partyInformation ? `
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
@@ -425,9 +493,9 @@ const QuotationList = () => {
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
@@ -435,11 +503,12 @@ const QuotationList = () => {
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
           </div>
         </div>
+        ` : ''}
 
         <table class="items">
           <thead>
@@ -447,20 +516,21 @@ const QuotationList = () => {
               <th>No.</th>
               <th>Image</th>
               <th>Item & Description</th>
-              <th>Item Code</th>
-              <th>HSN / SAC</th>
+              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
-              <th>Rate (₹)</th>
-              <th>Discount %</th>
-              <th>Discount (₹)</th>
-              <th>Taxable (₹)</th>
-              <th>GST %</th>
+              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
               <th>Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            ${itemRows || '<tr><td colspan="13" style="text-align: center;">No items</td></tr>'}
+            ${itemRows || `<tr><td colspan="${colCount}" style="text-align: center;">No items</td></tr>`}
           </tbody>
         </table>
 
@@ -471,11 +541,14 @@ const QuotationList = () => {
             </tr>
             <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
             
-            ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            
-            <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            ${printConfig.totalQuantity ? `<tr><td>Total Quantity</td><td>${totalQuantity}</td></tr>` : ''}
+
+            ${printConfig.gstSummary ? `
+              ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            ` : ''}
             
             <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
 
@@ -503,8 +576,9 @@ const QuotationList = () => {
           <div class="terms">
             <h3>Terms & Conditions</h3>
             ${termsAndConditionsHtml || '<p>-</p>'}
-            ${notesHtml}
+            ${printConfig.notes ? notesHtml : ''}
           </div>
+          ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
             <table>
@@ -516,13 +590,17 @@ const QuotationList = () => {
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
             </table>
           </div>
+          ` : ''}
         </div>
 
+        ${printConfig.footer ? `
         <div class="footer">
           <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
+          ${printConfig.digitalSignature ? `<div style="margin-top: 10px; font-style: italic; color: #666;">Digitally Signed</div>` : ''}
           <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
           <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
         </div>
+        ` : ''}
       </body>
       </html>
     `;
@@ -1159,13 +1237,20 @@ const QuotationList = () => {
       )}
 
       {showPrintSettings && (
-        <PrintSettingsDialog onClose={() => setShowPrintSettings(false)} />
+        <PrintSettingsDialog 
+          onClose={() => setShowPrintSettings(false)} 
+          initialConfig={printConfig}
+          onSave={handleSavePrintConfig}
+          docType={selectedQuotation ? getDocType(selectedQuotation) : 'Quotation'}
+        />
       )}
 
       {showQuotationDetail && selectedQuotation && (
         <div className="quotation-detail-overlay">
           <div className="quotation-detail-modal">
-            <button className="close-btn" onClick={() => setShowQuotationDetail(false)}>×</button>
+            <button className="close-btn" onClick={() => setShowQuotationDetail(false)}>
+              <FaTimes />
+            </button>
             
             <div className="detail-header">
               <div className="header-title">
@@ -1281,7 +1366,9 @@ const QuotationList = () => {
       {showConvertModal && selectedQuotation && (
         <div className="convert-modal-overlay">
           <div className="convert-modal">
-            <button className="close-btn" onClick={() => setShowConvertModal(false)}>×</button>
+            <button className="close-btn" onClick={() => setShowConvertModal(false)}>
+              <FaTimes />
+            </button>
             <h3>Convert Quotation</h3>
             <p>Select the type of order to convert to:</p>
             <div className="convert-options">

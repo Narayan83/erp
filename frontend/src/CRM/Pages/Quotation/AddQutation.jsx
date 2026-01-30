@@ -24,6 +24,7 @@ import PrintSettingsDialog from "../../../PrintSettings/Print";
 import SavedTemplate from "../../../Admin Master/page/SavedTemplate/SavedTemplate";
 import { useParams } from "react-router-dom"; 
 import AddNonStockModal from "../../../Admin Master/page/NonStock/AddNonStockModal";
+import CopyFromQuotationModal from "./CopyFromQuotationModal";
 import {
   TextField,
   SearchableSelect,
@@ -246,6 +247,9 @@ const [printAfterSave, setPrintAfterSave] = useState(false);
 const [templateName, setTemplateName] = useState("");
 const [showTemplateModal, setShowTemplateModal] = useState(false);
 const [showSavedTemplates, setShowSavedTemplates] = useState(false);
+
+// Copy From Earlier Quotation Modal state
+const [showCopyFromModal, setShowCopyFromModal] = useState(false);
 
 // Bank Details Modal state
 const [openBankModal, setOpenBankModal] = useState(false);
@@ -624,23 +628,26 @@ useEffect(()=>{console.log(customers)},[customers]);
     useEffect(() => {
       console.log(selectedCustomer);
       console.log(products);
-      // Reset address selections only when customer actually changes (not during edit prefill)
-      // If in edit mode and the selected customer matches the quotation's customer, keep prefilled addresses.
+      // Reset address selections only when customer actually changes (not during edit or copy/template prefill)
+      // If the selected customer matches the prefilled customer (from edit or copy), keep the addresses.
       const prefilledCustomerId = quotationData?.customer?.id || quotationData?.customer?.ID;
       const currentCustomerId = selectedCustomer?.id || selectedCustomer?.ID;
 
-      const isPrefilledCustomer = isEditMode && quotationData && prefilledCustomerId && currentCustomerId && String(prefilledCustomerId) === String(currentCustomerId);
-
-      if (isPrefilledCustomer) {
+      // In edit mode, if customer matches, don't clear (important for initialization)
+      if (isEditMode && quotationData && String(prefilledCustomerId) === String(currentCustomerId)) {
         return;
       }
       
-      // Otherwise, clear addresses when customer changes (new selection or cleared)
-      setSelectedBillingAddressId(null);
-      setSelectedBillingAddress(null);
-      setSelectedShippingAddressId(null);
-      setSelectedShippingAddress(null);
-      setIsSameAsBilling(true); 
+      // For new quotations (including Copy From/Template), if we have a customer, 
+      // we trust handleSelectCustomer or prefillFormData to set/reset addresses.
+      // We only clear everything if the customer is completely removed.
+      if (!selectedCustomer) {
+        setSelectedBillingAddressId(null);
+        setSelectedBillingAddress(null);
+        setSelectedShippingAddressId(null);
+        setSelectedShippingAddress(null);
+        setIsSameAsBilling(true);
+      }
     }, [selectedCustomer, isEditMode, quotationData]);
 
   // Fetch printer headers
@@ -1443,6 +1450,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     }
 
     const grandTotalVal = Number(q.grand_total || (taxableAmount + totalTax));
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 0), 0);
     
     const extraChargesArr = Array.isArray(q.extra_charges || extrcharges) ? (q.extra_charges || extrcharges) : [];
     const discountsArr = Array.isArray(q.discounts || additiondiscounts) ? (q.discounts || additiondiscounts) : [];
@@ -1465,20 +1473,24 @@ const handleTandCClose = () => setOpenTandCModal(false);
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center;">${imgHtml}</td>
           <td>${item.product_name || item.name || item.description || item.desc || '-'}</td>
-          <td>${item.product_code || item.item_code || item.sku || '-'}</td>
-          <td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>
+          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
-          <td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${Math.round(discountPct)}%</td>
-          <td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${(item.gst || 0)}%</td>
+          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
           <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
         </tr>
       `;
     }).join('');
     
+    // Count columns for the "No items" row
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -1532,6 +1544,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       <body>
         <div class="doc-title">${docType.toUpperCase()}</div>
 
+        ${printConfig.header ? `
         <div class="header">
           ${headerAlignment === 'right' ? `
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
@@ -1560,12 +1573,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
             <table>
               <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
               <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
-              <tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>
+              ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
               <tr><td>Ref.</td><td>${references || q.quotation_number || qutationNo || '-'}</td></tr>
             </table>
           </div>
         </div>
+        ` : ''}
 
+        ${printConfig.partyInformation ? `
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
@@ -1573,9 +1588,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
@@ -1583,11 +1598,12 @@ const handleTandCClose = () => setOpenTandCModal(false);
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
           </div>
         </div>
+        ` : ''}
 
         <table class="items">
           <thead>
@@ -1595,20 +1611,21 @@ const handleTandCClose = () => setOpenTandCModal(false);
               <th>No.</th>
               <th>Image</th>
               <th>Item & Description</th>
-              <th>Item Code</th>
-              <th>HSN / SAC</th>
+              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
-              <th>Rate (₹)</th>
-              <th>Discount %</th>
-              <th>Discount (₹)</th>
-              <th>Taxable (₹)</th>
-              <th>GST %</th>
+              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
               <th>Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            ${itemRows || '<tr><td colspan="13" style="text-align: center;">No items</td></tr>'}
+            ${itemRows || `<tr><td colspan="${colCount}" style="text-align: center;">No items</td></tr>`}
           </tbody>
         </table>
 
@@ -1619,11 +1636,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
             </tr>
             <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
             
-            ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            
-            <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            ${printConfig.totalQuantity ? `<tr><td>Total Quantity</td><td>${totalQuantity}</td></tr>` : ''}
+
+            ${printConfig.gstSummary ? `
+              ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+            ` : ''}
             
             <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
 
@@ -1651,8 +1671,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
           <div class="terms">
             <h3>Terms & Conditions</h3>
             ${termsAndConditionsHtml || '<p>-</p>'}
-            ${notesHtml}
+            ${printConfig.notes ? notesHtml : ''}
           </div>
+          ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
             <table>
@@ -1664,13 +1685,17 @@ const handleTandCClose = () => setOpenTandCModal(false);
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
             </table>
           </div>
+          ` : ''}
         </div>
 
+        ${printConfig.footer ? `
         <div class="footer">
           <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
+          ${printConfig.digitalSignature ? `<div style="margin-top: 10px; font-style: italic; color: #666;">Digitally Signed</div>` : ''}
           <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
           <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
         </div>
+        ` : ''}
       </body>
       </html>
     `;
@@ -2984,7 +3009,13 @@ const  prefillFormData = async (data) => {
                 id="copyFrom"
                 className="form-control"
                 onChange={(e) => {
-                  if (e.target.value === "templates") {
+                  if (e.target.value === "earlier") {
+                    if (!selectedCustomer || !selectedCustomer.id) {
+                      alert("Please select a customer first to copy from earlier quotations.");
+                    } else {
+                      setShowCopyFromModal(true);
+                    }
+                  } else if (e.target.value === "templates") {
                     setShowSavedTemplates(true);
                   }
                   e.target.value = "none";
@@ -3689,9 +3720,9 @@ const  prefillFormData = async (data) => {
              <TermsConditionSelector 
               open={openTandCModal} 
               handleClose={(p,ec,ed) => { setTandcSelections(p);setEndCustomer(ec),setEndDealer(ed) }} 
-              initialSelections={isEditMode ? tandcSelections : []}
-              end_customer_name = {isEditMode?endcustomer:''} 
-              end_dealer_name = {isEditMode?enddealer:''} 
+              initialSelections={tandcSelections}
+              end_customer_name = {endcustomer} 
+              end_dealer_name = {enddealer} 
             /> 
           </div>
 
@@ -4839,6 +4870,37 @@ const  prefillFormData = async (data) => {
     showAction={false}
   />
 )}
+
+{/* Copy From Earlier Quotation Modal */}
+<CopyFromQuotationModal
+  open={showCopyFromModal}
+  onClose={() => setShowCopyFromModal(false)}
+  customerId={selectedCustomer?.id || selectedCustomer?.ID}
+  customerName={selectedCustomer?.company_name || selectedCustomer?.business || `${selectedCustomer?.firstname || ''} ${selectedCustomer?.lastname || ''}`.trim()}
+  docType={docType}
+  onSelectQuotation={async (quotation) => {
+    // Fetch full quotation data and prefill the form directly
+    const qId = quotation.quotation_id || quotation.QuotationID || quotation.id;
+    try {
+      const resp = await axios.get(`${BASE_URL}/api/quotations/${qId}`);
+      const data = resp.data;
+      if (data) {
+        await prefillFormData(data);
+        // Clear quotation number fields so a new number is generated
+        setQutationNo('');
+        setPrevQutationNo('');
+        setSeqNumber('');
+        // Ensure we stay in create mode, not edit mode
+        setIsEditMode(false);
+        setIsReviseMode(false);
+      }
+    } catch (err) {
+      console.error("Failed to fetch quotation for copy:", err);
+      alert('Could not load the quotation to copy.');
+    }
+    setShowCopyFromModal(false);
+  }}
+/>
 
     </section>
 
