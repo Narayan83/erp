@@ -29,7 +29,7 @@ import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, Refresh, Star as 
 import axios from "axios";
 import * as XLSX from 'xlsx';
 // exceljs will be dynamically imported inside the download function to avoid bundling issues
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { BASE_URL } from "../../../config/Config";
 import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
@@ -319,6 +319,19 @@ const getMainImageForProduct = (p) => {
   }
 
   return null;
+};
+
+// Compute total cost from a list of products (sum of PurchaseCost * Stock across variants)
+const computeTotalCostFromProducts = (list = []) => {
+  return (Array.isArray(list) ? list : []).reduce((acc, p) => {
+    if (!p || !Array.isArray(p.Variants)) return acc;
+    const productCost = p.Variants.reduce((s, v) => {
+      const purchase = Number(v?.PurchaseCost) || 0;
+      const stock = Number(v?.Stock) || 0;
+      return s + purchase * stock;
+    }, 0);
+    return acc + productCost;
+  }, 0);
 };
 
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
@@ -1447,6 +1460,8 @@ const highlightText = (text, searchTerm) => {
 
 export default function ProductListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
@@ -1487,6 +1502,21 @@ export default function ProductListPage() {
   const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
   const [salesPriceSort, setSalesPriceSort] = useState(null); // null | 'asc' | 'desc'
   
+  // Apply sort when navigated with state.sortByName (from Add/Edit pages)
+  React.useEffect(() => {
+    if (location && location.state && location.state.sortByName) {
+      const dir = location.state.sortDirection || 'asc';
+      setNameSort(dir);
+      setStockSort(null);
+      setLeadTimeSort(null);
+      setPurchaseCostSort(null);
+      setSalesPriceSort(null);
+      setPage(0);
+      // Clear navigation state to prevent repeated behavior
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location && location.state && location.state.sortByName, navigate]);
+
   // Force refresh flag
   const [forceRefresh, setForceRefresh] = useState(0);
   
@@ -2396,11 +2426,11 @@ export default function ProductListPage() {
                 console.log('After client-side filtering, products count:', filtered.length);
                 setProducts(filtered);
                 setTotalItems(filtered.length);
-                setTotalCost(res?.data?.totalCost || 0);
+                setTotalCost(computeTotalCostFromProducts(filtered));
               } else {
                 setProducts(merged);
                 setTotalItems(merged.length);
-                setTotalCost(res?.data?.totalCost || 0);
+                setTotalCost(computeTotalCostFromProducts(merged));
               }
             } catch (mergeErr) {
               console.error('Error fetching extra-field matches for common filter:', mergeErr);

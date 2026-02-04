@@ -8,6 +8,7 @@ import (
 	"erp.local/backend/initializers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func init() {
@@ -79,6 +80,13 @@ func main() {
 
 	// set up fiber
 	app := fiber.New()
+
+	// Add logger middleware to log all requests
+	app.Use(logger.New(logger.Config{
+		Format:     "[${time}] ${status} - ${method} ${path} - ${latency}\n",
+		TimeFormat: "2006-01-02 15:04:05",
+		TimeZone:   "Local",
+	}))
 
 	// Enable CORS (default)
 	app.Use(cors.New())

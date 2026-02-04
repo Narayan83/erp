@@ -38,6 +38,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const [leads, setLeads] = useState([]);
   const [products, setProducts] = useState([]);
   const [saveError, setSaveError] = useState('');
+  const [isProductOthers, setIsProductOthers] = useState(false);
 
   useEffect(() => {
     if (leadData) {
@@ -241,9 +242,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     }
 
     // Validate product (required). Allow matching by id or name (case-insensitive)
+    // If "Others" is selected (isProductOthers), allow any non-empty custom product name
     if (!formData.product || !String(formData.product).trim()) {
       newErrors.product = 'Product is required';
-    } else {
+    } else if (!isProductOthers) {
       const matchProduct = products.some(p =>
         String(p.ID) === String(formData.product) ||
         String(p.id) === String(formData.product) ||
@@ -310,25 +312,32 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         }
 
         // Resolve product_id from numeric id or name
+        // If "Others" is selected (isProductOthers), use the custom product name without resolving to an ID
         let product_id = undefined;
         let productName = '';
         if (formData.product && formData.product !== '') {
-          const asNum = Number(formData.product);
-          if (!isNaN(asNum)) {
-            product_id = asNum;
-            // Find product name by ID
-            const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
-            productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+          if (isProductOthers) {
+            // Custom product entered by user - no product_id, just use the name
+            productName = formData.product;
+            product_id = undefined;
           } else {
-            const found = products.find(p =>
-              String(p.ID) === String(formData.product) ||
-              String(p.id) === String(formData.product) ||
-              (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
-              (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
-            );
-            if (found) {
-              product_id = found.ID || found.id;
-              productName = found.Name || found.name || '';
+            const asNum = Number(formData.product);
+            if (!isNaN(asNum)) {
+              product_id = asNum;
+              // Find product name by ID
+              const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
+              productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+            } else {
+              const found = products.find(p =>
+                String(p.ID) === String(formData.product) ||
+                String(p.id) === String(formData.product) ||
+                (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
+                (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
+              );
+              if (found) {
+                product_id = found.ID || found.id;
+                productName = found.Name || found.name || '';
+              }
             }
           }
         }
@@ -654,10 +663,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const stateOptions = Object.entries(stateList).map(([code, name]) => ({ value: name, label: name }));
   const cityOptions = cities.map(city => ({ value: city, label: city }));
 
-  const productOptions = products.map(p => ({
-    value: p.ID || p.id || (p.Name || p.name) || '',
-    label: `${p.Name || p.name || p.ID || p.id}${p.Code ? ` (${p.Code})` : ''}`
-  }));
+  const productOptions = [
+    ...products.map(p => ({
+      value: p.ID || p.id || (p.Name || p.name) || '',
+      label: `${p.Name || p.name || p.ID || p.id}${p.Code ? ` (${p.Code})` : ''}`
+    })),
+    { value: 'others', label: 'Others' }
+  ];
 
   const assignedOptions = assignedToOptions.map(a => ({
     value: a.id,
@@ -951,24 +963,64 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     <div className="form-group">
                       <label>Product <span className="required">*</span></label>
                         <div className="product-input">
-                          <Select
-                            options={productOptions}
-                            value={selectedProductOption}
-                            onChange={(opt) => {
-                              setFormData(prev => ({ ...prev, product: opt ? opt.value : '' }));
-                              if (opt) setErrors(prev => { const n = { ...prev }; delete n.product; return n; });
-                            }}
-                            isSearchable
-                            placeholder={"Search or select product"}
-                            className={errors.product ? 'react-select-container error' : 'react-select-container'}
-                            classNamePrefix={'react-select'}
-                            styles={{
-                              menuPortal: base => ({ ...base, zIndex: 9999 }),
-                              placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
-                            }}
-                            menuPortalTarget={document.body}
-                            isClearable={false}
-                          />
+                          {!isProductOthers ? (
+                            <Select
+                              options={productOptions}
+                              value={selectedProductOption}
+                              onChange={(opt) => {
+                                const val = opt ? opt.value : '';
+                                if (val === 'others') {
+                                  setIsProductOthers(true);
+                                  setFormData(prev => ({ ...prev, product: '' }));
+                                } else {
+                                  setIsProductOthers(false);
+                                  setFormData(prev => ({ ...prev, product: val }));
+                                }
+                                if (opt) setErrors(prev => { const n = { ...prev }; delete n.product; return n; });
+                              }}
+                              isSearchable
+                              placeholder={"Search or select product"}
+                              className={errors.product ? 'react-select-container error' : 'react-select-container'}
+                              classNamePrefix={'react-select'}
+                              styles={{
+                                menuPortal: base => ({ ...base, zIndex: 9999 }),
+                                placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
+                              }}
+                              menuPortalTarget={document.body}
+                              isClearable={false}
+                            />
+                          ) : (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                              <input
+                                type="text"
+                                name="product"
+                                placeholder="Enter product name"
+                                value={formData.product}
+                                onChange={handleChange}
+                                className={errors.product ? 'error' : ''}
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsProductOthers(false);
+                                  setFormData(prev => ({ ...prev, product: '' }));
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  backgroundColor: '#003366',
+                                  color: 'white',
+                                  border: '1px solid #003366',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                Back to Dropdown
+                              </button>
+                            </div>
+                          )}
                         </div>
                       {errors.product && <span className="input-error-inside">{errors.product}</span>}
                     </div>

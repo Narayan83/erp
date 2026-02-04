@@ -794,7 +794,7 @@ export default function ReviewStep({
             label: "View Products",
             onClick: () => {
               setDialogOpen(false);
-              navigate("/ProductMaster");
+              navigate("/ProductMaster", { state: { sortByName: true, sortDirection: 'asc' } });
             },
             plain: true,
             className: "btn btn-primary",
