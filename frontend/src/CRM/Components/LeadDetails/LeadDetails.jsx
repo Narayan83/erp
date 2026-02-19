@@ -27,7 +27,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
       if (data.type === 'stage') {
         payload.stage = data.newStage;
       } else if (data.type === 'reject') {
-        payload.stage = 'Inactive';
+        payload.stage = 'Rejected';
         payload.rejectionReason = data.reason;
       }
 
@@ -235,6 +235,57 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     return () => { mounted = false; window.removeEventListener('lead:interaction.saved', handler); };
   }, [isOpen, lead]);
 
+  // Recent interactions for this lead (show latest 3)
+  const [interactionsList, setInteractionsList] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadInteractions = async () => {
+      if (!isOpen || !lead || (!lead.id && lead.id !== 0)) {
+        if (mounted) setInteractionsList([]);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/lead-interactions`);
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+        const leadIdStr = String(lead.id);
+
+        const mapped = arr
+          .filter(i => String(i.lead_id || i.LeadID || (i.lead && i.lead.id) || i.lead || '') === leadIdStr)
+          .map(i => {
+            // try multiple timestamp locations (interaction objects sometimes nest date/time)
+            const ts = i.timestamp || i.Timestamp || i.created_at || i.createdAt || i.date || (i.interaction && (i.interaction.timestamp || i.interaction.date)) || '';
+            const dt = ts ? new Date(ts) : null;
+
+            // pick note/summary from many common locations used across endpoints
+            const notes = (
+              i.notes || i.Notes || i.note || i.Note || i.summary || i.Summary || i.details || i.Details || i.description || i.body || i.remarks || i.remark ||
+              (i.interaction && (i.interaction.note || i.interaction.description || i.interaction.summary || i.interaction.details)) ||
+              (i.followup && (i.followup.note || i.followup.description || i.followup.summary || i.followup.details)) ||
+              ''
+            );
+
+            const t = (i.type || i.Type || i.interaction_type || i.kind || (i.interaction && (i.interaction.type || i.interaction.kind)) || '');
+            return { raw: i, dt, notes: notes ? String(notes) : '', type: t };
+          })
+          .filter(x => x.dt && !isNaN(x.dt));
+
+        mapped.sort((a, b) => b.dt - a.dt);
+        if (mounted) setInteractionsList(mapped.slice(0, 3));
+      } catch (err) {
+        console.error('Failed to load interactions', err);
+        if (mounted) setInteractionsList([]);
+      }
+    };
+
+    loadInteractions();
+    const handler = () => { loadInteractions(); };
+    window.addEventListener('lead:interaction.saved', handler);
+    return () => { mounted = false; window.removeEventListener('lead:interaction.saved', handler); };
+  }, [isOpen, lead]);
+
   // Open the Add Quotation page in a new tab and prefill using lead data passed as query params
   const openQuoteFromLead = () => {
     try {
@@ -253,6 +304,19 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     } catch (err) {
       console.error('Failed to open quotation page from lead', err);
       window.open('/quotation', '_blank');
+    }
+  };
+
+  // Open the Reports page filtered for this lead
+  const openHistoryFromLead = () => {
+    try {
+      const params = new URLSearchParams();
+      if (lead?.id) params.set('lead_id', String(lead.id));
+      const url = `/reports?${params.toString()}`;
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Failed to open reports page from lead', err);
+      window.open('/reports', '_blank');
     }
   };
 
@@ -323,7 +387,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
                 <button className="btn small" onClick={() => { if (onEdit) onEdit(lead); }}>Reassign</button>
                 <button className="btn small" onClick={() => setShowUpdateStatus(true)}>Update Status</button>
                 <button className="btn small" onClick={() => openQuoteFromLead()}>+ Quote</button>
-                <button className="btn small">History</button>
+                <button className="btn small" onClick={() => openHistoryFromLead()}>History</button>
               </div>
             </div>
 
@@ -343,12 +407,44 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
                     'No appointment scheduled'
                   )}
                 </div>
+
                 <div className="button-group" style={{ display: 'flex', gap: '10px' }}>
-                  <button className="btn small green" onClick={() => { setInteractionMode('interaction'); setShowInteraction(true); }}>+ Interaction</button>
                   <button className="btn small green" onClick={() => { setInteractionMode('appointment'); setShowInteraction(true); }}>+ Appointment</button>
                 </div>
               </div>
-            </div> 
+            </div>
+
+            <div className="card">
+              <div className="card-title">Business Interactions</div>
+              <div className="interactions">
+                {interactionsList && interactionsList.length > 0 ? (
+                  <div className="business-interactions">
+                    <div className="bi-title">Recent Interactions</div>
+                    <ul className="interaction-list">
+                      {interactionsList.map((it, idx) => {
+                        const ts = it.raw.timestamp || it.raw.Timestamp || it.raw.created_at || it.raw.createdAt || it.dt?.toISOString();
+                        return (
+                          <li key={idx} className="interaction-item" title={it.notes || ''}>
+                            <div className="interaction-meta">
+                              <span className="interaction-date">{formatRelativeDate(ts)}</span>
+                              <span className="interaction-time">{formatTime12(ts)}</span>
+                              <span className="interaction-type">{it.type || 'Note'}</span>
+                            </div>
+                            {it.notes ? <div className="interaction-note">{it.notes}</div> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="no-interactions">No recent interactions</div>
+                )}
+
+                <div className="button-group" style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn small green" onClick={() => { setInteractionMode('interaction'); setShowInteraction(true); }}>+ Interaction</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

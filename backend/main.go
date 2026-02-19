@@ -352,6 +352,9 @@ func main() {
 	// IndiaMART Integration
 	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
 
+	// GSTIN Details Proxy
+	api.Get("/gstin/:gstin", handler.GetGSTINDetails)
+
 	// Printer Header
 	api.Post("/printer-headers", handler.CreatePrinterHeader)
 	api.Get("/printer-headers", handler.GetPrinterHeaders)

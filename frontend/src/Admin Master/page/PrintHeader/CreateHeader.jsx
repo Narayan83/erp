@@ -160,7 +160,6 @@ export default function CreateHeader({ show = false, onClose = () => {}, onCreat
     const dataUrl = canvas.toDataURL('image/png');
     const formValues = {
       header_title: company,
-      header_subtitle: '',
       address,
       pin,
       gstin,

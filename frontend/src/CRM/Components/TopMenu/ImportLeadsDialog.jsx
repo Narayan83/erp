@@ -49,12 +49,7 @@ const ImportLeadsDialog = ({ isOpen, onClose, onExcelClick, onLeadsImport }) => 
   if (activeIntegration === 'indiamart') {
     return (
       <div className="import-dialog-overlay" onMouseDown={(e) => { if (e.target.className === 'import-dialog-overlay') setActiveIntegration(null); }}>
-        <div className="dialog-content integration-view">
-          <div className="dialog-header">
-            <button className="back-btn" onClick={() => setActiveIntegration(null)}>← Back</button>
-            <h3>IndiaMART</h3>
-            <button className="close-btn" onClick={onClose}>×</button>
-          </div>
+        <div className="dialog-content integration-view" style={{ padding: 0, border: 'none', background: 'transparent', boxShadow: 'none', maxWidth: '600px' }}>
           <IndiaMartIntegration
             onClose={() => setActiveIntegration(null)}
             onImport={(leads) => {

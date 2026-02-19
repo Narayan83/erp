@@ -38,6 +38,25 @@ const accountTypes = [
 // Indian states list (used when country is India)
 const indiaStates = Object.values(stateList);
 
+const gstStateCodes = {
+  "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
+  "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur",
+  "15": "Mizoram", "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal",
+  "20": "Jharkhand", "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "25": "Daman and Diu", "26": "Dadra and Nagar Haveli", "27": "Maharashtra", "29": "Karnataka",
+  "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu", "34": "Puducherry",
+  "35": "Andaman and Nicobar", "36": "Telangana", "37": "Andhra Pradesh", "38": "Ladakh",
+  "97": "Other Territory"
+};
+
+// Helper to find case-insensitive match in a list
+const findMatchInList = (input, list) => {
+  if (!input || !list) return input;
+  const found = list.find(item => String(item).toLowerCase() === String(input).toLowerCase());
+  return found || input;
+};
+
 const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser }) => {
   const navigate = useNavigate();
   const {
@@ -183,6 +202,85 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
       const updated = [...addresses];
       updated[idx] = { ...updated[idx], [field]: value };
       return updated;
+    });
+  };
+
+  const fetchAndPopulateGstinData = async (gstin, callback) => {
+    try {
+      if (!gstin) {
+        alert("Please enter a valid GSTIN");
+        return;
+      }
+      // Use our backend proxy instead of calling the API directly to avoid CORS issues
+      const url = `${BASE_URL}/api/gstin/${gstin}`;
+      
+      const response = await axios.get(url);
+      
+      // Based on the observed API response:
+      if (response.data && (response.data.gstin || response.data.ErrorCode === "0")) {
+        // Some APIs might wrap the data in a Data property if ErrorCode is present
+        const gstinData = response.data.Data || response.data;
+        const pradr = gstinData.pradr?.addr || gstinData.pradr;
+        
+        if (pradr) {
+          // If pradr itself is the address object (depending on nesting) or has addr
+          const addrObj = pradr.addr || pradr;
+          
+          // Try to map state code to name if it's a code
+          let stateName = addrObj.stcd || "";
+          if (gstStateCodes[stateName]) {
+            stateName = gstStateCodes[stateName];
+          }
+
+          const mappedData = {
+            address1: `${addrObj.bno || ""} ${addrObj.bnm || ""} ${addrObj.flno || ""}`.trim(),
+            address2: `${addrObj.st || ""} ${addrObj.loc || ""}`.trim(),
+            address3: `${addrObj.dst || ""}`.trim(),
+            city: findMatchInList(addrObj.city || addrObj.dst || addrObj.loc || "", citiesList),
+            state: findMatchInList(stateName, indiaStates),
+            pincode: addrObj.pncd || ""
+          };
+          callback(mappedData);
+          alert("Address details fetched successfully!");
+        } else {
+          alert("GSTIN found but no address details available.");
+        }
+      } else if (response.data && response.data.ErrorMsg) {
+        alert(`API Error: ${response.data.ErrorMsg}`);
+      } else {
+        alert("Failed to fetch GSTIN data or invalid GSTIN.");
+      }
+    } catch (error) {
+      console.error("Error fetching GSTIN data:", error);
+      alert("Error connecting to GST API. Please check your connection or try again later.");
+    }
+  };
+
+  const handleGetPermanentGstin = async () => {
+    const gstin = watch("permanent_gstin");
+    await fetchAndPopulateGstinData(gstin, (data) => {
+      setValue("address1", data.address1, { shouldDirty: true });
+      setValue("address2", data.address2, { shouldDirty: true });
+      setValue("address3", data.address3, { shouldDirty: true });
+      setValue("city", data.city, { shouldDirty: true });
+      setValue("state", data.state, { shouldDirty: true });
+      setValue("permanent_country", "India", { shouldDirty: true });
+      setValue("permanent_country_code", "IN", { shouldDirty: true });
+      setValue("pincode", data.pincode, { shouldDirty: true });
+    });
+  };
+
+  const handleGetAdditionalGstin = async (idx) => {
+    const gstin = additionalAddresses[idx]?.gstin;
+    await fetchAndPopulateGstinData(gstin, (data) => {
+      handleAdditionalAddressChange(idx, "address1", data.address1);
+      handleAdditionalAddressChange(idx, "address2", data.address2);
+      handleAdditionalAddressChange(idx, "address3", data.address3);
+      handleAdditionalAddressChange(idx, "city", data.city);
+      handleAdditionalAddressChange(idx, "state", data.state);
+      handleAdditionalAddressChange(idx, "country", "India");
+      handleAdditionalAddressChange(idx, "country_code", "IN");
+      handleAdditionalAddressChange(idx, "pincode", data.pincode);
     });
   };
 
@@ -2447,7 +2545,13 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                 {...register("permanent_gstin")}
                 className={`form-input ${errors.permanent_gstin ? 'error' : ''}`}
               />
-              <button type="button" className="input-action-btn btn btn-secondary btn-small">Get</button>
+              <button 
+                type="button" 
+                className="input-action-btn btn btn-secondary btn-small"
+                onClick={handleGetPermanentGstin}
+              >
+                Get
+              </button>
             </div>
             {errors.permanent_gstin && <div className="error-message">{errors.permanent_gstin.message}</div>}
           </div>
@@ -3058,7 +3162,13 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                           value={address.gstin || ""}
                           onChange={e => handleAdditionalAddressChange(idx, "gstin", e.target.value)}
                         />
-                        <button type="button" className="btn btn-secondary btn-small input-action-btn">Get</button>
+                        <button 
+                          type="button" 
+                          className="btn btn-secondary btn-small input-action-btn"
+                          onClick={() => handleGetAdditionalGstin(idx)}
+                        >
+                          Get
+                        </button>
                       </div>
                     </div>
                     {[1, 2, 3].map((n) => (

@@ -987,6 +987,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                                 placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
                               }}
                               menuPortalTarget={document.body}
+                              menuPosition="fixed"
                               isClearable={false}
                             />
                           ) : (
@@ -1110,49 +1111,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           </div>
         </div>
       )}
-
-      {/* Leads Table */}
-      <div className="leads-table-container">
-        <h3>Leads</h3>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Business</th>
-              <th>Contact</th>
-              <th>Mobile</th>
-              <th>Email</th>
-              <th>City</th>
-              <th>Stage</th>
-              <th>Potential</th>
-              <th>Address Line 1</th>
-              <th>Address Line 2</th>
-              <th>Category</th>
-              <th>Tags</th>
-              {/* Add more columns as needed */}
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead.id}>
-                <td>{lead.id}</td>
-                <td>{lead.business}</td>
-                <td>{lead.contact}</td>
-                <td>{lead.mobile}</td>
-                <td>{lead.email}</td>
-                <td>{lead.city}</td>
-                <td>{lead.stage}</td>
-                <td>{lead.potential}</td>
-                <td>{lead.addressLine1 || lead.addressline1 || lead.address_line1 || ''}</td>
-                <td>{lead.addressLine2 || lead.addressline2 || lead.address_line2 || ''}</td>
-                <td>{lead.category || lead.Category || ''}</td>
-                <td>{lead.tags || lead.Tags || ''}</td>
-                {/* Add more cells as needed */}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </>
   );
 };

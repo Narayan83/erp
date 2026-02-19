@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -59,11 +61,12 @@ func CreateIntegration(c *fiber.Ctx) error {
 		Name:     body.Name,
 		Type:     body.Type,
 		Provider: body.Provider,
-		Config:   configBytes,
+		Config:   datatypes.JSON(configBytes),
 		IsActive: active,
 	}
 
 	if err := integrationDB.Create(&integration).Error; err != nil {
+		log.Printf("ERROR: Failed to create integration: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -134,13 +137,14 @@ func UpdateIntegration(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid config"})
 		}
-		integration.Config = configBytes
+		integration.Config = datatypes.JSON(configBytes)
 	}
 	if body.IsActive != nil {
 		integration.IsActive = *body.IsActive
 	}
 
 	if err := integrationDB.Save(&integration).Error; err != nil {
+		log.Printf("ERROR: Failed to save integration: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 

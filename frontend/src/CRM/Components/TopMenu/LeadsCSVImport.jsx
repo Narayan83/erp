@@ -44,8 +44,8 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
   // Source options (sync with AddLead - can be extended via localStorage 'leadSources')
   const [sourceOptions, setSourceOptions] = useState(['Website', 'Referral', 'Social Media', 'Direct', 'Partner']);
 
-  // Required fields for import (now including Source, Since and Assigned To)
-  const requiredFields = ['Business', 'Salutation', 'Name', 'Mobile', 'Email', 'Product', 'Source', 'Since', 'Assigned To'];
+  // Required fields for import (now including Source and Since; Salutation and Assigned To made optional)
+  const requiredFields = ['Business', 'Name', 'Mobile', 'Email', 'Product', 'Source', 'Since'];
 
   // Dropdown options for preview table (product/assigned filled from backend)
   const dropdownFields = {
@@ -255,7 +255,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
   const downloadTemplateCSV = async () => {
     const headersArr = [
       'Business *',
-      'Salutation *',
+      'Salutation',
       'Name *',
       'Designation',
       'Mobile *',
@@ -276,7 +276,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'Website',
       'Notes',
       'Tags',
-      'Assigned To *'
+      'Assigned To'
     ];
 
     const exampleRow = [
@@ -450,14 +450,12 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       // Highlight required field columns with red
       const requiredFieldsMap = {
         'business': true,
-        'salutation': true,
         'name': true,
         'mobile': true,
         'email': true,
         'product': true,
-      'source': true,
-      'since': true,
-      'assigned to': true
+        'source': true,
+        'since': true
       };
       for (let colIndex = 1; colIndex <= headersArr.length; colIndex++) {
         const headerText = headersArr[colIndex - 1].toLowerCase().replace(/\*/g, '').trim();
@@ -608,14 +606,12 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     const missingFields = [];
     const fieldMapping = {
       'Business': ['Business', 'Business *', 'business'],
-      'Salutation': ['Salutation', 'Salutation *', 'salutation'],
       'Name': ['Name', 'Name *', 'name'],
       'Mobile': ['Mobile', 'Mobile *', 'mobile'],
       'Email': ['Email', 'Email *', 'email'],
       'Product': ['Product', 'Product *', 'product'],
       'Source': ['Source', 'Source *', 'source'],
-      'Since': ['Since', 'Since *', 'since'],
-      'Assigned To': ['Assigned To', 'Assigned To *', 'assignedTo', 'assignedToName']
+      'Since': ['Since', 'Since *', 'since']
     };
 
     Object.keys(fieldMapping).forEach(displayName => {
@@ -663,12 +659,12 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
           errors.push(`Missing required fields: ${missingFields.join(', ')}`);
         }
         
-        // Validate product is from dropdown
-        if (!validateProductDropdown(row)) {
-          const productKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'product');
-          const productValue = row[productKey];
-          errors.push(`Product "${productValue}" is not in the available options. Please select from the dropdown list.`);
-        }
+        // Validate product is from dropdown (disabled to allow new products)
+        // if (!validateProductDropdown(row)) {
+        //   const productKey = Object.keys(row).find(k => k.replace(/[*]/g, '').trim().toLowerCase() === 'product');
+        //   const productValue = row[productKey];
+        //   errors.push(`Product "${productValue}" is not in the available options. Please select from the dropdown list.`);
+        // }
         
         if (errors.length > 0) {
           validationErrors.push({
@@ -700,18 +696,13 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       selectedArray.forEach((row, idx) => {
         const sourceKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'source');
         const sinceKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'since');
-        const assignedKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'assigned to');
         const sourceVal = sourceKey ? row[sourceKey] : '';
         const sinceVal = sinceKey ? row[sinceKey] : '';
-        const assignedVal = assignedKey ? row[assignedKey] : '';
         if (!sourceVal || String(sourceVal).trim() === '') {
           missingSpecial.push({ row: idx + 1, field: 'Source' });
         }
         if (!sinceVal || String(sinceVal).trim() === '') {
           missingSpecial.push({ row: idx + 1, field: 'Since' });
-        }
-        if (!assignedVal || String(assignedVal).trim() === '') {
-          missingSpecial.push({ row: idx + 1, field: 'Assigned To' });
         }
       });
       if (missingSpecial.length > 0) {
@@ -908,7 +899,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
         instructions={[
           'Download the template Excel file below',
           'Fill in your lead data following the template format',
-          'Required fields marked with ★ (Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To)',
+          'Required fields marked with ★ (Business, Name, Mobile, Email, Product, Source, Since)',
           'Save the file as CSV format',
           'Upload the completed CSV file'
         ]}
@@ -1179,6 +1170,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                       <TableHead>
                         <TableRow sx={{ backgroundColor: '#e8f5e9' }}>
                           <TableCell sx={{ fontWeight: 'bold' }}>Row</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
                           <TableCell sx={{ fontWeight: 'bold' }}>Business</TableCell>
                           <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                         </TableRow>
@@ -1212,7 +1204,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                     <strong>Required Fields (must be filled):</strong>
                   </Typography>
                   <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
-                    • Business, Salutation, Name, Mobile, Email, Product, Source, Since, Assigned To
+                    • Business, Name, Mobile, Email, Product, Source, Since
                   </Typography>
                   <Typography variant="body2" color="warning.dark">
                     <strong>How to proceed:</strong><br/>

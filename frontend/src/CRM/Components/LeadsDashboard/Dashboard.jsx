@@ -590,55 +590,6 @@ const Dashboard = () => {
       <div className="charts-row">
         <div className="charts-left">
           <div className="chart-card">
-            <div className="chart-title">Product-wise Leads</div>
-            <div className="chart-body product-pie">
-              {productData.length === 0 ? (
-                <div className="empty-pie">No data</div>
-              ) : (
-                <div className="product-pie-wrap">
-                  <PieChart data={productData} size={300} inner={40} />
-                  <div className="legend">
-                    {visibleLegend.map((p, i) => {
-                      const percent = productTotal ? Math.round((p.value / productTotal) * 1000) / 10 : 0;
-                      const labelText = `${p.label} — ${p.value} (${percent}%)`;
-                      return (
-                        <div className="legend-item" key={`${p.label}-${i}`} title={labelText}>
-                          <span className="legend-color" style={{ background: p.color }} />
-                          <span className="legend-label-text">{labelText}</span>
-                        </div>
-                      );
-                    })}
-
-                    {productData.length > legendPerPage && (
-                      <div className="legend-controls" role="navigation" aria-label="Legend pagination">
-                        <button
-                          type="button"
-                          className="legend-btn"
-                          onClick={() => setLegendPage(Math.max(0, legendPage - 1))}
-                          disabled={legendPage === 0}
-                          aria-label="Previous page"
-                        >
-                          ▲
-                        </button>
-                        <span className="legend-page">{legendPage + 1} / {legendTotalPages}</span>
-                        <button
-                          type="button"
-                          className="legend-btn"
-                          onClick={() => setLegendPage(Math.min(legendTotalPages - 1, legendPage + 1))}
-                          disabled={legendPage === legendTotalPages - 1}
-                          aria-label="Next page"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="chart-card" style={{ marginTop: 14 }}>
             <div className="chart-title">Source-wise Leads</div>
             <div className="chart-body">
               {sourceData.length === 0 ? (
@@ -675,6 +626,55 @@ const Dashboard = () => {
                           className="legend-btn"
                           onClick={() => setSourceLegendPage(Math.min(sourceLegendTotalPages - 1, sourceLegendPage + 1))}
                           disabled={sourceLegendPage === sourceLegendTotalPages - 1}
+                          aria-label="Next page"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="chart-card" style={{ marginTop: 14 }}>
+            <div className="chart-title">Product-wise Leads</div>
+            <div className="chart-body product-pie">
+              {productData.length === 0 ? (
+                <div className="empty-pie">No data</div>
+              ) : (
+                <div className="product-pie-wrap">
+                  <PieChart data={productData} size={300} inner={40} />
+                  <div className="legend">
+                    {visibleLegend.map((p, i) => {
+                      const percent = productTotal ? Math.round((p.value / productTotal) * 1000) / 10 : 0;
+                      const labelText = `${p.label} — ${p.value} (${percent}%)`;
+                      return (
+                        <div className="legend-item" key={`${p.label}-${i}`} title={labelText}>
+                          <span className="legend-color" style={{ background: p.color }} />
+                          <span className="legend-label-text">{labelText}</span>
+                        </div>
+                      );
+                    })}
+
+                    {productData.length > legendPerPage && (
+                      <div className="legend-controls" role="navigation" aria-label="Legend pagination">
+                        <button
+                          type="button"
+                          className="legend-btn"
+                          onClick={() => setLegendPage(Math.max(0, legendPage - 1))}
+                          disabled={legendPage === 0}
+                          aria-label="Previous page"
+                        >
+                          ▲
+                        </button>
+                        <span className="legend-page">{legendPage + 1} / {legendTotalPages}</span>
+                        <button
+                          type="button"
+                          className="legend-btn"
+                          onClick={() => setLegendPage(Math.min(legendTotalPages - 1, legendPage + 1))}
+                          disabled={legendPage === legendTotalPages - 1}
                           aria-label="Next page"
                         >
                           ▼

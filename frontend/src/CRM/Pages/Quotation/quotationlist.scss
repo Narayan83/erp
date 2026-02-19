@@ -163,12 +163,17 @@
   .table-container {
     background: #fff;
     border-radius: 4px;
-    overflow: hidden;
+    /* allow horizontal scrolling when table is wider than the container */
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     margin: 0;
 
     .quotation-table {
       width: 100%;
+      /* let the table grow to fit its content so the container can scroll horizontally */
+      min-width: max-content;
       border-collapse: collapse;
 
       thead {
@@ -204,6 +209,73 @@
           color: #212529;
           white-space: nowrap;
         }
+      }
+
+      /* Explicit per-column widths (matches table column order) */
+      thead tr th:nth-child(1),
+      tbody tr td:nth-child(1) {
+        width: 120px;
+        min-width: 120px;
+      }
+      thead tr th:nth-child(2),
+      tbody tr td:nth-child(2) {
+        width: 260px;
+        min-width: 160px;
+      }
+      thead tr th:nth-child(3),
+      tbody tr td:nth-child(3) {
+        width: 120px;
+        min-width: 100px;
+      }
+      thead tr th:nth-child(4),
+      tbody tr td:nth-child(4) {
+        width: 90px;
+        min-width: 90px;
+      }
+      thead tr th:nth-child(5),
+      tbody tr td:nth-child(5) {
+        width: 90px;
+        min-width: 90px;
+      }
+      thead tr th:nth-child(6),
+      tbody tr td:nth-child(6) {
+        width: 160px;
+        min-width: 120px;
+      }
+      thead tr th:nth-child(7),
+      tbody tr td:nth-child(7) {
+        width: 140px;
+        min-width: 100px;
+      }
+      thead tr th:nth-child(8),
+      tbody tr td:nth-child(8) {
+        width: 160px;
+        min-width: 120px;
+      }
+      thead tr th:nth-child(9),
+      tbody tr td:nth-child(9) {
+        width: 100px;
+        min-width: 90px;
+      }
+      thead tr th:nth-child(10),
+      tbody tr td:nth-child(10) {
+        width: 100px;
+        min-width: 80px;
+      }
+      thead tr th:nth-child(11),
+      tbody tr td:nth-child(11) {
+        width: 140px;
+        min-width: 100px;
+      }
+      thead tr th:nth-child(12),
+      tbody tr td:nth-child(12) {
+        width: 140px;
+        min-width: 100px;
+      }
+      thead tr th:nth-child(13),
+      tbody tr td:nth-child(13) {
+        width: 80px;
+        min-width: 80px;
       }
     }
   }

@@ -4,7 +4,7 @@ import { BASE_URL } from "../../../config/Config";
 import "../Email/Email.scss";
 import "./Integrations.scss";
 
-const INDiamart_INIT = { keyId: "", keySecret: "" };
+const INDiamart_INIT = { mobileNumber: "", apiKey: "" };
 const RAZORPAY_INIT = { keyId: "", keySecret: "" };
 const TRADE_INIT = { userId: "", profileId: "", key: "" };
 const RENAV_INIT = { mobile: "" };
@@ -106,16 +106,16 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
               <div className="integration-title">IndiaMART</div>
               {indiamartSaved ? (
                 <>
-                  <div className="tandc-item"><div className="tandc-name">Mobile: {indiamartSavedData.keyId}</div></div>
-                  <div className="tandc-item"><div className="tandc-name">Key: {indiamartSavedData.keySecret}</div></div>
+                  <div className="tandc-item"><div className="tandc-name">Mobile: {indiamartSavedData.mobileNumber}</div></div>
+                  <div className="tandc-item"><div className="tandc-name">Key: {indiamartSavedData.apiKey}</div></div>
                   <div className="integration-actions">
                     <button className="btn-primary small yellow" onClick={() => { setIndiamart(indiamartSavedData); setIndiamartSaved(false); }}>Edit</button>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="integration-row"><label>Mobile :</label><input value={indiamart.keyId} onChange={(e)=>setIndiamart({...indiamart, keyId: e.target.value})} type="text" /></div>
-                  <div className="integration-row"><label>Key :</label><input value={indiamart.keySecret} onChange={(e)=>setIndiamart({...indiamart, keySecret: e.target.value})} type="text" /></div>
+                  <div className="integration-row"><label>Mobile :</label><input value={indiamart.mobileNumber} onChange={(e)=>setIndiamart({...indiamart, mobileNumber: e.target.value.trim()})} type="text" /></div>
+                  <div className="integration-row"><label>Key :</label><input value={indiamart.apiKey} onChange={(e)=>setIndiamart({...indiamart, apiKey: e.target.value.trim()})} type="text" /></div>
                   <div className="integration-actions">
                     <button className="btn-primary save green" onClick={() => handleSave('lead_platform', 'indiamart', indiamart, 'IndiaMART', setIndiamartSaved, setIndiamartSavedData)}>Save</button>
                     <button className="btn-secondary" style={{marginLeft:8}} onClick={() => setIndiamart(INDiamart_INIT)}>Cancel</button>

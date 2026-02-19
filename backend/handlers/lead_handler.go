@@ -200,6 +200,10 @@ func DeleteLead(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid lead id"})
 	}
 
+	// Delete related records first to avoid foreign key constraint violations
+	leadsDB.Where("lead_id = ?", uint(parsed)).Delete(&models.LeadInteraction{})
+	leadsDB.Where("lead_id = ?", uint(parsed)).Delete(&models.LeadFollowUp{})
+
 	if err := leadsDB.Delete(&models.Lead{}, uint(parsed)).Error; err != nil {
 		// return actual DB error for easier debugging on client
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -422,9 +426,31 @@ func ImportLeads(c *fiber.Ctx) error {
 			lead.AssignedToName = assigned
 		}
 
-		// Product (store name)
+		// Product (store name and link to product entity)
 		if p := getAny("product", "productName", "product_name"); p != "" {
 			lead.ProductName = p
+
+			// Try to find existing product by name
+			var prod models.Product
+			if err := leadsDB.Where("LOWER(name) = ?", strings.ToLower(p)).First(&prod).Error; err == nil {
+				lead.ProductID = &prod.ID
+			} else {
+				// Product not found, create a new one
+				newProd := models.Product{
+					Name:      p,
+					Code:      fmt.Sprintf("AUTO-%s-%d", strings.ReplaceAll(strings.ToUpper(p), " ", ""), time.Now().Unix()%100000),
+					IsActive:  true,
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+				}
+				// Attempt to create the product (might still fail on unique code if unlucky)
+				if err := leadsDB.Create(&newProd).Error; err == nil {
+					lead.ProductID = &newProd.ID
+				} else {
+					// If creation fails (e.g. duplicate code), just fallback to storing ProductName as text
+					fmt.Printf("DEBUG: Failed to auto-create product %s: %v\n", p, err)
+				}
+			}
 		}
 
 		// Validate required fields

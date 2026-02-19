@@ -18,7 +18,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
   // Which action is selected by radio: 'change' or 'reject'
   const [selectedAction, setSelectedAction] = useState('change');
 
-  const stages = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
+  const stages = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive', 'Rejected'];
   const apiBase = '/api';
   const genCode = (title) => title.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 50);
   const normalizeReason = (reason) => {
@@ -99,8 +99,8 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
     }
 
     const prev = localCurrentStage;
-    // Optimistically mark as Inactive (reject)
-    setLocalCurrentStage('Inactive');
+    // Optimistically mark as Rejected
+    setLocalCurrentStage('Rejected');
     setIsUpdating(true);
 
     try {

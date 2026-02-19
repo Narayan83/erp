@@ -1,5 +1,5 @@
 // Import dependencies
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 // Import icons
 import { 
@@ -94,6 +94,24 @@ const TopMenu = () => {
 
   // Assigned to options (fetched from backend users)
   const [assignedToOptions, setAssignedToOptions] = useState(DEFAULT_ASSIGNED);
+
+  // View-filter controls (Date, Assigned To & Source)
+  const [filterDay, setFilterDay] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterAssignedTo, setFilterAssignedTo] = useState('');
+  const [filterSource, setFilterSource] = useState('');
+
+  const sourceOptions = useMemo(() => {
+    const setS = new Set();
+    (leads || []).forEach(l => {
+      const s = l.source || l.Source || l.sourceName || l.SourceName || '';
+      if (!s) return;
+      const val = typeof s === 'object' ? (s.name || s.label || JSON.stringify(s)) : String(s);
+      if (val && val.trim()) setS.add(val.trim());
+    });
+    return Array.from(setS).sort().map(s => ({ value: s, label: s }));
+  }, [leads]);
 
   // Interactions and followups for lookup maps
   const [interactions, setInteractions] = useState([]);
@@ -1026,6 +1044,34 @@ const TopMenu = () => {
   // -------------------- Filtering --------------------
   const filterLeadsByStatus = (leads, status) => {
     if (status === 'All Active Leads') return leads;
+
+    // CONTACTED: show leads that have at least one interaction OR at least one followup
+    if (status === 'Contacted') {
+      return leads.filter(l => {
+        const leadIdStr = String(l.id || l.ID || l.lead_id || '');
+        const hasInteraction = interactions.some(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+        const hasFollowup = followups.some(f => String(f.lead_id || f.LeadID || f.lead || '') === leadIdStr);
+        return hasInteraction || hasFollowup;
+      });
+    }
+
+    // PENDING: show leads that have NO interactions AND NO followups
+    if (status === 'Pending') {
+      return leads.filter(l => {
+        const leadIdStr = String(l.id || l.ID || l.lead_id || '');
+        const hasInteraction = interactions.some(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+        const hasFollowup = followups.some(f => String(f.lead_id || f.LeadID || f.lead || '') === leadIdStr);
+        return !(hasInteraction || hasFollowup);
+      });
+    }
+
+    if (status === 'Rejected') {
+      return leads.filter(l => {
+        const stage = (l.stage || l.Stage || '').toString().toLowerCase();
+        return ['rejected','lost','disqualified'].includes(stage);
+      });
+    }
+
     if (status === 'Discussion') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'discussion');
     if (status === 'Appointment') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'appointment');
     if (status === 'Demo') return leads.filter(lead => lead.stage && lead.stage.toLowerCase() === 'demo');
@@ -1036,10 +1082,71 @@ const TopMenu = () => {
   };
 
   const filterLeadsByView = (leads, view) => {
-    if (view === 'Newest First') return [...leads].sort((a, b) => new Date(b.since) - new Date(a.since));
-    if (view === 'Oldest First') return [...leads].sort((a, b) => new Date(a.since) - new Date(b.since));
-    if (view === 'Star Leads') return leads.filter(lead => lead.starred);
-    return leads;
+    let result = leads;
+
+    // Filters that narrow down the set
+    if (view === 'Star Leads') {
+      result = result.filter(lead => lead.starred);
+    }
+
+    if (view === 'Date') {
+      // Only apply if at least year/month/day is selected (year is optional but recommended)
+      if (filterYear || filterMonth || filterDay) {
+        result = result.filter(lead => {
+          const raw = lead.createdAt || lead.created_at || lead.CreatedAt || lead.since;
+          const d = raw ? new Date(raw) : null;
+          if (!d || isNaN(d)) return false;
+          if (filterYear && d.getFullYear() !== Number(filterYear)) return false;
+          if (filterMonth && (d.getMonth() + 1) !== Number(filterMonth)) return false;
+          if (filterDay && d.getDate() !== Number(filterDay)) return false;
+          return true;
+        });
+      }
+    }
+
+    if (view === 'Assigned To') {
+      if (filterAssignedTo) {
+        const f = String(filterAssignedTo).trim();
+        result = result.filter(lead => {
+          // Check explicit id fields first
+          const idCandidates = [lead.assigned_to_id, lead.assignedToId, (typeof lead.assignedTo === 'number' ? lead.assignedTo : undefined)];
+          for (const id of idCandidates) {
+            if (id !== undefined && id !== null && String(id) === f) return true;
+          }
+
+          // Then check assignedTo property which may be an object or a name string
+          const assigned = lead.assignedTo;
+          if (!assigned) return false;
+          if (typeof assigned === 'object') {
+            const id = assigned.id || assigned._id || assigned.value;
+            const name = assigned.name || assigned.label;
+            if (id !== undefined && id !== null && String(id) === f) return true;
+            if (name && String(name).toLowerCase() === f.toLowerCase()) return true;
+          } else {
+            if (String(assigned) === f) return true;
+            if (String(assigned).toLowerCase() === f.toLowerCase()) return true;
+          }
+          return false;
+        });
+      }
+    }
+
+    if (view === 'Source') {
+      if (filterSource) {
+        result = result.filter(lead => {
+          const s = lead.source || lead.Source || lead.sourceName || lead.SourceName || '';
+          if (!s) return false;
+          const val = typeof s === 'object' ? (s.name || s.label || '') : s;
+          return String(val).toLowerCase() === String(filterSource).toLowerCase();
+        });
+      }
+    }
+
+    // Sorting views
+    if (view === 'Newest First') return [...result].sort((a, b) => new Date(b.since || b.createdAt || b.created_at) - new Date(a.since || a.createdAt || a.created_at));
+    if (view === 'Oldest First') return [...result].sort((a, b) => new Date(a.since || a.createdAt || a.created_at) - new Date(b.since || b.createdAt || b.created_at));
+
+    return result;
   };
 
   // -------------------- Derived Data --------------------
@@ -1081,19 +1188,23 @@ const TopMenu = () => {
 
   const totalLeads = leads.length;
   const todaysLeads = leads.filter(l => isSameDay(l.createdAt || l.created_at || l.CreatedAt)).length;
+  // Contacted = lead has at least one interaction OR at least one followup
   const contactedCount = leads.filter(l => {
-    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
-    if (['discussion', 'appointment', 'demo', 'proposal', 'decided', 'contacted'].includes(stage)) return true;
-    if (l.lastTalk || l.last_talk || l.last_contacted) return true;
-    return false;
+    const leadIdStr = String(l.id || l.ID || l.lead_id || '');
+    const hasInteraction = interactions.some(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+    const hasFollowup = followups.some(f => String(f.lead_id || f.LeadID || f.lead || '') === leadIdStr);
+    return hasInteraction || hasFollowup;
   }).length;
+  // Pending = lead has NO interactions and NO followups
   const pendingCount = leads.filter(l => {
-    const stage = (l.stage || l.Stage || '').toString().toLowerCase();
-    return stage === 'pending' || stage === 'new' || stage === '' || stage === 'open';
+    const leadIdStr = String(l.id || l.ID || l.lead_id || '');
+    const hasInteraction = interactions.some(i => String(i.lead_id || i.LeadID || i.lead || '') === leadIdStr);
+    const hasFollowup = followups.some(f => String(f.lead_id || f.LeadID || f.lead || '') === leadIdStr);
+    return !(hasInteraction || hasFollowup);
   }).length;
   const rejectedCount = leads.filter(l => {
     const stage = (l.stage || l.Stage || '').toString().toLowerCase();
-    return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
+    return ['rejected', 'lost', 'disqualified'].includes(stage);
   }).length;
 
   const convertedCount = leads.filter(l => {
@@ -1108,7 +1219,7 @@ const TopMenu = () => {
 
   const isRejected = (lead) => {
     const stage = (lead.stage || lead.Stage || '').toString().toLowerCase();
-    return ['rejected', 'inactive', 'lost', 'disqualified'].includes(stage);
+    return ['rejected', 'lost', 'disqualified'].includes(stage);
   }; 
 
   // Paginated leads for current page
@@ -1216,6 +1327,9 @@ const TopMenu = () => {
       <div className="header-section">
         <div className="header-title">Leads & Prospects</div>
         <div className="header-actions">
+          <div className={`selected-count-overlay ${selectedLeadsCount > 0 ? 'visible' : ''}`}>
+            Selected: {selectedLeadsCount}
+          </div>
           {/* Status Dropdown */}
           <div style={{ position: 'relative' }} ref={statusDropdownRef}>
             <button
@@ -1227,7 +1341,7 @@ const TopMenu = () => {
             </button>
             {showStatusDropdown && (
               <div className="status-dropdown">
-                {['All Active Leads', 'Discussion','Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'].map((filter) => (
+                {['All Active Leads', 'Discussion','Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive', 'Rejected'].map((filter) => (
                   <div
                     key={filter}
                     className={`dropdown-item${activeStatusFilter === filter ? ' active' : ''}`}
@@ -1251,7 +1365,7 @@ const TopMenu = () => {
             </button>
             {showViewDropdown && (
               <div className="view-dropdown">
-                {['Newest First', 'Oldest First', 'Star Leads'].map((filter) => (
+                {['Newest First', 'Oldest First', 'Star Leads', 'Date', 'Assigned To', 'Source'].map((filter) => (
                   <div
                     key={filter}
                     className={`dropdown-item${activeViewFilter === filter ? ' active' : ''}`}
@@ -1261,7 +1375,7 @@ const TopMenu = () => {
                   </div>
                 ))}
               </div>
-            )}
+            )} 
           </div>
           {/* Search Bar */}
           <div className="search-bar">
@@ -1302,19 +1416,64 @@ const TopMenu = () => {
             </div>
           </div>
           {/* Center: Selected count overlay */}
-          <div className="selected-count-overlay-center">
-            <div className={`selected-count-overlay ${selectedLeadsCount > 0 ? 'visible' : ''}`}>
-              Selected: {selectedLeadsCount}
+          <div className="filter-controls">
+              {activeViewFilter === 'Date' && (
+                <div className="date-selectors">
+                  <select value={filterDay} onChange={e => setFilterDay(e.target.value)}>
+                    <option value="">Day</option>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+
+                  <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+                    <option value="">Month</option>
+                    {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, idx) => (
+                      <option key={idx} value={idx + 1}>{m}</option>
+                    ))}
+                  </select>
+
+                  <select value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+                    <option value="">Year</option>
+                    {Array.from({ length: 25 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {activeViewFilter === 'Assigned To' && (
+                <div className="assigned-selector">
+                  <select value={filterAssignedTo} onChange={e => setFilterAssignedTo(e.target.value)}>
+                    <option value=''>Assigned To</option>
+                    {assignedToOptions.map(opt => (
+                      <option key={opt.id || opt.value || opt.name} value={opt.id || opt.value || opt.name}>
+                        {opt.name || opt.label || opt.value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {activeViewFilter === 'Source' && (
+                <div className="source-selector">
+                  <select value={filterSource} onChange={e => { setFilterSource(e.target.value); setPageNo(1); }}>
+                    <option value=''>Source</option>
+                    {sourceOptions.length > 0 ? sourceOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    )) : <option value=''>No Sources</option>}
+                  </select>
+                </div>
+              )}
             </div>
-          </div>
           {/* Right: Stats section */}
           <div className="stats-section">
-            <div className="stat-box total">Total: {totalLeads}</div>
-            <div className="stat-box today">Today: {todaysLeads}</div>
-            <div className="stat-box contacted">Contacted: {contactedCount}</div>
-            <div className="stat-box converted">Converted: {convertedCount}</div>
-            <div className="stat-box pending">Pending: {pendingCount}</div>
-            <div className="stat-box rejected">Rejected: {rejectedCount}</div>
+            <div className={`stat-box total ${activeStatusFilter === 'All Active Leads' ? 'active' : ''}`} onClick={() => { setActiveStatusFilter('All Active Leads'); setPageNo(1); }}>Total: {totalLeads}</div>
+            {/* <div className="stat-box today">Today: {todaysLeads}</div> */}
+            <div className={`stat-box contacted ${activeStatusFilter === 'Contacted' ? 'active' : ''}`} onClick={() => { setActiveStatusFilter(activeStatusFilter === 'Contacted' ? 'All Active Leads' : 'Contacted'); setPageNo(1); }}>Contacted: {contactedCount}</div>
+            {/* <div className="stat-box converted">Converted: {convertedCount}</div> */}
+            <div className={`stat-box pending ${activeStatusFilter === 'Pending' ? 'active' : ''}`} onClick={() => { setActiveStatusFilter(activeStatusFilter === 'Pending' ? 'All Active Leads' : 'Pending'); setPageNo(1); }}>Pending: {pendingCount}</div>
+            <div className={`stat-box rejected ${activeStatusFilter === 'Rejected' ? 'active' : ''}`} onClick={() => { setActiveStatusFilter(activeStatusFilter === 'Rejected' ? 'All Active Leads' : 'Rejected'); setPageNo(1); }}>Rejected: {rejectedCount}</div>
             <div className="stat-box potential">Potential: {formatIndianRupees(leads.reduce((sum, lead) => sum + parseInt(lead.potential || "0"), 0))}</div> 
           </div>
         </div>
@@ -1511,17 +1670,16 @@ const TopMenu = () => {
             console.log('Imported leads received:', importedLeads);
             if (importedLeads && importedLeads.length > 0) {
               try {
-                // Filter out leads with missing required fields (now requiring Source, Since, Assigned To)
+                // Filter out leads with missing required fields (Source, Since are required; Assigned To is optional)
                 const validLeads = importedLeads.filter(lead => {
                   const business = lead.company || lead.business || '';
                   const name = lead.name || lead.contact || '';
                   const email = lead.email || '';
                   const mobile = lead.phone || lead.mobile || '';
-                  const source = lead.source || lead.Source || lead.enquiry_source || '';
-                  const since = lead.since || lead.Since || lead.QUERY_TIME || lead.enquiry_date || '';
-                  const assigned = lead.assignedTo || lead.assignedToName || lead.assigned_to || '';
+                  const source = lead.source || lead.Source || lead.enquiry_source || 'IndiaMART';
+                  const since = lead.since || lead.Since || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString();
 
-                  if (!business || !name || !email || !mobile || !source || !since || !assigned) {
+                  if (!business || !name || !email || !mobile) {
                     console.warn('Skipping lead with missing required fields:', {
                       business,
                       name,
@@ -1529,7 +1687,6 @@ const TopMenu = () => {
                       mobile,
                       source,
                       since,
-                      assigned,
                       lead
                     });
                     return false;
@@ -1538,7 +1695,7 @@ const TopMenu = () => {
                 });
 
                 if (validLeads.length === 0) {
-                  alert('No valid leads to import. Make sure each lead has company, name, email, mobile, source, since, and assigned to.');
+                  alert('No valid leads to import. Make sure each lead has company, name, email, and mobile.');
                   setShowImportDialog(false);
                   return;
                 }
@@ -1562,7 +1719,8 @@ const TopMenu = () => {
                   addressLine2: lead.addressLine2 || '',
                   designation: lead.designation || '',
                   potential: parseInt(lead.estimatedValue || lead.potential || '0') || 0,
-                  tags: lead.tags || ''
+                  tags: lead.tags || '',
+                  since: lead.since || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString()
                 }));
 
                 // Call backend import endpoint with array directly
