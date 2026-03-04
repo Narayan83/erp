@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import './dashboard.scss';
 
 const colors = [
@@ -156,7 +156,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchLeads = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/api/leads?page=1&limit=1000`);
+        const res = await fetch(`${BASE_URL}/api/leads?page=1&limit=1000`, { headers: getAuthHeaders() });
         const data = await res.json();
         setLeads(Array.isArray(data) ? data : (data.data || []));
       } catch (e) {
@@ -172,8 +172,8 @@ const Dashboard = () => {
     const load = async () => {
       try {
         const [fResp, iResp] = await Promise.all([
-          fetch(`${BASE_URL}/api/lead-followups`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/lead-interactions`).then(r => r.json())
+          fetch(`${BASE_URL}/api/lead-followups`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(r => r.json())
         ]);
         const fArr = Array.isArray(fResp) ? fResp : (fResp && fResp.data ? fResp.data : []);
         const iArr = Array.isArray(iResp) ? iResp : (iResp && iResp.data ? iResp.data : []);

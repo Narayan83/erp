@@ -15,6 +15,7 @@ type CreateCompanyBranchBankRequest struct {
 	BranchAddress   string  `json:"branch_address"`
 	AccountNumber   string  `json:"account_number"`
 	IFSCCode        string  `json:"ifsc_code"`
+	SwiftCode       string  `json:"swift_code"`
 	Balance         float64 `json:"balance"`
 }
 
@@ -25,6 +26,7 @@ type UpdateCompanyBranchBankRequest struct {
 	BranchAddress   string  `json:"branch_address"`
 	AccountNumber   string  `json:"account_number"`
 	IFSCCode        string  `json:"ifsc_code"`
+	SwiftCode       string  `json:"swift_code"`
 	Balance         float64 `json:"balance"`
 }
 
@@ -42,8 +44,9 @@ func CreateCompanyBranchBank(c *fiber.Ctx) error {
 		BranchName:      body.BranchName,
 		BranchAddress:   body.BranchAddress,
 		AccountNumber:   body.AccountNumber,
-		IFSCCode:        body.IFSCCode,
-		Balance:         body.Balance,
+		IFSCCode:        body.IFSCCode, 
+		SwiftCode: body.SwiftCode, 
+		Balance: body.Balance,
 	}
 
 	if err := companyBranchDB.Create(&bank).Error; err != nil {
@@ -77,6 +80,7 @@ func UpdateCompanyBranchBank(c *fiber.Ctx) error {
 		"branch_address":    body.BranchAddress,
 		"account_number":    body.AccountNumber,
 		"ifsc_code":         body.IFSCCode,
+		"swift_code":        body.SwiftCode,
 		"balance":           body.Balance,
 	}
 

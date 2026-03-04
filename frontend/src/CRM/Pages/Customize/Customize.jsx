@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrowLeft, FaCheck, FaPencilAlt, FaCog } from 'react-icons/fa';
+import images from '../../../assets/images';
 import { MdMissedVideoCall } from 'react-icons/md';
 import './_customize.scss';
 
@@ -277,14 +278,14 @@ const PlatformIntegrations = () => {
   const [loadingPlatforms, setLoadingPlatforms] = useState(new Set());
 
   const platforms = [
-    { id: 'indiamart', name: 'IndiaMART', icon: null, fallbackClass: 'indiamart' },
-    { id: 'tradeindia', name: 'TradeIndia', icon: null, fallbackClass: 'tradeindia' },
-    { id: 'justdial', name: 'JustDial', icon: null, fallbackClass: 'justdial' },
-    { id: 'meta', name: 'Meta', icon: null, fallbackClass: 'meta' },
-    { id: 'housing', name: 'Housing.com', icon: null, fallbackClass: 'housing' },
-    { id: 'acres99', name: '99acres', icon: null, fallbackClass: 'acres99' },
-    { id: 'magicbricks', name: 'MagicBricks', icon: null, fallbackClass: 'magicbricks' },
-    { id: 'website', name: 'Custom Website', icon: null, fallbackClass: 'website' }
+    { id: 'indiamart', name: 'IndiaMART', icon: images.indiamart, fallbackClass: 'indiamart' },
+    { id: 'tradeindia', name: 'TradeIndia', icon: images.tradeindia, fallbackClass: 'tradeindia' },
+    { id: 'justdial', name: 'JustDial', icon: images.justdial, fallbackClass: 'justdial' },
+    { id: 'meta', name: 'Meta', icon: images.meta, fallbackClass: 'meta' },
+    { id: 'housing', name: 'Housing.com', icon: images.housing, fallbackClass: 'housing' },
+    { id: 'acres99', name: '99acres', icon: images.acres99, fallbackClass: 'acres99' },
+    { id: 'magicbricks', name: 'MagicBricks', icon: images.magicbricks, fallbackClass: 'magicbricks' },
+    { id: 'website', name: 'Custom Website', icon: images.website, fallbackClass: 'website' }
   ];
 
   const handlePlatformClick = (platformId) => {

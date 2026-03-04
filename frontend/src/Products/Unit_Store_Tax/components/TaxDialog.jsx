@@ -109,7 +109,7 @@ export default function TaxDialog({ open, onClose, tax, onSuccess }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{tax ? "Edit Tax" : "Add Tax"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="name"

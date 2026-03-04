@@ -308,6 +308,28 @@ const QuotationList = () => {
     return cust.email || cust.email_address || cust.contact_email || '';
   };
 
+  // Helper: return customer's legal GSTIN (check common top-level fields, legal object and documents)
+  const getCustomerLegalGstin = (cust) => {
+    if (!cust) return '';
+    const top = cust.gst_in || cust.gstin || cust.GSTIN || cust.gst || cust.gstin_number || cust.gstinNumber || cust.tax_id || '';
+    if (top && String(top).trim() !== '') return top;
+    if (cust.legal && (cust.legal.gstin || cust.legal.gst)) return cust.legal.gstin || cust.legal.gst;
+    if (Array.isArray(cust.documents)) {
+      const doc = cust.documents.find(d => {
+        const k = (d.type || d.name || d.doc_type || '').toString().toLowerCase();
+        return k.includes('gst');
+      });
+      if (doc) return doc.doc_number || doc.number || doc.docNumber || '';
+    }
+    return '';
+  };
+
+  // Helper: determine which GST to display for an address — prefer address-level GST fields
+  const gstForAddr = (addr) => {
+    if (!addr) return '';
+    return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || addr.gst_number || addr.gst_no || addr.gstNo || '';
+  };
+
   const copyToClipboard = async (text) => {
     if (!text) return;
     try {
@@ -344,7 +366,7 @@ const QuotationList = () => {
     // billing address from the quotation's billing_address (preloaded)
     const bAddr = q.billing_address || {};
     const billingTitle = bAddr.title || customerName;
-    const billingGSTIN = bAddr.gstin || '-';
+    const billingGSTIN = gstForAddr(bAddr) || getCustomerLegalGstin(cust) || '-';
     const billingAddress1 = bAddr.address1 || '';
     const billingAddress2 = bAddr.address2 || '';
     const billingAddress3 = bAddr.address3 || '';
@@ -356,7 +378,7 @@ const QuotationList = () => {
     // shipping address from the quotation's shipping_address (preloaded)
     const sAddr = q.shipping_address || {};
     const shippingTitle = sAddr.title || customerName;
-    const shippingGSTIN = sAddr.gstin || '-';
+    const shippingGSTIN = gstForAddr(sAddr) || getCustomerLegalGstin(cust) || '-';
     const shippingAddress1 = sAddr.address1 || '';
     const shippingAddress2 = sAddr.address2 || '';
     const shippingAddress3 = sAddr.address3 || '';
@@ -390,14 +412,26 @@ const QuotationList = () => {
     // Bank details from quotaion's preloaded bank if available, else branch
     const bankB = q.company_branch_bank || branch.company_branch_bank || {};
     const bankName = bankB.bankName || bankB.bank_name || branch.bank_name || company.bank_name || '';
-    const bankBranch = bankB.branch || bankB.bank_branch || company.bank_branch || '';
+    const bankBranch = bankB.branch || bankB.branch_name || bankB.bankBranch || bankB.bank_branch || branch.bank_branch || company.bank_branch || '';
     const bankBranchAddress = branch.bank_branch_address || company.bank_branch_address || branchAddress || '';
     const accountNo = bankB.accountNo || bankB.account_number || branch.account_number || company.account_number || '';
     const ifscCode = bankB.ifsc || bankB.ifsc_code || branch.ifsc_code || company.ifsc_code || '';
     const swiftCode = bankB.swiftCode || bankB.swift_code || branch.swift_code || company.swift_code || '';
     
-    const termsArr = Array.isArray(q.terms_and_conditions) ? q.terms_and_conditions : [];
-    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t}</div>`).join('');
+    const rawTerms = q.terms_and_conditions;
+    let termsArr = [];
+    if (Array.isArray(rawTerms)) {
+      termsArr = rawTerms;
+    } else if (typeof rawTerms === 'string') {
+      try {
+        const parsed = JSON.parse(rawTerms);
+        if (Array.isArray(parsed)) termsArr = parsed;
+        else termsArr = [rawTerms];
+      } catch (e) {
+        termsArr = [rawTerms];
+      }
+    }
+    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || (typeof t === 'string' ? t : '')}</div>`).join('');
     const notesHtml = q.note ? `<div style="margin-top: 10px;"><strong>Notes:</strong><br/>${q.note}</div>` : '';
 
     const subtotal = items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.rate || 0)), 0);
@@ -439,6 +473,7 @@ const QuotationList = () => {
           ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
+          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${(Number(item.fixedRate || item.fixed_rate || item.fixed_price || item.fixedPrice || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
           ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
@@ -451,7 +486,7 @@ const QuotationList = () => {
     }).join('');
     
     // Count columns for the "No items" row
-    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
 
     const html = `
       <!DOCTYPE html>
@@ -472,7 +507,7 @@ const QuotationList = () => {
           .quotation-details td { padding: 6px 10px; border: 1px solid #ddd; }
           .quotation-details td:first-child { font-weight: 600; background: #E3F2FD; white-space: nowrap; width: 45%; color: #333; }
           .quotation-details td:last-child { color: #333; }
-          .addresses { display: flex; justify-content: space-between; margin: 20px 0; gap: 15px; }
+          .addresses { display: flex; justify-content: space-between; margin: 10px 0; gap: 0px; }
           .address-box { flex: 1; border: 1px solid #333; padding: 12px; background: #FAFAFA; }
           .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
           .address-box p { font-size: 10px; line-height: 1.7; margin: 4px 0; color: #333; }
@@ -483,14 +518,14 @@ const QuotationList = () => {
           table.items tbody tr:nth-child(odd) { background: #fff; }
           table.items tbody tr:hover { background: #E3F2FD; }
           table.items td { vertical-align: middle; color: #333; }
-          .three-col { display: flex; gap: 15px; margin: 20px 0; }
+          .three-col { display: flex; gap: 0px; margin: 10px 0; }
           .three-col > div { border: 1px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; border-bottom: 1px solid #333; padding-bottom: 4px; text-transform: uppercase; }
+          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; padding-bottom: 4px; text-transform: uppercase; }
           .bank-details { flex: 1; }
           .bank-details table { width: 100%; font-size: 10px; margin-top: 8px; }
           .bank-details td { padding: 4px 6px; }
           .bank-details td:first-child { font-weight: 600; color: #555; width: 45%; }
-          .amount-words-box { flex: 1; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom, #FFF9C4, #FFF59D); text-align: center; font-style: italic; border: 1px solid #FBC02D; }
+          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: center; }
           .amount-words-box > div { padding: 10px; }
           .amount-words-box strong { display: block; font-size: 11px; color: #F57F17; margin-bottom: 8px; }
           .amount-words-box div div { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; }
@@ -500,12 +535,13 @@ const QuotationList = () => {
           .summary td:first-child { text-align: left; font-weight: 500; background: #F5F5F5; color: #555; }
           .summary td:last-child { text-align: right; font-weight: 600; color: #333; }
           .summary .grand-total td { background: linear-gradient(to right, #333, #333); color: #fff; font-weight: 700; font-size: 13px; border-top: 3px solid #333; }
-          .terms { margin: 20px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
-          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; border-bottom: 1px solid #333; padding-bottom: 5px; }
-          .terms p, .terms div { font-size: 10px; line-height: 1.8; white-space: pre-line; color: #333; margin: 4px 0; }
-          .notes-signature { display: flex; gap: 15px; margin-top: 20px; }
+          .terms { margin: 10px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
+          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; padding-bottom: 5px; }
+          .terms .tc-columns { column-count: 2; column-gap: 20px; }
+          .terms .tc-columns > div { break-inside: avoid-column; -webkit-column-break-inside: avoid; padding-bottom: 6px; }
+          .notes-signature { display: flex; gap: 0px; margin-top: 10px; }
           .notes { flex: 2; border: 1px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
-          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; padding-bottom: 4px; }
           .notes p { font-size: 10px; line-height: 1.7; color: #333; }
           .authorized-sign { flex: 1; border: 1px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
           .authorized-sign > p:first-child { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 10px; }
@@ -557,7 +593,7 @@ const QuotationList = () => {
                 <tr><td>${getDocType(q)} No.</td><td>${q.quotation_number || '-'}</td></tr>
                 <tr><td>Date</td><td>${q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
                 ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
-                <tr><td>Ref.</td><td>${q.reference || q.quotation_number || '-'}</td></tr>
+                <tr><td>Ref.</td><td>${q.references || '-'}</td></tr>
                 <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
               </table>
             </div>
@@ -571,7 +607,7 @@ const QuotationList = () => {
               <tr><td>${getDocType(q)} No.</td><td>${q.quotation_number || '-'}</td></tr>
               <tr><td>Date</td><td>${q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
               ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
-              <tr><td>Ref.</td><td>${q.reference || q.quotation_number || '-'}</td></tr>
+              <tr><td>Ref.</td><td>${q.references || '-'}</td></tr>
               <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
             </table>
           </div>
@@ -588,9 +624,9 @@ const QuotationList = () => {
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
             ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
             ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
@@ -600,9 +636,9 @@ const QuotationList = () => {
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
             ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
             ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
         ` : ''}
@@ -617,6 +653,7 @@ const QuotationList = () => {
               ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
+              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
               ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
               ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
               ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
@@ -637,9 +674,8 @@ const QuotationList = () => {
             <h3>Bank Details</h3>
             <table>
               <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Branch Address</td><td>${bankBranchAddress || '-'}</td></tr>
+              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
             </table>
@@ -647,7 +683,7 @@ const QuotationList = () => {
           ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
 
           <div class="amount-words-box">
-            <div><strong>Amount in Words</strong><div>Rupees ${numberToWords(grandTotal)} only</div></div>
+            <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div><h5>Rupees ${numberToWords(grandTotal)} only</h5></div></div>
           </div>
 
           <div class="summary">
@@ -688,7 +724,7 @@ const QuotationList = () => {
 
         <div class="terms">
           <h3>Terms & Conditions</h3>
-          ${termsAndConditionsHtml || '<p>-</p>'}
+          <div class="tc-columns">${termsAndConditionsHtml || '<p>-</p>'}</div>
         </div>
 
         <div class="notes-signature">
@@ -703,7 +739,7 @@ const QuotationList = () => {
           </div>
         </div>
 
-        
+        <div class="pdf-footer">This is a computer-generated quotation. E. &amp; O. E.</div>
       </body>
       </html>
     `;

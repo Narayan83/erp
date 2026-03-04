@@ -53,6 +53,11 @@ func CreateLead(c *fiber.Ctx) error {
 		}
 	}
 
+	// If lead is being created with an assignee, record transferredOn as now
+	if lead.AssignedToID != nil && lead.TransferredOn.IsZero() {
+		lead.TransferredOn = time.Now()
+	}
+
 	if err := leadsDB.Create(&lead).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -154,6 +159,14 @@ func UpdateLead(c *fiber.Ctx) error {
 	var lead models.Lead
 	if err := leadsDB.First(&lead, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Lead not found"})
+	}
+
+	// If `assigned_to_id` is being changed, set `transferredOn` to now
+	oldAssignedToID := lead.AssignedToID
+	if req.AssignedToID != nil {
+		if oldAssignedToID == nil || *oldAssignedToID != *req.AssignedToID {
+			req.TransferredOn = time.Now()
+		}
 	}
 
 	req.UpdatedAt = time.Now()

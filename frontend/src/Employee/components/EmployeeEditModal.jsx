@@ -93,7 +93,7 @@ export default function EmployeeEditModal({ open, onClose, employee }) {
         </div>
 
         <div className="eem-body">
-          <form className="form-grid" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
+          <form autoComplete="off" className="form-grid" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
             <label>
               <span>Department</span>
               <select name="department_id" value={form.department_id} onChange={handleChange}>

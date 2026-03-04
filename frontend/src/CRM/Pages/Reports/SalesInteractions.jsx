@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaFileExport } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import './_sales_interactions.scss';
 
 
 const SalesInteractions = () => {
   const navigate = useNavigate();
+
   const [salesperson, setSalesperson] = useState('');
   const [period, setPeriod] = useState('This Month');
   const [selectedOtherMonth, setSelectedOtherMonth] = useState(''); // format YYYY-MM
@@ -36,7 +37,9 @@ const SalesInteractions = () => {
 
     // Fetch employees and normalize display name
     setLoadingEmployees(true);
-    fetch(`${BASE_URL}/api/employees`)
+    fetch(`${BASE_URL}/api/employees`, {
+      headers: getAuthHeaders()
+    })
       .then((res) => res.json())
       .then((data) => {
         if (!mounted) return;
@@ -57,8 +60,8 @@ const SalesInteractions = () => {
     // Fetch interactions and leads (handle paginated responses)
     setLoadingInteractions(true);
     Promise.all([
-      fetch(`${BASE_URL}/api/lead-interactions`).then(res => res.json()),
-      fetch(`${BASE_URL}/api/leads`).then(res => res.json())
+      fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(res => res.json()),
+      fetch(`${BASE_URL}/api/leads`, { headers: getAuthHeaders() }).then(res => res.json())
     ])
       .then(([interResp, leadsResp]) => {
         if (!mounted) return;
@@ -142,8 +145,8 @@ const SalesInteractions = () => {
           // reload interactions
           setLoadingInteractions(true);
           Promise.all([
-            fetch(`${BASE_URL}/api/lead-interactions`).then(res => res.json()),
-            fetch(`${BASE_URL}/api/leads`).then(res => res.json())
+            fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(res => res.json()),
+            fetch(`${BASE_URL}/api/leads`, { headers: getAuthHeaders() }).then(res => res.json())
           ])
             .then(([interResp, leadsResp]) => {
               if (!mounted) return;

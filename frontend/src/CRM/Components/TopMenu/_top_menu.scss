@@ -516,8 +516,9 @@
     }
 
     tr {
+      background-color: #e7f3da;
       &:hover {
-        background-color: #e7f3da;
+        background-color: #ffffff;
         cursor: pointer;
       }
     }
@@ -526,7 +527,31 @@
       opacity: 0.6;
       background-color: #f5b4b4;
       &:hover {
-        background-color: #e2baba;
+        background-color: #ffffff;
+      }
+    }
+
+    // Active leads (light yellow)
+    tr[data-status="active"] {
+      background-color: #d8c93f; // light yellow
+      &:hover {
+        background-color: #ffffff;
+      }
+    }
+
+    // Starred leads (light green). This takes precedence when a lead is starred.
+    tr[data-starred="true"] {
+      background-color: #c6fcca; // light green
+      &:hover {
+        background-color: #ffffff;
+      }
+    }
+
+    // Inactive leads (light red)
+    tr[data-status="inactive"] {
+      background-color: #ffa8a8;
+      &:hover {
+        background-color: #ffffff;
       }
     }
 

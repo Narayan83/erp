@@ -6,6 +6,8 @@ import (
 
 	handler "erp.local/backend/handlers"
 	"erp.local/backend/initializers"
+	"erp.local/backend/middleware"
+	"erp.local/backend/seeds"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -15,7 +17,7 @@ func init() {
 
 	initializers.LoadEnviromentVariables()
 	initializers.ConnectToDb()
-
+	seeds.SeedAll()
 }
 
 // func welcome(c *fiber.Ctx) error {
@@ -71,6 +73,7 @@ func main() {
 	handler.SetEmployeeDB(initializers.DB)
 	handler.SetEmployeeHierarchyDB(initializers.DB)
 	handler.SetEmployeeOrgUnitDB(initializers.DB)
+	handler.SetUserRoleMappingDB(initializers.DB)
 
 	// CRM/Leads Config
 	handler.SetCRMTagDB(initializers.DB)
@@ -133,14 +136,18 @@ func main() {
 
 	// Categories
 	api := app.Group("/api")
-	// Expose login under /api/login as well to match frontend calls
-	// api.Post("/login", handler.LoginDebug)
-	// routeStatus.APILogin = true
 
-	// Simple GET test for /api/login to verify route is reachable
-	api.Get("/login", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"ok": true, "message": "api login endpoint reachable"})
+	// Public Routes
+	api.Post("/login", handler.Login)
+	api.Get("/debug/login-check", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
 	})
+
+	// Use Middleware for subsequent routes
+	api.Use(middleware.Protected())
+
+	// Authenticated Routes
+	api.Get("/my-menus", handler.GetCurrentUserMenuTree)
 
 	// Categories
 	api.Get("/categories", handler.GetAllCategorie)
@@ -204,7 +211,6 @@ func main() {
 	api.Post("/products/import", handler.ImportProducts)
 	api.Post("/users/import", handler.ImportUsers)
 	api.Post("/products/fix-sequence", handler.FixProductSequence)
-
 	api.Get("/products/stats", handler.GetProductStats)
 
 	// Product Variants
@@ -328,6 +334,12 @@ func main() {
 	// Lead Timeline
 	api.Get("/lead/:id/timeline", handler.GetLeadTimeline)
 
+	// IndiaMART Integration
+	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
+
+	// GSTIN lookup (proxies external GST API)
+	api.Get("/gstin/:gstin", handler.GetGSTINDetails)
+
 	// Lead Sources
 	api.Get("/lead-sources", handler.GetLeadSources)
 	api.Get("/lead-sources/:id", handler.GetLeadSource)
@@ -348,12 +360,6 @@ func main() {
 	api.Get("/crm-tags/:id", handler.GetCRMTag)
 	api.Put("/crm-tags/:id", handler.UpdateCRMTag)
 	api.Delete("/crm-tags/:id", handler.DeleteCRMTag)
-
-	// IndiaMART Integration
-	api.Post("/indiamart/fetch-leads", handler.FetchIndiaMartLeads)
-
-	// GSTIN Details Proxy
-	api.Get("/gstin/:gstin", handler.GetGSTINDetails)
 
 	// Printer Header
 	api.Post("/printer-headers", handler.CreatePrinterHeader)

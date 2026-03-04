@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BASE_URL } from "../../../config/Config";
+import { BASE_URL, getAuthHeaders } from "../../../config/Config";
 import "./series.scss";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
@@ -44,7 +44,7 @@ export default function Series() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`);
+      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`, { headers: getAuthHeaders() });
       const data = await res.json();
       const branchList = Array.isArray(data.data) ? data.data : data;
       setBranches(Array.isArray(branchList) ? branchList : []);
@@ -66,7 +66,7 @@ export default function Series() {
         params.append('search', searchQuery);
       }
 
-      const res = await fetch(`${BASE_URL}/api/series?${params}`);
+      const res = await fetch(`${BASE_URL}/api/series?${params}`, { headers: getAuthHeaders() });
       const data = await res.json();
       
       // Normalize series records: ensure company_branch_ids is an array and document_type exists
@@ -157,7 +157,8 @@ export default function Series() {
     
     try {
       const res = await fetch(`${BASE_URL}/api/series/${series.id}`, { 
-        method: 'DELETE' 
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
       
       if (!res.ok) {
@@ -226,7 +227,7 @@ export default function Series() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 

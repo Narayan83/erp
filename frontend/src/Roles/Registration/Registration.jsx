@@ -16,7 +16,7 @@ import { FaUserTie, FaIndustry, FaIdCard } from "react-icons/fa";
 import Skeleton from "@mui/material/Skeleton";
 import { Today } from "@mui/icons-material";
 // import "./Registration.scss";
-import { BASE_URL } from "../../config/Config";
+import { BASE_URL, getAuthHeaders } from "../../config/Config";
 
 function Registration() {
   const navigate = useNavigate();
@@ -87,9 +87,7 @@ function Registration() {
     setIsLoading(true);
     try {
       const response = await fetch(`${BASE_URL}/registration_view/${id}`, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         // credentials: 'include' // If using cookies/sessions
       });
 
@@ -248,9 +246,7 @@ function Registration() {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(dataToSend),
       });
 

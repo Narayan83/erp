@@ -18,7 +18,7 @@ import './add_quotation.scss';
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 
-import { BASE_URL } from "../../../config/Config";
+import { BASE_URL, getAuthHeaders } from "../../../config/Config";
 import TermsConditionSelector from "./TermsConditionModal";
 import PrintSettingsDialog from "../../../PrintSettings/Print";
 import SavedTemplate from "../../../Admin Master/page/SavedTemplate/SavedTemplate";
@@ -431,7 +431,7 @@ useEffect(()=>{console.log(customers)},[customers]);
       // fallback to users endpoint if non-heads endpoint is not available
       let data = null;
       try {
-        const res = await fetch(`${BASE_URL}/api/employees/non-heads`);
+        const res = await fetch(`${BASE_URL}/api/employees/non-heads`, { headers: getAuthHeaders() });
         if (res.ok) {
           data = await res.json();
           setEmployees(Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
@@ -441,7 +441,7 @@ useEffect(()=>{console.log(customers)},[customers]);
         // ignore and fallback
       }
 
-      const res2 = await fetch(`${BASE_URL}/api/users?page=1&limit=50&user_type=employee`);
+      const res2 = await fetch(`${BASE_URL}/api/users?page=1&limit=50&user_type=employee`, { headers: getAuthHeaders() });
       const data2 = await res2.json();
       setEmployees(data2.data || data2 || []);
     } catch (err) {
@@ -453,7 +453,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch non-stock items from API
   const fetchNonStockItems = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/service-items`);
+      const res = await fetch(`${BASE_URL}/api/service-items`, { headers: getAuthHeaders() });
       const data = await res.json();
       setNonStockItems(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
@@ -466,7 +466,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const fetchProducts = async (query = "") => {
     try {
       // Prefer server-side filter if supported by backend (uses `filter` like other endpoints).
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
      const data = await res.json();
      console.log(data);
       let items = data.data || [];
@@ -491,7 +491,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch tandc from API
   const fetchTandC = async (query = "") => {
     try {
-      const res = await fetch(`${BASE_URL}/api/tandc`);
+      const res = await fetch(`${BASE_URL}/api/tandc`, { headers: getAuthHeaders() });
      const data = await res.json();
      console.log(data);
       setTandc(data.data || []);
@@ -504,7 +504,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const fetchBranches = async () => {
     try {
       // backend uses company-branches endpoint for branches
-      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`);
+      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch branches');
       const raw = Array.isArray(data.data) ? data.data : data;
@@ -525,7 +525,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch series for quotations (used to populate Series dropdown)
   const fetchSeries = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/series?limit=1000`);
+      const res = await fetch(`${BASE_URL}/api/series?limit=1000`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch series');
       const raw = Array.isArray(data.data) ? data.data : data;
@@ -559,7 +559,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch bank details (company branch banks) for dropdown
   const fetchBankDetails = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/company-branch-banks`);
+      const res = await fetch(`${BASE_URL}/api/company-branch-banks`, { headers: getAuthHeaders() });
       const data = await res.json();
       const raw = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       const list = Array.isArray(raw) ? raw.map(b => ({
@@ -568,6 +568,9 @@ useEffect(()=>{console.log(customers)},[customers]);
         accountNo: b.account_number || b.accountNo || b.account || '',
         branch: b.branch_name || b.branch || '',
         ifsc: b.ifsc_code || b.ifsc || '' ,
+        // include SWIFT in whatever form the API provides and keep a canonical key `swiftCode`
+        swift: b.swift_code || b.swiftCode || b.swift || '',
+        swiftCode: b.swift_code || b.swiftCode || b.swift || '',
         title: b.title || (b.bank_name || b.bankName || b.bank || '')
       })) : [];
       setBankDetails(list);
@@ -594,7 +597,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const debouncedBarcodeFetch = useMemo(() => debounce(async (q) => {
     if (!q || !q.trim()) { setBarcodeSuggestions([]); return; }
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=20&filter=${encodeURIComponent(q)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=20&filter=${encodeURIComponent(q)}`, { headers: getAuthHeaders() });
       const data = await res.json();
       let items = data.data || [];
       const qLower = q.toString().toLowerCase();
@@ -615,6 +618,24 @@ useEffect(()=>{console.log(customers)},[customers]);
       try { debouncedBarcodeFetch.cancel(); } catch (e) {}
     };
   }, [debouncedBarcodeFetch]);
+
+  // Ensure all fetch() calls from this component include the auth token
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    // wrapper that injects Authorization header from localStorage
+    window.fetch = (input, init = {}) => {
+      try {
+        const token = localStorage.getItem('token');
+        const existingHeaders = (init && init.headers) ? { ...init.headers } : {};
+        const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers = { ...existingHeaders, ...authHeader };
+        return originalFetch(input, { ...init, headers });
+      } catch (e) {
+        return originalFetch(input, init);
+      }
+    };
+    return () => { window.fetch = originalFetch; };
+  }, []);
 
   useEffect(() => {
     fetchCustomers();
@@ -709,7 +730,7 @@ useEffect(()=>{console.log(customers)},[customers]);
     if (!query) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
       const data = await res.json();
       let items = data.data || [];
 
@@ -1388,7 +1409,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     // addresses
     const bAddr = q.billing_address || selectedBillingAddress || {};
     const billingTitle = bAddr.title || customerName;
-    const billingGSTIN = bAddr.gstin || '-';
+    const billingGSTIN = gstForAddr(bAddr) || getCustomerLegalGstin(cust) || '-';
     const billingAddress1 = bAddr.address1 || '';
     const billingAddress2 = bAddr.address2 || '';
     const billingAddress3 = bAddr.address3 || '';
@@ -1399,7 +1420,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
     const sAddr = isSameAsBilling ? bAddr : (q.shipping_address || selectedShippingAddress || {});
     const shippingTitle = sAddr.title || customerName;
-    const shippingGSTIN = sAddr.gstin || '-';
+    const shippingGSTIN = gstForAddr(sAddr) || getCustomerLegalGstin(cust) || '-';
     const shippingAddress1 = sAddr.address1 || '';
     const shippingAddress2 = sAddr.address2 || '';
     const shippingAddress3 = sAddr.address3 || '';
@@ -1408,8 +1429,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const shippingCountry = sAddr.country || 'India';
     const shippingPincode = sAddr.postal_code || sAddr.pincode || '';
     
-    const custPhone = cust.mobile || cust.phone || '';
-    const custEmail = cust.email || '';
+    // Prefer common phone fields used across APIs (match QuotationList.getCustomerPhone)
+    const custPhone = cust.mobile || cust.phone || cust.phone_number || cust.mobile_number || cust.contact_number || cust.telephone || cust.contact || '';
+    const custEmail = cust.email || cust.email_address || cust.contact_email || '';
 
     // Issued by (use sales_credit_person from saved quotation or selected employee in form)
     const issuerObj = q.sales_credit_person || selectedEmployeeObj || {};
@@ -1432,15 +1454,27 @@ const handleTandCClose = () => setOpenTandCModal(false);
     
     // Bank details
     const bankB = q.company_branch_bank || branch.company_branch_bank || selectedBank || {};
-    const bankName = bankB.bankName || bankB.bank_name || '';
-    const bankBranch = bankB.branch || bankB.bank_branch || '';
+    const bankName = bankB.bankName || bankB.bank_name || branch.bank_name || company.bank_name || '';
+    const bankBranch = bankB.branch || bankB.branch_name || bankB.bankBranch || bankB.bank_branch || branch.bank_branch || company.bank_branch || '';
     const bankBranchAddress = branch.bank_branch_address || company.bank_branch_address || branchAddress || '';
-    const accountNo = bankB.accountNo || bankB.account_number || '';
-    const ifscCode = bankB.ifsc || bankB.ifsc_code || '';
-    const swiftCode = bankB.swiftCode || bankB.swift_code || '';
+    const accountNo = bankB.accountNo || bankB.account_number || branch.account_number || company.account_number || '';
+    const ifscCode = bankB.ifsc || bankB.ifsc_code || branch.ifsc_code || company.ifsc_code || '';
+    const swiftCode = bankB.swiftCode || bankB.swift_code || branch.swift_code || company.swift_code || '';
     
-    const termsArr = (q.terms_and_conditions || tandcSelections || []);
-    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || t}</div>`).join('');
+    const rawTerms = q.terms_and_conditions || tandcSelections;
+    let termsArr = [];
+    if (Array.isArray(rawTerms)) {
+      termsArr = rawTerms;
+    } else if (typeof rawTerms === 'string') {
+      try {
+        const parsed = JSON.parse(rawTerms);
+        if (Array.isArray(parsed)) termsArr = parsed;
+        else termsArr = [rawTerms];
+      } catch (e) {
+        termsArr = [rawTerms];
+      }
+    }
+    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || (typeof t === 'string' ? t : '')}</div>`).join('');
     const notesHtml = (q.note || note) ? `<div style="margin-top: 10px;"><strong>Notes:</strong><br/>${q.note || note}</div>` : '';
 
     // Calculate summary components
@@ -1495,6 +1529,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
           ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
+          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${(Number(item.fixedRate || item.fixed_rate || item.fixed_price || item.fixedPrice || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
           ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
@@ -1507,7 +1542,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     }).join('');
     
     // Count columns for the "No items" row
-    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
 
     const html = `
       <!DOCTYPE html>
@@ -1515,10 +1550,11 @@ const handleTandCClose = () => setOpenTandCModal(false);
       <head>
         <meta charset="UTF-8">
         <title>${docType} ${q.quotation_number || qutationNo}</title>
-        <style>
+          <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; background: #fff; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 3px solid #333; margin-bottom: 20px; gap: 20px; }
+          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px 20px 60px 20px; color: #000; background: #fff; }
+          .pdf-footer { position: fixed; left: 20px; right: 20px; bottom: 12px; text-align: center; font-size: 10px; color: #333; font-style: italic; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #333; margin-bottom: 20px; gap: 20px; }
           .branch-info { flex: 0 0 auto; max-width: 50%; }
           .branch-info h2 { font-size: 16px; color: #333; margin-bottom: 8px; font-weight: 700; }
           .branch-info p { font-size: 10px; line-height: 1.6; margin: 3px 0; color: #333; }
@@ -1528,9 +1564,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
           .quotation-details td { padding: 6px 10px; border: 1px solid #ddd; }
           .quotation-details td:first-child { font-weight: 600; background: #E3F2FD; white-space: nowrap; width: 45%; color: #333; }
           .quotation-details td:last-child { color: #333; }
-          .addresses { display: flex; justify-content: space-between; margin: 20px 0; gap: 15px; }
-          .address-box { flex: 1; border: 2px solid #333; padding: 12px; background: #FAFAFA; }
-          .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
+          .addresses { display: flex; justify-content: space-between; margin: 10px 0; gap: 0px; }
+          .address-box { flex: 1; border: 1px solid #333; padding: 12px; background: #FAFAFA; }
+          .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
           .address-box p { font-size: 10px; line-height: 1.7; margin: 4px 0; color: #333; }
           table.items { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
           table.items th, table.items td { border: 1px solid #ccc; padding: 8px 6px; }
@@ -1539,14 +1575,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
           table.items tbody tr:nth-child(odd) { background: #fff; }
           table.items tbody tr:hover { background: #E3F2FD; }
           table.items td { vertical-align: middle; color: #333; }
-          .three-col { display: flex; gap: 15px; margin: 20px 0; }
-          .three-col > div { border: 2px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; border-bottom: 2px solid #333; padding-bottom: 4px; text-transform: uppercase; }
+          .three-col { display: flex; gap: 0px; margin: 10px 0; }
+          .three-col > div { border: 1px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; padding-bottom: 4px; text-transform: uppercase; }
           .bank-details { flex: 1; }
           .bank-details table { width: 100%; font-size: 10px; margin-top: 8px; }
           .bank-details td { padding: 4px 6px; }
           .bank-details td:first-child { font-weight: 600; color: #555; width: 45%; }
-          .amount-words-box { flex: 1; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom, #FFF9C4, #FFF59D); text-align: center; font-style: italic; border: 2px solid #FBC02D; }
+          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: center; }
           .amount-words-box > div { padding: 10px; }
           .amount-words-box strong { display: block; font-size: 11px; color: #F57F17; margin-bottom: 8px; }
           .amount-words-box div div { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; }
@@ -1556,14 +1592,16 @@ const handleTandCClose = () => setOpenTandCModal(false);
           .summary td:first-child { text-align: left; font-weight: 500; background: #F5F5F5; color: #555; }
           .summary td:last-child { text-align: right; font-weight: 600; color: #333; }
           .summary .grand-total td { background: linear-gradient(to right, #333, #333); color: #fff; font-weight: 700; font-size: 13px; border-top: 3px solid #333; }
-          .terms { margin: 20px 0; border: 2px solid #333; padding: 15px; background: #FAFAFA; }
-          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; border-bottom: 2px solid #333; padding-bottom: 5px; }
+          .terms { margin: 10px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
+          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; padding-bottom: 5px; }
           .terms p, .terms div { font-size: 10px; line-height: 1.8; white-space: pre-line; color: #333; margin: 4px 0; }
-          .notes-signature { display: flex; gap: 15px; margin-top: 20px; }
-          .notes { flex: 2; border: 2px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
-          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+          .terms .tc-columns { column-count: 2; column-gap: 20px; }
+          .terms .tc-columns > div { break-inside: avoid-column; -webkit-column-break-inside: avoid; padding-bottom: 6px; }
+          .notes-signature { display: flex; gap: 0px; margin-top: 10px; }
+          .notes { flex: 2; border: 1px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
+          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; padding-bottom: 4px; }
           .notes p { font-size: 10px; line-height: 1.7; color: #333; }
-          .authorized-sign { flex: 1; border: 2px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
+          .authorized-sign { flex: 1; border: 1px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
           .authorized-sign > p:first-child { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 10px; }
           .authorized-sign .sign-line { display: inline-block; margin-top: 50px; border-top: 2px solid #333; padding-top: 8px; min-width: 200px; font-weight: 700; font-size: 11px; color: #333; }
           .authorized-sign > div { margin-top: 10px; font-style: italic; color: #666; font-size: 9px; }
@@ -1613,7 +1651,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
                 <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
                 <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
                 ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
-                <tr><td>Ref.</td><td>${references || q.quotation_number || qutationNo || '-'}</td></tr>
+                <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
                 <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
               </table>
             </div>
@@ -1627,7 +1665,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
               <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
               <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
               ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
-              <tr><td>Ref.</td><td>${references || q.quotation_number || qutationNo || '-'}</td></tr>
+              <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
               <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
             </table>
           </div>
@@ -1644,9 +1682,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
             ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
             ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
@@ -1656,9 +1694,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
             ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
             ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
         ` : ''}
@@ -1673,6 +1711,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
               ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
+              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
               ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
               ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
               ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
@@ -1693,9 +1732,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
             <h3>Bank Details</h3>
             <table>
               <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Branch Address</td><td>${bankBranchAddress || '-'}</td></tr>
+              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
             </table>
@@ -1703,7 +1741,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
           ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
 
           <div class="amount-words-box">
-            <div><strong>Amount in Words</strong><div>Rupees ${numberToWords(grandTotalVal)} only</div></div>
+             <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div><h5>Rupees ${numberToWords(grandTotalVal)} only</h5></div></div>
           </div>
 
           <div class="summary">
@@ -1744,7 +1782,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
         <div class="terms">
           <h3>Terms & Conditions</h3>
-          ${termsAndConditionsHtml || '<p>-</p>'}
+          <div class="tc-columns">${termsAndConditionsHtml || '<p>-</p>'}</div>
         </div>
 
         <div class="notes-signature">
@@ -1759,17 +1797,12 @@ const handleTandCClose = () => setOpenTandCModal(false);
           </div>
         </div>
 
-        ${printConfig.footer ? `
-        <div class="footer">
-          <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
-          ${printConfig.digitalSignature ? `<div style="margin-top: 10px; font-style: italic; color: #666;">Digitally Signed</div>` : ''}
-          <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
-          <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
-        </div>
-        ` : ''}
+        <div class="pdf-footer">This is a computer-generated quotation. E. &amp; O. E.</div>
+
       </body>
       </html>
     `;
+
     
     const w = window.open('', '_blank');
     if (!w) return;
@@ -1854,6 +1887,8 @@ const handleSaveQuotation = async () => {
       };
     }),
   };
+
+  console.log('Saving quotation with T&C:', payload.quotation.terms_and_conditions);
 
   try {
     setSaving(true);
@@ -2001,7 +2036,7 @@ const handleSaveAsTemplate = async () => {
 
 const onSelectTemplate = (template) => {
   if (template && template.qutation_table) {
-    prefillFormData(template.qutation_table);
+    prefillFormData(template.qutation_table, false);
     setShowSavedTemplates(false);
   }
 };
@@ -2289,8 +2324,8 @@ const onSelectTemplate = (template) => {
             const resp = await axios.get(`${BASE_URL}/api/quotations/${copyFrom}`);
             const data = resp.data;
             if (data) {
-              // prefill but keep it as a new document
-              await prefillFormData(data);
+              // prefill but keep it as a new document (don't change docType, keep current form's type)
+              await prefillFormData(data, false);
               setIsEditMode(false);
               setIsReviseMode(false);
               // ensure sequence/number fields are cleared so a new number is generated
@@ -2535,11 +2570,13 @@ const fetchQuotationData = async () => {
 
 
 
-const  prefillFormData = async (data) => {
+const  prefillFormData = async (data, shouldUpdateDocType = true) => {
   console.log('Prefilling form with data:', data);
-  // Ensure docType is set from saved data so UI matches saved document type
-  const incomingDocType = data.document_type || data.type || (data.is_proforma ? 'Proforma Invoice' : 'Quotation');
-  setDocType(incomingDocType);
+  // Ensure docType is set from saved data so UI matches saved document type (only in edit mode)
+  if (shouldUpdateDocType) {
+    const incomingDocType = data.document_type || data.type || (data.is_proforma ? 'Proforma Invoice' : 'Quotation');
+    setDocType(incomingDocType);
+  }
   
   // Pre-fill customer
   if (data.customer) {
@@ -2820,6 +2857,7 @@ const  prefillFormData = async (data) => {
 
   // Pre-fill terms and conditions
   if (data.terms_and_conditions) {
+    console.log('Prefilling T&C:', data.terms_and_conditions);
     if (Array.isArray(data.terms_and_conditions)) {
       // normalize: convert primitive IDs to objects { ID: value }
       const normalized = data.terms_and_conditions.map(v => (v && typeof v === 'object') ? v : { ID: v });
@@ -2836,6 +2874,8 @@ const  prefillFormData = async (data) => {
         setTandcSelections([{ ID: data.terms_and_conditions }]);
       }
     }
+  } else {
+    console.log('No T&C data found in quotation');
   }
 
   // Pre-fill charges and discounts
@@ -3061,7 +3101,7 @@ const  prefillFormData = async (data) => {
               <option value="">-- Select --</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.name} - {b.state ? ` ${b.state}` : ''} - {(b.gst_number || b.gst || b.GST || b.gstin) ? ` ${(b.gst_number || b.gst || b.GST || b.gstin)}` : ''}
+                  {b.name} - {b.state ? ` ${b.state}` : ''} ({(b.gst_number || b.gst || b.GST || b.gstin) ? ` ${(b.gst_number || b.gst || b.GST || b.gstin)}` : ''})
                 </option>
               ))}
             </select>
@@ -3432,8 +3472,10 @@ const  prefillFormData = async (data) => {
                 type="date"
                 className="form-control"
                 value={quotationDate}
-                onChange={(e) => setQuotationDate(e.target.value)}
-                readOnly={true}
+                readOnly
+                onKeyDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
+                style={{ pointerEvents: 'none', backgroundColor: '#f5f5f5' }}
               />
             </div>
 
@@ -3792,7 +3834,7 @@ const  prefillFormData = async (data) => {
           <div className="summary-card tandc-card">
              <TermsConditionSelector 
               open={openTandCModal} 
-              handleClose={(p,ec,ed) => { setTandcSelections(p);setEndCustomer(ec),setEndDealer(ed) }} 
+              handleClose={(p,ec,ed) => { setTandcSelections(p); setEndCustomer(ec); setEndDealer(ed); }} 
               initialSelections={tandcSelections}
               end_customer_name = {endcustomer} 
               end_dealer_name = {enddealer} 
@@ -3822,7 +3864,7 @@ const  prefillFormData = async (data) => {
                   {bankDetails && bankDetails.length > 0 ? (
                     bankDetails.map((bank) => (
                       <option key={bank.id} value={bank.id}>
-                        {bank.bankName} - {bank.accountNo}
+                        {bank.bankName} ({bank.accountNo})
                       </option>
                     ))
                   ) : null}
@@ -3852,10 +3894,13 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="bank-details-grid">
-                      <div className="bank-item"><strong>A/C No:</strong> <span>{selectedBank.accountNo}</span></div>
-                      {selectedBank.branch && <div className="bank-item"><strong>Branch:</strong> <span>{selectedBank.branch}</span></div>}
-                      {selectedBank.ifsc && <div className="bank-item"><strong>IFSC:</strong> <span>{selectedBank.ifsc}</span></div>}
-                      {selectedBank.swiftCode && <div className="bank-item"><strong>SWIFT:</strong> <span>{selectedBank.swiftCode}</span></div>}
+                      {selectedBank.branch && <div className="bank-item"><strong>BRANCH</strong> <span>{selectedBank.branch}</span></div>}
+                      {selectedBank.accountNo && <div className="bank-item"><strong>ACC NO</strong> <span>{selectedBank.accountNo}</span></div>}
+                      {selectedBank.ifsc && <div className="bank-item"><strong>IFSC</strong> <span>{selectedBank.ifsc}</span></div>}
+                      {(selectedBank.swiftCode || selectedBank.swift || selectedBank.swift_code) && (
+                        <div className="bank-item"><strong>SWIFT</strong> <span>{selectedBank.swiftCode || selectedBank.swift || selectedBank.swift_code}</span></div>
+                      )}
+
                     </div>
                   </div>
                 )}
@@ -4958,7 +5003,7 @@ const  prefillFormData = async (data) => {
       const resp = await axios.get(`${BASE_URL}/api/quotations/${qId}`);
       const data = resp.data;
       if (data) {
-        await prefillFormData(data);
+        await prefillFormData(data, false);
         // Clear quotation number fields so a new number is generated
         setQutationNo('');
         setPrevQutationNo('');

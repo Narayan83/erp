@@ -60,7 +60,7 @@ export default function TagDialog({ open, onClose, tag, onSuccess, onError }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{tag ? "Edit Tag" : "Add Tag"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="name"

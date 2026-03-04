@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BASE_URL } from "../../../config/Config";
+import { BASE_URL, getAuthHeaders } from "../../../config/Config";
 import "./termsandcond.scss";
 
 // export default function TermsConditionSelector({ open, handleClose,initialSelections = [], // Add this prop for prefill
@@ -210,12 +210,16 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
 
+  const [hasPrefilled, setHasPrefilled] = useState(false);
+
   useEffect(() => {
-    // Only prefill when there are actual initial selections provided.
-    if (Array.isArray(initialSelections) && initialSelections.length > 0) {
+    // Only prefill once when initialSelections transition from empty to populated.
+    // Or if we need a more dynamic sync, ensure it only happens when they are truly different.
+    if (!hasPrefilled && Array.isArray(initialSelections) && initialSelections.length > 0) {
       setSelectedItems(initialSelections);
+      setHasPrefilled(true);
     }
-  }, [initialSelections]);
+  }, [initialSelections, hasPrefilled]);
 
   useEffect(() => {
     setEndCustomer(end_customer_name || "");
@@ -225,15 +229,31 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/api/tandc`);
+        const res = await fetch(`${BASE_URL}/api/tandc`, { headers: getAuthHeaders() });
         const data = await res.json();
-        setTandc(data.data || []);
+        const masterTandc = data.data || [];
+        setTandc(masterTandc);
+        
+        // Sync existing selected items with master data names
+        if (selectedItems.length > 0 && masterTandc.length > 0) {
+          setSelectedItems(prev => prev.map(sel => {
+            const master = masterTandc.find(m => m.ID === sel.ID);
+            return master ? { ...sel, TandcName: master.TandcName } : sel;
+          }));
+        }
       } catch (err) {
         console.error("Error fetching TandC:", err);
       }
     };
     fetchData();
   }, []);
+
+  // Notify parent whenever selections or names change, to keep everything in sync
+  useEffect(() => {
+    if (typeof handleClose === "function") {
+      handleClose(selectedItems, endCustomer, endDealer);
+    }
+  }, [selectedItems, endCustomer, endDealer]);
 
   const toggleItem = (item) => {
     setSelectedItems((prev) => {
@@ -256,9 +276,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
 
       const response = await fetch(`${BASE_URL}/api/tandc`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -329,7 +347,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                       try {
                         await fetch(`${BASE_URL}/api/tandc/${id}`, {
                           method: "PUT",
-                          headers: { "Content-Type": "application/json" },
+                          headers: getAuthHeaders(),
                           body: JSON.stringify({ TandcName: newName }),
                         });
                       } catch (err) {

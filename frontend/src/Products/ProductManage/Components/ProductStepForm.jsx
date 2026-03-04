@@ -118,6 +118,10 @@ function AutocompleteInput({ options, value, onChange, onSelect, placeholder }) 
         onChange={handleInputChange}
         onFocus={handleFocus}
         placeholder={placeholder}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck="false"
       />
       <div className="dropdown-menu" style={{ display: open ? 'block' : 'none' }}>
         {filtered.map(item => (
@@ -344,7 +348,7 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
       {formError && (
         <div className="form-error">{formError}</div>
       )}
-      <form onSubmit={handleSubmit(handleFormSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(handleFormSubmit)}>
         <div className="form-grid">
           {/* Product Name */}
           <div className="form-field">

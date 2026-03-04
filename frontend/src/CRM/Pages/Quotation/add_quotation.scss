@@ -2018,7 +2018,6 @@ select.form-control::-ms-expand {
 
       &:hover {
         color: #1e7b5a;
-        transform: scale(1.15);
       }
     }
   }
@@ -2942,7 +2941,7 @@ select.form-control::-ms-expand {
     .bank-details-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 4px;
+      gap: 0 !important;
       font-size: 13px;
 
       .bank-item {
@@ -3170,7 +3169,7 @@ select.form-control::-ms-expand {
 
     .bank-item {
       display: flex;
-      gap: 8px;
+      gap: 0;
       strong {
         color: #222;
         min-width: 80px;

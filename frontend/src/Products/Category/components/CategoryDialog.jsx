@@ -83,7 +83,7 @@ export default function CategoryDialog({ open, onClose, category, onSuccess }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{category ? "Edit Category" : "Add Category"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="name"

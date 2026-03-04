@@ -26,6 +26,7 @@ type CreateCompanyBranchRequest struct {
 	City         string `json:"city"`
 	State        string `json:"state"`
 	Pincode      string `json:"pincode"`
+	Country      string `json:"country"`
 	IsHeadOffice bool   `json:"is_head_office"`
 }
 
@@ -37,6 +38,7 @@ type UpdateCompanyBranchRequest struct {
 	City         *string `json:"city"`
 	State        *string `json:"state"`
 	Pincode      *string `json:"pincode"`
+	Country      *string `json:"country"`
 	IsHeadOffice *bool   `json:"is_head_office"`
 }
 
@@ -55,6 +57,7 @@ func CreateCompanyBranch(c *fiber.Ctx) error {
 		City:         body.City,
 		State:        body.State,
 		Pincode:      body.Pincode,
+		Country:      body.Country,
 		IsHeadOffice: body.IsHeadOffice,
 	}
 
@@ -143,6 +146,9 @@ func UpdateCompanyBranch(c *fiber.Ctx) error {
 	}
 	if body.Pincode != nil {
 		updates["pincode"] = *body.Pincode
+	}
+	if body.Country != nil {
+		updates["country"] = *body.Country
 	}
 	if body.IsHeadOffice != nil {
 		updates["is_head_office"] = *body.IsHeadOffice

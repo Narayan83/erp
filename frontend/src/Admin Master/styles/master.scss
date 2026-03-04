@@ -19,6 +19,13 @@
   flex-direction: column;
   max-height: 85vh;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* make dialog children use border-box so padding doesn't force overflow */
+.tandc-dialog,
+.tandc-dialog * {
+  box-sizing: border-box;
 }
 
 .tandc-dialog-header {
@@ -64,7 +71,9 @@
 
 .tandc-dialog-body {
   padding: 12px 14px;
-  overflow: auto;
+  /* only vertical scrolling when needed; hide horizontal overflow */
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -267,12 +276,14 @@
 .form-grid .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 12px !important;
 }
 
 .form-grid .two-col div {
   display: flex;
   flex-direction: column;
+  /* allow columns to shrink instead of forcing horizontal scroll */
+  min-width: 0;
 }
 
 .checkbox-row {
@@ -310,6 +321,9 @@
   background: #fff;
   padding: 8px 10px;
   border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 /* Ensure Save button is right-aligned in small dialogs when used inside the modal component */
@@ -324,7 +338,8 @@
 }
 
 .tandc-dialog-body input[type="text"],
-.tandc-dialog-body input {
+.tandc-dialog-body input,
+.tandc-dialog-body textarea {
   border: 1px solid #e6e9ee;
   background: #fff;
   padding: 8px 10px;
@@ -332,7 +347,12 @@
   font-size: 14px;
   color: #222;
   outline: none;
-  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+  transition:
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .tandc-dialog-body input:focus {
@@ -533,6 +553,22 @@
   gap: 2px;
   align-items: flex-start;
   width: 100%;
+}
+
+/* Two-column bank row (SWIFT + Balance) */
+.bank-row.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.bank-row.two-col .bank-label {
+  min-width: 0;
+}
+
+.bank-row.two-col .bank-value {
+  font-weight: 700;
 }
 
 .bank-label {

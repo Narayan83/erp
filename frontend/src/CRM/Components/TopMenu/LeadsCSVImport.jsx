@@ -308,12 +308,15 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
     // Dropdown options
     const salutationOptions = ['Mr.', 'Ms.', 'Mrs.'];
-    const sourceOptions = ['Website', 'Referral', 'Social Media', 'Direct', 'Partner'];
+    const defaultSourceOptions = ['Website', 'Referral', 'Social Media', 'Direct', 'Partner'];
     const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
     const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
     const countryOptions = countries.map(c => c.name).slice(0, 50); // Top countries
     const stateOptions = Object.values(stateList).slice(0, 36); // All Indian states
     const cityOptions = Array.isArray(cities) ? cities.slice(0, 100) : []; // Top cities
+
+    // Use component `sourceOptions` state when available, otherwise fallback to defaults
+    const sourceList = (sourceOptions && sourceOptions.length > 0) ? sourceOptions : defaultSourceOptions;
 
     let ExcelJS;
     try {
@@ -355,7 +358,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
       // Add lists data to the hidden sheet
       const salutationRow = ['Salutation', ...salutationOptions];
-      const sourceRow = ['Source', ...sourceOptions];
+      const sourceRow = ['Source', ...sourceList];
       const stageRow = ['Stage', ...stageOptions];
       const categoryRow = ['Category', ...categoryOptions];
       const countryRow = ['Country', ...countryOptions];
@@ -427,7 +430,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
       // Apply validations
       if (salutationCol) applyValidationToColumn(salutationCol, `=${makeRange(1, salutationOptions.length)}`);
-      if (sourceCol) applyValidationToColumn(sourceCol, `=${makeRange(2, sourceOptions.length)}`);
+      if (sourceCol) applyValidationToColumn(sourceCol, `=${makeRange(2, sourceList.length)}`);
       if (stageCol) applyValidationToColumn(stageCol, `=${makeRange(3, stageOptions.length)}`);
       if (categoryCol) applyValidationToColumn(categoryCol, `=${makeRange(4, categoryOptions.length)}`);
       if (countryCol) applyValidationToColumn(countryCol, `=${makeRange(5, countryOptions.length)}`);

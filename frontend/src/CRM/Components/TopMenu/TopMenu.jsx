@@ -16,7 +16,7 @@ import ImportLeadsDialog from './ImportLeadsDialog';
 import LeadDetails from '../LeadDetails/LeadDetails';
 import Pagination from '../../../CommonComponents/Pagination';
 
-import {BASE_URL} from '../../../config/Config' 
+import { BASE_URL, getAuthHeaders } from '../../../config/Config' 
 
 // Assigned to options will be loaded from backend users
 // (fallback to a small static list while loading)
@@ -48,12 +48,12 @@ const FIELD_OPTIONS = [
   { key: 'requirements', label: 'Requirements' },
   { key: 'notes', label: 'Notes' },
   { key: 'tags', label: 'Tags' },
-  { key: 'lastTalk', label: 'LastTalk' },
-  { key: 'nextTalk', label: 'NextTalk' },
-  { key: 'transferredOn', label: 'TransferredOn' },
-  { key: 'assignedTo', label: 'AssignedTo' },
-  { key: 'createdAt', label: 'CreatedAt' },
-  { key: 'updatedAt', label: 'UpdatedAt' },
+  { key: 'lastTalk', label: 'Last Talk' },
+  { key: 'nextTalk', label: 'Next Talk' },
+  { key: 'transferredOn', label: 'Transferred On' },
+  { key: 'assignedTo', label: 'Assigned To' },
+  { key: 'createdAt', label: 'Created At' },
+  { key: 'updatedAt', label: 'Updated At' },
   { key: 'code', label: 'Code' }
 ];
 
@@ -101,6 +101,8 @@ const TopMenu = () => {
   const [filterYear, setFilterYear] = useState('');
   const [filterAssignedTo, setFilterAssignedTo] = useState('');
   const [filterSource, setFilterSource] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterState, setFilterState] = useState('');
 
   const sourceOptions = useMemo(() => {
     const setS = new Set();
@@ -111,6 +113,24 @@ const TopMenu = () => {
       if (val && val.trim()) setS.add(val.trim());
     });
     return Array.from(setS).sort().map(s => ({ value: s, label: s }));
+  }, [leads]);
+
+  const cityOptions = useMemo(() => {
+    const setC = new Set();
+    (leads || []).forEach(l => {
+      const city = (l.city || l.City || l.addressCity || l.address_line_city || '').toString().trim();
+      if (city) setC.add(city);
+    });
+    return Array.from(setC).sort().map(c => ({ value: c, label: c }));
+  }, [leads]);
+
+  const stateOptions = useMemo(() => {
+    const setSt = new Set();
+    (leads || []).forEach(l => {
+      const st = (l.state || l.State || l.addressState || '').toString().trim();
+      if (st) setSt.add(st);
+    });
+    return Array.from(setSt).sort().map(s => ({ value: s, label: s }));
   }, [leads]);
 
   // Interactions and followups for lookup maps
@@ -128,8 +148,8 @@ const TopMenu = () => {
     const loadInteractionsAndFollowups = async () => {
       try {
         const [interRes, followRes] = await Promise.all([
-          fetch(`${BASE_URL}/api/lead-interactions`),
-          fetch(`${BASE_URL}/api/lead-followups`)
+          fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }),
+          fetch(`${BASE_URL}/api/lead-followups`, { headers: getAuthHeaders() })
         ]);
         const interData = await interRes.json();
         const followData = await followRes.json();
@@ -173,7 +193,7 @@ const TopMenu = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/api/products?page=1&limit=1000`);
+        const res = await fetch(`${BASE_URL}/api/products?page=1&limit=1000`, { headers: getAuthHeaders() });
         const data = await res.json();
         setProducts(data.data || []);
       } catch (err) {
@@ -188,14 +208,14 @@ const TopMenu = () => {
     const fetchEmployees = async () => {
       try {
         // try to fetch many employees; backend returns { data: [...] }
-        const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
+        const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`, { headers: getAuthHeaders() });
         const data = await res.json();
         // Support both shapes: { data: [...] } or direct array
         const employeesList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
 
         const opts = employeesList.map(u => {
-          const name = [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || u.email || String(u.id);
-          return { id: u.id, name };
+          const name = [u.salutation || u.Salutation, u.first_name || u.FirstName || u.firstName || u.firstname, u.last_name || u.LastName || u.lastName || u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || u.email || String(u.id);
+          return { id: u.id || u.ID, name };
         });
 
         // Filter out obvious placeholders
@@ -220,23 +240,18 @@ const TopMenu = () => {
   useEffect(() => {
     if (!assignedToOptions || assignedToOptions.length === 0) return;
     setLeads(prev => prev.map(l => {
-      const cur = l.assignedTo;
-      // If it's a non-numeric string (already a name), keep it
-      if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) return l;
-      // Determine candidate id from multiple possible fields
-      let idCandidate;
-      if (cur && (typeof cur === 'number' || (typeof cur === 'string' && /^\d+$/.test(cur.trim())))) {
-        idCandidate = Number(cur);
-      } else if (l.assigned_to_id !== undefined && l.assigned_to_id !== null && l.assigned_to_id !== '') {
-        idCandidate = Number(l.assigned_to_id);
-      } else if (l.assignedToId !== undefined && l.assignedToId !== null && l.assignedToId !== '') {
-        idCandidate = Number(l.assignedToId);
-      }
+      // Get the ID from assignedTo (numeric string) or assigned_to_id
+      const idStr = l.assignedTo || (l.assigned_to_id ? String(l.assigned_to_id) : '');
+      const idCandidate = idStr && /^\d+$/.test(idStr.trim()) ? Number(idStr) : undefined;
+      
       if (idCandidate === undefined || isNaN(idCandidate)) return l;
+      
       const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
-      const resolved = found ? found.name : String(idCandidate);
-      if (String(resolved) === String(cur)) return l;
-      return { ...l, assignedTo: resolved };
+      const resolvedName = found ? found.name : String(idCandidate);
+      
+      // Only update if the value changed
+      if (resolvedName === l.assignedTo) return l;
+      return { ...l, assignedTo: resolvedName };
     }));
   }, [assignedToOptions]);
 
@@ -288,33 +303,20 @@ const TopMenu = () => {
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/leads?page=1&limit=100`);
+      const res = await fetch(`${BASE_URL}/api/leads?page=1&limit=100`, { headers: getAuthHeaders() });
       const data = await res.json();
 
       const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
       const backendLeads = (data.data || []).map(lead => {
-        // Normalize assigned fields: id and display name from multiple possible backend shapes
+        // Extract assigned_to_id from multiple possible backend field names
         const assignedId = lead.assigned_to_id || lead.assignedToId || (lead.assignedTo && typeof lead.assignedTo === 'number' ? lead.assignedTo : undefined);
-        let assignedName = '';
-        if (lead.assignedTo && typeof lead.assignedTo === 'string') {
-          assignedName = lead.assignedTo;
-        } else if (lead.assignedTo && typeof lead.assignedTo === 'object') {
-          assignedName = lead.assignedTo.name || lead.assignedTo.Name || '';
-        } else if (lead.assignedToName) {
-          assignedName = lead.assignedToName;
-        } else if (lead.assigned_to_name) {
-          assignedName = lead.assigned_to_name;
-        } else if (assignedId !== undefined && assignedId !== null) {
-          const found = assignedToOptions.find(opt => Number(opt.id) === Number(assignedId));
-          assignedName = found ? found.name : String(assignedId);
-        }
 
         return {
           ...lead,
           starred: !!starredMap[lead.id],
           product: lead.productName || '',
-          assignedTo: assignedName,
           assigned_to_id: assignedId,
+          assignedTo: assignedId ? String(assignedId) : '',  // Store just the ID as string for later resolution
           // Normalize field names to match case-sensitive keys
           addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
           addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
@@ -450,7 +452,7 @@ const TopMenu = () => {
         // Backend lead: update via API
         const res = await fetch(`${BASE_URL}/api/leads/${editLead.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         const data = await res.json();
@@ -472,7 +474,7 @@ const TopMenu = () => {
 
           const res = await fetch(`${BASE_URL}/api/leads`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload),
           });
           if (res && res.ok) {
@@ -509,7 +511,7 @@ const TopMenu = () => {
         // New lead: add via API
         const res = await fetch(`${BASE_URL}/api/leads`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         const data = await res.json();
@@ -566,7 +568,7 @@ const TopMenu = () => {
           return;
         }
 
-        const res = await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE' });
+        const res = await fetch(`${BASE_URL}/api/leads/${leadId}`, { method: 'DELETE', headers: getAuthHeaders() });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Failed to delete lead' }));
           console.error('Delete failed:', err);
@@ -643,6 +645,15 @@ const TopMenu = () => {
   };
 
   // -------------------- Helpers --------------------
+  // Normalize mobile number to 10 digits (remove country codes, prefixes, etc.)
+  const normalizeMobile = (mobile) => {
+    if (!mobile) return '';
+    // Remove all non-digit characters
+    const digits = String(mobile).replace(/[^0-9]/g, '');
+    // Take last 10 digits (handles cases like +91 prefix, 0 prefix, etc.)
+    return digits.slice(-10);
+  };
+
   // Get the most recent interaction timestamp for a lead
   const getLastTalkForLead = (leadId) => {
     const leadIdStr = String(leadId);
@@ -771,7 +782,7 @@ const TopMenu = () => {
             contact: row.Contact || row.contact || row.Name || row.name || '',
             name: row.Name || row.name || row.Contact || row.contact || '',
             designation: row.Designation || row.designation || '',
-            mobile: row.Mobile || row.mobile || '',
+            mobile: normalizeMobile(row.Mobile || row.mobile || ''),
             email: row.Email || row.email || '',
             // Address lines
             addressLine1: row['Address Line 1'] || row.AddressLine1 || row.addressLine1 || row.Address1 || row.address1 || '',
@@ -865,7 +876,7 @@ const TopMenu = () => {
           business: l.business || l.SENDER_COMPANY || '',
           contact: l.contact || l.name || l.SENDER_NAME || [l.prefix, l.firstName, l.lastName].filter(Boolean).join(' '),
           designation: l.designation,
-          mobile: l.mobile || l.SENDER_MOBILE || '',
+          mobile: normalizeMobile(l.mobile || l.SENDER_MOBILE || ''),
           email: l.email || l.SENDER_EMAIL || '',
           city: l.city || l.SENDER_CITY || '',
           state: l.state || l.SENDER_STATE || '',
@@ -915,7 +926,7 @@ const TopMenu = () => {
 
         const res = await fetch(`${BASE_URL}/api/leads`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
 
@@ -998,7 +1009,7 @@ const TopMenu = () => {
           const nextFollowup = getNextTalkForLead(lead.id);
           value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
         } else if (field.key === 'transferredOn') {
-          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
+          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: false });
         } else if (field.key === 'assignedToId') {
           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
         } else if (field.key === 'productId') {
@@ -1138,6 +1149,21 @@ const TopMenu = () => {
           if (!s) return false;
           const val = typeof s === 'object' ? (s.name || s.label || '') : s;
           return String(val).toLowerCase() === String(filterSource).toLowerCase();
+        });
+      }
+    }
+
+    if (view === 'Location') {
+      if (filterCity || filterState) {
+        result = result.filter(lead => {
+          const cityVal = (lead.city || lead.City || lead.addressCity || '').toString().trim();
+          const stateVal = (lead.state || lead.State || '').toString().trim();
+          if (filterCity && filterState) {
+            return String(cityVal).toLowerCase() === String(filterCity).toLowerCase() && String(stateVal).toLowerCase() === String(filterState).toLowerCase();
+          }
+          if (filterCity) return String(cityVal).toLowerCase() === String(filterCity).toLowerCase();
+          if (filterState) return String(stateVal).toLowerCase() === String(filterState).toLowerCase();
+          return true;
         });
       }
     }
@@ -1341,7 +1367,7 @@ const TopMenu = () => {
             </button>
             {showStatusDropdown && (
               <div className="status-dropdown">
-                {['All Active Leads', 'Discussion','Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive', 'Rejected'].map((filter) => (
+                {['All Active Leads', 'Discussion','Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'].map((filter) => (
                   <div
                     key={filter}
                     className={`dropdown-item${activeStatusFilter === filter ? ' active' : ''}`}
@@ -1365,7 +1391,7 @@ const TopMenu = () => {
             </button>
             {showViewDropdown && (
               <div className="view-dropdown">
-                {['Newest First', 'Oldest First', 'Star Leads', 'Date', 'Assigned To', 'Source'].map((filter) => (
+                {['Newest First', 'Oldest First', 'Star Leads', 'Date', 'Assigned To', 'Source', 'Location'].map((filter) => (
                   <div
                     key={filter}
                     className={`dropdown-item${activeViewFilter === filter ? ' active' : ''}`}
@@ -1465,6 +1491,24 @@ const TopMenu = () => {
                   </select>
                 </div>
               )}
+
+              {activeViewFilter === 'Location' && (
+                <div className="location-selectors">
+                  <select value={filterCity} onChange={e => { setFilterCity(e.target.value); setPageNo(1); }}>
+                    <option value=''>City</option>
+                    {cityOptions.length > 0 ? cityOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    )) : <option value=''>No Cities</option>}
+                  </select>
+
+                  <select value={filterState} onChange={e => { setFilterState(e.target.value); setPageNo(1); }}>
+                    <option value=''>State</option>
+                    {stateOptions.length > 0 ? stateOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    )) : <option value=''>No States</option>}
+                  </select>
+                </div>
+              )}
             </div>
           {/* Right: Stats section */}
           <div className="stats-section">
@@ -1510,7 +1554,13 @@ const TopMenu = () => {
               </tr>
             ) : (
               Array.isArray(paginatedLeads) && paginatedLeads.map((lead, index) => (
-                <tr key={lead.id || index} className={isRejected(lead) ? 'rejected-row' : ''} onClick={() => { setLeadDetails(lead); setShowLeadDetails(true); }}>
+                <tr
+                  key={lead.id || index}
+                  className={`${isRejected(lead) ? 'rejected-row' : ''} ${lead.starred ? 'starred-row' : ''}`.trim()}
+                  data-starred={lead.starred ? 'true' : 'false'}
+                  data-status={(lead.status || '').toLowerCase()}
+                  onClick={() => { setLeadDetails(lead); setShowLeadDetails(true); }}
+                >
                   <td className="checkbox-cell">
                     <input
                       type="checkbox"
@@ -1554,21 +1604,9 @@ const TopMenu = () => {
                           const nextFollowup = getNextTalkForLead(lead.id);
                           value = formatDateStrict(nextFollowup || lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
                         } else if (field.key === 'transferredOn') {
-                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: false });
                         } else if (field.key === 'assignedTo') {
-                          // Resolve name even when stored as numeric id or numeric string
-                          const cur = lead.assignedTo;
-                          if (cur && typeof cur === 'string' && !/^\d+$/.test(cur.trim())) {
-                            value = cur;
-                          } else {
-                            const idCandidate = (cur && !isNaN(Number(cur))) ? Number(cur) : (lead.assigned_to_id ? Number(lead.assigned_to_id) : undefined);
-                            if (idCandidate !== undefined && !isNaN(idCandidate)) {
-                              const found = assignedToOptions.find(opt => Number(opt.id) === idCandidate);
-                              value = found ? found.name : String(idCandidate);
-                            } else {
-                              value = '';
-                            }
-                          }
+                          value = lead.assignedTo || '';
                         } else if (field.key === 'product') {
                           value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
                             ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
@@ -1586,7 +1624,7 @@ const TopMenu = () => {
                         } else if (field.key === 'nextTalk') {
                           value = formatDateStrict(lead.nextTalk || lead.NextTalk || lead.next_talk || lead.nexttalk || '', { hideIfNow: true });
                         } else if (field.key === 'transferredOn') {
-                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: true });
+                          value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: false });
                         } else if (field.key === 'assignedToId') {
                           value = lead.assigned_to_id || lead.assignedToId || lead.AssignedToID || '';
                         } else if (field.key === 'productId') {
@@ -1727,7 +1765,7 @@ const TopMenu = () => {
                 console.log('Sending leads to backend import endpoint:', leadsToImport);
                 const response = await fetch(`${BASE_URL}/api/leads/import`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders(),
                   body: JSON.stringify(leadsToImport)
                 });
 

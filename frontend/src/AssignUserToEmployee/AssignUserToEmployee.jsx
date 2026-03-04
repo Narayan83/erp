@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BASE_URL } from "../config/Config";
+import { BASE_URL, getAuthHeaders } from "../config/Config";
 import "./AssignUserToEmployee.scss";
 
 export default function AssignUserToEmployee() {
@@ -30,10 +30,10 @@ export default function AssignUserToEmployee() {
     setLoading(true);
     try {
       const [empRes, allEmpRes, userRes, mapRes] = await Promise.all([
-        fetch(`${BASE_URL}/api/employees/non-heads`),
-        fetch(`${BASE_URL}/api/employees`),
-        fetch(`${BASE_URL}/api/users/unassigned`),
-        fetch(`${BASE_URL}/api/employee-user-mappings`),
+        fetch(`${BASE_URL}/api/employees/non-heads`, { headers: getAuthHeaders() }),
+        fetch(`${BASE_URL}/api/employees`, { headers: getAuthHeaders() }),
+        fetch(`${BASE_URL}/api/users/unassigned`, { headers: getAuthHeaders() }),
+        fetch(`${BASE_URL}/api/employee-user-mappings`, { headers: getAuthHeaders() }),
       ]);
 
       if (!empRes.ok) throw new Error("Failed to fetch employees");
@@ -75,7 +75,7 @@ export default function AssignUserToEmployee() {
       for (const userId of selectedUsers) {
         const res = await fetch(`${BASE_URL}/api/employees/assign-user`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ employee_id: Number(selectedEmployee), user_id: Number(userId) }),
         });
         const json = await res.json();
@@ -98,7 +98,7 @@ export default function AssignUserToEmployee() {
     if (!window.confirm("Remove user mapping for this employee?")) return;
     try {
       setLoading(true);
-      const res = await fetch(`${BASE_URL}/api/employees/remove-user?id=${relationId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_URL}/api/employees/remove-user?id=${relationId}`, { method: "DELETE", headers: getAuthHeaders() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || json.message || "Remove failed");
       window.alert(json.message || "Removed successfully");
@@ -122,7 +122,7 @@ export default function AssignUserToEmployee() {
       setLoading(true);
       const res = await fetch(`${BASE_URL}/api/employees/shift-users`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ user_ids: selectedMappingUsers.map(Number), to_employee_id: Number(shiftToEmployee) }),
       });
       const json = await res.json();

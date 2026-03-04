@@ -107,8 +107,8 @@ func main() {
 			if defaultSeriesID == 0 {
 				log.Println("Creating default series for migration...")
 				initializers.DB.Exec(`
-					INSERT INTO series (prefix, prefix_number, remarks, is_active) 
-					VALUES ('QT', 1, 'Default quotation series', true)
+					INSERT INTO series (name, prefix, postfix, remarks, is_active) 
+					VALUES ('QT', 'QT', '', 'Default quotation series', true)
 				`)
 				initializers.DB.Raw(`SELECT id FROM series ORDER BY id LIMIT 1`).Scan(&defaultSeriesID)
 			}
@@ -269,6 +269,18 @@ func main() {
 		}
 	}
 
+	// Ensure departments.head_id exists before full migration to avoid SQL errors in handlers
+	var deptTableExists bool
+	initializers.DB.Raw(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'departments')`).Scan(&deptTableExists)
+	if deptTableExists {
+		var headIdExists bool
+		initializers.DB.Raw(`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'departments' AND column_name = 'head_id')`).Scan(&headIdExists)
+		if !headIdExists {
+			log.Println("Adding missing head_id column to departments table...")
+			initializers.DB.Exec(`ALTER TABLE departments ADD COLUMN head_id bigint`)
+		}
+	}
+
 	err := initializers.DB.AutoMigrate(
 		&models.Category{},
 		&models.Subcategory{},
@@ -292,11 +304,13 @@ func main() {
 		&models.HsnCode{},
 		&models.Size{},
 		&models.Lead{},
+		&models.LeadSource{},
 		&models.LeadInteraction{},
 		&models.LeadFollowUp{},
 		&models.RoleManagement{},
 		&models.Role{},
 		&models.Menu{},
+		&models.PrinterHeader{},
 
 		&models.Employee{},
 		&models.Supplier{},
@@ -311,7 +325,7 @@ func main() {
 		//30/9/2025
 		&models.TandC{},
 		&models.Series{},
-		&models.PrinterHeader{},
+		&models.Integration{},
 
 		&models.QuotationTable{},
 		&models.QuotationTableItems{},
@@ -328,59 +342,11 @@ func main() {
 		&models.Employee{},
 		&models.EmployeeHierarchy{},
 		&models.EmployeeOrganizationUnit{},
-		&models.Integration{},
-
-		// CRM Configuration
-		&models.CRMTag{},
-		&models.LeadSource{},
 		&models.RejectionReason{},
-		&models.ServiceItem{},
 	)
 
 	if err != nil {
 		log.Fatal("Migration failed:", err)
-	}
-
-	// Handle PrinterHeader column rename: logo_path -> logo_data
-	var printerHeaderTableExists bool
-	initializers.DB.Raw(`
-		SELECT EXISTS (
-			SELECT 1 FROM information_schema.tables 
-			WHERE table_name = 'printer_headers'
-		)
-	`).Scan(&printerHeaderTableExists)
-
-	if printerHeaderTableExists {
-		// Check if old logo_path column exists
-		var oldLogoPathExists bool
-		initializers.DB.Raw(`
-			SELECT EXISTS (
-				SELECT 1 FROM information_schema.columns 
-				WHERE table_name = 'printer_headers' AND column_name = 'logo_path'
-			)
-		`).Scan(&oldLogoPathExists)
-
-		if oldLogoPathExists {
-			// Check if new logo_data column exists
-			var newLogoDataExists bool
-			initializers.DB.Raw(`
-				SELECT EXISTS (
-					SELECT 1 FROM information_schema.columns 
-					WHERE table_name = 'printer_headers' AND column_name = 'logo_data'
-				)
-			`).Scan(&newLogoDataExists)
-
-			if newLogoDataExists {
-				// Both exist, copy old to new then drop old
-				log.Println("Both logo_path and logo_data exist. Copying data from logo_path to logo_data...")
-				initializers.DB.Exec(`UPDATE printer_headers SET logo_data = logo_path WHERE logo_data IS NULL`)
-				initializers.DB.Exec(`ALTER TABLE printer_headers DROP COLUMN logo_path`)
-			} else {
-				// Only old exists, rename it
-				log.Println("Renaming logo_path to logo_data...")
-				initializers.DB.Exec(`ALTER TABLE printer_headers RENAME COLUMN logo_path TO logo_data`)
-			}
-		}
 	}
 
 	// Post-migration cleanup: drop typo column if it still exists

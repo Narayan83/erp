@@ -9,5 +9,6 @@ type CompanyBranchBank struct {
 	BranchAddress string  `json:"branch_address"`
 	AccountNumber string  `gorm:"not null;unique" json:"account_number"`
 	IFSCCode      string  `json:"ifsc_code"`
+	SwiftCode     string  `json:"swift_code"`
 	Balance       float64 `json:"balance"`
 }

@@ -682,10 +682,21 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Quotation not found"})
 	}
 
-	// Update main quotation fields (avoid changing primary key)
+	// Update main quotation fields using Updates for most fields
 	if err := tx.Model(&existing).Updates(req.Quotation).Error; err != nil {
 		tx.Rollback()
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Explicitly update JSON fields (GORM's Updates may not handle JSON fields properly)
+	// We need to use Select to force update even if the value appears unchanged
+	if err := tx.Model(&existing).Select("terms_and_conditions", "extra_charges", "discounts").Updates(map[string]interface{}{
+		"terms_and_conditions": req.Quotation.TermsAndConditions,
+		"extra_charges":        req.Quotation.ExtraCharges,
+		"discounts":            req.Quotation.Discounts,
+	}).Error; err != nil {
+		tx.Rollback()
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update JSON fields: " + err.Error()})
 	}
 
 	// Replace quotation items if provided

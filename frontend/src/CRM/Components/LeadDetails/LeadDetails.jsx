@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaPhone, FaEnvelope, FaRegCalendarAlt, FaClipboardList, FaWhatsapp, FaCopy, FaEdit, FaTrash } from 'react-icons/fa';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import UpdateStatusModal from './UpdateStatusModal/UpdateStatusModal';
 import InteractionModal from './InteractionModal/InteractionModal';
 import './leadDetails.scss';
@@ -37,7 +37,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
 
       const res = await fetch(`${BASE_URL}/api/leads/${lead.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -80,7 +80,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
         return;
       }
 
-      const res = await fetch(`${BASE_URL}/api/leads/${lead.id}`, { method: 'DELETE' });
+      const res = await fetch(`${BASE_URL}/api/leads/${lead.id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (res.ok) {
         if (onStatusUpdate) onStatusUpdate();
         onClose();
@@ -189,7 +189,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
       }
 
       try {
-        const res = await fetch(`${BASE_URL}/api/lead-followups`);
+        const res = await fetch(`${BASE_URL}/api/lead-followups`, { headers: getAuthHeaders() });
         const data = await res.json();
         const arr = Array.isArray(data) ? data : (data && data.data ? data.data : []);
         const leadIdStr = String(lead.id);
@@ -247,7 +247,7 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
       }
 
       try {
-        const res = await fetch(`${BASE_URL}/api/lead-interactions`);
+        const res = await fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() });
         const data = await res.json();
         const arr = Array.isArray(data) ? data : (data && data.data ? data.data : []);
         const leadIdStr = String(lead.id);

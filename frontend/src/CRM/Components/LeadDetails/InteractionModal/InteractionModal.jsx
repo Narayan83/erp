@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
-import { BASE_URL } from '../../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../../config/Config';
 import './InteractionModal.scss';
 
 const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => {
@@ -26,18 +26,26 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
 
   useEffect(() => {
     // Fetch employees for the assignee dropdown and normalize to include a displayName
-    fetch(`${BASE_URL}/api/employees`)
+    fetch(`${BASE_URL}/api/employees`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
-        const list = Array.isArray(data) ? data : [];
+        // Support multiple API shapes: array, { data: [] }, { employees: [] }, { results: [] }
+        let list = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        else if (data && Array.isArray(data.employees)) list = data.employees;
+        else if (data && Array.isArray(data.results)) list = data.results;
+
         const mapped = list.map(emp => {
-          const id = emp.id || emp.ID || emp.employee_id || emp.empid || emp.EmployeeID || emp.EmployeeId || emp.user_id || emp.userId || '';
+          const idVal = emp.id || emp.ID || emp.employee_id || emp.empid || emp.EmployeeID || emp.EmployeeId || emp.user_id || emp.userId || '';
+          const id = idVal !== undefined && idVal !== null ? String(idVal) : '';
           const first = emp.name || emp.fullName || emp.full_name || emp.firstname || emp.firstName || emp.Firstname || emp.first_name || emp.first || '';
           const last = emp.lastname || emp.lastName || emp.Lastname || emp.last_name || emp.last || '';
           const email = emp.email || emp.emailAddress || emp.email_id || '';
           const displayName = first ? (first + (last ? ` ${last}` : '')) : (email ? email : (id ? `Employee ${id}` : 'Unnamed'));
           return { ...emp, id, displayName };
         });
+
         setEmployees(mapped);
       })
       .catch(err => console.error('Failed to fetch employees:', err));
@@ -153,7 +161,7 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
     try {
       const res = await fetch(`${BASE_URL}/api/leads/${lead.id}/interactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -255,8 +263,9 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
                 <input type="date" value={nextDate} onChange={e=>setNextDate(e.target.value)} />
                 <input type="time" value={nextTime} onChange={e=>setNextTime(e.target.value)} />
                 <select value={nextAssignee} onChange={e=>setNextAssignee(e.target.value)}>
+                  <option value="">Select Assignee</option>
                   {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
+                    <option key={emp.id || emp.displayName} value={emp.id || emp.displayName}>
                       {emp.displayName}
                     </option>
                   ))}
