@@ -127,7 +127,7 @@ function LoginPage() {
             <div className="error-message">{error}</div>
           )}
 
-          <form onSubmit={handleSubmit} className="login-form">
+          <form autoComplete="off" onSubmit={handleSubmit} className="login-form">
             <label className="label">Email Address</label>
             <div className="input-with-icon">
               <IoMdMail className="input-icon" />
@@ -137,6 +137,7 @@ function LoginPage() {
                 name="email"
                 value={loginData.email}
                 onChange={handleInputChange}
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -150,6 +151,7 @@ function LoginPage() {
                 name="password"
                 value={loginData.password}
                 onChange={handleInputChange}
+                autoComplete="new-password"
                 required
               />
             </div>

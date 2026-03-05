@@ -11,6 +11,7 @@ type CompanyBranch struct {
 	City         string `json:"city"`
 	State        string `json:"state"`
 	Pincode      string `gorm:"size:6" json:"pincode"`
+	Country      string `gorm:"size:100;index" json:"country"`
 	IsHeadOffice bool   `gorm:"default:false" json:"is_head_office"`
 
 	Banks []CompanyBranchBank `gorm:"foreignKey:CompanyBranchID" json:"banks,omitempty"`

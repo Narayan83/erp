@@ -132,7 +132,7 @@ export default function ProductEditPage() {
                                 label: "View Products",
                                 onClick: () => {
                                   setDialogOpen(false);
-                                  navigate("/ProductMaster"); // or your product list route
+                                  navigate("/ProductMaster", { state: { sortByName: true, sortDirection: 'asc' } }); // or your product list route
                                 },
                                 variant: "contained",
                               },

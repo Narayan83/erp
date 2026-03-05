@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
+import { getAuthHeaders } from '../../../../config/Config';
 import './sources.scss';
 
 const apiBase = '/api';
@@ -18,13 +19,18 @@ const Sources = ({ isOpen, onClose }) => {
   const fetchSources = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/lead-sources`);
-      if (!res.ok) throw new Error('Failed to fetch');
+      const res = await fetch(`${apiBase}/lead-sources`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`Failed to fetch: ${res.status} ${txt}`);
+      }
       const data = await res.json();
       setSources(data || []);
     } catch (err) {
       console.error('Failed to load sources', err);
-      alert('Failed to load lead sources');
+      alert('Failed to load lead sources: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -39,7 +45,7 @@ const Sources = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { code: genCode(newSourceName), name: newSourceName };
-      const res = await fetch(`${apiBase}/lead-sources`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/lead-sources`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Create failed');
@@ -57,7 +63,7 @@ const Sources = ({ isOpen, onClose }) => {
   const handleDeleteSource = async (id) => {
     if (!window.confirm('Are you sure you want to delete this source?')) return;
     try {
-      const res = await fetch(`${apiBase}/lead-sources/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${apiBase}/lead-sources/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Delete failed');
       setSources(prev => prev.filter(s => s.id !== id));
     } catch (error) {
@@ -74,7 +80,7 @@ const Sources = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { name, code };
-      const res = await fetch(`${apiBase}/lead-sources/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/lead-sources/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Update failed');

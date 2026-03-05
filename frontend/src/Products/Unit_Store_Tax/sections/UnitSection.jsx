@@ -6,7 +6,11 @@ import UnitDialog from "../components/UnitDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import { BASE_URL }  from "../../../config/Config";
 import "./allinone.scss";
+import { useAuth } from "../../../context/AuthContext";
+
+
 export default function UnitSection() {
+  const { perms } = useAuth();
   const [units, setUnits] = useState([]);
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
@@ -73,13 +77,15 @@ export default function UnitSection() {
           />
         </div>
         <div className="add-button-wrapper">
-          <button
-            className="btn-add"
-            onClick={() => setDialogOpen(true)}
-            type="button"
-          >
-            Add Unit
-          </button>
+          {perms?.can_create && (
+            <button
+              className="btn-add"
+              onClick={() => setDialogOpen(true)}
+              type="button"
+            >
+              Add Unit
+            </button>
+          )}
         </div>
       </div>
 

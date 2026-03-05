@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FaCheck, FaTimes, FaFileExport, FaSearch } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import './_sales_interactions.scss';
 import './followup.scss';
 
@@ -81,10 +81,10 @@ const Followup = () => {
     try {
       setLoading(true);
       const [fups, leadsResp, emps, interResp] = await Promise.all([
-        fetch(`${BASE_URL}/api/lead-followups`).then(r => r.json()),
-        fetch(`${BASE_URL}/api/leads`).then(r => r.json()),
-        fetch(`${BASE_URL}/api/employees`).then(r => r.json()),
-        fetch(`${BASE_URL}/api/lead-interactions`).then(r => r.json())
+        fetch(`${BASE_URL}/api/lead-followups`, { headers: getAuthHeaders() }).then(r => r.json()),
+        fetch(`${BASE_URL}/api/leads`, { headers: getAuthHeaders() }).then(r => r.json()),
+        fetch(`${BASE_URL}/api/employees`, { headers: getAuthHeaders() }).then(r => r.json()),
+        fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(r => r.json())
       ]);
 
       console.log('loadData: raw followups response:', fups);
@@ -246,7 +246,7 @@ const Followup = () => {
 
       const res = await fetch(`${BASE_URL}/api/leads/${leadId}/interactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -269,7 +269,7 @@ const Followup = () => {
       // Now delete the followup from the backend
       const delRes = await fetch(`${BASE_URL}/api/lead-followups/${fup.id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
       });
 
       if (!delRes.ok) {
@@ -302,7 +302,7 @@ const Followup = () => {
       // Delete the followup from the backend
       const delRes = await fetch(`${BASE_URL}/api/lead-followups/${fup.id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
       });
 
       if (!delRes.ok) {

@@ -6,11 +6,14 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Pagination from "../../../CommonComponents/Pagination";
+import {useAuth} from "../../../context/AuthContext";
+
 const SubcategoryTable = ({
   data, page, limit, total,
   onPageChange, onRowsPerPageChange,
   onEdit, onDelete
 }) => {
+  const { perms } = useAuth();
   return (
     <>
     <TableContainer component={Paper}>
@@ -33,8 +36,12 @@ const SubcategoryTable = ({
               <TableCell align="center">{sub.Category.Name}</TableCell>
                <TableCell align="center">{sub.Name}</TableCell>
               <TableCell align="right" sx={{ textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(sub)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(sub.ID)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(sub)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(sub.ID)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}

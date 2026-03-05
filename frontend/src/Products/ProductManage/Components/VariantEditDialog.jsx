@@ -538,7 +538,7 @@ export default function VariantEditDialog({ open, onClose, onSave, defaultValues
               </div>
             )}
             
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
               <div className="form-grid">
                 <div className="form-field col-33">
                   <label className="field-label">Color</label>

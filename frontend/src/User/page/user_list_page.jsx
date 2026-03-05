@@ -2171,7 +2171,7 @@ const getUserDisplayName = (u) => {
             ) : (
             <Grid container direction="column" spacing={2} sx={{ alignItems: 'stretch' }}>
               <Grid item sx={{ borderBottom: '1px solid rgba(0,0,0,0.12)', pb: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 , display: 'flex', justifyContent: 'center' }}>Parent(s) (Above)</Typography>
+                <Typography variant="h6" sx={{ mb: 1 , display: 'flex', justifyContent: 'center' }}>Top Level</Typography>
                 {hierarchyParents.length === 0 ? (
                   <Typography color="text.secondary" sx={{ display: 'flex', justifyContent: 'center' }}>No parent relations found.</Typography>
                 ) : (
@@ -2220,7 +2220,7 @@ const getUserDisplayName = (u) => {
               </Grid>
 
               <Grid item sx={{ borderTop: '1px solid rgba(0,0,0,0.12)', pt: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 , display: 'flex', justifyContent: 'center' }}>Child(ren) (Below)</Typography>
+                <Typography variant="h6" sx={{ mb: 1 , display: 'flex', justifyContent: 'center' }}>Bottom Level</Typography>
                 {hierarchyChildren.length === 0 ? (
                   <Typography color="text.secondary" sx={{ display: 'flex', justifyContent: 'center' }}>No child relations found.</Typography>
                 ) : (

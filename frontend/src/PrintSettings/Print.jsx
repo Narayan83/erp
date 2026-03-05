@@ -10,7 +10,6 @@ const sections = [
 			"Header",
 			"Footer",
 			"Digital Signature",
-			"Org. / Dup. / Trip.",
 			"Party Information",
 			"GSTIN",
 			"GST Summary",
@@ -18,7 +17,6 @@ const sections = [
 			"HSN in export also",
 			"Branch",
 			"Bank Details",
-			"Disclaimer",
 			"Total Quantity",
 			"Valid till",
 		],
@@ -43,8 +41,6 @@ const sections = [
 			"Qty in Services",
 			"Item Fixed Rate",
 			"Item Rate",
-			"Non-Stock Item Code",
-			"Auto-pad small docs",
 		],
 	},
 ];
@@ -55,7 +51,6 @@ export default function PrintSettingsDialog({ onClose, initialConfig = {}, onSav
 		"Header": 'header',
 		"Footer": 'footer',
 		"Digital Signature": 'digitalSignature',
-		"Org. / Dup. / Trip.": 'orgDupTrip',
 		"Party Information": 'partyInformation',
 		"GSTIN": 'gstin',
 		"GST Summary": 'gstSummary',
@@ -63,7 +58,6 @@ export default function PrintSettingsDialog({ onClose, initialConfig = {}, onSav
 		"HSN in export also": 'hsnInExport',
 		"Branch": 'branch',
 		"Bank Details": 'bankDetails',
-		"Disclaimer": 'disclaimer',
 		"Total Quantity": 'totalQuantity',
 		"Valid till": 'validTill',
 		// Party Information
@@ -84,8 +78,6 @@ export default function PrintSettingsDialog({ onClose, initialConfig = {}, onSav
 		"Qty in Services": 'qtyInServices',
 		"Item Fixed Rate": 'itemFixedRate',
 		"Item Rate": 'itemRate',
-		"Non-Stock Item Code": 'nonStockItemCode',
-		"Auto-pad small docs": 'autoPadSmallDocs',
 	};
 
 	const [checked, setChecked] = useState(() => {

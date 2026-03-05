@@ -3,8 +3,10 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function UnitTable({ units, onEdit, onDelete, page, rowsPerPage }) {
+  const { perms } = useAuth();
   return (
     <TableContainer component={Paper}>
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
@@ -25,8 +27,12 @@ export default function UnitTable({ units, onEdit, onDelete, page, rowsPerPage }
               <TableCell align="center" sx={{ py: 0.5, width: 200 }}>{unit.name || unit.Name}</TableCell>
               <TableCell align="center" sx={{ py: 0.5, width: 'auto' }}>{unit.description || unit.Description}</TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(unit)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(unit)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(unit)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(unit)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}

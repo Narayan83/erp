@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
+import { getAuthHeaders } from '../../../../config/Config';
 import '../Sources/sources.scss';
 
 const apiBase = '/api';
@@ -18,7 +19,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
   const fetchReasons = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/rejection-reasons`);
+      const res = await fetch(`${apiBase}/rejection-reasons`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setItems(data || []);
@@ -35,7 +36,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { code: genCode(newTitle), title: newTitle, };
-      const res = await fetch(`${apiBase}/rejection-reasons`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/rejection-reasons`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Create failed');
@@ -49,7 +50,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this reason?')) return;
     try {
-      const res = await fetch(`${apiBase}/rejection-reasons/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${apiBase}/rejection-reasons/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Delete failed');
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) { console.error(err); alert('Failed to delete'); }
@@ -63,7 +64,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { title, code };
-      const res = await fetch(`${apiBase}/rejection-reasons/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/rejection-reasons/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Update failed');

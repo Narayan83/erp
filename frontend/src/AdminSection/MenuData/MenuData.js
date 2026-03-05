@@ -75,7 +75,7 @@ export const menuItems = [
     title: "Admin",
     icon: FiSettings,
     submenu: [
-      { title: "Role Creation", path: "/rolecreation" },
+      // { title: "Role Creation", path: "/rolecreation" },
       // "Role Management" here links to the list of existing roles
       { title: "Role Management", path: "/existingroles" },
       // "Role Mapping" is the role->menu mapping UI

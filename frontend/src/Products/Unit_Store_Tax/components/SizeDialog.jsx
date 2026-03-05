@@ -77,7 +77,7 @@ export default function SizeDialog({ open, onClose, size, onSuccess, onError }) 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{size ? "Edit Size" : "Add Size"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="code"

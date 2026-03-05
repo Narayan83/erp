@@ -84,14 +84,16 @@
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 .import-tile:hover {
-  transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba($primary-blue, 0.3);
 }
 .tile-icon-img {
   width: 80px;
   height: 80px;
   object-fit: contain;
   display: block;
+  background: transparent;
+  border: none;
 }
 .tile-label {
   font-size: 13px;

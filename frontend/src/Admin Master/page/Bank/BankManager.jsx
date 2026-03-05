@@ -91,6 +91,7 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
     const [branchAddress, setBranchAddress] = useState('');
     const [accountNo, setAccountNo] = useState('');
     const [ifsc, setIfsc] = useState('');
+    const [swift, setSwift] = useState('');
     const [balance, setBalance] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -110,10 +111,11 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
         branch_address: branchAddress.trim(),
         account_number: accountNo.trim(),
         ifsc_code: ifsc.trim(),
+        swift_code: swift.trim(),
         balance: balance === '' ? null : Number(balance),
       };
       await onSave(payload, () => {
-        setBankName(''); setBranchName(''); setBranchAddress(''); setAccountNo(''); setIfsc(''); setBalance('');
+        setBankName(''); setBranchName(''); setBranchAddress(''); setAccountNo(''); setIfsc(''); setSwift(''); setBalance('');
       }, setSaving);
     };
 
@@ -154,9 +156,15 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
               </div>
             </div>
 
-            <div className="form-row">
-              <label>Balance</label>
-              <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+            <div className="form-row two-col">
+              <div>
+                <label>SWIFT</label>
+                <input value={swift} onChange={(e) => setSwift(e.target.value)} placeholder="SWIFT code" />
+              </div>
+              <div>
+                <label>Balance</label>
+                <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+              </div>
             </div>
 
           </div>
@@ -176,6 +184,7 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
     const [branchAddress, setBranchAddress] = useState(bank.BranchAddress || bank.branch_address || '');
     const [accountNo, setAccountNo] = useState(bank.AccountNumber || bank.account_number || bank.AccountNo || bank.account_no || '');
     const [ifsc, setIfsc] = useState(bank.IFSCCode || bank.ifsc_code || bank.IFSC || bank.ifsc || '');
+    const [swift, setSwift] = useState(bank.SwiftCode || bank.swift_code || bank.swift || '');
     const [balance, setBalance] = useState(bank.Balance != null ? String(bank.Balance) : (bank.balance != null ? String(bank.balance) : ''));
     const [saving, setSaving] = useState(false);
 
@@ -186,6 +195,7 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
         setBranchAddress(bank.BranchAddress || bank.branch_address || '');
       setAccountNo(bank.AccountNumber || bank.account_number || bank.AccountNo || bank.account_no || '');
       setIfsc(bank.IFSCCode || bank.ifsc_code || bank.IFSC || bank.ifsc || '');
+      setSwift(bank.SwiftCode || bank.swift_code || bank.swift || '');
         setBalance(bank.Balance != null ? String(bank.Balance) : (bank.balance != null ? String(bank.balance) : ''));
     }, [bank]);
 
@@ -201,6 +211,7 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
         branch_address: branchAddress.trim(),
         account_number: accountNo.trim(),
         ifsc_code: ifsc.trim(),
+        swift_code: swift.trim(),
         balance: balance === '' ? null : Number(balance),
       };
       await onSave(bank.ID || bank.id, payload, setSaving);
@@ -243,9 +254,15 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
               </div>
             </div>
 
-            <div className="form-row">
-              <label>Balance</label>
-              <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+            <div className="form-row two-col">
+              <div>
+                <label>SWIFT</label>
+                <input value={swift} onChange={(e) => setSwift(e.target.value)} placeholder="SWIFT code" />
+              </div>
+              <div>
+                <label>Balance</label>
+                <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+              </div>
             </div>
 
           </div>
@@ -285,7 +302,8 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
                   <div className="bank-row bank-address"><span className="bank-label">Address </span>: {it.BranchAddress || it.branch_address}</div>
                   <div className="bank-row bank-account"><span className="bank-label">Account No</span>: {it.AccountNumber || it.account_number || it.AccountNo || it.account_no}</div>
                   <div className="bank-row bank-ifsc"><span className="bank-label">IFSC</span>: {it.IFSCCode || it.ifsc_code || it.IFSC || it.ifsc}</div>
-                  <div className="bank-row bank-balance"><span className="bank-label">Balance</span>: {(it.Balance != null ? it.Balance : (it.balance != null ? it.balance : ''))}</div>
+                  <div className="bank-row bank-swift"><span className="bank-label">SWIFT</span>: {it.SwiftCode || it.swift_code || it.swift}</div>
+                  <div className="bank-row bank-balance"><span className="bank-label">Balance</span>: {it.Balance != null ? String(it.Balance) : (it.balance != null ? String(it.balance) : '')}</div>
                 </div>
 
                 <div className="bank-actions">

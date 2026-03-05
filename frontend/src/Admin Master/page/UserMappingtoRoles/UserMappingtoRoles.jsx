@@ -1,201 +1,197 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "../../styles/user_mapping.scss";
 import { BASE_URL } from "../../../config/Config";
+import "../../styles/user_mapping.scss";
+// Icons
+import { FaUserCircle, FaSearch, FaSave, FaSync } from "react-icons/fa";
 
-const users = [
-  { label: "admin assignor (admin@cag.com)", value: "admin@cag.com" },
-  // ...add more users as needed
-];
+export default function UserMapping() {
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [assignedRoleIds, setAssignedRoleIds] = useState(new Set());
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-const roles = (() => {
-  const stored = JSON.parse(localStorage.getItem("roles") || "[]");
-  if (stored.length > 0) {
-    return stored.map(role => ({ label: `${role.name} - ${role.description}`, value: role.name }));
-  } else {
-    return [
-      { label: "superadmin - Super Administrator with access to all p", value: "superadmin" },
-    ];
-  }
-})();
-
-const permissionsData = [
-  { menu: "Home", permissions: ["All", "View", "Create", "Update", "Delete"] },
-  { menu: "About", permissions: ["All", "View", "Create", "Update", "Delete"] },
-  { menu: "Feedback", permissions: ["All", "View", "Create", "Update", "Delete"] },
-  { menu: "Data Validation", permissions: ["All", "View", "Create", "Update", "Delete"] },
-  { menu: "Bulk Upload", permissions: ["All", "View", "Create", "Update", "Delete"] },
-];
-
-export default function UserManagement() {
-  const [selectedUser, setSelectedUser] = useState(users[0].value);
-  const [selectedRole, setSelectedRole] = useState(roles[0].value);
-
-  const [menus, setMenus] = useState([{ label: "All menus...", value: "all" }]);
-  const [selectedMenu, setSelectedMenu] = useState("all");
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-
+  // 1. Fetch Users and Roles on Mount
   useEffect(() => {
-    // fetch menus from backend and populate dropdown
-    const fetchMenus = async () => {
-      try {
-        const res = await axios.get(`${BASE_URL}/api/loadMenus?limit=1000`);
-        const menusArray = Array.isArray(res.data) ? res.data : res.data.data || [];
-        const mapped = [{ label: "All menus...", value: "all" }, ...menusArray.map(m => ({ label: m.menu_name, value: m.menu_name, id: m.id }))];
-        setMenus(mapped);
-        // store in localStorage for compatibility
-        try { localStorage.setItem('menus', JSON.stringify(menusArray)); } catch(e) {}
-        if (mapped.length) setSelectedMenu(mapped[0].value);
-      } catch (err) {
-        console.error('UserManagement: failed to fetch menus, falling back to localStorage', err);
-        const stored = JSON.parse(localStorage.getItem("menus") || "[]");
-        if (stored.length) {
-          const mapped = [{ label: "All menus...", value: "all" }, ...stored.map(m => ({ label: m.name || m.menu_name, value: m.name || m.menu_name }))];
-          setMenus(mapped);
-          if (mapped.length) setSelectedMenu(mapped[0].value);
-        }
-      }
-    };
-
-    fetchMenus();
+    fetchInitialData();
   }, []);
 
-  // Permissions state: { [menu]: { [perm]: boolean } }
-  const loadPermissions = (user, role) => {
-    let stored = localStorage.getItem(`permissions_${user}_${role}`);
-    if (stored) return JSON.parse(stored);
-    stored = localStorage.getItem(`permissions_${role}`);
-    return stored ? JSON.parse(stored) : {
-      Home: { All: false, View: false, Create: false, Update: false, Delete: false },
-      About: { All: false, View: false, Create: false, Update: false, Delete: false },
-      Feedback: { All: false, View: false, Create: false, Update: false, Delete: false },
-      "Data Validation": { All: true, View: true, Create: true, Update: true, Delete: true },
-      "Bulk Upload": { All: true, View: true, Create: true, Update: true, Delete: true },
-    };
+  const fetchInitialData = async () => {
+    setLoading(true);
+    try {
+      const [usersRes, rolesRes] = await Promise.all([
+        axios.get(`${BASE_URL}/api/users?limit=1000&user_type=all`),
+        axios.get(`${BASE_URL}/api/roles?limit=1000`)
+      ]);
+
+      const usersData = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data.data || [];
+      const rolesData = Array.isArray(rolesRes.data) ? rolesRes.data : rolesRes.data.data || [];
+
+      setUsers(usersData);
+      setRoles(rolesData);
+
+      // Auto-select first user if available
+      if (usersData.length > 0) {
+        handleUserSelect(usersData[0]);
+      }
+
+    } catch (err) {
+      console.error("Failed to load initial data", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const [permissions, setPermissions] = useState(loadPermissions(selectedUser, selectedRole));
+  // 2. Handle User Selection -> Fetch Assigned Roles
+  const handleUserSelect = async (user) => {
+    setSelectedUser(user);
+    // Optimistic UI or loading? Better loading for accuracy
+    // Fetch specific user roles
+    try {
+      // Endpoint: /api/user/:id (GetUserRoles -> returns []Role)
+      // Note: Endpoint defined in main.go as api.Get("/user/:user_id", handler.GetUserRoles)
+      const res = await axios.get(`${BASE_URL}/api/user/${user.id}`);
+      const assignedRoles = res.data || [];
 
-  // Update permissions when selectedUser or selectedRole changes
-  useEffect(() => {
-    setPermissions(loadPermissions(selectedUser, selectedRole));
-  }, [selectedUser, selectedRole]);
+      // Extract IDs
+      const ids = new Set(assignedRoles.map(r => r.id));
+      setAssignedRoleIds(ids);
 
-  useEffect(() => {
-    if (currentPage > Math.max(1, Math.ceil(permissionsData.length / itemsPerPage))) setCurrentPage(1);
-  }, [permissionsData.length]);
+    } catch (err) {
+      console.error("Failed to fetch user roles", err);
+      setAssignedRoleIds(new Set()); // Reset on error
+    }
+  };
 
-  const handlePermissionChange = (menu, perm) => {
-    setPermissions(prev => {
-      const newPerms = {
-        ...prev[menu],
-        [perm]: !prev[menu][perm],
-      };
-      // Update "All" based on whether all other permissions are checked
-      const allOthers = newPerms.View && newPerms.Create && newPerms.Update && newPerms.Delete;
-      newPerms.All = allOthers;
-      return {
-        ...prev,
-        [menu]: newPerms,
-      };
+  // 3. Toggle Role Checkbox
+  const toggleRole = (roleId) => {
+    setAssignedRoleIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(roleId)) {
+        newSet.delete(roleId);
+      } else {
+        newSet.add(roleId);
+      }
+      return newSet;
     });
   };
 
-  const handleAllChange = (menu) => {
-    const allChecked = !permissions[menu].All;
-    setPermissions(prev => ({
-      ...prev,
-      [menu]: {
-        All: allChecked,
-        View: allChecked,
-        Create: allChecked,
-        Update: allChecked,
-        Delete: allChecked,
-      }
-    }));
+  // 4. Save Changes
+  const handleSave = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const payload = {
+        role_ids: Array.from(assignedRoleIds)
+      };
+
+      // Endpoint: PUT /api/user/:id (UpdateUserRoles)
+      await axios.put(`${BASE_URL}/api/user/${selectedUser.id}`, payload);
+      alert(`Roles updated successfully for ${getUserDisplayName(selectedUser)}`);
+
+      // Optional: Refresh local user list if it displays summaries of roles
+      // For now, we remain on the same selection. 
+    } catch (err) {
+      console.error("Failed to save roles", err);
+      alert("Failed to save changes.");
+    }
   };
 
-  const handleReset = () => {
-    localStorage.removeItem(`permissions_${selectedUser}_${selectedRole}`);
-    setPermissions(loadPermissions(selectedUser, selectedRole));
+  // Helper to get display name
+  const getUserDisplayName = (user) => {
+    if (user.username) return user.username;
+    if (user.firstname || user.lastname) {
+      return `${user.firstname || ""} ${user.lastname || ""}`.trim();
+    }
+    return user.email || "Unknown User";
   };
+
+  // Filter users by search
+  const filteredUsers = users.filter(u => {
+    const q = searchQuery.toLowerCase();
+    const displayName = getUserDisplayName(u).toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    return displayName.includes(q) || email.includes(q);
+  });
 
   return (
-    <div className="user-management-container">
-      <div className="user-management-header">User Mapping to Roles</div>
-      <div className="user-management-selectors">
-        <div>
-          <label>Select User</label>
-          <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
-            {users.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
+    <div className="user-mapping-container">
+      {/* Left Sidebar: User List */}
+      <div className="user-sidebar">
+        <div className="sidebar-header">
+          <h3>User Management</h3>
+          <div className="subtitle">Select a user to assign roles</div>
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
-        <div>
-          <label>Select Role</label>
-          <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}>
-            {roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label>Select Menu</label>
-          <select value={selectedMenu} onChange={e => setSelectedMenu(e.target.value)}>
-            {menus.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="user-management-permissions">
-        <div className="user-management-permissions-title">
-          Assign Permissions for: <b>{selectedRole}</b>
-        </div>
-        <div className="permissions-table">
-          {permissionsData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(({ menu, permissions: perms }) => (
-            <div className={`permissions-row${permissions[menu].All ? " active" : ""}`} key={menu}>
-              <span className="menu-title">{menu}</span>
-              {perms.map(perm => (
-                <label key={perm} className="perm-label">
-                  <input
-                    type="checkbox"
-                    checked={permissions[menu][perm]}
-                    onChange={() => perm === "All" ? handleAllChange(menu) : handlePermissionChange(menu, perm)}
-                  />
-                  {perm}
-                </label>
-              ))}
+
+        <div className="user-list">
+          {filteredUsers.map(user => (
+            <div
+              key={user.id}
+              className={`user-item ${selectedUser?.id === user.id ? 'active' : ''}`}
+              onClick={() => handleUserSelect(user)}
+            >
+              <div className="user-name">{getUserDisplayName(user)}</div>
+              <div className="user-email">{user.email}</div>
+              {/* Optional: Show role count badge if we had that info pre-loaded */}
             </div>
           ))}
         </div>
-        <div className="pagination">
-          <div className="page-info">Showing {(permissionsData.length === 0) ? 0 : ((currentPage - 1) * itemsPerPage + 1)} - {Math.min(currentPage * itemsPerPage, permissionsData.length)} of {permissionsData.length}</div>
-          <div className="page-controls">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Prev</button>
-            {[...Array(Math.max(1, Math.ceil(permissionsData.length / itemsPerPage)))].map((_, i) => {
-              const p = i + 1;
-              return <button key={p} className={p === currentPage ? 'active' : ''} onClick={() => setCurrentPage(p)}>{p}</button>;
-            })}
-            <button disabled={currentPage === Math.max(1, Math.ceil(permissionsData.length / itemsPerPage))} onClick={() => setCurrentPage(p => Math.min(Math.max(1, Math.ceil(permissionsData.length / itemsPerPage)), p + 1))}>Next</button>
+      </div>
+
+      {/* Right Content: Role Assignment */}
+      <div className="role-mapping-content">
+        <div className="content-header">
+          <div className="header-info">
+            <h2>{selectedUser ? getUserDisplayName(selectedUser) : "Select a User"}</h2>
+            <p>Assign roles to grant permissions</p>
           </div>
-          <div className="items-per-page">
-            <label>Show:</label>
-            <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
-        <div className="buttons-container">
-          <button className="save-button" onClick={handleReset}>
-            Reset Permissions
-          </button>
-          <button className="save-button" onClick={() => {
-            localStorage.setItem(`permissions_${selectedUser}_${selectedRole}`, JSON.stringify(permissions));
-            console.log('Changes saved for user:', selectedUser, 'role:', selectedRole);
-          }}>
+
+          <button
+            className="btn-save"
+            onClick={handleSave}
+            disabled={!selectedUser}
+          >
+            <FaSave style={{ marginBottom: -2, marginRight: 6 }} />
             Save Changes
           </button>
+        </div>
+
+        <div className="roles-grid">
+          {loading && roles.length === 0 ? (
+            <p style={{ padding: 20 }}>Loading roles...</p>
+          ) : (
+            <div className="roles-grid-inner">
+              {roles.map(role => {
+                const isChecked = assignedRoleIds.has(role.id);
+                return (
+                  <label
+                    key={role.id}
+                    className={`role-card ${isChecked ? 'selected' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleRole(role.id)}
+                    />
+                    <div className="role-info">
+                      <div className="role-title">{role.role_name}</div>
+                      <div className="role-desc">{role.description}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

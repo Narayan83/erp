@@ -43,20 +43,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 10px 0 0 0 !important;
-  padding: 0 20px !important;
   background-color: $primary-white;
 
   h2 {
-    margin: 0;
+    margin: 0 20px;
     color: $primary-black;
-    font-size: 16px;
+    font-size: 1.2rem;
   }
 
   .close-button {
+    margin: 0 20px;
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.7rem;
     cursor: pointer;
     color: $primary-blue;
     transition: color 0.2s;
@@ -347,6 +346,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .react-select__menu {
     z-index: 9999;
+    /* keep dropdown within viewport and allow scrolling */
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
   }
 }
 
@@ -373,8 +375,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: $primary-white;
     border: 1px solid $primary-blue;
     border-radius: 4px;
-    padding: 3px 8px;
-    margin: 0px;
+    padding: 2px 8px;
+    margin: 8px 20px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;

@@ -4,8 +4,10 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function StoreTable({ stores, onEdit, onDelete, page, rowsPerPage }) {
+  const { perms } = useAuth();
   return (
     <TableContainer component={Paper}>
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
@@ -22,8 +24,12 @@ export default function StoreTable({ stores, onEdit, onDelete, page, rowsPerPage
               <TableCell align="left" sx={{ py: 0.5, width: 60 }}>{(page * rowsPerPage) + index + 1}</TableCell>
               <TableCell align="center" sx={{ py: 0.5, width: '70%' }}>{store.Name}</TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(store)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(store)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(store)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(store)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}

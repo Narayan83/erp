@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BASE_URL } from '../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../config/Config';
 import {
   Table,
   TableBody,
@@ -43,19 +43,10 @@ function Roles() {
   const fetchRoles = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token") || "";
-      
-      const headers = {
-        "Content-Type": "application/json"
-      };
-      
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
       
       const response = await fetch(`${BASE_URL}/allroles`, {
         method: "GET",
-        headers: headers,
+        headers: getAuthHeaders(),
         credentials: 'include'
       });
 
@@ -82,19 +73,10 @@ function Roles() {
     if (!window.confirm("Are you sure you want to delete this role? Users with this role will lose their permissions.")) return;
     
     try {
-      const token = localStorage.getItem("token") || "";
-      
-      const headers = {
-        "Content-Type": "application/json"
-      };
-      
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
       
       const response = await fetch(`${BASE_URL}/roles_delete/${id}`, {
         method: "DELETE",
-        headers: headers,
+        headers: getAuthHeaders(),
         credentials: 'include'
       });
 

@@ -18,12 +18,13 @@ import './add_quotation.scss';
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 
-import { BASE_URL } from "../../../config/Config";
+import { BASE_URL, getAuthHeaders } from "../../../config/Config";
 import TermsConditionSelector from "./TermsConditionModal";
 import PrintSettingsDialog from "../../../PrintSettings/Print";
 import SavedTemplate from "../../../Admin Master/page/SavedTemplate/SavedTemplate";
 import { useParams } from "react-router-dom"; 
 import AddNonStockModal from "../../../Admin Master/page/NonStock/AddNonStockModal";
+import CopyFromQuotationModal from "./CopyFromQuotationModal";
 import {
   TextField,
   SearchableSelect,
@@ -247,6 +248,11 @@ const [templateName, setTemplateName] = useState("");
 const [showTemplateModal, setShowTemplateModal] = useState(false);
 const [showSavedTemplates, setShowSavedTemplates] = useState(false);
 
+// Copy From Earlier Quotation Modal state
+const [showCopyFromModal, setShowCopyFromModal] = useState(false);
+// docType to use inside CopyFrom modal (allow showing all docs)
+const [copyFromDocType, setCopyFromDocType] = useState('All');
+
 // Bank Details Modal state
 const [openBankModal, setOpenBankModal] = useState(false);
 const [bankDetails, setBankDetails] = useState([]);
@@ -425,7 +431,7 @@ useEffect(()=>{console.log(customers)},[customers]);
       // fallback to users endpoint if non-heads endpoint is not available
       let data = null;
       try {
-        const res = await fetch(`${BASE_URL}/api/employees/non-heads`);
+        const res = await fetch(`${BASE_URL}/api/employees/non-heads`, { headers: getAuthHeaders() });
         if (res.ok) {
           data = await res.json();
           setEmployees(Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
@@ -435,7 +441,7 @@ useEffect(()=>{console.log(customers)},[customers]);
         // ignore and fallback
       }
 
-      const res2 = await fetch(`${BASE_URL}/api/users?page=1&limit=50&user_type=employee`);
+      const res2 = await fetch(`${BASE_URL}/api/users?page=1&limit=50&user_type=employee`, { headers: getAuthHeaders() });
       const data2 = await res2.json();
       setEmployees(data2.data || data2 || []);
     } catch (err) {
@@ -447,7 +453,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch non-stock items from API
   const fetchNonStockItems = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/service-items`);
+      const res = await fetch(`${BASE_URL}/api/service-items`, { headers: getAuthHeaders() });
       const data = await res.json();
       setNonStockItems(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
@@ -460,7 +466,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const fetchProducts = async (query = "") => {
     try {
       // Prefer server-side filter if supported by backend (uses `filter` like other endpoints).
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
      const data = await res.json();
      console.log(data);
       let items = data.data || [];
@@ -485,7 +491,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch tandc from API
   const fetchTandC = async (query = "") => {
     try {
-      const res = await fetch(`${BASE_URL}/api/tandc`);
+      const res = await fetch(`${BASE_URL}/api/tandc`, { headers: getAuthHeaders() });
      const data = await res.json();
      console.log(data);
       setTandc(data.data || []);
@@ -498,7 +504,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const fetchBranches = async () => {
     try {
       // backend uses company-branches endpoint for branches
-      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`);
+      const res = await fetch(`${BASE_URL}/api/company-branches?limit=1000`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch branches');
       const raw = Array.isArray(data.data) ? data.data : data;
@@ -519,7 +525,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch series for quotations (used to populate Series dropdown)
   const fetchSeries = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/series?limit=1000`);
+      const res = await fetch(`${BASE_URL}/api/series?limit=1000`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch series');
       const raw = Array.isArray(data.data) ? data.data : data;
@@ -553,7 +559,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   // Fetch bank details (company branch banks) for dropdown
   const fetchBankDetails = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/company-branch-banks`);
+      const res = await fetch(`${BASE_URL}/api/company-branch-banks`, { headers: getAuthHeaders() });
       const data = await res.json();
       const raw = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       const list = Array.isArray(raw) ? raw.map(b => ({
@@ -562,6 +568,9 @@ useEffect(()=>{console.log(customers)},[customers]);
         accountNo: b.account_number || b.accountNo || b.account || '',
         branch: b.branch_name || b.branch || '',
         ifsc: b.ifsc_code || b.ifsc || '' ,
+        // include SWIFT in whatever form the API provides and keep a canonical key `swiftCode`
+        swift: b.swift_code || b.swiftCode || b.swift || '',
+        swiftCode: b.swift_code || b.swiftCode || b.swift || '',
         title: b.title || (b.bank_name || b.bankName || b.bank || '')
       })) : [];
       setBankDetails(list);
@@ -588,7 +597,7 @@ useEffect(()=>{console.log(customers)},[customers]);
   const debouncedBarcodeFetch = useMemo(() => debounce(async (q) => {
     if (!q || !q.trim()) { setBarcodeSuggestions([]); return; }
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=20&filter=${encodeURIComponent(q)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=20&filter=${encodeURIComponent(q)}`, { headers: getAuthHeaders() });
       const data = await res.json();
       let items = data.data || [];
       const qLower = q.toString().toLowerCase();
@@ -610,6 +619,24 @@ useEffect(()=>{console.log(customers)},[customers]);
     };
   }, [debouncedBarcodeFetch]);
 
+  // Ensure all fetch() calls from this component include the auth token
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    // wrapper that injects Authorization header from localStorage
+    window.fetch = (input, init = {}) => {
+      try {
+        const token = localStorage.getItem('token');
+        const existingHeaders = (init && init.headers) ? { ...init.headers } : {};
+        const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers = { ...existingHeaders, ...authHeader };
+        return originalFetch(input, { ...init, headers });
+      } catch (e) {
+        return originalFetch(input, init);
+      }
+    };
+    return () => { window.fetch = originalFetch; };
+  }, []);
+
   useEffect(() => {
     fetchCustomers();
     fetchEmployees();
@@ -624,23 +651,26 @@ useEffect(()=>{console.log(customers)},[customers]);
     useEffect(() => {
       console.log(selectedCustomer);
       console.log(products);
-      // Reset address selections only when customer actually changes (not during edit prefill)
-      // If in edit mode and the selected customer matches the quotation's customer, keep prefilled addresses.
+      // Reset address selections only when customer actually changes (not during edit or copy/template prefill)
+      // If the selected customer matches the prefilled customer (from edit or copy), keep the addresses.
       const prefilledCustomerId = quotationData?.customer?.id || quotationData?.customer?.ID;
       const currentCustomerId = selectedCustomer?.id || selectedCustomer?.ID;
 
-      const isPrefilledCustomer = isEditMode && quotationData && prefilledCustomerId && currentCustomerId && String(prefilledCustomerId) === String(currentCustomerId);
-
-      if (isPrefilledCustomer) {
+      // In edit mode, if customer matches, don't clear (important for initialization)
+      if (isEditMode && quotationData && String(prefilledCustomerId) === String(currentCustomerId)) {
         return;
       }
       
-      // Otherwise, clear addresses when customer changes (new selection or cleared)
-      setSelectedBillingAddressId(null);
-      setSelectedBillingAddress(null);
-      setSelectedShippingAddressId(null);
-      setSelectedShippingAddress(null);
-      setIsSameAsBilling(true); 
+      // For new quotations (including Copy From/Template), if we have a customer, 
+      // we trust handleSelectCustomer or prefillFormData to set/reset addresses.
+      // We only clear everything if the customer is completely removed.
+      if (!selectedCustomer) {
+        setSelectedBillingAddressId(null);
+        setSelectedBillingAddress(null);
+        setSelectedShippingAddressId(null);
+        setSelectedShippingAddress(null);
+        setIsSameAsBilling(true);
+      }
     }, [selectedCustomer, isEditMode, quotationData]);
 
   // Fetch printer headers
@@ -660,6 +690,16 @@ useEffect(()=>{console.log(customers)},[customers]);
 
   useEffect(() => {
     fetchPrinterHeaders();
+  }, []);
+
+  // listen for print-header updates so the editor/print preview reflects saved changes immediately
+  useEffect(() => {
+    const onHeaderChanged = (ev) => {
+      const payload = ev && ev.detail ? ev.detail : null;
+      if (payload) setPrinterHeader(payload);
+    };
+    window.addEventListener('printerHeader:changed', onHeaderChanged);
+    return () => window.removeEventListener('printerHeader:changed', onHeaderChanged);
   }, []);
 
   const handleProductSearch = (e) => {
@@ -690,7 +730,7 @@ useEffect(()=>{console.log(customers)},[customers]);
     if (!query) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`);
+      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=50&filter=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
       const data = await res.json();
       let items = data.data || [];
 
@@ -1369,7 +1409,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     // addresses
     const bAddr = q.billing_address || selectedBillingAddress || {};
     const billingTitle = bAddr.title || customerName;
-    const billingGSTIN = bAddr.gstin || '-';
+    const billingGSTIN = gstForAddr(bAddr) || getCustomerLegalGstin(cust) || '-';
     const billingAddress1 = bAddr.address1 || '';
     const billingAddress2 = bAddr.address2 || '';
     const billingAddress3 = bAddr.address3 || '';
@@ -1380,7 +1420,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
     const sAddr = isSameAsBilling ? bAddr : (q.shipping_address || selectedShippingAddress || {});
     const shippingTitle = sAddr.title || customerName;
-    const shippingGSTIN = sAddr.gstin || '-';
+    const shippingGSTIN = gstForAddr(sAddr) || getCustomerLegalGstin(cust) || '-';
     const shippingAddress1 = sAddr.address1 || '';
     const shippingAddress2 = sAddr.address2 || '';
     const shippingAddress3 = sAddr.address3 || '';
@@ -1389,8 +1429,15 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const shippingCountry = sAddr.country || 'India';
     const shippingPincode = sAddr.postal_code || sAddr.pincode || '';
     
-    const custPhone = cust.mobile || cust.phone || '';
-    const custEmail = cust.email || '';
+    // Prefer common phone fields used across APIs (match QuotationList.getCustomerPhone)
+    const custPhone = cust.mobile || cust.phone || cust.phone_number || cust.mobile_number || cust.contact_number || cust.telephone || cust.contact || '';
+    const custEmail = cust.email || cust.email_address || cust.contact_email || '';
+
+    // Issued by (use sales_credit_person from saved quotation or selected employee in form)
+    const issuerObj = q.sales_credit_person || selectedEmployeeObj || {};
+    const issuerName = (issuerObj && ((issuerObj.firstname || issuerObj.first_name) ? `${issuerObj.firstname || issuerObj.first_name} ${issuerObj.lastname || issuerObj.last_name || ''}`.trim() : (issuerObj.name || issuerObj.Name || '')) ) || '';
+    const issuerPhone = issuerObj.mobile || issuerObj.mobile_number || issuerObj.phone || issuerObj.contact || '';
+    const issuerEmail = issuerObj.email || issuerObj.email_address || '';
     
     const companyName = printerHeader?.header_title || (branch.name || branch.company_name) || company.company_name || 'Canares Automation Pvt Ltd';
     const branchName = printerHeader?.header_subtitle || (branch.name || branch.branch_name || '');
@@ -1402,20 +1449,32 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const companyPhone = printerHeader?.mobile || branch.phone || company.phone || '';
     const companyEmail = printerHeader?.email || branch.email || company.email || '';
     const companyWebsite = printerHeader?.website || company.website || '';
-    const companyLogo = printerHeader?.logo_data || null;
+    const companyLogo = normalizeImageUrl(printerHeader?.logo_data || null);
     const headerAlignment = printerHeader?.alignment || 'left';
     
     // Bank details
     const bankB = q.company_branch_bank || branch.company_branch_bank || selectedBank || {};
-    const bankName = bankB.bankName || bankB.bank_name || '';
-    const bankBranch = bankB.branch || bankB.bank_branch || '';
+    const bankName = bankB.bankName || bankB.bank_name || branch.bank_name || company.bank_name || '';
+    const bankBranch = bankB.branch || bankB.branch_name || bankB.bankBranch || bankB.bank_branch || branch.bank_branch || company.bank_branch || '';
     const bankBranchAddress = branch.bank_branch_address || company.bank_branch_address || branchAddress || '';
-    const accountNo = bankB.accountNo || bankB.account_number || '';
-    const ifscCode = bankB.ifsc || bankB.ifsc_code || '';
-    const swiftCode = bankB.swiftCode || bankB.swift_code || '';
+    const accountNo = bankB.accountNo || bankB.account_number || branch.account_number || company.account_number || '';
+    const ifscCode = bankB.ifsc || bankB.ifsc_code || branch.ifsc_code || company.ifsc_code || '';
+    const swiftCode = bankB.swiftCode || bankB.swift_code || branch.swift_code || company.swift_code || '';
     
-    const termsArr = (q.terms_and_conditions || tandcSelections || []);
-    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || t}</div>`).join('');
+    const rawTerms = q.terms_and_conditions || tandcSelections;
+    let termsArr = [];
+    if (Array.isArray(rawTerms)) {
+      termsArr = rawTerms;
+    } else if (typeof rawTerms === 'string') {
+      try {
+        const parsed = JSON.parse(rawTerms);
+        if (Array.isArray(parsed)) termsArr = parsed;
+        else termsArr = [rawTerms];
+      } catch (e) {
+        termsArr = [rawTerms];
+      }
+    }
+    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || (typeof t === 'string' ? t : '')}</div>`).join('');
     const notesHtml = (q.note || note) ? `<div style="margin-top: 10px;"><strong>Notes:</strong><br/>${q.note || note}</div>` : '';
 
     // Calculate summary components
@@ -1443,6 +1502,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
     }
 
     const grandTotalVal = Number(q.grand_total || (taxableAmount + totalTax));
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 0), 0);
     
     const extraChargesArr = Array.isArray(q.extra_charges || extrcharges) ? (q.extra_charges || extrcharges) : [];
     const discountsArr = Array.isArray(q.discounts || additiondiscounts) ? (q.discounts || additiondiscounts) : [];
@@ -1465,78 +1525,100 @@ const handleTandCClose = () => setOpenTandCModal(false);
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center;">${imgHtml}</td>
           <td>${item.product_name || item.name || item.description || item.desc || '-'}</td>
-          <td>${item.product_code || item.item_code || item.sku || '-'}</td>
-          <td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>
+          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
-          <td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${Math.round(discountPct)}%</td>
-          <td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${(item.gst || 0)}%</td>
+          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${(Number(item.fixedRate || item.fixed_rate || item.fixed_price || item.fixedPrice || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
           <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
         </tr>
       `;
     }).join('');
     
+    // Count columns for the "No items" row
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
         <title>${docType} ${q.quotation_number || qutationNo}</title>
-        <style>
+          <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; }
-          .doc-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; gap: 20px; }
-          .branch-info { flex: 0 0 auto; max-width: 35%; }
-          .branch-info h2 { font-size: 14px; color: #1976d2; margin-bottom: 6px; }
-          .branch-info p { font-size: 10px; line-height: 1.5; margin: 2px 0; }
-          .quotation-details { flex: 0 0 auto; min-width: 280px; }
-          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; }
-          .quotation-details td { padding: 4px 8px; border: 1px solid #ddd; }
-          .quotation-details td:first-child { font-weight: 600; background: #f5f5f5; white-space: nowrap; width: 40%; }
-          .addresses { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 15px; }
-          .address-box { flex: 1; border: 1px solid #000; padding: 10px; }
-          .address-box h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; text-transform: uppercase; }
-          .address-box p { font-size: 10px; line-height: 1.6; margin: 3px 0; }
-          table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px; }
-          table.items th, table.items td { border: 1px solid #000; padding: 6px 4px; }
-          table.items th { background: #e3f2fd; font-weight: 600; text-align: center; font-size: 9px; }
-          table.items td { vertical-align: top; }
-          .summary { margin-left: auto; width: 380px; margin-bottom: 15px; }
-          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; }
-          .summary td { padding: 5px 10px; border: 1px solid #ddd; }
-          .summary td:first-child { text-align: left; font-weight: 500; background: #f9f9f9; }
-          .summary td:last-child { text-align: right; font-weight: 600; }
-          .summary .amount-words { border-top: 2px solid #000; background: #fff3e0; font-style: italic; }
-          .summary .grand-total td { background: #e3f2fd; font-weight: bold; font-size: 12px; border-top: 2px solid #000; }
-          .bottom-section { display: flex; gap: 15px; margin-bottom: 15px; }
-          .terms { flex: 1; border: 1px solid #000; padding: 10px; }
-          .terms h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
-          .terms p { font-size: 10px; line-height: 1.6; white-space: pre-line; }
-          .bank-details { flex: 1; border: 1px solid #000; padding: 10px; }
-          .bank-details h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
-          .bank-details table { width: 100%; font-size: 10px; }
-          .bank-details td { padding: 3px 5px; }
-          .bank-details td:first-child { font-weight: 600; width: 45%; }
-          .footer { text-align: right; margin-top: 30px; padding-top: 10px; border-top: 1px solid #000; }
-          .footer p { font-size: 10px; margin: 4px 0; }
+          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px 20px 60px 20px; color: #000; background: #fff; }
+          .pdf-footer { position: fixed; left: 20px; right: 20px; bottom: 12px; text-align: center; font-size: 10px; color: #333; font-style: italic; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #333; margin-bottom: 20px; gap: 20px; }
+          .branch-info { flex: 0 0 auto; max-width: 50%; }
+          .branch-info h2 { font-size: 16px; color: #333; margin-bottom: 8px; font-weight: 700; }
+          .branch-info p { font-size: 10px; line-height: 1.6; margin: 3px 0; color: #333; }
+          .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 20px 0; text-transform: uppercase; color: #333; letter-spacing: 1px; }
+          .quotation-details { min-width: 300px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; background: #fff; }
+          .quotation-details td { padding: 6px 10px; border: 1px solid #ddd; }
+          .quotation-details td:first-child { font-weight: 600; background: #E3F2FD; white-space: nowrap; width: 45%; color: #333; }
+          .quotation-details td:last-child { color: #333; }
+          .addresses { display: flex; justify-content: space-between; margin: 10px 0; gap: 0px; }
+          .address-box { flex: 1; border: 1px solid #333; padding: 12px; background: #FAFAFA; }
+          .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
+          .address-box p { font-size: 10px; line-height: 1.7; margin: 4px 0; color: #333; }
+          table.items { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+          table.items th, table.items td { border: 1px solid #ccc; padding: 8px 6px; }
+          table.items th { background: linear-gradient(to bottom, #333, #333); color: #fff; font-weight: 600; text-align: center; font-size: 10px; }
+          table.items tbody tr:nth-child(even) { background: #F5F5F5; }
+          table.items tbody tr:nth-child(odd) { background: #fff; }
+          table.items tbody tr:hover { background: #E3F2FD; }
+          table.items td { vertical-align: middle; color: #333; }
+          .three-col { display: flex; gap: 0px; margin: 10px 0; }
+          .three-col > div { border: 1px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; padding-bottom: 4px; text-transform: uppercase; }
+          .bank-details { flex: 1; }
+          .bank-details table { width: 100%; font-size: 10px; margin-top: 8px; }
+          .bank-details td { padding: 4px 6px; }
+          .bank-details td:first-child { font-weight: 600; color: #555; width: 45%; }
+          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: center; }
+          .amount-words-box > div { padding: 10px; }
+          .amount-words-box strong { display: block; font-size: 11px; color: #F57F17; margin-bottom: 8px; }
+          .amount-words-box div div { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; }
+          .summary { flex: 1; }
+          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; }
+          .summary td { padding: 6px 10px; border: 1px solid #ddd; }
+          .summary td:first-child { text-align: left; font-weight: 500; background: #F5F5F5; color: #555; }
+          .summary td:last-child { text-align: right; font-weight: 600; color: #333; }
+          .summary .grand-total td { background: linear-gradient(to right, #333, #333); color: #fff; font-weight: 700; font-size: 13px; border-top: 3px solid #333; }
+          .terms { margin: 10px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
+          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; padding-bottom: 5px; }
+          .terms p, .terms div { font-size: 10px; line-height: 1.8; white-space: pre-line; color: #333; margin: 4px 0; }
+          .terms .tc-columns { column-count: 2; column-gap: 20px; }
+          .terms .tc-columns > div { break-inside: avoid-column; -webkit-column-break-inside: avoid; padding-bottom: 6px; }
+          .notes-signature { display: flex; gap: 0px; margin-top: 10px; }
+          .notes { flex: 2; border: 1px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
+          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; padding-bottom: 4px; }
+          .notes p { font-size: 10px; line-height: 1.7; color: #333; }
+          .authorized-sign { flex: 1; border: 1px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
+          .authorized-sign > p:first-child { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 10px; }
+          .authorized-sign .sign-line { display: inline-block; margin-top: 50px; border-top: 2px solid #333; padding-top: 8px; min-width: 200px; font-weight: 700; font-size: 11px; color: #333; }
+          .authorized-sign > div { margin-top: 10px; font-style: italic; color: #666; font-size: 9px; }
           @media print {
             body { padding: 10px; }
             @page { margin: 10mm; }
+            table.items tbody tr:hover { background: inherit; }
           }
         </style>
       </head>
       <body>
-        <div class="doc-title">${docType.toUpperCase()}</div>
-
+        ${printConfig.header ? `
         <div class="header">
           ${headerAlignment === 'right' ? `
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
             <div class="branch-info" style="text-align: right; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
               ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
@@ -1546,7 +1628,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
             </div>
           ` : `
             <div class="branch-info" style="text-align: left; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
               ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
@@ -1556,38 +1638,68 @@ const handleTandCClose = () => setOpenTandCModal(false);
             </div>
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
           `}
-          <div class="quotation-details" style="flex: 0 0 auto; min-width: 250px;">
+        </div>
+
+        <div style="display:flex; align-items:flex-start; gap:20px; margin-bottom: 15px;">
+          <div style="width:260px;"></div>
+          <div style="flex:1; text-align:center;">
+            <div class="doc-title">${docType.toUpperCase()}</div>
+          </div>
+          <div style="width:260px;">
+            <div class="quotation-details" style="min-width:250px;">
+              <table>
+                <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
+                <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
+                ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
+                <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
+                <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        ` : `
+        <div class="doc-title">${docType.toUpperCase()}</div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+          <div class="quotation-details" style="min-width:250px;">
             <table>
               <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
               <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
-              <tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>
-              <tr><td>Ref.</td><td>${references || q.quotation_number || qutationNo || '-'}</td></tr>
+              ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
+              <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
+              <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
             </table>
           </div>
         </div>
+        `}
 
+        ${printConfig.partyInformation ? `
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
+            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
+            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
             ${billingAddress1 ? `<p>${billingAddress1}</p>` : ''}
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
+            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
+            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
             ${shippingAddress1 ? `<p>${shippingAddress1}</p>` : ''}
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
+        ` : ''}
 
         <table class="items">
           <thead>
@@ -1595,85 +1707,102 @@ const handleTandCClose = () => setOpenTandCModal(false);
               <th>No.</th>
               <th>Image</th>
               <th>Item & Description</th>
-              <th>Item Code</th>
-              <th>HSN / SAC</th>
+              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
-              <th>Rate (₹)</th>
-              <th>Discount %</th>
-              <th>Discount (₹)</th>
-              <th>Taxable (₹)</th>
-              <th>GST %</th>
+              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
+              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
               <th>Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            ${itemRows || '<tr><td colspan="13" style="text-align: center;">No items</td></tr>'}
+            ${itemRows || `<tr><td colspan="${colCount}" style="text-align: center;">No items</td></tr>`}
           </tbody>
         </table>
 
-        <div class="summary">
-          <table>
-            <tr class="amount-words">
-              <td colspan="2"><strong>Total Amount in Words:</strong> Rupees ${numberToWords(grandTotalVal)} only</td>
-            </tr>
-            <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-            
-            ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            
-            <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-            
-            <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-
-            ${extraChargesArr.map(c => `
-              <tr>
-                <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
-                <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-              </tr>
-            `).join('')}
-
-            ${discountsArr.map(d => `
-              <tr>
-                <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
-                <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-              </tr>
-            `).join('')}
-
-            ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-
-            <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotalVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-          </table>
-        </div>
-
-        <div class="bottom-section">
-          <div class="terms">
-            <h3>Terms & Conditions</h3>
-            ${termsAndConditionsHtml || '<p>-</p>'}
-            ${notesHtml}
-          </div>
+        <div class="three-col">
+          ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
             <table>
               <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Branch Address</td><td>${bankBranchAddress || '-'}</td></tr>
-              ${ifscCode ? `<tr><td>IFSC</td><td>${ifscCode}</td></tr>` : ''}
+              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
+              ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
+            </table>
+          </div>
+          ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
+
+          <div class="amount-words-box">
+             <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div><h5>Rupees ${numberToWords(grandTotalVal)} only</h5></div></div>
+          </div>
+
+          <div class="summary">
+            <h3>Summary</h3>
+            <table>
+              <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              ${printConfig.totalQuantity ? `<tr><td>Total Quantity</td><td>${totalQuantity}</td></tr>` : ''}
+
+              ${printConfig.gstSummary ? `
+                ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              ` : ''}
+
+              <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+
+              ${extraChargesArr.map(c => `
+                <tr>
+                  <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
+                  <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                </tr>
+              `).join('')}
+
+              ${discountsArr.map(d => `
+                <tr>
+                  <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
+                  <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                </tr>
+              `).join('')}
+
+              ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+
+              <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotalVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
             </table>
           </div>
         </div>
 
-        <div class="footer">
-          <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
-          <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
-          <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
+        <div class="terms">
+          <h3>Terms & Conditions</h3>
+          <div class="tc-columns">${termsAndConditionsHtml || '<p>-</p>'}</div>
         </div>
+
+        <div class="notes-signature">
+          <div class="notes">
+            <strong>Additional Notes</strong>
+            ${printConfig.notes && (q.note || note || notesHtml) ? ((q.note || note) ? `<p>${q.note || note}</p>` : notesHtml.replace('<div style="margin-top: 10px;"><strong>Notes:</strong><br/>', '<p>').replace('</div>', '</p>')) : '<p style="color:#999;font-style:italic;">No additional notes</p>'}
+          </div>
+          <div class="authorized-sign">
+            <p>For ${companyName}</p>
+            <div class="sign-line">Authorised Signatory</div>
+            ${printConfig.digitalSignature ? `<div>Digitally Signed</div>` : ''}
+          </div>
+        </div>
+
+        <div class="pdf-footer">This is a computer-generated quotation. E. &amp; O. E.</div>
+
       </body>
       </html>
     `;
+
     
     const w = window.open('', '_blank');
     if (!w) return;
@@ -1758,6 +1887,8 @@ const handleSaveQuotation = async () => {
       };
     }),
   };
+
+  console.log('Saving quotation with T&C:', payload.quotation.terms_and_conditions);
 
   try {
     setSaving(true);
@@ -1905,7 +2036,7 @@ const handleSaveAsTemplate = async () => {
 
 const onSelectTemplate = (template) => {
   if (template && template.qutation_table) {
-    prefillFormData(template.qutation_table);
+    prefillFormData(template.qutation_table, false);
     setShowSavedTemplates(false);
   }
 };
@@ -2193,8 +2324,8 @@ const onSelectTemplate = (template) => {
             const resp = await axios.get(`${BASE_URL}/api/quotations/${copyFrom}`);
             const data = resp.data;
             if (data) {
-              // prefill but keep it as a new document
-              await prefillFormData(data);
+              // prefill but keep it as a new document (don't change docType, keep current form's type)
+              await prefillFormData(data, false);
               setIsEditMode(false);
               setIsReviseMode(false);
               // ensure sequence/number fields are cleared so a new number is generated
@@ -2439,11 +2570,13 @@ const fetchQuotationData = async () => {
 
 
 
-const  prefillFormData = async (data) => {
+const  prefillFormData = async (data, shouldUpdateDocType = true) => {
   console.log('Prefilling form with data:', data);
-  // Ensure docType is set from saved data so UI matches saved document type
-  const incomingDocType = data.document_type || data.type || (data.is_proforma ? 'Proforma Invoice' : 'Quotation');
-  setDocType(incomingDocType);
+  // Ensure docType is set from saved data so UI matches saved document type (only in edit mode)
+  if (shouldUpdateDocType) {
+    const incomingDocType = data.document_type || data.type || (data.is_proforma ? 'Proforma Invoice' : 'Quotation');
+    setDocType(incomingDocType);
+  }
   
   // Pre-fill customer
   if (data.customer) {
@@ -2724,6 +2857,7 @@ const  prefillFormData = async (data) => {
 
   // Pre-fill terms and conditions
   if (data.terms_and_conditions) {
+    console.log('Prefilling T&C:', data.terms_and_conditions);
     if (Array.isArray(data.terms_and_conditions)) {
       // normalize: convert primitive IDs to objects { ID: value }
       const normalized = data.terms_and_conditions.map(v => (v && typeof v === 'object') ? v : { ID: v });
@@ -2740,6 +2874,8 @@ const  prefillFormData = async (data) => {
         setTandcSelections([{ ID: data.terms_and_conditions }]);
       }
     }
+  } else {
+    console.log('No T&C data found in quotation');
   }
 
   // Pre-fill charges and discounts
@@ -2965,7 +3101,7 @@ const  prefillFormData = async (data) => {
               <option value="">-- Select --</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.name} - {b.state ? ` ${b.state}` : ''} - {(b.gst_number || b.gst || b.GST || b.gstin) ? ` ${(b.gst_number || b.gst || b.GST || b.gstin)}` : ''}
+                  {b.name} - {b.state ? ` ${b.state}` : ''} ({(b.gst_number || b.gst || b.GST || b.gstin) ? ` ${(b.gst_number || b.gst || b.GST || b.gstin)}` : ''})
                 </option>
               ))}
             </select>
@@ -2984,7 +3120,15 @@ const  prefillFormData = async (data) => {
                 id="copyFrom"
                 className="form-control"
                 onChange={(e) => {
-                  if (e.target.value === "templates") {
+                  if (e.target.value === "earlier") {
+                    if (!selectedCustomer || !selectedCustomer.id) {
+                      alert("Please select a customer first to copy from earlier quotations.");
+                    } else {
+                      // show all document types created for this customer
+                      setCopyFromDocType('All');
+                      setShowCopyFromModal(true);
+                    }
+                  } else if (e.target.value === "templates") {
                     setShowSavedTemplates(true);
                   }
                   e.target.value = "none";
@@ -3328,8 +3472,10 @@ const  prefillFormData = async (data) => {
                 type="date"
                 className="form-control"
                 value={quotationDate}
-                onChange={(e) => setQuotationDate(e.target.value)}
-                readOnly={true}
+                readOnly
+                onKeyDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
+                style={{ pointerEvents: 'none', backgroundColor: '#f5f5f5' }}
               />
             </div>
 
@@ -3688,10 +3834,10 @@ const  prefillFormData = async (data) => {
           <div className="summary-card tandc-card">
              <TermsConditionSelector 
               open={openTandCModal} 
-              handleClose={(p,ec,ed) => { setTandcSelections(p);setEndCustomer(ec),setEndDealer(ed) }} 
-              initialSelections={isEditMode ? tandcSelections : []}
-              end_customer_name = {isEditMode?endcustomer:''} 
-              end_dealer_name = {isEditMode?enddealer:''} 
+              handleClose={(p,ec,ed) => { setTandcSelections(p); setEndCustomer(ec); setEndDealer(ed); }} 
+              initialSelections={tandcSelections}
+              end_customer_name = {endcustomer} 
+              end_dealer_name = {enddealer} 
             /> 
           </div>
 
@@ -3718,7 +3864,7 @@ const  prefillFormData = async (data) => {
                   {bankDetails && bankDetails.length > 0 ? (
                     bankDetails.map((bank) => (
                       <option key={bank.id} value={bank.id}>
-                        {bank.bankName} - {bank.accountNo}
+                        {bank.bankName} ({bank.accountNo})
                       </option>
                     ))
                   ) : null}
@@ -3748,10 +3894,13 @@ const  prefillFormData = async (data) => {
                       </button>
                     </div>
                     <div className="bank-details-grid">
-                      <div className="bank-item"><strong>A/C No:</strong> <span>{selectedBank.accountNo}</span></div>
-                      {selectedBank.branch && <div className="bank-item"><strong>Branch:</strong> <span>{selectedBank.branch}</span></div>}
-                      {selectedBank.ifsc && <div className="bank-item"><strong>IFSC:</strong> <span>{selectedBank.ifsc}</span></div>}
-                      {selectedBank.swiftCode && <div className="bank-item"><strong>SWIFT:</strong> <span>{selectedBank.swiftCode}</span></div>}
+                      {selectedBank.branch && <div className="bank-item"><strong>BRANCH</strong> <span>{selectedBank.branch}</span></div>}
+                      {selectedBank.accountNo && <div className="bank-item"><strong>ACC NO</strong> <span>{selectedBank.accountNo}</span></div>}
+                      {selectedBank.ifsc && <div className="bank-item"><strong>IFSC</strong> <span>{selectedBank.ifsc}</span></div>}
+                      {(selectedBank.swiftCode || selectedBank.swift || selectedBank.swift_code) && (
+                        <div className="bank-item"><strong>SWIFT</strong> <span>{selectedBank.swiftCode || selectedBank.swift || selectedBank.swift_code}</span></div>
+                      )}
+
                     </div>
                   </div>
                 )}
@@ -4839,6 +4988,37 @@ const  prefillFormData = async (data) => {
     showAction={false}
   />
 )}
+
+{/* Copy From Earlier Quotation Modal */}
+<CopyFromQuotationModal
+  open={showCopyFromModal}
+  onClose={() => setShowCopyFromModal(false)}
+  customerId={selectedCustomer?.id || selectedCustomer?.ID}
+  customerName={selectedCustomer?.company_name || selectedCustomer?.business || `${selectedCustomer?.firstname || ''} ${selectedCustomer?.lastname || ''}`.trim()}
+  docType={copyFromDocType}
+  onSelectQuotation={async (quotation) => {
+    // Fetch full quotation data and prefill the form directly
+    const qId = quotation.quotation_id || quotation.QuotationID || quotation.id;
+    try {
+      const resp = await axios.get(`${BASE_URL}/api/quotations/${qId}`);
+      const data = resp.data;
+      if (data) {
+        await prefillFormData(data, false);
+        // Clear quotation number fields so a new number is generated
+        setQutationNo('');
+        setPrevQutationNo('');
+        setSeqNumber('');
+        // Ensure we stay in create mode, not edit mode
+        setIsEditMode(false);
+        setIsReviseMode(false);
+      }
+    } catch (err) {
+      console.error("Failed to fetch quotation for copy:", err);
+      alert('Could not load the quotation to copy.');
+    }
+    setShowCopyFromModal(false);
+  }}
+/>
 
     </section>
 

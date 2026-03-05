@@ -86,7 +86,7 @@ export default function UnitDialog({ open, onClose, unit, onSuccess }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{unit ? "Edit Unit" : "Add Unit"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="name"

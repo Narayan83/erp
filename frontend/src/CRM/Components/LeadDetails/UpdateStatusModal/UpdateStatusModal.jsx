@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaCheck } from 'react-icons/fa';
+import { getAuthHeaders } from '../../../../config/Config';
 import './updateStatusModal.scss';
 
 const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) => {
@@ -50,7 +51,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
 
     const fetchReasons = async () => {
       try {
-        const res = await fetch(`${apiBase}/rejection-reasons`);
+        const res = await fetch(`${apiBase}/rejection-reasons`, { headers: getAuthHeaders() });
         if (!res.ok) {
           throw new Error('Failed to fetch');
         }
@@ -99,8 +100,8 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
     }
 
     const prev = localCurrentStage;
-    // Optimistically mark as Inactive (reject)
-    setLocalCurrentStage('Inactive');
+    // Optimistically mark as Rejected
+    setLocalCurrentStage('Rejected');
     setIsUpdating(true);
 
     try {
@@ -151,7 +152,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
         const payload = { title: trimmed, code: existing?.code || genCode(trimmed) };
         const res = await fetch(`${apiBase}/rejection-reasons/${editingReasonId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
@@ -166,7 +167,7 @@ const UpdateStatusModal = ({ isOpen, onClose, currentStage, onStatusChange }) =>
         const payload = { title: trimmed, code: genCode(trimmed) };
         const res = await fetch(`${apiBase}/rejection-reasons`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
         if (!res.ok) {

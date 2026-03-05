@@ -319,7 +319,7 @@ export default function ProductEditForm({ product, onSubmit, navigate }) {
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="product-edit-form">
+    <form autoComplete="off" onSubmit={handleSubmit(handleFormSubmit)} className="product-edit-form">
       <h2 className="form-title">Edit Product Info</h2>
       <div className="form-grid">
         <div className="form-field col-33">

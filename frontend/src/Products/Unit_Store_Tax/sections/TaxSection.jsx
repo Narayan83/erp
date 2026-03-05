@@ -7,8 +7,10 @@ import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
 import "./allinone.scss";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function TaxSection() {
+  const { perms } = useAuth();
   const [taxes, setTaxes] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTax, setEditingTax] = useState(null);
@@ -87,13 +89,15 @@ export default function TaxSection() {
           />
         </div>
         <div className="add-button-wrapper">
-          <button
-            className="btn-add"
-            onClick={() => setDialogOpen(true)}
-            type="button"
-          >
-            Add Tax
-          </button>
+          {perms?.can_create && (
+            <button
+              className="btn-add"
+              onClick={() => setDialogOpen(true)}
+              type="button"
+            >
+              Add Tax
+            </button>
+          )}
         </div>
       </div>
 

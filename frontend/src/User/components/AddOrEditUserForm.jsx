@@ -9,7 +9,6 @@ import countries from "../utils/countries";
 import citiesList from "../utils/cities-name-list.json";
 import stateList from "../utils/state_list.json";
 import ImageEditor from '../../Products/ProductManage/Components/ImageEditor';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
 import "./addoredituserform.scss";
 
 const salutations = ["Mr", "Mrs", "Miss", "Dr", "Prof"];
@@ -94,6 +93,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
   // When mounted, enforce autocomplete/off and related attributes on all inputs
   // and add hidden dummy username/password inputs to further reduce browser autofill.
+  // AGGRESSIVE: Use readonly trick to completely prevent browser suggestions
   React.useEffect(() => {
     const form = formRef.current;
     if (!form) return;
@@ -130,10 +130,40 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
     const elems = form.querySelectorAll('input, textarea, select');
     elems.forEach((el) => {
       try {
-        el.setAttribute('autocomplete', 'off');
-        el.setAttribute('autocorrect', 'off');
-        el.setAttribute('autocapitalize', 'off');
-        el.setAttribute('spellcheck', 'false');
+        // Skip Material-UI Autocomplete inputs
+        const isMuiAutocomplete = el.closest('.MuiAutocomplete-root');
+        if (!isMuiAutocomplete) {
+          // Multiple autocomplete prevention strategies
+          el.setAttribute('autocomplete', 'off');
+          el.setAttribute('autocomplete', 'nope');
+          el.setAttribute('autocomplete', 'new-password');
+          el.setAttribute('autocorrect', 'off');
+          el.setAttribute('autocapitalize', 'off');
+          el.setAttribute('spellcheck', 'false');
+          el.setAttribute('data-lpignore', 'true');
+          el.setAttribute('data-1p-ignore', 'true');
+          el.setAttribute('data-bwignore', 'true');
+          
+          // AGGRESSIVE: Apply readonly trick - prevents browser from showing suggestions
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.setAttribute('readonly', 'readonly');
+            
+            // Remove readonly on focus
+            const focusHandler = function() {
+              this.removeAttribute('readonly');
+            };
+            
+            // Re-apply readonly on blur
+            const blurHandler = function() {
+              setTimeout(() => {
+                this.setAttribute('readonly', 'readonly');
+              }, 100);
+            };
+            
+            el.addEventListener('focus', focusHandler);
+            el.addEventListener('blur', blurHandler);
+          }
+        }
       } catch (e) {
         // ignore immutable fields
       }
@@ -184,6 +214,90 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
       updated[idx] = { ...updated[idx], [field]: value };
       return updated;
     });
+  };
+
+  // Fetch GSTIN details from backend and try to auto-fill address fields.
+  const fetchGSTAndFill = async (gstin, idx = null) => {
+    if (!gstin || String(gstin).trim() === '') return;
+    try {
+      const resp = await axios.get(`${BASE_URL}/api/gstin/${encodeURIComponent(String(gstin).trim())}`);
+      let payload = resp.data;
+      // If server returned a JSON string, try to parse
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) { /* keep as string */ }
+      }
+
+      // Recursive search for address-like fields
+      const found = { address: [], city: '', state: '', pincode: '' };
+      const walk = (obj) => {
+        if (!obj) return;
+        if (typeof obj === 'string') {
+          // try extract pincode
+          const pinMatch = obj.match(/\b\d{6}\b/);
+          if (pinMatch && !found.pincode) found.pincode = pinMatch[0];
+          // push longer strings as possible address lines
+          if (obj.length > 10) found.address.push(obj);
+          return;
+        }
+        if (typeof obj !== 'object') return;
+        for (const k of Object.keys(obj)) {
+          const v = obj[k];
+          const lk = String(k).toLowerCase();
+          if (/city|district|taluk|town/.test(lk) && typeof v === 'string' && !found.city) found.city = v;
+          if (/state|st_name|statename/.test(lk) && typeof v === 'string' && !found.state) found.state = v;
+          if (/pin|pincode|postal/.test(lk) && typeof v === 'string' && !found.pincode) {
+            const pm = v.match(/\d{6}/);
+            if (pm) found.pincode = pm[0];
+          }
+          if (/addr|address|pradr|trade|lgnm|premise|building/.test(lk)) {
+            if (typeof v === 'string') found.address.push(v);
+            else walk(v);
+            continue;
+          }
+          walk(v);
+        }
+      };
+
+      walk(payload);
+
+      // Normalize address lines
+      const uniqueAddr = Array.from(new Set(found.address)).slice(0, 3);
+
+      if (idx == null) {
+        // permanent address
+        if (uniqueAddr[0]) setValue('address1', uniqueAddr[0]);
+        if (uniqueAddr[1]) setValue('address2', uniqueAddr[1]);
+        if (uniqueAddr[2]) setValue('address3', uniqueAddr[2]);
+        if (found.city) {
+          const matchedCity = citiesList.find(c => c.toLowerCase() === found.city.toLowerCase()) || found.city;
+          setValue('city', matchedCity);
+        }
+        if (found.state) {
+          const matchedState = indiaStates.find(s => s.toLowerCase() === found.state.toLowerCase()) || found.state;
+          setValue('state', matchedState);
+        }
+        if (found.pincode) setValue('pincode', found.pincode);
+        // Auto-fill country for GST
+        setValue('permanent_country', 'India');
+        setValue('permanent_country_code', '+91');
+      } else {
+        // additional address slot
+        const matchedCity = found.city ? (citiesList.find(c => c.toLowerCase() === found.city.toLowerCase()) || found.city) : '';
+        const matchedState = found.state ? (indiaStates.find(s => s.toLowerCase() === found.state.toLowerCase()) || found.state) : '';
+        handleAdditionalAddressChange(idx, 'address1', uniqueAddr[0] || '');
+        handleAdditionalAddressChange(idx, 'address2', uniqueAddr[1] || '');
+        handleAdditionalAddressChange(idx, 'address3', uniqueAddr[2] || '');
+        handleAdditionalAddressChange(idx, 'city', matchedCity);
+        handleAdditionalAddressChange(idx, 'state', matchedState);
+        handleAdditionalAddressChange(idx, 'pincode', found.pincode || '');
+        // Auto-fill country for GST
+        handleAdditionalAddressChange(idx, 'country', 'India');
+        handleAdditionalAddressChange(idx, 'country_code', '+91');
+      }
+    } catch (err) {
+      console.error('GST lookup failed', err?.response?.data || err.message || err);
+      alert('Failed to lookup GSTIN. See console for details.');
+    }
   };
 
   const handleAddAdditionalAccountType = () => {
@@ -287,7 +401,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
     const fetchDepartments = async () => {
       try {
         const params = { page: 1, limit: 1000 };
-        const resp = await axios.get(`${BASE_URL}/api/departments`, { params });
+        const resp = await axios.get(`${BASE_URL}/departments`, { params });
         const payload = resp.data.departments || resp.data || [];
         const list = Array.isArray(payload) ? payload : [];
         if (!cancelled) setDepartmentsList(list);
@@ -498,7 +612,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
         // Try multiple endpoints to get employees for a department
         let employees = [];
         const tryEndpoints = [
-          `${BASE_URL}/api/departments/${deptId}/employees`,
+          `${BASE_URL}/departments/${deptId}/employees`,
           `${BASE_URL}/api/employees`,
           `${BASE_URL}/employees`,
         ];
@@ -2163,6 +2277,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
     <>
       <div className="user-form-container">
         <form
+          ref={formRef}
+          autoComplete="off"
           onSubmitCapture={(e) => { e.preventDefault(); handleFormSubmit(); }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); } }}
         >
@@ -2447,7 +2563,13 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                 {...register("permanent_gstin")}
                 className={`form-input ${errors.permanent_gstin ? 'error' : ''}`}
               />
-              <button type="button" className="input-action-btn btn btn-secondary btn-small">Get</button>
+              <button
+                type="button"
+                className="input-action-btn btn btn-secondary btn-small"
+                onClick={() => fetchGSTAndFill(getValues('permanent_gstin'))}
+              >
+                Get
+              </button>
             </div>
             {errors.permanent_gstin && <div className="error-message">{errors.permanent_gstin.message}</div>}
           </div>
@@ -2503,8 +2625,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                       className={errors.city ? 'error' : ''}
                     >
                       <option value="">Select City</option>
-                      {citiesList.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                      {citiesList.map((c, i) => (
+                        <option key={`${c}_${i}`} value={c}>{c}</option>
                       ))}
                     </select>
                   </div>
@@ -2536,8 +2658,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                       className={errors.state ? 'error' : ''}
                     >
                       <option value="">Select State</option>
-                      {indiaStates.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                      {indiaStates.map((s, i) => (
+                        <option key={`${s}_${i}`} value={s}>{s}</option>
                       ))}
                     </select>
                   </div>
@@ -2966,12 +3088,12 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
             {errors.title && <div className="error-message">{errors.title.message}</div>}
           </div>
 
-          {/* <div style={{ gridColumn: '1 / -1' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
             <h6>Assign to Executive</h6>
-          </div> */}
+          </div>
 
           {/* Select Department */}
-          {/* <div className="form-field">
+          <div className="form-field">
             <label htmlFor="assigned_department_id">Select Department</label>
             <div className="form-select-wrapper">
               <Controller
@@ -2993,10 +3115,10 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
             {errors.assigned_department_id && <div className="error-message">{errors.assigned_department_id.message}</div>}
-          </div> */}
+          </div>
 
           {/* Select Executive */}
-          {/* <div className="form-field">
+          <div className="form-field">
             <label htmlFor="assigned_executive_id">Select Executive</label>
             <div className="form-select-wrapper">
               <Controller
@@ -3025,12 +3147,12 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
             {errors.assigned_executive_id && <div className="error-message">{errors.assigned_executive_id.message}</div>}
-          </div> */}
+          </div>
         </div>
       </div>
 
           <div className="tab-content" style={{ display: tabIndex === 2 ? 'block' : 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div className="form-grid">
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Additional Address</h6>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -3058,7 +3180,13 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                           value={address.gstin || ""}
                           onChange={e => handleAdditionalAddressChange(idx, "gstin", e.target.value)}
                         />
-                        <button type="button" className="btn btn-secondary btn-small input-action-btn">Get</button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-small input-action-btn"
+                          onClick={() => fetchGSTAndFill(address.gstin, idx)}
+                        >
+                          Get
+                        </button>
                       </div>
                     </div>
                     {[1, 2, 3].map((n) => (
@@ -3081,8 +3209,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                           onChange={e => handleAdditionalAddressChange(idx, "city", e.target.value)}
                         >
                           <option value="">Select City</option>
-                          {citiesList.map((c) => (
-                            <option key={c} value={c}>{c}</option>
+                          {citiesList.map((c, i) => (
+                            <option key={`${c}_${i}`} value={c}>{c}</option>
                           ))}
                         </select>
                       ) : (
@@ -3103,8 +3231,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                           onChange={e => handleAdditionalAddressChange(idx, "state", e.target.value)}
                         >
                           <option value="">Select State</option>
-                          {indiaStates.map((s) => (
-                            <option key={s} value={s}>{s}</option>
+                          {indiaStates.map((s, i) => (
+                            <option key={`${s}_${i}`} value={s}>{s}</option>
                           ))}
                         </select>
                       ) : (
@@ -3216,36 +3344,40 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Bank Information</h6>
 
-          <div>
+          <div className="five-col-grid" style={{ gridColumn: '1 / -1' }}>
+
+          <div className="grid-col md-4 xs-12">
             <div className="form-field">
               <label htmlFor="bank_name">Bank Name</label>
               <input {...register("bank_name")} id="bank_name" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-4 xs-12">
             <div className="form-field">
               <label htmlFor="branch_name">Branch Name</label>
               <input {...register("branch_name")} id="branch_name" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-4 xs-12">
             <div className="form-field">
               <label htmlFor="branch_address">Branch Address</label>
               <input {...register("branch_address")} id="branch_address" type="text" className="form-input" />
             </div>
           </div>
 
-          <div>
+          <div className="grid-col md-4 xs-12">
             <div className="form-field">
               <label htmlFor="account_number">Account Number</label>
               <input {...register("account_number")} id="account_number" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-4 xs-12">
             <div className="form-field">
               <label htmlFor="ifsc_code">IFSC Code</label>
               <input {...register("ifsc_code")} id="ifsc_code" type="text" className="form-input" />
             </div>
+          </div>
+
           </div>
 
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Additional Bank Info</h6>
@@ -3513,37 +3645,42 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
       <div className="tab-content" style={{ display: tabIndex === 3 ? 'block' : 'none' }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div className="form-grid">
           {/* Legal information block (Authentication tab) - moved above authentication fields */}
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Legal Information</h6>
-          <div>
+          <div className="five-col-grid" style={{ gridColumn: '1 / -1' }}>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="aadhar_number">Aadhar Number</label>
               <input {...register("aadhar_number")} id="aadhar_number" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="pan_number">PAN Number</label>
               <input {...register("pan_number")} id="pan_number" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="gstin_number">GSTIN</label>
               <input {...register("gstin_number")} id="gstin_number" type="text" className="form-input" />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="msme_no">MSME No</label>
               <input {...register("msme_no")} id="msme_no" type="text" className="form-input" />
+            </div>
             </div>
           </div>
 
           {/* Authentication section - placed below legal information */}
           <h6 className="subsection-header" style={{ gridColumn: '1 / -1' }}>Authentication</h6>
-          <div>
+
+          <div className="five-col-grid" style={{ gridColumn: '1 / -1' }}>
+
+          <div className="grid-col md-2 xs-12">
             <div className="form-field">
               <label htmlFor="username">User Name *</label>
               <Controller
@@ -3559,7 +3696,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="password">Password *</label>
               <Controller
@@ -3586,11 +3723,10 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         type="button"
                         onClick={handleClickShowPassword}
                         onMouseDown={handleMouseDownPassword}
-                        className="password-toggle-btn"
-                        title={showPassword ? "Hide password" : "Show password"}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="btn btn-small password-toggle"
+                        title="Toggle password visibility"
                       >
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        {showPassword ? '👁️‍🗨️' : '👁️'}
                       </button>
                     </div>
                     {errors.password && <div className="error-message">{errors.password.message}</div>}
@@ -3599,7 +3735,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
           </div>
-          <div>
+          <div className="grid-col md-3 xs-12">
             <div className="form-field">
               <label htmlFor="confirmPassword">Confirm Password *</label>
               <Controller
@@ -3622,11 +3758,10 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
                         type="button"
                         onClick={handleClickShowConfirmPassword}
                         onMouseDown={handleMouseDownPassword}
-                        className="password-toggle-btn"
-                        title={showConfirmPassword ? "Hide password" : "Show password"}
-                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        className="btn btn-small password-toggle"
+                        title="Toggle password visibility"
                       >
-                        {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        {showConfirmPassword ? '👁️‍🗨️' : '👁️'}
                       </button>
                     </div>
                     {errors.confirmPassword && <div className="error-message">{errors.confirmPassword.message}</div>}
@@ -3638,7 +3773,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
 
           {/* Primary Key & User Code */}
           {defaultValues?.id && (
-            <div>
+            <div className="grid-col md-2 xs-12">
               <div className="form-field">
                 <label htmlFor="primary_key">Primary Key (ID)</label>
                 <input
@@ -3651,7 +3786,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               </div>
             </div>
           )}
-          <div>
+          <div className="grid-col md-2 xs-12">
             <div className="form-field">
               <label htmlFor="usercode">User Code *</label>
               <Controller
@@ -3667,6 +3802,8 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
               />
             </div>
           </div>
+          </div>
+
         </div>
 
         

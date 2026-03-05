@@ -3,8 +3,10 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function CategoryTable({ categories, onEdit, onDelete, page, rowsPerPage }) {
+  const { perms } = useAuth();
   return (
     <TableContainer component={Paper}>
       <Table size="small">
@@ -23,8 +25,12 @@ export default function CategoryTable({ categories, onEdit, onDelete, page, rows
               </TableCell>
               <TableCell align="center" sx={{ py: 0.5 }}>{cat.Name}</TableCell>
               <TableCell align="right" sx={{ py: 0.5, textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(cat)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(cat)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(cat)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(cat)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}

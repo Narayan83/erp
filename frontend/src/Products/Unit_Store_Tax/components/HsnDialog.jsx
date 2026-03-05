@@ -115,7 +115,7 @@ export default function HsnDialog({ open, onClose, hsn, onSuccess, onError }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{hsn ? "Edit HSN" : "Add HSN"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="code"

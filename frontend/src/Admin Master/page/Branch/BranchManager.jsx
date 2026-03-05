@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
+import countries from "../../../User/utils/countries";
+import stateList from "../../../User/utils/state_list.json";
+import citiesList from "../../../User/utils/cities-name-list.json";
 import "../../styles/master.scss";
 
 export default function BranchManager({ isOpen = false, onClose = () => {} }) {
@@ -110,6 +113,7 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
     const [stateVal, setStateVal] = useState('');
+    const [country, setCountry] = useState('India');
     const [pincode, setPincode] = useState('');
     const [gstin, setGstin] = useState('');
     const [isHeadOffice, setIsHeadOffice] = useState(false);
@@ -134,11 +138,12 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
         address: address.trim(),
         city: city.trim(),
         state: stateVal.trim(),
+        country: country.trim(),
         pincode: pincode.trim(),
         is_head_office: !!isHeadOffice,
       };
       await onSave(payload, () => {
-        setCode(''); setName(''); setAddress(''); setCity(''); setStateVal(''); setPincode(''); setGstin(''); setIsHeadOffice(false);
+        setCode(''); setName(''); setAddress(''); setCity(''); setStateVal(''); setCountry('India'); setPincode(''); setGstin(''); setIsHeadOffice(false);
       }, setSaving);
     };
 
@@ -173,23 +178,46 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
             <div className="form-row two-col">
               <div>
                 <label>City</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+                {country === 'India' ? (
+                  <select value={city} onChange={(e) => setCity(e.target.value)}>
+                    <option value="">Select City</option>
+                    {citiesList.map((c, idx) => <option key={idx} value={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+                )}
               </div>
               <div>
                 <label>State</label>
-                <input value={stateVal} onChange={(e) => setStateVal(e.target.value)} placeholder="State" />
+                {country === 'India' ? (
+                  <select value={stateVal} onChange={(e) => setStateVal(e.target.value)}>
+                    <option value="">Select State</option>
+                    {Object.values(stateList).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input value={stateVal} onChange={(e) => setStateVal(e.target.value)} placeholder="State" />
+                )}
               </div>
             </div>
 
             <div className="form-row two-col">
               <div>
+                <label>Country</label>
+                <select value={country} onChange={(e) => setCountry(e.target.value)}>
+                  {countries.map(c => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label>Pincode</label>
                 <input value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="Pincode" />
               </div>
-              <div>
-                <label>GSTIN</label>
-                <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="GST Number" />
-              </div>
+            </div>
+
+            <div className="form-row">
+              <label>GSTIN</label>
+              <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="GST Number" />
             </div>
 
             <div className="form-row checkbox-row">
@@ -216,6 +244,7 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
     const [address, setAddress] = useState(branch.Address || branch.address || '');
     const [city, setCity] = useState(branch.City || branch.city || '');
     const [stateVal, setStateVal] = useState(branch.State || branch.state || '');
+    const [country, setCountry] = useState(branch.Country || branch.country || 'India');
     const [pincode, setPincode] = useState(branch.Pincode || branch.pincode || '');
     const [gstin, setGstin] = useState(branch.GSTNumber || branch.gst_number || branch.GST || branch.gst || '');
     const [isHeadOffice, setIsHeadOffice] = useState(!!(branch.IsHeadOffice || branch.is_head_office));
@@ -228,6 +257,7 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
       setAddress(branch.Address || branch.address || '');
       setCity(branch.City || branch.city || '');
       setStateVal(branch.State || branch.state || '');
+      setCountry(branch.Country || branch.country || 'India');
       setPincode(branch.Pincode || branch.pincode || '');
       setGstin(branch.GSTNumber || branch.gst_number || branch.GST || branch.gst || '');
       setIsHeadOffice(!!(branch.IsHeadOffice || branch.is_head_office));
@@ -246,6 +276,7 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
         address: address.trim(),
         city: city.trim(),
         state: stateVal.trim(),
+        country: country.trim(),
         pincode: pincode.trim(),
         is_head_office: !!isHeadOffice,
       };
@@ -283,23 +314,46 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
             <div className="form-row two-col">
               <div>
                 <label>City</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+                {country === 'India' ? (
+                  <select value={city} onChange={(e) => setCity(e.target.value)}>
+                    <option value="">Select City</option>
+                    {citiesList.map((c, idx) => <option key={idx} value={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+                )}
               </div>
               <div>
                 <label>State</label>
-                <input value={stateVal} onChange={(e) => setStateVal(e.target.value)} placeholder="State" />
+                {country === 'India' ? (
+                  <select value={stateVal} onChange={(e) => setStateVal(e.target.value)}>
+                    <option value="">Select State</option>
+                    {Object.values(stateList).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input value={stateVal} onChange={(e) => setStateVal(e.target.value)} placeholder="State" />
+                )}
               </div>
             </div>
 
             <div className="form-row two-col">
               <div>
+                <label>Country</label>
+                <select value={country} onChange={(e) => setCountry(e.target.value)}>
+                  {countries.map(c => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label>Pincode</label>
                 <input value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="Pincode" />
               </div>
-              <div>
-                <label>GSTIN</label>
-                <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="GST Number" />
-              </div>
+            </div>
+
+            <div className="form-row">
+              <label>GSTIN</label>
+              <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="GST Number" />
             </div>
 
             <div className="form-row checkbox-row">
@@ -410,7 +464,7 @@ export default function BranchManager({ isOpen = false, onClose = () => {} }) {
                   <div className="branch-row branch-company">{(companies.find(c => (c.ID || c.id) === (it.CompanyID || it.company_id)) || {}).Name || (companies.find(c => (c.ID || c.id) === (it.CompanyID || it.company_id)) || {}).name || 'Company #' + (it.CompanyID || it.company_id)}</div>
                   <div className="branch-row branch-code-name"><span className="branch-code">{it.Code || it.code}</span>-<span className="branch-name">{it.Name || it.name || it.BranchName}</span></div>
                   {it.Address || it.address ? <div className="branch-row branch-address">{it.Address || it.address}</div> : null}
-                  <div className="branch-row branch-city-state">{it.City || it.city}{it.City || it.city ? ',' : ''} {it.State || it.state}</div>
+                  <div className="branch-row branch-city-state">{[it.City || it.city, it.State || it.state, it.Country || it.country].filter(Boolean).join(', ')}</div>
                   <div className="branch-row branch-pincode">{it.Pincode || it.pincode}</div>
                   <div className="branch-row branch-gst">{it.GSTNumber || it.gst_number || it.GST || it.gst}</div>
                 </div>

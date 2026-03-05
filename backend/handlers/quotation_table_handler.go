@@ -484,9 +484,61 @@ func GetAllQuotationsTable(c *fiber.Ctx) error {
 	limit := c.QueryInt("limit", 10)
 	offset := (page - 1) * limit
 
-	if err := quotationTableDB.
+	// Optional filters
+	customerID := c.Query("customer_id")
+	yearRange := c.Query("year_range") // e.g., "2025-2026"
+	docType := c.Query("doc_type")     // e.g., "Quotation", "Proforma Invoice", etc.
+
+	query := quotationTableDB.
 		// Exclude quotations that are saved as templates
-		Where("quotation_id NOT IN (SELECT template_quotation_id FROM qutation_templates)").
+		Where("quotation_id NOT IN (SELECT template_quotation_id FROM qutation_templates)")
+
+	// Filter by customer_id if provided
+	if customerID != "" {
+		query = query.Where("customer_id = ?", customerID)
+	}
+
+	// Filter by document type if provided
+	if docType != "" && docType != "All" {
+		query = query.Where("document_type = ? OR type = ?", docType, docType)
+	}
+
+	// Filter by year range if provided (e.g., "2025-2026" means April 2025 to March 2026)
+	if yearRange != "" {
+		parts := strings.Split(yearRange, "-")
+		if len(parts) == 2 {
+			startYear := parts[0]
+			endYear := parts[1]
+			// Financial year: April of start year to March of end year
+			startDate := fmt.Sprintf("%s-04-01", startYear)
+			endDate := fmt.Sprintf("%s-03-31", endYear)
+			query = query.Where("quotation_date >= ? AND quotation_date <= ?", startDate, endDate)
+		}
+	}
+
+	// Get total count for pagination
+	var total int64
+	countQuery := quotationTableDB.Model(&models.QuotationTable{}).
+		Where("quotation_id NOT IN (SELECT template_quotation_id FROM qutation_templates)")
+	if customerID != "" {
+		countQuery = countQuery.Where("customer_id = ?", customerID)
+	}
+	if docType != "" && docType != "All" {
+		countQuery = countQuery.Where("document_type = ? OR type = ?", docType, docType)
+	}
+	if yearRange != "" {
+		parts := strings.Split(yearRange, "-")
+		if len(parts) == 2 {
+			startYear := parts[0]
+			endYear := parts[1]
+			startDate := fmt.Sprintf("%s-04-01", startYear)
+			endDate := fmt.Sprintf("%s-03-31", endYear)
+			countQuery = countQuery.Where("quotation_date >= ? AND quotation_date <= ?", startDate, endDate)
+		}
+	}
+	countQuery.Count(&total)
+
+	if err := query.
 		Preload("Series").
 		Preload("CompanyBranch").
 		Preload("CompanyBranchBank").
@@ -507,6 +559,7 @@ func GetAllQuotationsTable(c *fiber.Ctx) error {
 		"data":  quotations,
 		"page":  page,
 		"limit": limit,
+		"total": total,
 	})
 }
 
@@ -629,10 +682,21 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Quotation not found"})
 	}
 
-	// Update main quotation fields (avoid changing primary key)
+	// Update main quotation fields using Updates for most fields
 	if err := tx.Model(&existing).Updates(req.Quotation).Error; err != nil {
 		tx.Rollback()
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Explicitly update JSON fields (GORM's Updates may not handle JSON fields properly)
+	// We need to use Select to force update even if the value appears unchanged
+	if err := tx.Model(&existing).Select("terms_and_conditions", "extra_charges", "discounts").Updates(map[string]interface{}{
+		"terms_and_conditions": req.Quotation.TermsAndConditions,
+		"extra_charges":        req.Quotation.ExtraCharges,
+		"discounts":            req.Quotation.Discounts,
+	}).Error; err != nil {
+		tx.Rollback()
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update JSON fields: " + err.Error()})
 	}
 
 	// Replace quotation items if provided

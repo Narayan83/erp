@@ -1,8 +1,9 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type Integration struct {
@@ -16,7 +17,7 @@ type Integration struct {
 	Provider string `json:"provider"`
 	// razorpay | stripe | phonepe | cashfree | upi | gmail | outlook | indiamart | tradeindia | justdial | 99acres | custom
 
-	Config json.RawMessage `gorm:"type:jsonb" json:"config"` // Stores key-value pairs or structured JSON configuration (e.g., API keys, SMTP settings)
+	Config datatypes.JSON `gorm:"type:jsonb" json:"config"` // Stores key-value pairs or structured JSON configuration (e.g., API keys, SMTP settings)
 
 	IsActive bool `json:"is_active"`
 

@@ -2,8 +2,10 @@ import React from "react";
 import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function SizeTable({ data, onEdit, onDelete, page = 0, rowsPerPage = 5 }) {
+  const { perms } = useAuth();
   return (
     <TableContainer component={Paper}>
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
@@ -24,8 +26,12 @@ export default function SizeTable({ data, onEdit, onDelete, page = 0, rowsPerPag
               <TableCell align="center" sx={{ py: 0.5, width: 200 }}>{size.code}</TableCell>
               <TableCell align="center" sx={{ py: 0.5, width: 'auto' }}>{size.description}</TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(size)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(size)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(size)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(size)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}

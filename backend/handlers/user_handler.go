@@ -555,9 +555,13 @@ func GetUsers(c *fiber.Ctx) error {
 			query = query.Where("is_dealer = ?", true)
 		case "distributor":
 			query = query.Where("is_distributor = ?", true)
+		case "employee":
+			query = query.Where("is_employee = ?", true)
+		case "all":
+			// No filter, show everyone
 		}
 	} else {
-		// When no user type filter, exclude employees to keep user list separate
+		// Default: exclude employees to keep user list separate (use user_type=all to include them)
 		query = query.Where("is_employee = ?", false)
 	}
 

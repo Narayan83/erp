@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FaSearch, FaFileExport } from 'react-icons/fa';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import './noreports.scss';
 
 const NoReports = () => {
@@ -31,10 +31,10 @@ const NoReports = () => {
       setLoading(true);
       try {
         const [leadsResp, interResp, followResp, empsResp] = await Promise.all([
-          fetch(`${BASE_URL}/api/leads?page=1&limit=1000`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/lead-interactions`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/lead-followups`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/employees?page=1&limit=1000`).then(r => r.json())
+          fetch(`${BASE_URL}/api/leads?page=1&limit=1000`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/lead-followups`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/employees?page=1&limit=1000`, { headers: getAuthHeaders() }).then(r => r.json())
         ]);
 
         const leadsArr = Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []);

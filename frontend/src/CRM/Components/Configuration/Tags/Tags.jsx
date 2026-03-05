@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
+import { getAuthHeaders } from '../../../../config/Config';
 import '../Sources/sources.scss';
 
 const apiBase = '/api';
@@ -18,7 +19,7 @@ const Tags = ({ isOpen, onClose }) => {
   const fetchTags = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/crm-tags`);
+      const res = await fetch(`${apiBase}/crm-tags`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setItems(data || []);
@@ -33,7 +34,7 @@ const Tags = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { code: genCode(newTitle), title: newTitle };
-      const res = await fetch(`${apiBase}/crm-tags`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/crm-tags`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Create failed'); }
       const created = await res.json();
       setItems(prev => [...prev, created]);
@@ -44,7 +45,7 @@ const Tags = ({ isOpen, onClose }) => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this tag?')) return;
     try {
-      const res = await fetch(`${apiBase}/crm-tags/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${apiBase}/crm-tags/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Delete failed');
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) { console.error(err); alert('Failed to delete tag'); }
@@ -58,7 +59,7 @@ const Tags = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const payload = { title, code };
-      const res = await fetch(`${apiBase}/crm-tags/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${apiBase}/crm-tags/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Update failed'); }
       const updated = await res.json();
       setItems(prev => prev.map(i => i.id === updated.ID || i.id === updated.id ? updated : i));

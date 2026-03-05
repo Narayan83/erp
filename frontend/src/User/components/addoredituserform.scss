@@ -35,11 +35,6 @@ $spacing-xl: 32px;
   }
 }
 
-/* Neutralize MUI Container margin-top when a generated class is present */
-.css-uowltm-MuiContainer-root {
-  margin-top: 0 !important;
-}
-
 // ============ TABS ============
 .form-tabs-wrapper {
   border-bottom: 2px solid $border-color;
@@ -117,6 +112,27 @@ $spacing-xl: 32px;
 
   @media (max-width: 768px) {
     grid-template-columns: repeat(6, 1fr);
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ============ FIVE COLUMN GRID (used for Bank & Authentication sections) ============
+.five-col-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: $spacing-md;
+
+  > .grid-col,
+  > .form-field {
+    grid-column: auto !important;
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   @media (max-width: 480px) {
@@ -398,25 +414,23 @@ $spacing-xl: 32px;
     padding-right: 44px;
   }
 
-  /* Keep compatibility with both class names used across forms */
-  .password-toggle,
-  .password-toggle-btn {
+  .password-toggle {
     position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 10px;
+    top: 20%;
     background: none;
     border: none;
     cursor: pointer;
-    color: $primary-color;
+    color: $text-secondary;
     padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
 
     &:hover {
-      opacity: 0.7;
+      outline: none;
+      transform: none;
+      box-shadow: none;
     }
 
     svg {
@@ -823,48 +837,32 @@ $spacing-xl: 32px;
     padding: $spacing-sm;
     border-top: 1px solid $border-color;
 
-    /* Make action buttons more visible and easier to tap/click */
     button {
-      background: transparent;
+      background: none;
       border: none;
       cursor: pointer;
       color: $primary-color;
-      padding: 0px !important;
-      min-width: 40px;
-      min-height: 40px;
-      border-radius: $radius;
-      display: inline-flex;
+      padding: 4px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      transition:
-        background-color 0.12s ease,
-        color 0.12s ease,
-        transform 0.06s ease;
+      transition: color 0.3s ease;
 
       &:hover {
-        background: rgba($primary-color, 0.08);
         color: $primary-dark;
-      }
-
-      &:focus {
-        outline: 2px solid rgba($primary-color, 0.18);
-        outline-offset: 2px;
       }
 
       &.delete {
         color: $error-color;
 
         &:hover {
-          background: rgba($error-color, 0.08);
           color: $error-light;
         }
       }
 
-      /* Larger icons for better visibility */
       svg {
-        width: 22px;
-        height: 22px;
-        display: block;
+        width: 18px;
+        height: 18px;
       }
     }
   }

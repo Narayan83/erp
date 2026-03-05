@@ -7,11 +7,11 @@ import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
 import { BASE_URL }  from "../../../config/Config";
 import "./category.scss";
+import {useAuth} from "../../../context/AuthContext";
 
 export default function CategoryPage() {
+  const { perms } = useAuth();
   const [categories, setCategories] = useState([]);
-
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -103,6 +103,7 @@ export default function CategoryPage() {
           />
         </div>
         <div className="add-button-wrapper">
+          {perms?.can_create && (
           <button 
             className="btn-add" 
             onClick={() => setDialogOpen(true)}
@@ -110,6 +111,7 @@ export default function CategoryPage() {
           >
             Add Category
           </button>
+          )}
         </div>
       </div>
 

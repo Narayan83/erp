@@ -260,3 +260,67 @@
   text-overflow: ellipsis;
   max-width: 320px;
 }
+
+.business-interactions {
+  margin-top: 10px;
+}
+.business-interactions .bi-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #666;
+}
+.interaction-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* show only one interaction by default and allow scrolling for older items */
+  max-height: 80px; /* approx height of one .interaction-item */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.interaction-item {
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 8px;
+  border-radius: 4px;
+  min-height: 60px; /* keep a consistent single-item height */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.interaction-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #666;
+  font-weight: 600;
+}
+.interaction-date,
+.interaction-time {
+  color: rgb(255, 115, 0);
+}
+.interaction-type {
+  margin-left: auto;
+  background: #f1f6f9;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: #3b4b57;
+}
+.interaction-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #444;
+  /* allow multi-line wrapped notes (show full content) */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+  max-width: 100%;
+  word-break: break-word;
+  line-height: 1.4;
+}

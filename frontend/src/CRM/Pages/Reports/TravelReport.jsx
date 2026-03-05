@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaSearch, FaFileExport } from 'react-icons/fa';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import './travelreport.scss';
 
 const formatTime12 = (iso) => {
@@ -75,9 +75,9 @@ const TravelReport = () => {
       setLoading(true);
       try {
         const [interResp, leadsResp, empsResp] = await Promise.all([
-          fetch(`${BASE_URL}/api/lead-interactions`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/leads?page=1&limit=1000`).then(r => r.json()),
-          fetch(`${BASE_URL}/api/employees?page=1&limit=1000`).then(r => r.json())
+          fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/leads?page=1&limit=1000`, { headers: getAuthHeaders() }).then(r => r.json()),
+          fetch(`${BASE_URL}/api/employees?page=1&limit=1000`, { headers: getAuthHeaders() }).then(r => r.json())
         ]);
 
         const interArr = Array.isArray(interResp) ? interResp : (interResp && interResp.data ? interResp.data : []);

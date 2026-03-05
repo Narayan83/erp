@@ -77,7 +77,7 @@ export default function StoreDialog({ open, onClose, store, onSuccess }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{store ? "Edit Store" : "Add Store"}</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           <Controller
             name="name"

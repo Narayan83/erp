@@ -74,6 +74,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
   const formRef = React.useRef(null);
 
   // When mounted, enforce autocomplete/off and add hidden dummy username/password inputs
+  // AGGRESSIVE: Use readonly trick to completely prevent browser suggestions
   React.useEffect(() => {
     const form = formRef.current;
     if (!form) return;
@@ -106,10 +107,40 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
     const elems = form.querySelectorAll('input, textarea, select');
     elems.forEach((el) => {
       try {
-        el.setAttribute('autocomplete', 'off');
-        el.setAttribute('autocorrect', 'off');
-        el.setAttribute('autocapitalize', 'off');
-        el.setAttribute('spellcheck', 'false');
+        // Skip Material-UI Autocomplete inputs
+        const isMuiAutocomplete = el.closest('.MuiAutocomplete-root');
+        if (!isMuiAutocomplete) {
+          // Multiple autocomplete prevention strategies
+          el.setAttribute('autocomplete', 'off');
+          el.setAttribute('autocomplete', 'nope');
+          el.setAttribute('autocomplete', 'new-password');
+          el.setAttribute('autocorrect', 'off');
+          el.setAttribute('autocapitalize', 'off');
+          el.setAttribute('spellcheck', 'false');
+          el.setAttribute('data-lpignore', 'true');
+          el.setAttribute('data-1p-ignore', 'true');
+          el.setAttribute('data-bwignore', 'true');
+          
+          // AGGRESSIVE: Apply readonly trick - prevents browser from showing suggestions
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.setAttribute('readonly', 'readonly');
+            
+            // Remove readonly on focus
+            const focusHandler = function() {
+              this.removeAttribute('readonly');
+            };
+            
+            // Re-apply readonly on blur
+            const blurHandler = function() {
+              setTimeout(() => {
+                this.setAttribute('readonly', 'readonly');
+              }, 100);
+            };
+            
+            el.addEventListener('focus', focusHandler);
+            el.addEventListener('blur', blurHandler);
+          }
+        }
       } catch (e) {
         // ignore
       }
@@ -1452,6 +1483,7 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
     <>
       <form
         ref={formRef}
+        autoComplete="off"
         onSubmitCapture={(e) => { e.preventDefault(); handleSubmit(onSubmit)(); }}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); } }}
       >
@@ -1913,8 +1945,8 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                       className={errors.state ? 'error' : ''}
                     >
                       <option value="">Select State</option>
-                      {indiaStates.map((s) => (
-                        <option key={s} value={s}>
+                      {indiaStates.map((s, i) => (
+                        <option key={`${s}_${i}`} value={s}>
                           {s}
                         </option>
                       ))}
@@ -2035,8 +2067,8 @@ const AddOrEditEmployeeForm = ({ defaultValues = null, onSubmitUser }) => {
                       className={errors.residential_state ? 'error' : ''}
                     >
                       <option value="">Select State</option>
-                      {indiaStates.map((s) => (
-                        <option key={s} value={s}>
+                      {indiaStates.map((s, i) => (
+                        <option key={`${s}_${i}`} value={s}>
                           {s}
                         </option>
                       ))}

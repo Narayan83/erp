@@ -120,6 +120,8 @@ export default function PrintHeader({ show = false, onClose = () => {}, onSave =
       setFileName(draft?.header_title || fileName);
       // notify parent
       onSave(created);
+      // broadcast so other open pages/components pick up the change immediately
+      try { window.dispatchEvent(new CustomEvent('printerHeader:changed', { detail: created })); } catch (err) { /* ignore */ }
       onClose();
     } catch (e) {
       console.error('Failed to save header', e);

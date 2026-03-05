@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import axios from 'axios';
 import { BASE_URL } from '../../../config/Config';
 import countries from '../../../User/utils/countries.js';
 import stateList from '../../../User/utils/state_list.json';
@@ -38,6 +39,19 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const [leads, setLeads] = useState([]);
   const [products, setProducts] = useState([]);
   const [saveError, setSaveError] = useState('');
+  const [isProductOthers, setIsProductOthers] = useState(false);
+  const [sourceOptions, setSourceOptions] = useState([]);
+  const [tagsOptions, setTagsOptions] = useState([]);
+  const [assignedToOptions, setAssignedToOptions] = useState(Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : []);
+
+  // Helper function to normalize mobile number to 10 digits
+  const normalizeMobile = (mobile) => {
+    if (!mobile) return '';
+    // Remove all non-digit characters
+    const digits = mobile.replace(/[^0-9]/g, '');
+    // Take last 10 digits (handles cases like +91 prefix, 0 prefix, etc.)
+    return digits.slice(-10);
+  };
 
   useEffect(() => {
     if (leadData) {
@@ -64,8 +78,17 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         if (typeof leadData.assignedTo === 'number') {
           assignedToId = leadData.assignedTo;
         } else if (typeof leadData.assignedTo === 'string') {
-          const found = assignedToOptions.find(opt => opt.name === leadData.assignedTo);
-          assignedToId = found ? found.id : '';
+          // Try to match by ID first (if it's a numeric string)
+          const asNum = Number(leadData.assignedTo);
+          if (!isNaN(asNum)) {
+            assignedToId = asNum;
+          } else {
+            // Try to match by name (case-insensitive)
+            const found = assignedToOptions.find(opt => 
+              opt.name && opt.name.toLowerCase() === leadData.assignedTo.toLowerCase()
+            );
+            assignedToId = found ? found.id : '';
+          }
         } else if (typeof leadData.assignedTo === 'object' && leadData.assignedTo !== null) {
           assignedToId = leadData.assignedTo.id || '';
         }
@@ -77,11 +100,19 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       let productId = '';
       if (leadData.product) {
         if (typeof leadData.product === 'number' || typeof leadData.product === 'string') {
-          // If it's a number or string, check if it matches a product in the list
-          const found = products.find(
-            p => p.ID === leadData.product || p.id === leadData.product || p.Name === leadData.product || p.name === leadData.product
-          );
-          productId = found ? (found.ID || found.id) : leadData.product;
+          // If it's a number or numeric string, try to find by ID
+          const asNum = Number(leadData.product);
+          if (!isNaN(asNum)) {
+            const found = products.find(p => p.ID === asNum || p.id === asNum);
+            productId = found ? (found.ID || found.id) : asNum;
+          } else {
+            // If it's a non-numeric string, try to find by name (case-insensitive)
+            const found = products.find(
+              p => (p.Name && p.Name.toLowerCase() === leadData.product.toLowerCase()) ||
+                   (p.name && p.name.toLowerCase() === leadData.product.toLowerCase())
+            );
+            productId = found ? (found.ID || found.id) : leadData.product;
+          }
         } else if (typeof leadData.product === 'object' && leadData.product !== null) {
           productId = leadData.product.ID || leadData.product.id || '';
         }
@@ -95,7 +126,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         firstName,
         lastName,
         designation: leadData.designation || '',
-        mobile: leadData.mobile || '',
+        mobile: normalizeMobile(leadData.mobile || ''),
         email: leadData.email || '',
         website: leadData.website || '',
         addressLine1: leadData.addressLine1 || leadData.AddressLine1 || leadData.addressLine1 || '',
@@ -143,7 +174,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         tags: ''
       });
     }
-  }, [leadData, isOpen, products]);
+  }, [leadData, isOpen, products, assignedToOptions]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -158,11 +189,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     // Clear related error if the field becomes valid/fills
     setErrors(prev => {
       const next = { ...prev };
-      // Name uses two fields
-      if (name === 'firstName' || name === 'lastName') {
-        const first = name === 'firstName' ? newValue : formData.firstName;
-        const last = name === 'lastName' ? newValue : formData.lastName;
-        if (String(first).trim() && String(last).trim()) delete next.name;
+      // Name: only firstName is required
+      if (name === 'firstName') {
+        if (String(newValue).trim()) delete next.name;
+        return next;
+      }
+      if (name === 'lastName') {
+        // lastName is optional, no validation needed
         return next;
       }
 
@@ -198,8 +231,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       newErrors.business = 'Business is required';
     }
     
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      newErrors.name = 'Full name is required';
+    if (!formData.firstName.trim()) {
+      newErrors.name = 'First name is required';
     }
     
     if (!formData.mobile.trim()) {
@@ -241,9 +274,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     }
 
     // Validate product (required). Allow matching by id or name (case-insensitive)
+    // If "Others" is selected (isProductOthers), allow any non-empty custom product name
     if (!formData.product || !String(formData.product).trim()) {
       newErrors.product = 'Product is required';
-    } else {
+    } else if (!isProductOthers) {
       const matchProduct = products.some(p =>
         String(p.ID) === String(formData.product) ||
         String(p.id) === String(formData.product) ||
@@ -260,33 +294,28 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   // Fetch all leads from backend
   const fetchLeads = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/leads`);
-      const data = await res.json();
-      setLeads(data.data || []);
+      const res = await axios.get(`${BASE_URL}/api/leads`);
+      setLeads(res.data.data || res.data || []);
     } catch (err) {
-      // handle error
+      console.error('Error fetching leads:', err);
     }
   };
 
   // Fetch products from backend
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/products?page=1&limit=1000`);
-      const data = await res.json();
-      setProducts(data.data || []);
+      const res = await axios.get(`${BASE_URL}/api/products`, { params: { page: 1, limit: 1000 } });
+      const productList = res.data.data || res.data || [];
+      setProducts(Array.isArray(productList) ? productList : []);
     } catch (err) {
+      console.error('Error fetching products:', err);
       setProducts([]);
     }
   };
 
   useEffect(() => {
     fetchLeads();
-    // Prefer products passed from parent; fallback to fetching if parentProducts empty
-    if (Array.isArray(parentProducts) && parentProducts.length > 0) {
-      setProducts(parentProducts);
-    } else {
-      fetchProducts();
-    }
+    fetchProducts();
   }, []);
 
   // Add new lead to backend
@@ -295,7 +324,10 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     setSaveError('');
     if (validateForm()) {
       try {
-        const contact = `${formData.prefix} ${formData.firstName} ${formData.lastName}`.trim();
+        // Normalize mobile number before saving
+        const normalizedMobile = normalizeMobile(formData.mobile);
+        
+        const contact = `${formData.prefix} ${formData.firstName}${formData.lastName ? ' ' + formData.lastName : ''}`.trim();
         
         // Resolve assigned_to_id from numeric id or name
         let assigned_to_id = undefined;
@@ -310,25 +342,32 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         }
 
         // Resolve product_id from numeric id or name
+        // If "Others" is selected (isProductOthers), use the custom product name without resolving to an ID
         let product_id = undefined;
         let productName = '';
         if (formData.product && formData.product !== '') {
-          const asNum = Number(formData.product);
-          if (!isNaN(asNum)) {
-            product_id = asNum;
-            // Find product name by ID
-            const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
-            productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+          if (isProductOthers) {
+            // Custom product entered by user - no product_id, just use the name
+            productName = formData.product;
+            product_id = undefined;
           } else {
-            const found = products.find(p =>
-              String(p.ID) === String(formData.product) ||
-              String(p.id) === String(formData.product) ||
-              (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
-              (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
-            );
-            if (found) {
-              product_id = found.ID || found.id;
-              productName = found.Name || found.name || '';
+            const asNum = Number(formData.product);
+            if (!isNaN(asNum)) {
+              product_id = asNum;
+              // Find product name by ID
+              const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
+              productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
+            } else {
+              const found = products.find(p =>
+                String(p.ID) === String(formData.product) ||
+                String(p.id) === String(formData.product) ||
+                (p.Name && p.Name.toLowerCase() === String(formData.product).toLowerCase()) ||
+                (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
+              );
+              if (found) {
+                product_id = found.ID || found.id;
+                productName = found.Name || found.name || '';
+              }
             }
           }
         }
@@ -342,7 +381,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           contact,
           name: contact, // Include both for backend compatibility
           designation: formData.designation,
-          mobile: formData.mobile,
+          mobile: normalizedMobile,
           email: formData.email,
           city: formData.city,
           state: formData.state,
@@ -405,73 +444,64 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
               }
             });
 
-            const res = await fetch(`${BASE_URL}/api/leads`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-            if (res && res.ok) {
-              const created = await res.json().catch(() => null);
-              // transfer starred flag from imported id to new backend id
-              try {
-                const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
-                if (starredMap && leadData.id && starredMap[leadData.id]) {
-                  if (created && created.id) {
-                    starredMap[created.id] = true;
-                  }
-                  delete starredMap[leadData.id];
-                  localStorage.setItem('starredLeads', JSON.stringify(starredMap));
+            const res = await axios.post(`${BASE_URL}/api/leads`, payload);
+            const created = res.data;
+            // transfer starred flag from imported id to new backend id
+            try {
+              const starredMap = JSON.parse(localStorage.getItem('starredLeads') || '{}');
+              if (starredMap && leadData.id && starredMap[leadData.id]) {
+                if (created && created.id) {
+                  starredMap[created.id] = true;
                 }
-              } catch (e) {}
-              // remove the imported lead from localStorage if present
-              try {
-                const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
-                const updated = imported.filter(l => l.id !== leadData.id);
-                localStorage.setItem('importedLeads', JSON.stringify(updated));
-              } catch (e) {
-                // ignore localStorage errors
+                delete starredMap[leadData.id];
+                localStorage.setItem('starredLeads', JSON.stringify(starredMap));
               }
-              if (typeof onAddLeadSubmit === 'function') {
-                // pass created lead back to parent so it can update its table immediately
-                onAddLeadSubmit(created || null);
-              }
-              setFormData({
-                business: '',
-                prefix: 'Mr.',
-                firstName: '',
-                lastName: '',
-                designation: '',
-                mobile: '',
-                email: '',
-                website: '',
-                addressLine1: '',
-                addressLine2: '',
-                country: '',
-                city: '',
-                state: '',
-                gstin: '',
-                source: '',
-                since: '',
-                requirement: '',
-                category: '',
-                product: '',
-                potential: '',
-                assignedTo: '',
-                stage: '',
-                notes: '',
-                tags: ''
-              });
-              setErrors({});
-              onClose();
-              return;
-            } else {
-              const err = await res.json().catch(() => ({ error: 'Failed to save imported lead' }));
-              setSaveError(err.error || 'Failed to save imported lead');
-              return;
+            } catch (e) {}
+            // remove the imported lead from localStorage if present
+            try {
+              const imported = JSON.parse(localStorage.getItem('importedLeads') || '[]') || [];
+              const updated = imported.filter(l => l.id !== leadData.id);
+              localStorage.setItem('importedLeads', JSON.stringify(updated));
+            } catch (e) {
+              // ignore localStorage errors
             }
+            if (typeof onAddLeadSubmit === 'function') {
+              // pass created lead back to parent so it can update its table immediately
+              onAddLeadSubmit(created || null);
+            }
+            setFormData({
+              business: '',
+              prefix: 'Mr.',
+              firstName: '',
+              lastName: '',
+              designation: '',
+              mobile: '',
+              email: '',
+              website: '',
+              addressLine1: '',
+              addressLine2: '',
+              country: '',
+              city: '',
+              state: '',
+              gstin: '',
+              source: '',
+              since: '',
+              requirement: '',
+              category: '',
+              product: '',
+              potential: '',
+              assignedTo: '',
+              stage: '',
+              notes: '',
+              tags: ''
+            });
+            setErrors({});
+            onClose();
+            return;
           } catch (err) {
             console.error('Error saving imported lead to backend:', err);
-            setSaveError('Error saving imported lead to backend.');
+            const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Error saving imported lead to backend.';
+            setSaveError(errorMsg);
             return;
           }
         }
@@ -479,142 +509,90 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         let res;
         if (leadData && leadData.id) {
           // Edit mode: send PUT request for backend leads only
-          res = await fetch(`${BASE_URL}/api/leads/${leadData.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
+          res = await axios.put(`${BASE_URL}/api/leads/${leadData.id}`, payload);
         }
         if (!leadData || !leadData.id) {
           // Add mode: send POST request
-          res = await fetch(`${BASE_URL}/api/leads`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
+          res = await axios.post(`${BASE_URL}/api/leads`, payload);
         }
         
-        if (res && res.ok) {
-          const created = await res.json().catch(() => null);
-          await fetchLeads();
-          setFormData({
-            business: '',
-            prefix: '',
-            firstName: '',
-            lastName: '',
-            designation: '',
-            mobile: '',
-            email: '',
-            website: '',
-            addressLine1: '',
-            addressLine2: '',
-            country: '',
-            city: '',
-            state: '',
-            gstin: '',
-            source: '',
-            since: '',
-            requirement: '',
-            category: '',
-            product: '',
-            potential: '',
-            assignedTo: '',
-            stage: '',
-            notes: '',
-            tags: ''
-          });
-          setErrors({});
-          setSaveError('');
-          if (typeof onAddLeadSubmit === 'function') {
-            onAddLeadSubmit(created || null);
-          }
-          onClose();
-        } else if (res && !res.ok) {
-          const errorData = await res.json().catch(() => ({ error: 'Failed to save lead' }));
-          const errorMessage = errorData.error || 'Failed to save lead';
-          const detail = errorData.detail ? `: ${errorData.detail}` : '';
-          const combined = errorMessage + detail;
-          setSaveError(combined.includes('foreign key constraint') ?
-            'Error: Invalid assignment. Please select a valid assignee.' :
-            combined);
+        const created = res.data;
+        await fetchLeads();
+        setFormData({
+          business: '',
+          prefix: '',
+          firstName: '',
+          lastName: '',
+          designation: '',
+          mobile: '',
+          email: '',
+          website: '',
+          addressLine1: '',
+          addressLine2: '',
+          country: '',
+          city: '',
+          state: '',
+          gstin: '',
+          source: '',
+          since: '',
+          requirement: '',
+          category: '',
+          product: '',
+          potential: '',
+          assignedTo: '',
+          stage: '',
+          notes: '',
+          tags: ''
+        });
+        setErrors({});
+        setSaveError('');
+        if (typeof onAddLeadSubmit === 'function') {
+          onAddLeadSubmit(created || null);
         }
+        onClose();
       } catch (err) {
         console.error('Error saving lead:', err);
-        setSaveError('Error saving lead. Please try again.');
+        const errorData = err.response?.data || {};
+        const errorMessage = errorData.error || errorData.message || 'Failed to save lead';
+        const detail = errorData.detail ? `: ${errorData.detail}` : '';
+        const combined = errorMessage + detail;
+        setSaveError(combined.includes('foreign key constraint') ?
+          'Error: Invalid assignment. Please select a valid assignee.' :
+          combined);
       }
     }
   };
 
   const prefixOptions = ['Mr.', 'Ms.', 'Mrs.'];
-  const [sourceOptions, setSourceOptions] = useState([]);
-  const [tagsOptions, setTagsOptions] = useState([]);
   const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
-  const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
-  // Use assignedToOptions passed from parent (TopMenu) or fetch employees if not provided
-  const [assignedToOptions, setAssignedToOptions] = useState(Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : []);
+  const stageOptions = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
 
   // Fetch employees to populate the Assigned To dropdown.
-  // Always fetch from backend and merge any valid parent-provided options,
-  // but filter out obvious sample/test placeholder entries.
+  // Fetch from backend and use fetched employees as the authoritative list.
   const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/employees?page=1&limit=1000`);
-      const json = await res.json();
-      const list = json.data || [];
+      const res = await axios.get(`${BASE_URL}/api/employees`, { params: { page: 1, limit: 1000 } });
+      const list = res.data.data || res.data || [];
 
-      const mapped = list.map(u => ({
-        id: u.id,
-        name: [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || String(u.id)
-      }));
+      const mapped = (Array.isArray(list) ? list : [])
+        .filter(u => u && u.id) // Only include valid employees with IDs
+        .map(u => ({
+          id: u.id,
+          name: [u.salutation, u.firstname, u.lastname].filter(Boolean).join(' ').trim() || u.usercode || u.username || String(u.id)
+        }))
+        .filter(m => m.name && m.name.trim().length > 0); // Only include employees with valid names
 
-      // Merge parentProvided options if valid and not duplicates
-      const finalMap = new Map();
-      mapped.forEach(m => finalMap.set(String(m.id), m));
-
-      if (Array.isArray(parentAssignedToOptions)) {
-        parentAssignedToOptions.forEach(p => {
-          const pid = String(p?.id || '');
-          const pname = (p?.name || '').trim();
-          // Accept parent-provided option only if it has a numeric id and non-empty name
-          if (pid && !isNaN(Number(pid)) && pname) {
-            if (!finalMap.has(pid)) finalMap.set(pid, { id: Number(pid), name: pname });
-          }
-        });
-      }
-
-      // Filter out placeholder/sample entries and obvious dummy values (abc, xyz, numeric-only like 123)
-      const PLACEHOLDERS = new Set(['sample','test','example','abc','xyz','demo','123','000']);
-
-      const filtered = Array.from(finalMap.values()).filter(item => {
-        const name = (item.name || '').toLowerCase().trim();
-        if (!name) return false;
-
-        // Direct placeholder matches
-        if (PLACEHOLDERS.has(name)) return false;
-
-        // Numeric-only values (eg. "123")
-        if (/^[0-9]+$/.test(name)) return false;
-
-        // Common short placeholder patterns (e.g., 'abc', 'xyz') already covered above.
-        // Also exclude gibberish single-letter or 2-letter uppercase tokens if needed
-        // (but be conservative to avoid removing real short names):
-        if (/^[a-z]{1,2}$/.test(name)) return false;
-
-        return true;
-      });
-
-      setAssignedToOptions(filtered);
+      setAssignedToOptions(mapped);
     } catch (err) {
-      // fallback to empty
+      console.error('Error fetching employees:', err);
       setAssignedToOptions([]);
     }
   };
 
   const fetchSources = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/lead-sources`);
-      if (!res.ok) throw new Error('Failed to fetch sources');
-      const data = await res.json();
+      const res = await axios.get(`${BASE_URL}/api/lead-sources`);
+      const data = res.data;
       if (Array.isArray(data)) {
         setSourceOptions(data.map(s => s.name || s.Name));
       }
@@ -625,9 +603,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
 
   const fetchTags = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/crm-tags`);
-      if (!res.ok) throw new Error('Failed to fetch tags');
-      const data = await res.json();
+      const res = await axios.get(`${BASE_URL}/api/crm-tags`);
+      const data = res.data;
       if (Array.isArray(data)) {
         setTagsOptions(data.map(t => t.title || t.Title));
       }
@@ -637,9 +614,9 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   };
 
   useEffect(() => {
-    // Always fetch live employees and merge / sanitize parent-provided options
+    // Always fetch live employees from backend
     fetchEmployees();
-  }, [parentAssignedToOptions]);
+  }, []);
 
   // Fetch sources and tags from backend on mount/open
   useEffect(() => {
@@ -654,10 +631,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const stateOptions = Object.entries(stateList).map(([code, name]) => ({ value: name, label: name }));
   const cityOptions = cities.map(city => ({ value: city, label: city }));
 
-  const productOptions = products.map(p => ({
-    value: p.ID || p.id || (p.Name || p.name) || '',
-    label: `${p.Name || p.name || p.ID || p.id}${p.Code ? ` (${p.Code})` : ''}`
-  }));
+  const productOptions = [
+    ...products.map(p => ({
+      value: p.ID || p.id || (p.Name || p.name) || '',
+      label: `${p.Name || p.name || p.ID || p.id}${p.Code ? ` (${p.Code})` : ''}`
+    })),
+    { value: 'others', label: 'Others' }
+  ];
 
   const assignedOptions = assignedToOptions.map(a => ({
     value: a.id,
@@ -667,8 +647,25 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const selectedCountryOption = countryOptions.find(o => o.value === formData.country) || null;
   const selectedStateOption = stateOptions.find(o => o.value === formData.state) || null;
   const selectedCityOption = cityOptions.find(o => o.value === formData.city) || null;
-  const selectedProductOption = productOptions.find(o => String(o.value) === String(formData.product)) || null;
-  const selectedAssignedOption = assignedOptions.find(o => String(o.value) === String(formData.assignedTo) || String(o.label).toLowerCase() === String(formData.assignedTo).toLowerCase()) || null;
+  
+  const selectedProductOption = formData.product 
+    ? productOptions.find(o => {
+        const oVal = Number(o.value) || String(o.value).toLowerCase();
+        const fVal = Number(formData.product) || String(formData.product).toLowerCase();
+        return oVal === fVal || String(oVal) === String(fVal);
+      }) || null
+    : null;
+    
+  const selectedAssignedOption = formData.assignedTo
+    ? assignedOptions.find(o => {
+        const oVal = Number(o.value);
+        const fVal = Number(formData.assignedTo);
+        if (!isNaN(oVal) && !isNaN(fVal)) {
+          return oVal === fVal;
+        }
+        return String(o.value).toLowerCase() === String(formData.assignedTo).toLowerCase();
+      }) || null
+    : null;
 
   if (!isOpen) return null;
 
@@ -723,11 +720,9 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                       <input
                         type="text"
                         name="lastName"
-                        placeholder="Last Name"
+                        placeholder="Last Name (Optional)"
                         value={formData.lastName}
                         onChange={handleChange}
-                        className={errors.name ? 'error' : ''}
-                        aria-invalid={errors.name ? 'true' : 'false'}
                       />
                       {errors.name && <span className="input-error-inside">{errors.name}</span>}
                     </div>
@@ -951,24 +946,65 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     <div className="form-group">
                       <label>Product <span className="required">*</span></label>
                         <div className="product-input">
-                          <Select
-                            options={productOptions}
-                            value={selectedProductOption}
-                            onChange={(opt) => {
-                              setFormData(prev => ({ ...prev, product: opt ? opt.value : '' }));
-                              if (opt) setErrors(prev => { const n = { ...prev }; delete n.product; return n; });
-                            }}
-                            isSearchable
-                            placeholder={"Search or select product"}
-                            className={errors.product ? 'react-select-container error' : 'react-select-container'}
-                            classNamePrefix={'react-select'}
-                            styles={{
-                              menuPortal: base => ({ ...base, zIndex: 9999 }),
-                              placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
-                            }}
-                            menuPortalTarget={document.body}
-                            isClearable={false}
-                          />
+                          {!isProductOthers ? (
+                            <Select
+                              options={productOptions}
+                              value={selectedProductOption}
+                              onChange={(opt) => {
+                                const val = opt ? opt.value : '';
+                                if (val === 'others') {
+                                  setIsProductOthers(true);
+                                  setFormData(prev => ({ ...prev, product: '' }));
+                                } else {
+                                  setIsProductOthers(false);
+                                  setFormData(prev => ({ ...prev, product: val }));
+                                }
+                                if (opt) setErrors(prev => { const n = { ...prev }; delete n.product; return n; });
+                              }}
+                              isSearchable
+                              placeholder={"Search or select product"}
+                              className={errors.product ? 'react-select-container error' : 'react-select-container'}
+                              classNamePrefix={'react-select'}
+                              styles={{
+                                menuPortal: base => ({ ...base, zIndex: 9999 }),
+                                placeholder: base => ({ ...base, color: errors.product ? '#d9534f' : base.color })
+                              }}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                              isClearable={false}
+                            />
+                          ) : (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                              <input
+                                type="text"
+                                name="product"
+                                placeholder="Enter product name"
+                                value={formData.product}
+                                onChange={handleChange}
+                                className={errors.product ? 'error' : ''}
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsProductOthers(false);
+                                  setFormData(prev => ({ ...prev, product: '' }));
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  backgroundColor: '#003366',
+                                  color: 'white',
+                                  border: '1px solid #003366',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                Back to Dropdown
+                              </button>
+                            </div>
+                          )}
                         </div>
                       {errors.product && <span className="input-error-inside">{errors.product}</span>}
                     </div>
@@ -1058,49 +1094,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           </div>
         </div>
       )}
-
-      {/* Leads Table */}
-      <div className="leads-table-container">
-        <h3>Leads</h3>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Business</th>
-              <th>Contact</th>
-              <th>Mobile</th>
-              <th>Email</th>
-              <th>City</th>
-              <th>Stage</th>
-              <th>Potential</th>
-              <th>Address Line 1</th>
-              <th>Address Line 2</th>
-              <th>Category</th>
-              <th>Tags</th>
-              {/* Add more columns as needed */}
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead.id}>
-                <td>{lead.id}</td>
-                <td>{lead.business}</td>
-                <td>{lead.contact}</td>
-                <td>{lead.mobile}</td>
-                <td>{lead.email}</td>
-                <td>{lead.city}</td>
-                <td>{lead.stage}</td>
-                <td>{lead.potential}</td>
-                <td>{lead.addressLine1 || lead.addressline1 || lead.address_line1 || ''}</td>
-                <td>{lead.addressLine2 || lead.addressline2 || lead.address_line2 || ''}</td>
-                <td>{lead.category || lead.Category || ''}</td>
-                <td>{lead.tags || lead.Tags || ''}</td>
-                {/* Add more cells as needed */}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </>
   );
 };

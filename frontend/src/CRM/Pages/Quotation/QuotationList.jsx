@@ -7,12 +7,15 @@ import { debounce } from "lodash";
 import * as XLSX from 'xlsx';
 import "./quotationlist.scss";
 import Pagination from "../../../CommonComponents/Pagination";
-import { getProductImage } from "./utils";
+import { getProductImage, normalizeImageUrl } from "./utils";
 
-import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt } from 'react-icons/fa';
+import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaPrint, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt, FaTimes } from 'react-icons/fa';
+import {useAuth} from "../../../context/AuthContext";
+
 
 const QuotationList = () => {
   const navigate = useNavigate();
+  const { perms } = useAuth();
   const [quotations, setQuotations] = useState([]);
   const [displayedQuotations, setDisplayedQuotations] = useState([]);
   const [page, setPage] = useState(1);
@@ -35,6 +38,107 @@ const QuotationList = () => {
   const [exporting, setExporting] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [printerHeader, setPrinterHeader] = useState(null);
+
+  const getDefaultPrintConfig = (type = 'Quotation') => ({
+    header: true,
+    footer: false,
+    digitalSignature: false,
+    orgDupTrip: false,
+    partyInformation: true,
+    gstin: true,
+    gstSummary: true,
+    branch: true,
+    bankDetails: type === 'Invoice',
+    disclaimer: false,
+    totalQuantity: true,
+    validTill: type === 'Quotation',
+    mobile: true,
+    email: true,
+    contactPersonName: true,
+    companyBeforePOC: false,
+    totalBeforeRoundOff: false,
+    itemCode: true,
+    notes: false,
+    discountRate: true,
+    discountAmt: true,
+    taxableAmt: true,
+    hsnSac: true,
+    gstAmounts: true,
+    leadTime: false,
+    qtyInServices: false,
+    itemFixedRate: false,
+    itemRate: true,
+    nonStockItemCode: false,
+    autoPadSmallDocs: false,
+  });
+
+  const [printConfig, setPrintConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('printConfig_Quotation');
+      return saved ? JSON.parse(saved) : getDefaultPrintConfig('Quotation');
+    } catch (e) {
+      return getDefaultPrintConfig('Quotation');
+    }
+  });
+
+  // derive a user-facing document type from a quotation object
+  const getDocType = (q) => {
+    if (!q) return 'Quotation';
+    const pick = (v) => (v === undefined || v === null) ? null : String(v).trim();
+    const candidates = [
+      pick(q.document_type),
+      pick(q.type),
+      pick(q.doc_type),
+      pick(q.docType),
+      pick(q.DocumentType),
+      pick(q.documentType),
+      pick(q.quotation_type),
+      pick(q.quotationType),
+      pick(q.document),
+    ].filter(Boolean);
+
+    for (const c of candidates) {
+      const lc = c.toLowerCase();
+      if (lc.includes('proforma')) return 'Proforma Invoice';
+      if (lc.includes('sales order')) return 'Sales Order';
+      if (lc.includes('transfer order')) return 'Transfer Order';
+      if (lc.includes('purchase order') || lc.includes('purchase')) return 'Purchase Order';
+      // otherwise return as-is (preserve casing from source)
+      return c;
+    }
+
+    if (q.series && (q.series.document_type || q.series.DocumentType)) {
+      const sdt = pick(q.series.document_type) || pick(q.series.DocumentType);
+      if (sdt) return sdt;
+    }
+
+    if (q.is_proforma) return 'Proforma Invoice';
+    return 'Quotation';
+  };
+
+  // Determine which document type the print dialog should use.
+  // Priority: selectedQuotation (if open) -> typeFilter from header -> default 'Quotation'
+  const currentPrintDocType = selectedQuotation ? getDocType(selectedQuotation) : (typeFilter && typeFilter !== 'All' ? typeFilter : 'Quotation');
+
+  // Load per-document-type print config when the relevant doc type source changes
+  useEffect(() => {
+    const key = `printConfig_${currentPrintDocType}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) setPrintConfig(JSON.parse(saved));
+      else setPrintConfig(getDefaultPrintConfig(currentPrintDocType));
+    } catch (e) {
+      setPrintConfig(getDefaultPrintConfig(currentPrintDocType));
+    }
+  }, [selectedQuotation, typeFilter]);
+
+  const handleSavePrintConfig = (newCfg) => {
+    const type = currentPrintDocType;
+    const key = `printConfig_${type}`;
+    localStorage.setItem(key, JSON.stringify(newCfg));
+    setPrintConfig(newCfg);
+    setShowPrintSettings(false);
+  };
 
   const getDiscountPercentage = (item) => {
     const pct = item.discount_percentage ?? item.discountPercent ?? item.discount_percent ?? item.discountRate ?? item.discount_rate ?? 0;
@@ -173,6 +277,16 @@ const QuotationList = () => {
     fetchOptions();
   }, []);
 
+  // update local header state when another component (PrintHeader) saves/updates it
+  useEffect(() => {
+    const onHeaderChanged = (ev) => {
+      const payload = ev && ev.detail ? ev.detail : null;
+      if (payload) setPrinterHeader(payload);
+    };
+    window.addEventListener('printerHeader:changed', onHeaderChanged);
+    return () => window.removeEventListener('printerHeader:changed', onHeaderChanged);
+  }, []);
+
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure to delete this quotation?")) {
       await axios.delete(`${BASE_URL}/api/quotations/${id}`);
@@ -195,6 +309,28 @@ const QuotationList = () => {
   const getCustomerEmail = (cust) => {
     if (!cust) return '';
     return cust.email || cust.email_address || cust.contact_email || '';
+  };
+
+  // Helper: return customer's legal GSTIN (check common top-level fields, legal object and documents)
+  const getCustomerLegalGstin = (cust) => {
+    if (!cust) return '';
+    const top = cust.gst_in || cust.gstin || cust.GSTIN || cust.gst || cust.gstin_number || cust.gstinNumber || cust.tax_id || '';
+    if (top && String(top).trim() !== '') return top;
+    if (cust.legal && (cust.legal.gstin || cust.legal.gst)) return cust.legal.gstin || cust.legal.gst;
+    if (Array.isArray(cust.documents)) {
+      const doc = cust.documents.find(d => {
+        const k = (d.type || d.name || d.doc_type || '').toString().toLowerCase();
+        return k.includes('gst');
+      });
+      if (doc) return doc.doc_number || doc.number || doc.docNumber || '';
+    }
+    return '';
+  };
+
+  // Helper: determine which GST to display for an address — prefer address-level GST fields
+  const gstForAddr = (addr) => {
+    if (!addr) return '';
+    return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || addr.gst_number || addr.gst_no || addr.gstNo || '';
   };
 
   const copyToClipboard = async (text) => {
@@ -233,7 +369,7 @@ const QuotationList = () => {
     // billing address from the quotation's billing_address (preloaded)
     const bAddr = q.billing_address || {};
     const billingTitle = bAddr.title || customerName;
-    const billingGSTIN = bAddr.gstin || '-';
+    const billingGSTIN = gstForAddr(bAddr) || getCustomerLegalGstin(cust) || '-';
     const billingAddress1 = bAddr.address1 || '';
     const billingAddress2 = bAddr.address2 || '';
     const billingAddress3 = bAddr.address3 || '';
@@ -245,7 +381,7 @@ const QuotationList = () => {
     // shipping address from the quotation's shipping_address (preloaded)
     const sAddr = q.shipping_address || {};
     const shippingTitle = sAddr.title || customerName;
-    const shippingGSTIN = sAddr.gstin || '-';
+    const shippingGSTIN = gstForAddr(sAddr) || getCustomerLegalGstin(cust) || '-';
     const shippingAddress1 = sAddr.address1 || '';
     const shippingAddress2 = sAddr.address2 || '';
     const shippingAddress3 = sAddr.address3 || '';
@@ -256,6 +392,12 @@ const QuotationList = () => {
     
     const custPhone = getCustomerPhone(cust);
     const custEmail = getCustomerEmail(cust);
+
+    // Issued by (sales person on the quotation)
+    const issuerObj = q.sales_credit_person || {};
+    const issuerName = (issuerObj && ((issuerObj.firstname || issuerObj.first_name) ? `${issuerObj.firstname || issuerObj.first_name} ${issuerObj.lastname || issuerObj.last_name || ''}`.trim() : (issuerObj.name || issuerObj.Name || '')) ) || '';
+    const issuerPhone = issuerObj.mobile || issuerObj.mobile_number || issuerObj.phone || issuerObj.contact || '';
+    const issuerEmail = issuerObj.email || issuerObj.email_address || '';
     
     const companyName = printerHeader?.header_title || (branch.name || branch.company_name) || company.company_name || 'Canares Automation Pvt Ltd';
     const branchName = printerHeader?.header_subtitle || (branch.name || branch.branch_name || branch.company_branch_name || '');
@@ -267,20 +409,32 @@ const QuotationList = () => {
     const companyPhone = printerHeader?.mobile || branch.phone || company.phone || '';
     const companyEmail = printerHeader?.email || branch.email || company.email || '';
     const companyWebsite = printerHeader?.website || company.website || '';
-    const companyLogo = printerHeader?.logo_data || null;
+    const companyLogo = normalizeImageUrl(printerHeader?.logo_data || null);
     const headerAlignment = printerHeader?.alignment || 'left';
     
     // Bank details from quotaion's preloaded bank if available, else branch
     const bankB = q.company_branch_bank || branch.company_branch_bank || {};
     const bankName = bankB.bankName || bankB.bank_name || branch.bank_name || company.bank_name || '';
-    const bankBranch = bankB.branch || bankB.bank_branch || company.bank_branch || '';
+    const bankBranch = bankB.branch || bankB.branch_name || bankB.bankBranch || bankB.bank_branch || branch.bank_branch || company.bank_branch || '';
     const bankBranchAddress = branch.bank_branch_address || company.bank_branch_address || branchAddress || '';
     const accountNo = bankB.accountNo || bankB.account_number || branch.account_number || company.account_number || '';
     const ifscCode = bankB.ifsc || bankB.ifsc_code || branch.ifsc_code || company.ifsc_code || '';
     const swiftCode = bankB.swiftCode || bankB.swift_code || branch.swift_code || company.swift_code || '';
     
-    const termsArr = Array.isArray(q.terms_and_conditions) ? q.terms_and_conditions : [];
-    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t}</div>`).join('');
+    const rawTerms = q.terms_and_conditions;
+    let termsArr = [];
+    if (Array.isArray(rawTerms)) {
+      termsArr = rawTerms;
+    } else if (typeof rawTerms === 'string') {
+      try {
+        const parsed = JSON.parse(rawTerms);
+        if (Array.isArray(parsed)) termsArr = parsed;
+        else termsArr = [rawTerms];
+      } catch (e) {
+        termsArr = [rawTerms];
+      }
+    }
+    const termsAndConditionsHtml = termsArr.map((t, idx) => `<div>${idx + 1}. ${t.TandcName || t.name || t.term || (typeof t === 'string' ? t : '')}</div>`).join('');
     const notesHtml = q.note ? `<div style="margin-top: 10px;"><strong>Notes:</strong><br/>${q.note}</div>` : '';
 
     const subtotal = items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.rate || 0)), 0);
@@ -295,6 +449,7 @@ const QuotationList = () => {
     const igst = (q.igst_amount || 0);
     const totalTax = q.tax_amount || (cgst + sgst + igst);
     const grandTotal = q.grand_total || (taxableAmount + totalTax);
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 0), 0);
     
     const extraChargesArr = Array.isArray(q.extra_charges) ? q.extra_charges : [];
     const discountsArr = Array.isArray(q.discounts) ? q.discounts : [];
@@ -317,78 +472,98 @@ const QuotationList = () => {
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center;">${imgHtml}</td>
           <td>${item.product_name || item.name || item.description || '-'}</td>
-          <td>${item.product_code || item.item_code || '-'}</td>
-          <td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>
+          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
           <td style="text-align: center;">${quantity}</td>
           <td>${item.unit || 'Nos'}</td>
-          <td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${Math.round(discountPct)}%</td>
-          <td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-          <td style="text-align: right;">${(item.gst || 0)}%</td>
+          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${(Number(item.fixedRate || item.fixed_rate || item.fixed_price || item.fixedPrice || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
           <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
         </tr>
       `;
     }).join('');
     
+    // Count columns for the "No items" row
+    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Quotation ${q.quotation_number}</title>
+        <title>${getDocType(q)} ${q.quotation_number}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; }
-          .doc-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; gap: 20px; }
-          .branch-info { flex: 0 0 auto; max-width: 35%; }
-          .branch-info h2 { font-size: 14px; color: #1976d2; margin-bottom: 6px; }
-          .branch-info p { font-size: 10px; line-height: 1.5; margin: 2px 0; }
-          .quotation-details { flex: 0 0 auto; min-width: 280px; }
-          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; }
-          .quotation-details td { padding: 4px 8px; border: 1px solid #ddd; }
-          .quotation-details td:first-child { font-weight: 600; background: #f5f5f5; white-space: nowrap; width: 40%; }
-          .addresses { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 15px; }
-          .address-box { flex: 1; border: 1px solid #000; padding: 10px; }
-          .address-box h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; text-transform: uppercase; }
-          .address-box p { font-size: 10px; line-height: 1.6; margin: 3px 0; }
-          table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px; }
-          table.items th, table.items td { border: 1px solid #000; padding: 6px 4px; }
-          table.items th { background: #e3f2fd; font-weight: 600; text-align: center; font-size: 9px; }
-          table.items td { vertical-align: top; }
-          .summary { margin-left: auto; width: 380px; margin-bottom: 15px; }
-          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; }
-          .summary td { padding: 5px 10px; border: 1px solid #ddd; }
-          .summary td:first-child { text-align: left; font-weight: 500; background: #f9f9f9; }
-          .summary td:last-child { text-align: right; font-weight: 600; }
-          .summary .amount-words { border-top: 2px solid #000; background: #fff3e0; font-style: italic; }
-          .summary .grand-total td { background: #e3f2fd; font-weight: bold; font-size: 12px; border-top: 2px solid #000; }
-          .bottom-section { display: flex; gap: 15px; margin-bottom: 15px; }
-          .terms { flex: 1; border: 1px solid #000; padding: 10px; }
-          .terms h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
-          .terms p { font-size: 10px; line-height: 1.6; white-space: pre-line; }
-          .bank-details { flex: 1; border: 1px solid #000; padding: 10px; }
-          .bank-details h3 { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
-          .bank-details table { width: 100%; font-size: 10px; }
-          .bank-details td { padding: 3px 5px; }
-          .bank-details td:first-child { font-weight: 600; width: 45%; }
-          .footer { text-align: right; margin-top: 30px; padding-top: 10px; border-top: 1px solid #000; }
-          .footer p { font-size: 10px; margin: 4px 0; }
+          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #000; background: #fff; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #333; margin-bottom: 20px; gap: 20px; }
+          .branch-info { flex: 0 0 auto; max-width: 50%; }
+          .branch-info h2 { font-size: 16px; color: #333; margin-bottom: 8px; font-weight: 700; }
+          .branch-info p { font-size: 10px; line-height: 1.6; margin: 3px 0; color: #333; }
+          .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 20px 0; text-transform: uppercase; color: #333; letter-spacing: 1px; }
+          .quotation-details { min-width: 300px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; background: #fff; }
+          .quotation-details td { padding: 6px 10px; border: 1px solid #ddd; }
+          .quotation-details td:first-child { font-weight: 600; background: #E3F2FD; white-space: nowrap; width: 45%; color: #333; }
+          .quotation-details td:last-child { color: #333; }
+          .addresses { display: flex; justify-content: space-between; margin: 10px 0; gap: 0px; }
+          .address-box { flex: 1; border: 1px solid #333; padding: 12px; background: #FAFAFA; }
+          .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
+          .address-box p { font-size: 10px; line-height: 1.7; margin: 4px 0; color: #333; }
+          table.items { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+          table.items th, table.items td { border: 1px solid #ccc; padding: 8px 6px; }
+          table.items th { background: linear-gradient(to bottom, #333, #333); color: #fff; font-weight: 600; text-align: center; font-size: 10px; }
+          table.items tbody tr:nth-child(even) { background: #F5F5F5; }
+          table.items tbody tr:nth-child(odd) { background: #fff; }
+          table.items tbody tr:hover { background: #E3F2FD; }
+          table.items td { vertical-align: middle; color: #333; }
+          .three-col { display: flex; gap: 0px; margin: 10px 0; }
+          .three-col > div { border: 1px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; padding-bottom: 4px; text-transform: uppercase; }
+          .bank-details { flex: 1; }
+          .bank-details table { width: 100%; font-size: 10px; margin-top: 8px; }
+          .bank-details td { padding: 4px 6px; }
+          .bank-details td:first-child { font-weight: 600; color: #555; width: 45%; }
+          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: center; }
+          .amount-words-box > div { padding: 10px; }
+          .amount-words-box strong { display: block; font-size: 11px; color: #F57F17; margin-bottom: 8px; }
+          .amount-words-box div div { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; }
+          .summary { flex: 1; }
+          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; }
+          .summary td { padding: 6px 10px; border: 1px solid #ddd; }
+          .summary td:first-child { text-align: left; font-weight: 500; background: #F5F5F5; color: #555; }
+          .summary td:last-child { text-align: right; font-weight: 600; color: #333; }
+          .summary .grand-total td { background: linear-gradient(to right, #333, #333); color: #fff; font-weight: 700; font-size: 13px; border-top: 3px solid #333; }
+          .terms { margin: 10px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
+          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; padding-bottom: 5px; }
+          .terms .tc-columns { column-count: 2; column-gap: 20px; }
+          .terms .tc-columns > div { break-inside: avoid-column; -webkit-column-break-inside: avoid; padding-bottom: 6px; }
+          .notes-signature { display: flex; gap: 0px; margin-top: 10px; }
+          .notes { flex: 2; border: 1px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
+          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; padding-bottom: 4px; }
+          .notes p { font-size: 10px; line-height: 1.7; color: #333; }
+          .authorized-sign { flex: 1; border: 1px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
+          .authorized-sign > p:first-child { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 10px; }
+          .authorized-sign .sign-line { display: inline-block; margin-top: 50px; border-top: 2px solid #333; padding-top: 8px; min-width: 200px; font-weight: 700; font-size: 11px; color: #333; }
+          .authorized-sign > div { margin-top: 10px; font-style: italic; color: #666; font-size: 9px; }
           @media print {
             body { padding: 10px; }
             @page { margin: 10mm; }
+            table.items tbody tr:hover { background: inherit; }
           }
         </style>
       </head>
       <body>
-        <div class="doc-title">QUOTATION</div>
-
+        ${printConfig.header ? `
         <div class="header">
           ${headerAlignment === 'right' ? `
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
             <div class="branch-info" style="text-align: right; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
               ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
@@ -398,7 +573,7 @@ const QuotationList = () => {
             </div>
           ` : `
             <div class="branch-info" style="text-align: left; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #1976d2; margin-bottom: 6px;">${branchName || companyName}</h2>
+              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
               <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
               ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
@@ -408,38 +583,68 @@ const QuotationList = () => {
             </div>
             ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
           `}
-          <div class="quotation-details" style="flex: 0 0 auto; min-width: 250px;">
+        </div>
+
+        <div style="display:flex; align-items:flex-start; gap:20px; margin-bottom: 15px;">
+          <div style="width:260px;"></div>
+          <div style="flex:1; text-align:center;">
+            <div class="doc-title">${getDocType(q).toUpperCase()}</div>
+          </div>
+          <div style="width:260px;">
+            <div class="quotation-details" style="min-width:250px;">
+              <table>
+                <tr><td>${getDocType(q)} No.</td><td>${q.quotation_number || '-'}</td></tr>
+                <tr><td>Date</td><td>${q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
+                ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
+                <tr><td>Ref.</td><td>${q.references || '-'}</td></tr>
+                <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        ` : `
+        <div class="doc-title">${getDocType(q).toUpperCase()}</div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+          <div class="quotation-details" style="min-width:250px;">
             <table>
-              <tr><td>Quotation No.</td><td>${q.quotation_number || '-'}</td></tr>
+              <tr><td>${getDocType(q)} No.</td><td>${q.quotation_number || '-'}</td></tr>
               <tr><td>Date</td><td>${q.quotation_date ? new Date(q.quotation_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
-              <tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>
-              <tr><td>Ref.</td><td>${q.reference || q.quotation_number || '-'}</td></tr>
+              ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
+              <tr><td>Ref.</td><td>${q.references || '-'}</td></tr>
+              <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
             </table>
           </div>
         </div>
+        `}
 
+        ${printConfig.partyInformation ? `
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
+            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
+            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
             ${billingAddress1 ? `<p>${billingAddress1}</p>` : ''}
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
+            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
+            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
             ${shippingAddress1 ? `<p>${shippingAddress1}</p>` : ''}
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
-            ${custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
+        ` : ''}
 
         <table class="items">
           <thead>
@@ -447,82 +652,97 @@ const QuotationList = () => {
               <th>No.</th>
               <th>Image</th>
               <th>Item & Description</th>
-              <th>Item Code</th>
-              <th>HSN / SAC</th>
+              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
               <th>Qty</th>
               <th>Unit</th>
-              <th>Rate (₹)</th>
-              <th>Discount %</th>
-              <th>Discount (₹)</th>
-              <th>Taxable (₹)</th>
-              <th>GST %</th>
+              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
+              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
               <th>Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            ${itemRows || '<tr><td colspan="13" style="text-align: center;">No items</td></tr>'}
+            ${itemRows || `<tr><td colspan="${colCount}" style="text-align: center;">No items</td></tr>`}
           </tbody>
         </table>
 
-        <div class="summary">
-          <table>
-            <tr class="amount-words">
-              <td colspan="2"><strong>Total Amount in Words:</strong> Rupees ${numberToWords(grandTotal)} only</td>
-            </tr>
-            <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-            
-            ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-            
-            <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-            
-            <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-
-            ${extraChargesArr.map(c => `
-              <tr>
-                <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
-                <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-              </tr>
-            `).join('')}
-
-            ${discountsArr.map(d => `
-              <tr>
-                <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
-                <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-              </tr>
-            `).join('')}
-
-            ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-
-            <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
-          </table>
-        </div>
-
-        <div class="bottom-section">
-          <div class="terms">
-            <h3>Terms & Conditions</h3>
-            ${termsAndConditionsHtml || '<p>-</p>'}
-            ${notesHtml}
-          </div>
+        <div class="three-col">
+          ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
             <table>
               <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
               <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Branch Address</td><td>${bankBranchAddress || '-'}</td></tr>
-              ${ifscCode ? `<tr><td>IFSC</td><td>${ifscCode}</td></tr>` : ''}
+              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
+              ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
               ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
+            </table>
+          </div>
+          ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
+
+          <div class="amount-words-box">
+            <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div><h5>Rupees ${numberToWords(grandTotal)} only</h5></div></div>
+          </div>
+
+          <div class="summary">
+            <h3>Summary</h3>
+            <table>
+              <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              ${printConfig.totalQuantity ? `<tr><td>Total Quantity</td><td>${totalQuantity}</td></tr>` : ''}
+
+              ${printConfig.gstSummary ? `
+                ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              ` : ''}
+
+              <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+
+              ${extraChargesArr.map(c => `
+                <tr>
+                  <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
+                  <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                </tr>
+              `).join('')}
+
+              ${discountsArr.map(d => `
+                <tr>
+                  <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
+                  <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                </tr>
+              `).join('')}
+
+              ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+
+              <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
             </table>
           </div>
         </div>
 
-        <div class="footer">
-          <p style="margin-top: 20px; font-weight: bold;">For ${companyName}</p>
-          <p style="margin-top: 30px; border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 150px;">Authorised Signatory</p>
-          <p style="margin-top: 10px;"><em>This is a computer generated quotation. E. & O.E.</em></p>
+        <div class="terms">
+          <h3>Terms & Conditions</h3>
+          <div class="tc-columns">${termsAndConditionsHtml || '<p>-</p>'}</div>
         </div>
+
+        <div class="notes-signature">
+          <div class="notes">
+            <strong>Additional Notes</strong>
+            ${printConfig.notes && (q.note || notesHtml) ? (q.note ? `<p>${q.note}</p>` : notesHtml.replace('<div style="margin-top: 10px;"><strong>Notes:</strong><br/>', '<p>').replace('</div>', '</p>')) : '<p style="color:#999;font-style:italic;">No additional notes</p>'}
+          </div>
+          <div class="authorized-sign">
+            <p>For ${companyName}</p>
+            <div class="sign-line">Authorised Signatory</div>
+            ${printConfig.digitalSignature ? `<div>Digitally Signed</div>` : ''}
+          </div>
+        </div>
+
+        <div class="pdf-footer">This is a computer-generated quotation. E. &amp; O. E.</div>
       </body>
       </html>
     `;
@@ -584,40 +804,7 @@ const QuotationList = () => {
     }
   };
 
-  // derive a user-facing document type from a quotation object
-  const getDocType = (q) => {
-    if (!q) return 'Quotation';
-    const pick = (v) => (v === undefined || v === null) ? null : String(v).trim();
-    const candidates = [
-      pick(q.document_type),
-      pick(q.type),
-      pick(q.doc_type),
-      pick(q.docType),
-      pick(q.DocumentType),
-      pick(q.documentType),
-      pick(q.quotation_type),
-      pick(q.quotationType),
-      pick(q.document),
-    ].filter(Boolean);
-
-    for (const c of candidates) {
-      const lc = c.toLowerCase();
-      if (lc.includes('proforma')) return 'Proforma Invoice';
-      if (lc.includes('sales order')) return 'Sales Order';
-      if (lc.includes('transfer order')) return 'Transfer Order';
-      if (lc.includes('purchase order') || lc.includes('purchase')) return 'Purchase Order';
-      // otherwise return as-is (preserve casing from source)
-      return c;
-    }
-
-    if (q.series && (q.series.document_type || q.series.DocumentType)) {
-      const sdt = pick(q.series.document_type) || pick(q.series.DocumentType);
-      if (sdt) return sdt;
-    }
-
-    if (q.is_proforma) return 'Proforma Invoice';
-    return 'Quotation';
-  };
+  // getDocType moved earlier to fix initialization order (no-op here)
 
   const shareViaWhatsApp = (e) => {
     e.stopPropagation();
@@ -952,6 +1139,23 @@ const QuotationList = () => {
               </div>
             
             <button className="icon-btn square" title={exporting ? 'Exporting...' : 'Export to Excel'} onClick={handleExport} disabled={exporting}><FaFileExport /></button>
+            <button
+              className="icon-btn square"
+              title="Print settings"
+              onClick={() => {
+                const type = selectedQuotation ? getDocType(selectedQuotation) : (typeFilter && typeFilter !== 'All' ? typeFilter : 'Quotation');
+                try {
+                  const saved = localStorage.getItem(`printConfig_${type}`);
+                  setPrintConfig(saved ? JSON.parse(saved) : getDefaultPrintConfig(type));
+                } catch (e) {
+                  setPrintConfig(getDefaultPrintConfig(type));
+                }
+                setShowPrintSettings(true);
+              }}
+              aria-label="Open print settings"
+            >
+              <FaPrint />
+            </button>
             <button className="icon-btn square" title="Display Preferences" onClick={() => { setTempVisibleColumns(visibleColumns); setShowDisplayPrefs(true); }}><FaBars /></button>
             <button className="icon-btn square" title="Items Summary" onClick={() => navigate('/quotation-item-summary')}><FaChartBar /></button>
             <button className="icon-btn square settings" title="Configuration" onClick={() => window.open(`${window.location.origin}/sales-configuration`, '_blank')}><FaCog /></button>
@@ -1059,12 +1263,14 @@ const QuotationList = () => {
           })}
         </select>
         <div className="filters-right">
+          {perms?.can_create && (
           <button
             className="btn-create"
             onClick={() => window.open(`${window.location.origin}/quotation?type=${encodeURIComponent(typeFilter === 'All' ? 'Quotation' : typeFilter)}`, '_blank', 'noopener,noreferrer')}
           >
             {getCreateButtonText()}
           </button>
+            )}
         </div>
       </div>
 
@@ -1072,7 +1278,7 @@ const QuotationList = () => {
         <table className="quotation-table">
           <thead>
             <tr>
-              {visibleColumns.includes('quote_no') && <th>Quote No.</th>}
+              {visibleColumns.includes('quote_no') && <th>Document No.</th>}
               {visibleColumns.includes('customer') && <th>Customer</th>}
               {visibleColumns.includes('amount') && <th>Amount (₹)</th>}
               {visibleColumns.includes('valid_till') && <th>Valid Till</th>}
@@ -1103,8 +1309,12 @@ const QuotationList = () => {
                 {visibleColumns.includes('last_interaction') && <td>{quotation.last_interaction ? new Date(quotation.last_interaction).toLocaleDateString('en-IN') : '-'}</td>}
                 {visibleColumns.includes('next_action') && <td>{quotation.next_action || '-'}</td>}
                 {visibleColumns.includes('actions') && <td onClick={(e) => e.stopPropagation()}>
+                  {perms?.can_update && (
                   <FaEdit onClick={() => window.open(`${window.location.origin}/quotation/${quotation.quotation_id}`, '_blank')} style={{ cursor: 'pointer', marginRight: '10px' }} />
+                    )}
+                  {perms?.can_delete && (
                   <FaTrash onClick={() => handleDelete(quotation.quotation_id)} style={{ cursor: 'pointer' }} />
+                    )}
                 </td>}
               </tr>
             ))}
@@ -1159,13 +1369,20 @@ const QuotationList = () => {
       )}
 
       {showPrintSettings && (
-        <PrintSettingsDialog onClose={() => setShowPrintSettings(false)} />
+        <PrintSettingsDialog 
+          onClose={() => setShowPrintSettings(false)} 
+          initialConfig={printConfig}
+          onSave={handleSavePrintConfig}
+          docType={currentPrintDocType}
+        />
       )}
 
       {showQuotationDetail && selectedQuotation && (
         <div className="quotation-detail-overlay">
           <div className="quotation-detail-modal">
-            <button className="close-btn" onClick={() => setShowQuotationDetail(false)}>×</button>
+            <button className="close-btn" onClick={() => setShowQuotationDetail(false)}>
+              <FaTimes />
+            </button>
             
             <div className="detail-header">
               <div className="header-title">
@@ -1244,15 +1461,19 @@ const QuotationList = () => {
             </div>
 
             <div className="detail-actions">
+              {perms?.can_update && (
               <button className="action-btn edit" onClick={() => { window.open(`${window.location.origin}/quotation/${selectedQuotation.quotation_id}`, '_blank'); setShowQuotationDetail(false); }} title="Edit">
                 <FaEdit />
                 <span>Edit</span>
               </button>
+              )}
 
+              {perms?.can_delete && (
               <button className="action-btn delete" onClick={() => { handleDelete(selectedQuotation.quotation_id); setShowQuotationDetail(false); }} title="Delete">
                 <FaTrash />
                 <span>Delete</span>
               </button>
+              )}
 
               <button className="action-btn revise" title="Revise" onClick={() => { window.open(`${window.location.origin}/quotation/${selectedQuotation.quotation_id}?revise=1`, '_blank'); setShowQuotationDetail(false); }}>
                 <FaRedo />
@@ -1281,7 +1502,9 @@ const QuotationList = () => {
       {showConvertModal && selectedQuotation && (
         <div className="convert-modal-overlay">
           <div className="convert-modal">
-            <button className="close-btn" onClick={() => setShowConvertModal(false)}>×</button>
+            <button className="close-btn" onClick={() => setShowConvertModal(false)}>
+              <FaTimes />
+            </button>
             <h3>Convert Quotation</h3>
             <p>Select the type of order to convert to:</p>
             <div className="convert-options">

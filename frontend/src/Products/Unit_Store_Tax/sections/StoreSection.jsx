@@ -7,8 +7,10 @@ import Pagination from "../../../CommonComponents/Pagination";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
 import "./allinone.scss";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function StoreSection() {
+  const { perms } = useAuth();
   const [stores, setStores] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
@@ -72,6 +74,7 @@ export default function StoreSection() {
             />
           </div>
           <div className="add-button-wrapper">
+            {perms?.can_create && (
             <button
               className="btn-add"
               onClick={() => setDialogOpen(true)}
@@ -79,6 +82,7 @@ export default function StoreSection() {
             >
               Add Store
             </button>
+          )}
           </div>
         </div>
 

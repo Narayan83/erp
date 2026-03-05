@@ -29,7 +29,7 @@ import { Edit, Delete, Visibility, ArrowUpward, ArrowDownward, Refresh, Star as 
 import axios from "axios";
 import * as XLSX from 'xlsx';
 // exceljs will be dynamically imported inside the download function to avoid bundling issues
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { BASE_URL } from "../../../config/Config";
 import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
@@ -37,6 +37,7 @@ import Pagination from "../../../CommonComponents/Pagination";
 import ImportDialog from "../../../CommonComponents/ImportDialog";
 import "./product_list_page.scss";
 
+import { useAuth } from "../../../context/AuthContext"; 
 
 // RAL colors data (complete list from color.csv)
 const ralColors = [
@@ -321,6 +322,19 @@ const getMainImageForProduct = (p) => {
   return null;
 };
 
+// Compute total cost from a list of products (sum of PurchaseCost * Stock across variants)
+const computeTotalCostFromProducts = (list = []) => {
+  return (Array.isArray(list) ? list : []).reduce((acc, p) => {
+    if (!p || !Array.isArray(p.Variants)) return acc;
+    const productCost = p.Variants.reduce((s, v) => {
+      const purchase = Number(v?.PurchaseCost) || 0;
+      const stock = Number(v?.Stock) || 0;
+      return s + purchase * stock;
+    }, 0);
+    return acc + productCost;
+  }, 0);
+};
+
 const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumns, anchorEl, open, onClose }) {
   const selectAllRef = React.useRef(null);
 
@@ -415,7 +429,7 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
   );
 });
 
-const ProductTableBody = memo(function ProductTableBody({ products, navigate, loading, visibleColumns, onView, page, limit, selectedIds, onToggleOne, onDelete, exportAnchorEl, setExportAnchorEl, exportMenuOpen, handleExport, commonSearch }) {
+const ProductTableBody = memo(function ProductTableBody({ products, navigate, perms, loading, visibleColumns, onView, page, limit, selectedIds, onToggleOne, onDelete, exportAnchorEl, setExportAnchorEl, exportMenuOpen, handleExport, commonSearch }) {
   // Image preview state
   const [previewImage, setPreviewImage] = useState(null);
   const [hoverTimer, setHoverTimer] = useState(null);
@@ -671,6 +685,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Edit">
+                  {perms?.can_update && (
                   <IconButton 
                     size="small"
                     onClick={() => navigate(`/products/${p.ID}/edit`)}
@@ -678,8 +693,10 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                   >
                     <Edit fontSize="small" />
                   </IconButton>
+                 )}
                 </Tooltip>
                 <Tooltip title="Delete">
+                  {perms?.can_delete && (
                   <IconButton 
                     size="small"
                     onClick={() => onDelete && onDelete(p.ID)}
@@ -687,6 +704,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, lo
                   >
                     <Delete fontSize="small" />
                   </IconButton>
+                  )}
                 </Tooltip>
               </Box>
             </TableCell>
@@ -1446,7 +1464,7 @@ const highlightText = (text, searchTerm) => {
 };
 
 export default function ProductListPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [allSubcategories, setAllSubcategories] = useState([]);
@@ -1487,6 +1505,24 @@ export default function ProductListPage() {
   const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
   const [salesPriceSort, setSalesPriceSort] = useState(null); // null | 'asc' | 'desc'
   
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
+  // Apply sort when navigated with state.sortByName (from Add/Edit pages)
+  React.useEffect(() => {
+    if (location && location.state && location.state.sortByName) {
+      const dir = location.state.sortDirection || 'asc';
+      setNameSort(dir);
+      setStockSort(null);
+      setLeadTimeSort(null);
+      setPurchaseCostSort(null);
+      setSalesPriceSort(null);
+      setPage(0);
+      // Clear navigation state to prevent repeated behavior
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location && location.state && location.state.sortByName, navigate]);
+
   // Force refresh flag
   const [forceRefresh, setForceRefresh] = useState(0);
   
@@ -2396,11 +2432,11 @@ export default function ProductListPage() {
                 console.log('After client-side filtering, products count:', filtered.length);
                 setProducts(filtered);
                 setTotalItems(filtered.length);
-                setTotalCost(res?.data?.totalCost || 0);
+                setTotalCost(computeTotalCostFromProducts(filtered));
               } else {
                 setProducts(merged);
                 setTotalItems(merged.length);
-                setTotalCost(res?.data?.totalCost || 0);
+                setTotalCost(computeTotalCostFromProducts(merged));
               }
             } catch (mergeErr) {
               console.error('Error fetching extra-field matches for common filter:', mergeErr);
@@ -4247,6 +4283,7 @@ export default function ProductListPage() {
 
                 <div className="dialog-actions">
                   <button onClick={handleCloseView} className="btn btn-secondary">Close</button>
+                  {perms?.can_update && (
                   <button 
                     onClick={() => {
                       handleCloseView();
@@ -4256,6 +4293,7 @@ export default function ProductListPage() {
                   >
                     Edit Product
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -4330,8 +4368,13 @@ export default function ProductListPage() {
           </div>
 
           <div className="summary-actions">
-            <button type="button" className="btn btn-add-product" onClick={() => window.open(`${window.location.origin}/ManageProduct`, '_blank', 'noopener,noreferrer')} title="Add Product">+ Add Product</button>
+            {
+              perms?.can_create && <>
 
+             <button type="button" className="btn btn-add-product" onClick={() => window.open(`${window.location.origin}/ManageProduct`, '_blank', 'noopener,noreferrer')} title="Add Product">+ Add Product</button>  
+              
+              </>
+            }
             <button type="button" className="btn btn-outline btn-display-prefs" onClick={handleOpenDisplayPrefs} title="Display Preferences" aria-label="Display Preferences">
               <svg className="icon-columns" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
                 <rect x="3" y="4" width="6" height="7" fill="currentColor" />
@@ -4658,6 +4701,7 @@ export default function ProductListPage() {
             <ProductTableBody 
               products={products} 
               navigate={navigate} 
+              perms={perms}
               loading={loading} 
               visibleColumns={visibleColumns}
               onView={handleOpenView}
