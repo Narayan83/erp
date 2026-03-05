@@ -54,6 +54,8 @@ import SalesInteractions from './CRM/Pages/Reports/SalesInteractions';
 import Followup from './CRM/Pages/Reports/Followup';
 import NoReports from './CRM/Pages/Reports/NoReports';
 import TravelReport from "./CRM/Pages/Reports/TravelReport";
+import RejectedLeads from './CRM/Pages/Reports/RejectedLeads';
+import InactiveLeads from './CRM/Pages/Reports/InactiveLeads';
 import Configuration from './CRM/Components/Configuration/Configuration';
 // import QuotationList from './CRM/Pages/Quotation/QuotationList';
 
@@ -193,6 +195,8 @@ function App() {
               <Route path="/reports/followups" element={<Followup />} />
               <Route path="/reports/no-reports" element={<NoReports />} />
               <Route path="/reports/travel-report" element={<TravelReport />} />
+              <Route path="/reports/rejected-leads" element={<RejectedLeads />} />
+              <Route path="/reports/inactive-leads" element={<InactiveLeads />} />
 
 
               <Route path="/configuration" element={<Configuration />} />

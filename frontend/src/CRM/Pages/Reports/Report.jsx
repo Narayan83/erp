@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrowLeft } from 'react-icons/fa';
+import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrowLeft, FaBan, FaUserSlash } from 'react-icons/fa';
 import { MdMissedVideoCall } from 'react-icons/md';
 import './_report.scss';
 
@@ -51,6 +51,18 @@ const Report = () => {
       description: "Track travel record of sales team.",
       icon: <FaRoute />,
       path: '/reports/travel-report'
+    },
+    {
+      title: "Rejected Leads",
+      description: "View all leads that have been rejected with their rejection reasons.",
+      icon: <FaBan />,
+      path: '/reports/rejected-leads'
+    },
+    {
+      title: "Inactive Leads",
+      description: "Track leads that have become inactive and need re-engagement.",
+      icon: <FaUserSlash />,
+      path: '/reports/inactive-leads'
     }
   ];
 

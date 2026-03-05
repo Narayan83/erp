@@ -10,9 +10,12 @@ import Pagination from "../../../CommonComponents/Pagination";
 import { getProductImage, normalizeImageUrl } from "./utils";
 
 import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaPrint, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt, FaTimes } from 'react-icons/fa';
+import {useAuth} from "../../../context/AuthContext";
+
 
 const QuotationList = () => {
   const navigate = useNavigate();
+  const { perms } = useAuth();
   const [quotations, setQuotations] = useState([]);
   const [displayedQuotations, setDisplayedQuotations] = useState([]);
   const [page, setPage] = useState(1);
@@ -1260,12 +1263,14 @@ const QuotationList = () => {
           })}
         </select>
         <div className="filters-right">
+          {perms?.can_create && (
           <button
             className="btn-create"
             onClick={() => window.open(`${window.location.origin}/quotation?type=${encodeURIComponent(typeFilter === 'All' ? 'Quotation' : typeFilter)}`, '_blank', 'noopener,noreferrer')}
           >
             {getCreateButtonText()}
           </button>
+            )}
         </div>
       </div>
 
@@ -1304,8 +1309,12 @@ const QuotationList = () => {
                 {visibleColumns.includes('last_interaction') && <td>{quotation.last_interaction ? new Date(quotation.last_interaction).toLocaleDateString('en-IN') : '-'}</td>}
                 {visibleColumns.includes('next_action') && <td>{quotation.next_action || '-'}</td>}
                 {visibleColumns.includes('actions') && <td onClick={(e) => e.stopPropagation()}>
+                  {perms?.can_update && (
                   <FaEdit onClick={() => window.open(`${window.location.origin}/quotation/${quotation.quotation_id}`, '_blank')} style={{ cursor: 'pointer', marginRight: '10px' }} />
+                    )}
+                  {perms?.can_delete && (
                   <FaTrash onClick={() => handleDelete(quotation.quotation_id)} style={{ cursor: 'pointer' }} />
+                    )}
                 </td>}
               </tr>
             ))}
@@ -1452,15 +1461,19 @@ const QuotationList = () => {
             </div>
 
             <div className="detail-actions">
+              {perms?.can_update && (
               <button className="action-btn edit" onClick={() => { window.open(`${window.location.origin}/quotation/${selectedQuotation.quotation_id}`, '_blank'); setShowQuotationDetail(false); }} title="Edit">
                 <FaEdit />
                 <span>Edit</span>
               </button>
+              )}
 
+              {perms?.can_delete && (
               <button className="action-btn delete" onClick={() => { handleDelete(selectedQuotation.quotation_id); setShowQuotationDetail(false); }} title="Delete">
                 <FaTrash />
                 <span>Delete</span>
               </button>
+              )}
 
               <button className="action-btn revise" title="Revise" onClick={() => { window.open(`${window.location.origin}/quotation/${selectedQuotation.quotation_id}?revise=1`, '_blank'); setShowQuotationDetail(false); }}>
                 <FaRedo />

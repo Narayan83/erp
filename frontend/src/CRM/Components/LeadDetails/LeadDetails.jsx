@@ -43,6 +43,8 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
 
       if (res.ok) {
         console.log('Status updated successfully:', data);
+        // Dispatch event so other components (like reports) can refresh
+        window.dispatchEvent(new CustomEvent('leads:updated', { detail: { leadId: lead.id, stage: payload.stage } }));
         // Refresh the leads data
         if (onStatusUpdate) {
           onStatusUpdate();

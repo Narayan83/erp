@@ -7,8 +7,10 @@ import HsnDialog from "../components/HsnDialog";
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import "./allinone.scss";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function HsnSection() {
+  const { perms } = useAuth();
   const [hsns, setHsns] = useState([]);
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const [filter, setFilter] = useState("");
@@ -115,6 +117,7 @@ export default function HsnSection() {
           />
         </div>
         <div className="add-button-wrapper">
+          {perms?.can_create && (
           <button
             className="btn-add"
             onClick={() => setDialogOpen(true)}
@@ -122,6 +125,7 @@ export default function HsnSection() {
           >
             Add HSN
           </button>
+          )}
         </div>
       </div>
 

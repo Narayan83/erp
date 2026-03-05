@@ -7,8 +7,10 @@ import SubcategoryTable from "../components/SubcategoryTable";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { BASE_URL }  from "../../../config/Config";
 import "./subcategory.scss";
+import {useAuth} from "../../../context/AuthContext";
 
 const SubcategoryPage = () => {
+  const { perms } = useAuth();
   const [subcategories, setSubcategories] = useState([]);
   const [filter, setFilter] = useState("");
   const [formData, setFormData] = useState({ id: null, name: "" });
@@ -136,6 +138,7 @@ const handleOpenDialog = async (item = { id: null, name: "" }) => {
           />
         </div>
         <div className="add-button-wrapper">
+          {perms?.can_create && (
           <button
             className="btn-add"
             onClick={() => handleOpenDialog()}
@@ -143,6 +146,7 @@ const handleOpenDialog = async (item = { id: null, name: "" }) => {
           >
             Add Subcategory
           </button>
+          )}
         </div>
       </div>
 

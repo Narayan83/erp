@@ -15,8 +15,8 @@ import AddLead from '../../Pages/AddLead/AddLead';
 import ImportLeadsDialog from './ImportLeadsDialog';
 import LeadDetails from '../LeadDetails/LeadDetails';
 import Pagination from '../../../CommonComponents/Pagination';
-
 import { BASE_URL, getAuthHeaders } from '../../../config/Config' 
+import {useAuth} from '../../../context/AuthContext';
 
 // Assigned to options will be loaded from backend users
 // (fallback to a small static list while loading)
@@ -61,6 +61,7 @@ const LOCAL_STORAGE_KEY = 'displayPreferences';
 
 const TopMenu = () => {
   // -------------------- State --------------------
+  const { perms } = useAuth();
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -749,6 +750,33 @@ const TopMenu = () => {
     return `${day}-${month}-${year} ${hours}:${mins}`;
   };
 
+  // Resolve the display name for assignedTo fields robustly
+  const getAssignedToDisplayName = (lead) => {
+    if (!lead) return '';
+    const raw = lead.assignedTo ?? lead.assignedToName ?? (lead.assigned_to_id !== undefined ? lead.assigned_to_id : (lead.assignedToId ?? lead.AssignedToID ?? ''));
+
+    // If it's an object, try common name fields
+    if (typeof raw === 'object' && raw !== null) {
+      return raw.name || raw.Name || raw.label || raw.email || String(raw.id || raw.value || '') || '';
+    }
+
+    const s = String(raw || '').trim();
+    if (!s) return '';
+
+    // If it's numeric, try to lookup from loaded options
+    if (/^\d+$/.test(s)) {
+      const idNum = Number(s);
+      const found = (assignedToOptions || []).find(opt => Number(opt.id) === idNum || String(opt.id) === String(idNum));
+      if (found) return found.name || String(found.id || '');
+      return s; // fallback to the numeric id string
+    }
+
+    // Non-numeric string: prefer the original text but try to match it to known options
+    const foundByName = (assignedToOptions || []).find(opt => (opt.name || '').toString().toLowerCase() === s.toLowerCase());
+    if (foundByName) return foundByName.name;
+    return s;
+  };
+
   // -------------------- Import/Export --------------------
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -986,9 +1014,7 @@ const TopMenu = () => {
         } else if (field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
           value = formatDateStrict(lead[field.key], { hideIfNow: true });
         } else if (field.key === 'assignedTo') {
-          value = lead.assignedToName || (typeof lead.assignedTo === 'object' && lead.assignedTo !== null
-            ? (lead.assignedTo.Name || lead.assignedTo.name || lead.assignedTo.email || '')
-            : (lead.assignedTo || ''));
+          value = getAssignedToDisplayName(lead);
         } else if (field.key === 'product') {
           value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
             ? (lead.product.Name || lead.product.name || lead.product.Code || '')
@@ -1430,9 +1456,11 @@ const TopMenu = () => {
           {/* Left: Action buttons */}
           <div className="action-buttons-center">
             <div className="action-buttons">
+            {perms?.can_create && (
               <button className="add-lead-btn" onClick={() => setShowAddLead(true)}>
                 + Add Lead
               </button>
+            )}
               <button className="import-btn" onClick={handleImportClick}>
                 <FaDownload /> Import
               </button>
@@ -1606,7 +1634,7 @@ const TopMenu = () => {
                         } else if (field.key === 'transferredOn') {
                           value = formatDateStrict(lead.transferredOn || lead.TransferredOn || lead.transferred_on || lead.transferredon || '', { hideIfNow: false });
                         } else if (field.key === 'assignedTo') {
-                          value = lead.assignedTo || '';
+                          value = getAssignedToDisplayName(lead);
                         } else if (field.key === 'product') {
                           value = lead.productName || (typeof lead.product === 'object' && lead.product !== null
                             ? (lead.product.Name || lead.product.name || lead.product.Code || JSON.stringify(lead.product))
@@ -1644,6 +1672,7 @@ const TopMenu = () => {
                     </td>
                   ))}
                   <td className="action-cell">
+                    {perms?.can_update && (
                     <button
                       className="edit-btn"
                       title="Edit Lead"
@@ -1654,6 +1683,8 @@ const TopMenu = () => {
                     >
                       <FaEdit />
                     </button>
+                    )}
+                    {perms?.can_delete && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1664,6 +1695,7 @@ const TopMenu = () => {
                     >
                       <FaTrash />
                     </button>
+                    )}
                   </td>
                 </tr>
               ))

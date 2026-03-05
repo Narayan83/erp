@@ -516,7 +516,7 @@
     }
 
     tr {
-      background-color: #e7f3da;
+      background-color: #f9ffc2;
       &:hover {
         background-color: #ffffff;
         cursor: pointer;
@@ -524,8 +524,7 @@
     }
 
     .rejected-row {
-      opacity: 0.6;
-      background-color: #f5b4b4;
+      background-color: #ff000046;
       &:hover {
         background-color: #ffffff;
       }
@@ -533,7 +532,7 @@
 
     // Active leads (light yellow)
     tr[data-status="active"] {
-      background-color: #d8c93f; // light yellow
+      background-color: #c9b92e; // light yellow
       &:hover {
         background-color: #ffffff;
       }

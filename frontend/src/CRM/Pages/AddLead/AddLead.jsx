@@ -565,7 +565,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
 
   const prefixOptions = ['Mr.', 'Ms.', 'Mrs.'];
   const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
-  const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
+  const stageOptions = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
 
   // Fetch employees to populate the Assigned To dropdown.
   // Fetch from backend and use fetched employees as the authoritative list.

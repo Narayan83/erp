@@ -2,8 +2,10 @@ import React from "react";
 import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, Button, IconButton } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function HsnTable({ data, onEdit, onDelete, page = 0, rowsPerPage = 5 }) {
+  const { perms } = useAuth();
   return (
     <TableContainer component={Paper}>
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
@@ -40,8 +42,12 @@ export default function HsnTable({ data, onEdit, onDelete, page = 0, rowsPerPage
                 })()}
               </TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                <IconButton size="small" onClick={() => onEdit(hsn)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => onDelete(hsn)}><DeleteIcon fontSize="small" /></IconButton>
+                {perms?.can_edit && (
+                  <IconButton size="small" onClick={() => onEdit(hsn)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(hsn)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
               </TableCell> 
             </TableRow>
           ))}
