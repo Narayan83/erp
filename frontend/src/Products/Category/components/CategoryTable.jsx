@@ -1,0 +1,42 @@
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Paper
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
+
+
+export default function CategoryTable({ categories, onEdit, onDelete, page, rowsPerPage, perms }) {
+
+  return (
+    <TableContainer component={Paper}>
+      <Table size="small">
+        <TableHead sx={{ '& .MuiTableCell-root': { textAlign: 'center' } }}>
+          <TableRow>
+            <TableCell style={{ textAlign: 'left' }}>S.No.</TableCell>
+            <TableCell>Category Name</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 120 }}>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {categories.map((cat, index) => (
+            <TableRow key={cat.ID} sx={{ height: 36 }}>
+              <TableCell align="left" sx={{ py: 0.5 }}>
+                {(page * rowsPerPage) + index + 1} 
+              </TableCell>
+              <TableCell align="center" sx={{ py: 0.5 }}>{cat.Name}</TableCell>
+              <TableCell align="right" sx={{ py: 0.5, textAlign: 'right' }}>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(cat)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(cat)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
+              </TableCell> 
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}

@@ -1,0 +1,48 @@
+/* AGGRESSIVE: Disable browser autocomplete/autofill styling for all form fields */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: inherit !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s;
+}
+
+/* Prevent autofill background color */
+input:-webkit-autofill::first-line {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Hide autofill dropdown arrow in Chrome */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  margin: 0;
+}
+
+/* Additional security for password managers */
+input[type="text"][data-original-name],
+input[type="email"][data-original-name],
+input[type="tel"][data-original-name],
+input[type="number"][data-original-name] {
+  background-image: none !important;
+  background-color: white !important;
+}

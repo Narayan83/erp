@@ -1,0 +1,73 @@
+@use "../../Styles/variable" as *;
+
+// Additional styles specific to inactive leads report
+// The main styles are inherited from _sales_interactions.scss
+
+.sales-interactions-container {
+  // Highlight last interaction and days columns
+  .si-table {
+    tbody tr {
+      td:nth-child(8),
+      td:nth-child(9) {
+        // Last interaction and days since contact columns
+        font-style: italic;
+        color: #6c757d;
+      }
+
+      // Add visual indicator for leads with no recent interaction
+      td:nth-child(9) {
+        font-weight: 500;
+
+        // Color code based on days since last contact
+        &:contains("Never") {
+          color: #dc3545;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  // Add a subtle indicator for inactive leads
+  .inactive-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #6c757d;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+}
+
+// Additional utility styles for inactive leads
+.inactive-badge {
+  background: #6c757d;
+  color: $primary-white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.days-since-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+
+  &.warning {
+    background: #ffc107;
+    color: #000;
+  }
+
+  &.danger {
+    background: #dc3545;
+    color: $primary-white;
+  }
+
+  &.info {
+    background: #17a2b8;
+    color: $primary-white;
+  }
+}

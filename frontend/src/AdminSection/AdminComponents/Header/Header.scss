@@ -1,0 +1,285 @@
+@import "../../../styles/shell-theme";
+
+// Header — dropdowns & chrome stay light; bar matches shell (sidebar)
+$header-surface: #ffffff;
+$header-border: #e8ecf1;
+$header-on-dark: #f8fafc;
+$text-primary: #1f2937;
+$text-secondary: #6b7280;
+$icon-color: #6b7280;
+$icon-on-dark-muted: #cbd5e1;
+$dropdown-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+$transition-speed: 0.2s;
+
+.header {
+  background-color: $shell-header-bar;
+  border-bottom: 1px solid $shell-border;
+  padding: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 100;
+  /* Separates top bar from the deeper sidebar + page content */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 14px rgba(0, 0, 0, 0.22);
+
+  .header-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 1.25rem;
+    max-width: 100%;
+    height: auto;
+    min-height: 56px;
+    gap: 1rem;
+    background: transparent;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+
+    .logo-text {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: $header-on-dark;
+      letter-spacing: -0.03em;
+      transition: color $transition-speed ease;
+
+      &:hover {
+        color: $shell-accent-hover;
+      }
+    }
+  }
+
+  .header-menu-search {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(720px, 60%);
+    max-width: 90%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .menu-toggle-btn {
+    margin-left: 1.5rem;
+    background: $shell-hover;
+    border: 1px solid $shell-divider;
+    color: $header-on-dark;
+    font-size: 1.35rem;
+    cursor: pointer;
+    padding: 0.45rem 0.55rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      background-color $transition-speed ease,
+      border-color $transition-speed ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background: $shell-hover-strong;
+      border-color: rgba(148, 163, 184, 0.2);
+    }
+
+    &:active {
+      background-color: $shell-hover;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .header-icon-btn {
+    background: $shell-hover;
+    border: 1px solid transparent;
+    color: $icon-on-dark-muted;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      background-color $transition-speed ease,
+      color $transition-speed ease,
+      border-color $transition-speed ease;
+    position: relative;
+
+    &:hover {
+      background-color: $shell-hover-strong;
+      color: $header-on-dark;
+      border-color: $shell-divider;
+    }
+
+    &:active {
+      background-color: $shell-hover;
+    }
+  }
+
+  // Profile Menu Wrapper
+  .profile-menu-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .profile-btn {
+    background: $shell-hover;
+    border: 1px solid $shell-divider;
+    padding: 0.35rem 0.65rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    border-radius: 0.5rem;
+    transition:
+      background-color $transition-speed ease,
+      border-color $transition-speed ease;
+
+    &:hover {
+      background: $shell-hover-strong;
+      border-color: rgba(148, 163, 184, 0.22);
+    }
+  }
+
+  .profile-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    transition: box-shadow $transition-speed ease;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    text-align: left;
+  }
+
+  .profile-name {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: $header-on-dark;
+    line-height: 1.2;
+  }
+
+  .profile-role {
+    margin: 0;
+    font-size: 0.75rem;
+    color: $shell-text-muted;
+    line-height: 1.2;
+  }
+
+  // Dropdown Menu
+  .profile-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background-color: $header-surface;
+    border: 1px solid $header-border;
+    border-radius: 0.75rem;
+    box-shadow: $dropdown-shadow;
+    min-width: 12rem;
+    padding: 0.5rem 0;
+    z-index: 1000;
+    animation: slideDown $transition-speed ease;
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
+
+  .dropdown-item {
+    background: none;
+    border: none;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    color: $text-primary;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all $transition-speed ease;
+
+    &:hover {
+      background-color: #f8fafc;
+      color: $shell-accent;
+
+      .dropdown-icon {
+        color: $shell-accent;
+      }
+    }
+
+    &.logout {
+      color: #ef4444;
+
+      &:hover {
+        background-color: #fef2f2;
+        color: #dc2626;
+
+        .dropdown-icon {
+          color: #dc2626;
+        }
+      }
+    }
+  }
+
+  .dropdown-icon {
+    font-size: 1rem;
+    color: $icon-color;
+    flex-shrink: 0;
+    transition: color $transition-speed ease;
+  }
+
+  .dropdown-divider {
+    height: 1px;
+    background-color: $header-border;
+    margin: 0.5rem 0;
+  }
+}

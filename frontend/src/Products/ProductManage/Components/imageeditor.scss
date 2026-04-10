@@ -1,0 +1,117 @@
+.image-editor-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 3000;
+}
+.image-editor-overlay.open {
+  display: flex;
+}
+.image-editor-dialog {
+  width: 90%;
+  max-width: 840px;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.image-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eaeaea;
+}
+.image-editor-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cropper-wrapper {
+  width: 100%;
+  height: 420px;
+  position: relative;
+  background: #f5f5f5;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: grab;
+}
+.cropper-wrapper.dragging {
+  cursor: grabbing;
+}
+.cropper-wrapper.transparent {
+  /* checkerboard background to indicate transparency */
+  background-image: linear-gradient(45deg, #e6e6e6 25%, transparent 25%),
+    linear-gradient(-45deg, #e6e6e6 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e6e6e6 75%),
+    linear-gradient(-45deg, transparent 75%, #e6e6e6 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+.cropper-wrapper .reactEasyCrop_Container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap; /* keep items on one row */
+}
+.controls .control-row {
+  flex: 1 1 auto; /* let zoom take available space */
+  min-width: 0; /* allow shrinking for small viewports */
+}
+.controls .checkbox-group {
+  flex: 0 0 auto; /* keep checkbox group compact */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.zoom-value {
+  min-width: 48px;
+  text-align: right;
+  color: #444;
+  font-size: 0.85rem;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.image-editor-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #eaeaea;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.no-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #777;
+}

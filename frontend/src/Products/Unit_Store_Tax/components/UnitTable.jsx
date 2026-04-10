@@ -1,0 +1,46 @@
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Paper
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
+
+export default function UnitTable({ units, onEdit, onDelete, page, rowsPerPage }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
+  return (
+    <TableContainer component={Paper}>
+      <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
+        <TableHead>
+          <TableRow>
+            <TableCell style={{ textAlign: 'left', width: 60 }}>S.No.</TableCell>
+            <TableCell align="center" sx={{ width: 200 }}>Unit</TableCell>
+            <TableCell align="center" sx={{ width: 'auto' }}>Description</TableCell>
+            <TableCell style={{ textAlign: 'right', width: 120 }}>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {units.map((unit, index) => (
+            <TableRow key={unit.ID || index} sx={{ height: 36 }}>
+              <TableCell align="left" sx={{ py: 0.5, width: 60 }}>
+                {(page * rowsPerPage) + index + 1}
+              </TableCell>
+              <TableCell align="center" sx={{ py: 0.5, width: 200 }}>{unit.name || unit.Name}</TableCell>
+              <TableCell align="center" sx={{ py: 0.5, width: 'auto' }}>{unit.description || unit.Description}</TableCell>
+              <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
+                {perms?.can_update && (
+                  <IconButton size="small" onClick={() => onEdit(unit)}><EditIcon fontSize="small" /></IconButton>
+                )}
+                {perms?.can_delete && (
+                  <IconButton size="small" onClick={() => onDelete(unit)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
+              </TableCell> 
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
