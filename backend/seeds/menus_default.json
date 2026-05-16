@@ -1,0 +1,305 @@
+[
+  {
+    "menu_name": "Dashboard",
+    "url": "/home",
+    "icon": "LayoutDashboard",
+    "sort_order": 1,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false
+  },
+  {
+    "menu_name": "Product Master",
+    "url": "/catalog",
+    "icon": "Package",
+    "sort_order": 2,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "Product List",
+        "url": "/ProductMaster",
+        "icon": "List",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Product Config",
+        "url": "/product-config",
+        "sort_order": 2,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  },
+  {
+    "menu_name": "CRM \u0026 QTN",
+    "url": "/crm",
+    "icon": "ShoppingCart",
+    "sort_order": 3,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "CRM Master",
+        "url": "/crm-master",
+        "icon": "Database",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "CRM Config",
+        "url": "/sales-configuration?section=crm",
+        "sort_order": 2,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Quotations",
+        "url": "/quotation-list",
+        "icon": "FileText",
+        "sort_order": 3,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Sales Config",
+        "url": "/sales-configuration",
+        "icon": "Sliders",
+        "sort_order": 4,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  },
+  {
+    "menu_name": "HR Management",
+    "url": "/hr",
+    "icon": "Users2",
+    "sort_order": 5,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "Employee List",
+        "url": "/employeemanagement",
+        "icon": "Users",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Manage Employees",
+        "url": "/manage-employees",
+        "sort_order": 2,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Employee Hierarchy",
+        "url": "/empHierarchy",
+        "icon": "GitMerge",
+        "sort_order": 3,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Departments",
+        "url": "/departmentmaster",
+        "icon": "Building",
+        "sort_order": 4,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Designations",
+        "url": "/designation",
+        "icon": "Award",
+        "sort_order": 5,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Organization Units",
+        "url": "/orgunits",
+        "icon": "Network",
+        "sort_order": 6,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "User Assignment",
+        "url": "/assignusertoemployee",
+        "icon": "UserCheck",
+        "sort_order": 7,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  },
+  {
+    "menu_name": "Users",
+    "url": "/admin-master",
+    "icon": "ShieldAlert",
+    "sort_order": 6,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "User List",
+        "url": "/users",
+        "icon": "Users",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  },
+  {
+    "menu_name": "Admin Master",
+    "url": "/company-master",
+    "icon": "Building2",
+    "sort_order": 7,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "Product Config",
+        "url": "/product-config",
+        "sort_order": -1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Sales Config",
+        "url": "/sales-configuration",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "CRM Config",
+        "url": "/sales-configuration?section=crm",
+        "sort_order": 2,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Role Creation",
+        "url": "/rolecreation",
+        "icon": "ShieldPlus",
+        "sort_order": 3,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Existing Roles",
+        "url": "/existingroles",
+        "icon": "Shield",
+        "sort_order": 4,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Role Permissions",
+        "url": "/rolemanagement",
+        "icon": "Lock",
+        "sort_order": 5,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "User-Role Map",
+        "url": "/usermanagement",
+        "icon": "Link",
+        "sort_order": 6,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Menu Creation",
+        "url": "/menucreation",
+        "icon": "Menu",
+        "sort_order": 7,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Existing Menus",
+        "url": "/existingmenus",
+        "icon": "List",
+        "sort_order": 8,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "Audit Logs",
+        "url": "/auditlogs",
+        "icon": "FileClock",
+        "sort_order": 9,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  },
+  {
+    "menu_name": "Settings",
+    "url": "/settings-root",
+    "icon": "Settings",
+    "sort_order": 8,
+    "menu_type": "main",
+    "is_active": true,
+    "requires_auth": false,
+    "children": [
+      {
+        "menu_name": "Profile",
+        "url": "/profile",
+        "icon": "User",
+        "sort_order": 1,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      },
+      {
+        "menu_name": "App Settings",
+        "url": "/settings",
+        "icon": "sliders",
+        "sort_order": 2,
+        "menu_type": "main",
+        "is_active": true,
+        "requires_auth": false
+      }
+    ]
+  }
+]

@@ -870,7 +870,8 @@ const TopMenu = () => {
     const year = date.getFullYear();
     const hours = String(date.getHours()).padStart(2, '0');
     const mins = String(date.getMinutes()).padStart(2, '0');
-    return `${day}-${month}-${year} ${hours}:${mins}`;
+    const secs = String(date.getSeconds()).padStart(2, '0');
+    return `${day}-${month}-${year} ${hours}:${mins}:${secs}`;
   };
 
   // Resolve the display name for assignedTo fields robustly
@@ -1037,7 +1038,7 @@ const TopMenu = () => {
           stage: l.stage || l.lead_stage || l.STATUS || 'New',
           potential: parseFloat((l.potential || l.estimated_value || '0').toString()) || 0,
           since: (() => {
-            const d = new Date(l.since || l.QUERY_TIME || l.enquiry_date || l.createdAt);
+            const d = new Date(l.since || l.queryTime || l.QUERY_TIME || l.enquiry_date || l.createdAt);
             return isNaN(d) ? new Date().toISOString() : d.toISOString();
           })(),
           website: l.website || '',
@@ -1132,7 +1133,7 @@ const TopMenu = () => {
         } else if (field.key === 'potential') {
           value = lead.potential || '';
         } else if (field.key === 'since') {
-          value = formatDate(lead.since);
+          value = formatDateTime(lead.since);
         } else if (field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
           value = formatDateStrict(lead[field.key], { hideIfNow: true });
         } else if (field.key === 'assignedTo') {
@@ -1744,8 +1745,8 @@ const TopMenu = () => {
                         } else if (field.key === 'potential') {
                           value = `₹${lead.potential || ''}`;
                         } else if (field.key === 'since') {
-                          // 'since' can be shown even if it's today
-                          value = formatDate(lead.since);
+                          // Show date + time (e.g. IndiaMART QUERY_TIME) so it differs from Created at on the same day
+                          value = formatDateTime(lead.since);
                         } else if (field.key === 'lastTalk') {
                           const recentInteraction = getLastTalkForLead(lead.id);
                           // Show very recent interactions immediately (don't hide 'now')
@@ -1906,7 +1907,7 @@ const TopMenu = () => {
                   designation: textOrNA(lead.designation),
                   potential: parseInt(lead.estimatedValue || lead.potential || '0') || 0,
                   tags: textOrNA(lead.tags),
-                  since: lead.since || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString()
+                  since: lead.since || lead.queryTime || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString()
                 }));
 
                 // Call backend import endpoint with array directly

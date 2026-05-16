@@ -70,9 +70,9 @@ func UpdateRolePermissions(c *fiber.Ctx) error {
 			converted[k] = v
 			continue
 		}
-		// try to find menu by menu_name or name
+		// try to find menu by menu_name
 		var menu models.Menu
-		if err := rolemanageDB.Where("menu_name = ? OR name = ?", k, k).First(&menu).Error; err != nil {
+		if err := rolemanageDB.Where("menu_name = ?", k).First(&menu).Error; err != nil {
 			// not found - record unknown key
 			unknownKeys = append(unknownKeys, k)
 			continue

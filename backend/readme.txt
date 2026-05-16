@@ -5,3 +5,8 @@ Navigate to Backend Folder.
 
 //To migrate 
 3) go run ./migrations/migrate.go
+
+
+// to remove zone.identifier
+cd 'c:\Users\Admin\Downloads\erp'; Get-ChildItem -Path . -Recurse -Filter '*Zone.Identifier*' -File -Force | Remove-Item -Force -ErrorAction SilentlyContinue; Write-Output 'REMOVE_DONE'
+REMOVE_DONE

@@ -729,7 +729,7 @@
   }
 
   .activity-create-modal {
-    width: 520px;
+    width: 720px;
     max-width: 95vw;
     background: #fff;
     border-radius: 8px;
@@ -763,6 +763,22 @@
         border-radius: 4px;
         padding: 7px 8px;
         font-size: 13px;
+      }
+
+      .time-picker-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+
+        select {
+          width: auto;
+          min-width: 64px;
+        }
+
+        .time-separator {
+          color: #475569;
+          font-weight: 600;
+        }
       }
     }
 
@@ -917,6 +933,15 @@
           background: #e3f2fd;
           color: #1976d2;
           border-color: #bbdefb;
+        }
+
+        &.excel {
+          background: #e8f5e9;
+          color: #1b5e20;
+          border-color: #a5d6a7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         &.print {

@@ -104,6 +104,8 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
   const getDropdownOptions = (key, row = {}) => {
     const cleanKey = String(key).replace(/\s*\*\s*$/g, '');
     const normalizedKey = cleanKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const countryVal = (row['Country'] || row['Permanent Country'] || '').toString().toLowerCase();
+    const isIndia = countryVal.includes('india') || countryVal.includes('+91') || countryVal.includes('091');
     if (normalizedKey === 'salutation') {
       return { options: ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sir', 'Madam'], multiple: false };
     } else if (normalizedKey === 'gender') {
@@ -112,9 +114,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
       return { options: ['Yes', 'No'], multiple: false };
     } else if (normalizedKey === 'country' || normalizedKey === 'permanentcountry') {
       return { options: IMPORT_COUNTRY_OPTIONS, multiple: false };
-    } else if (normalizedKey === 'state' && (row['Country'] === 'India (+91)' || row['Permanent Country'] === 'India (+91)')) {
+    } else if (normalizedKey === 'state' && isIndia) {
       return { options: Object.values(stateList), multiple: false };
-    } else if (normalizedKey === 'city' && (row['Country'] === 'India (+91)' || row['Permanent Country'] === 'India (+91)')) {
+    } else if (normalizedKey === 'city' && isIndia) {
       return { options: citiesList, multiple: false };
     } else if (normalizedKey.includes('accounttype') || (normalizedKey.includes('account') && normalizedKey.includes('type'))) {
       return { options: IMPORT_ACCOUNT_TYPES, multiple: true };
@@ -978,6 +980,8 @@ const getUserDisplayName = (u) => {
     const genders = ['Male','Female','Other','Prefer not to say'];
     const activeOptions = ['Yes','No'];
     const accountTypes = ['Customer','Supplier','Dealer','Distributor'];
+    const stateOptions = Object.values(stateList || {}).filter(Boolean);
+    const cityOptions = Array.isArray(citiesList) ? citiesList.filter(Boolean) : [];
 
     // Build countries list from imported countriesData if IMPORT_COUNTRY_OPTIONS isn't present
     const countries = (typeof IMPORT_COUNTRY_OPTIONS !== 'undefined' && Array.isArray(IMPORT_COUNTRY_OPTIONS) && IMPORT_COUNTRY_OPTIONS.length > 0)
@@ -986,7 +990,8 @@ const getUserDisplayName = (u) => {
 
     // Write lists into the Lists sheet (each list in its own column)
     // For template download we do NOT include IndustrySegment dropdown (large list)
-    const lists = [salutations, genders, countries, activeOptions, accountTypes];
+    // Columns: A=salutation, B=gender, C=country, D=active, E=accountTypes, F=state, G=city
+    const lists = [salutations, genders, countries, activeOptions, accountTypes, stateOptions, cityOptions];
     lists.forEach((arr, colIdx) => {
       for (let i = 0; i < arr.length; i++) {
         listsSheet.getCell(i + 1, colIdx + 1).value = arr[i];
@@ -1002,6 +1007,8 @@ const getUserDisplayName = (u) => {
       2: { sheetCol: 'A', length: salutations.length },
       6: { sheetCol: 'B', length: genders.length },
       7: { sheetCol: 'C', length: countries.length },
+      17: { sheetCol: 'G', length: cityOptions.length },
+      18: { sheetCol: 'F', length: stateOptions.length },
       19: { sheetCol: 'C', length: countries.length },
       37: { sheetCol: 'D', length: activeOptions.length },
       38: { sheetCol: 'E', length: accountTypes.length }

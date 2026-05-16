@@ -398,6 +398,7 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
               </label>
             </div>
 
+            <label className="form-control-label"><input type="checkbox" checked={columns.primaryKey} onChange={handleColumnToggle('primaryKey')} /> <span>Primary Key</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.name} onChange={handleColumnToggle('name')} /> <span>Name</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.code} onChange={handleColumnToggle('code')} /> <span>Code</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.category} onChange={handleColumnToggle('category')} /> <span>Category</span></label>
@@ -516,6 +517,9 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, pe
             />
           </TableCell>
           <TableCell className="sl-cell" sx={{ py: 0.5, whiteSpace: 'nowrap' }}>{page * limit + idx + 1}</TableCell>
+          {visibleColumns.primaryKey && (
+            <TableCell sx={{ py: 0.5, whiteSpace: 'nowrap' }}>{p.ID}</TableCell>
+          )}
           {visibleColumns.serialnumber && (
             <TableCell sx={{ py: 0.5, width: 20, whiteSpace: 'nowrap' }}>
               {p.SerialNumber ?? p.serial_number ?? ''}
@@ -793,6 +797,7 @@ const FiltersRow = memo(function FiltersRow({
     <TableRow>
       <TableCell sx={{ width: 60 }} />
       <TableCell className="sl-filter" />
+      {visibleColumns.primaryKey && <TableCell sx={{ width: 40 }} />}
       {visibleColumns.name && (
         <TableCell className="filter-cell" sx={{ width: 150 }}>
           <div className="filter-control">
@@ -1543,6 +1548,7 @@ export default function ProductListPage() {
   const [visibleColumns, setVisibleColumns] = useState(() => {
     // Default columns configuration
     const defaultColumns = {
+      primaryKey: false,
       name: true,
       code: true,
       category: true,
@@ -3001,6 +3007,9 @@ export default function ProductListPage() {
       const exportData = productsToExport.map(p => {
         const row = {};
         
+        // Primary Key - include when visible (for filtered) or always for 'all' export
+        if (!shouldRespectVisibleColumns || visibleColumns.primaryKey) row['Primary Key'] = p.ID;
+        
         // Product details - include all for 'all' export, or only visible for 'filtered'
         if (!shouldRespectVisibleColumns || visibleColumns.name) row.Name = p.Name;
         if (!shouldRespectVisibleColumns || visibleColumns.code) row.Code = p.Code;
@@ -3085,6 +3094,7 @@ export default function ProductListPage() {
       
       // Build ordered headers to match table column order
       const columnOrder = [
+        { key: 'Primary Key', visibleKey: 'primaryKey' },
         { key: 'Name', visibleKey: 'name' },
         { key: 'Code', visibleKey: 'code' },
         { key: 'Category', visibleKey: 'category' },
@@ -4455,6 +4465,7 @@ export default function ProductListPage() {
                   />
                 </TableCell>
                 <TableCell className="sl-header" sx={{fontWeight : "bold"}}>SL</TableCell>
+                {visibleColumns.primaryKey && <TableCell sx={{fontWeight : "bold", minWidth: 20}}>Primary Key</TableCell>}
                 {visibleColumns.name && (
                   <TableCell sx={{fontWeight : "bold", minWidth: 200}}>
                     <Box display="flex" alignItems="center" gap={0.5}>

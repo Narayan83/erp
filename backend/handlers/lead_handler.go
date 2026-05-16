@@ -243,7 +243,14 @@ func payloadGetTime(payload map[string]interface{}, keys ...string) (time.Time, 
 			return parsed, true
 		}
 
-		layouts := []string{"02-01-2006", "02-01-2006 15:04", "02-01-2006 15:04:05", "2006-01-02", "2006/01/02", "02/01/2006", "2006-01-02T15:04:05Z07:00"}
+		layouts := []string{
+			"2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02",
+			"2006/01/02 15:04:05", "2006/01/02 15:04", "2006/01/02",
+			"2006-01-02T15:04:05", "2006-01-02T15:04:05Z07:00",
+			"02-01-2006", "02-01-2006 15:04", "02-01-2006 15:04:05",
+			"02/01/2006", "02/01/2006 15:04:05", "02/01/2006 15:04",
+			"02-Jan-2006 15:04:05", "02-Jan-2006 15:04", "02-Jan-2006",
+		}
 		for _, layout := range layouts {
 			if parsed, err := time.Parse(layout, trimmed); err == nil {
 				return parsed, true
@@ -370,7 +377,7 @@ func CreateLead(c *fiber.Ctx) error {
 		if productID, ok := payloadGetUint(payload, "product_id", "productId", "ProductID"); ok {
 			lead.ProductID = productID
 		}
-		if since, ok := payloadGetTime(payload, "since", "createdAt", "created_at", "enquiryDate", "enquiry_date"); ok {
+		if since, ok := payloadGetTime(payload, "since", "queryTime", "query_time", "QUERY_TIME", "createdAt", "created_at", "enquiryDate", "enquiry_date"); ok {
 			lead.Since = since
 		}
 	}
@@ -552,7 +559,7 @@ func UpdateLead(c *fiber.Ctx) error {
 	if value, ok := payloadGetFloat(payload, "potential", "estimated_value", "estimatedValue"); ok {
 		updates["potential"] = value
 	}
-	if value, ok := payloadGetTime(payload, "since", "createdAt", "created_at", "enquiryDate", "enquiry_date"); ok {
+	if value, ok := payloadGetTime(payload, "since", "queryTime", "query_time", "QUERY_TIME", "createdAt", "created_at", "enquiryDate", "enquiry_date"); ok {
 		updates["since"] = value
 	}
 	if value, ok := payloadGetString(payload, "gstin"); ok {
@@ -813,8 +820,15 @@ func ImportLeads(c *fiber.Ctx) error {
 			if t, err := time.Parse(time.RFC3339, val); err == nil {
 				return t, true
 			}
-			// Try common formats
-			layouts := []string{"02-01-2006", "02-01-2006 15:04", "02-01-2006 15:04:05", "2006-01-02", "2006/01/02", "02/01/2006", "2006-01-02T15:04:05Z07:00"}
+			// Try common formats (IndiaMART QUERY_TIME is often "2006-01-02 15:04:05")
+			layouts := []string{
+				"2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02",
+				"2006/01/02 15:04:05", "2006/01/02 15:04", "2006/01/02",
+				"2006-01-02T15:04:05", "2006-01-02T15:04:05Z07:00",
+				"02-01-2006", "02-01-2006 15:04", "02-01-2006 15:04:05",
+				"02/01/2006", "02/01/2006 15:04:05", "02/01/2006 15:04",
+				"02-Jan-2006 15:04:05", "02-Jan-2006 15:04", "02-Jan-2006",
+			}
 			for _, l := range layouts {
 				if t, err := time.Parse(l, val); err == nil {
 					return t, true
@@ -871,8 +885,8 @@ func ImportLeads(c *fiber.Ctx) error {
 			lead.Tags = v
 		}
 
-		// Parse time fields if provided
-		if s := getAny("since", "createdAt", "created_at", "enquiryDate", "enquiry_date"); s != "" {
+		// Parse time fields if provided (enquiry/since only — CreatedAt is set to server time below)
+		if s := getAny("since", "queryTime", "query_time", "QUERY_TIME", "createdAt", "created_at", "enquiryDate", "enquiry_date"); s != "" {
 			if dt, ok := parseDate(s); ok {
 				lead.Since = dt
 			}

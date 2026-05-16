@@ -108,7 +108,9 @@ const IndiaMartIntegration = ({ onClose, onImport }) => {
             setError('No leads found for the selected date range.');
           } else {
             // Format leads for import
-            const formattedLeads = fetchedLeads.map(lead => ({
+            const formattedLeads = fetchedLeads.map(lead => {
+              const enquiryWhen = lead.QUERY_TIME || lead.enquiry_date || '';
+              return {
               business: lead.SENDER_COMPANY || lead.buyer_company || '',
               name: lead.SENDER_NAME || lead.buyer_name || '',
               mobile: lead.SENDER_MOBILE || lead.buyer_mobile || '',
@@ -120,8 +122,10 @@ const IndiaMartIntegration = ({ onClose, onImport }) => {
               product: lead.QUERY_PRODUCT_NAME || lead.product_name || '',
               requirements: lead.QUERY_MESSAGE || lead.buyer_requirement || '',
               queryId: lead.UNIQUE_QUERY_ID || lead.lead_id || '',
-              queryTime: lead.QUERY_TIME || lead.enquiry_date || ''
-            }));
+              queryTime: enquiryWhen,
+              since: enquiryWhen
+              };
+            });
 
             if (onImport) {
               onImport(formattedLeads);

@@ -8,8 +8,9 @@ import * as XLSX from 'xlsx';
 import "./quotationlist.scss";
 import Pagination from "../../../CommonComponents/Pagination";
 import { getProductImage, normalizeImageUrl, normalizeQuotationNumber } from "./utils";
+import { exportQuotationToExcelStyled } from "./quotationExcelExport";
 
-import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaPrint, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt, FaTimes } from 'react-icons/fa';
+import { FaSearch, FaCog, FaTh, FaChartBar, FaFilter, FaWrench, FaDownload, FaBars, FaFileExport, FaFileExcel, FaPrint, FaTrash, FaEdit, FaStar, FaChevronDown, FaCopy, FaCheckCircle, FaRedo, FaExchangeAlt, FaTimes } from 'react-icons/fa';
 import {useAuth} from "../../../context/AuthContext";
 import { useLocation } from "react-router-dom";
 
@@ -530,6 +531,32 @@ const QuotationList = () => {
     return `${h}:${m} ${ampm}`;
   };
 
+  const hourOptions12 = ['12', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11'];
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+  const get12HourParts = (time24) => {
+    const [hourStr = '00', minuteStr = '00'] = String(time24 || '00:00').split(':');
+    const hour24 = Number(hourStr);
+    if (Number.isNaN(hour24)) {
+      return { hour: '12', minute: '00', meridiem: 'AM' };
+    }
+    return {
+      hour: String(hour24 % 12 || 12).padStart(2, '0'),
+      minute: String(Number(minuteStr) || 0).padStart(2, '0'),
+      meridiem: hour24 >= 12 ? 'PM' : 'AM',
+    };
+  };
+
+  const get24HourTime = (hour12, minute, meridiem) => {
+    let parsedHour = Number(hour12);
+    if (Number.isNaN(parsedHour) || parsedHour < 1 || parsedHour > 12) parsedHour = 12;
+    const safeMinute = String(Number(minute) || 0).padStart(2, '0');
+    const normalizedMeridiem = meridiem === 'PM' ? 'PM' : 'AM';
+    let hour24 = parsedHour % 12;
+    if (normalizedMeridiem === 'PM') hour24 += 12;
+    return `${String(hour24).padStart(2, '0')}:${safeMinute}`;
+  };
+
   const fetchDocumentActivities = async (meta) => {
     const [interactionRes, actionRes] = await Promise.all([
       fetch(`${BASE_URL}/api/document-interactions?document_id=${meta.documentId}&document_type=${encodeURIComponent(meta.documentType)}`, { headers: getAuthHeaders() }),
@@ -588,9 +615,10 @@ const QuotationList = () => {
 
   const openActivityCreateModal = (mode) => {
     setActivityMode(mode);
+    const now = new Date();
     setActivityForm({
-      date: new Date().toISOString().slice(0, 10),
-      time: new Date().toTimeString().slice(0, 5),
+      date: now.toISOString().slice(0, 10),
+      time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
       type: mode === 'next_action' ? 'Appointment' : 'General',
       note: '',
     });
@@ -1472,6 +1500,42 @@ const QuotationList = () => {
     await shareAsPDF(e);
   };
 
+  const shareAsExcel = async (e) => {
+    e.stopPropagation();
+    if (!selectedQuotation) return;
+    try {
+      await exportQuotationToExcelStyled({
+        q: selectedQuotation,
+        printConfig,
+        printerHeader,
+        docType: getDocType(selectedQuotation),
+        quotationDate: selectedQuotation.quotation_date,
+        validTill: selectedQuotation.valid_until,
+        references: selectedQuotation.references,
+        note: selectedQuotation.note,
+        tandcSelections: selectedQuotation.terms_and_conditions,
+        extrcharges: selectedQuotation.extra_charges || [],
+        additiondiscounts: selectedQuotation.discounts || [],
+        tableItems: [],
+        selectedBranch: selectedQuotation.company_branch,
+        selectedBank: selectedQuotation.company_branch_bank,
+        selectedEmployeeObj: selectedQuotation.sales_credit_person,
+        selectedBillingAddress: selectedQuotation.billing_address,
+        selectedShippingAddress: selectedQuotation.shipping_address,
+        isSameAsBilling: false,
+        isGSTStateMatch: true,
+        qutationNo: "",
+        selectedCustomer: selectedQuotation.customer,
+        gstForAddr,
+        getCustomerLegalGstin,
+        normalizeQuotationNumber,
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export Excel.");
+    }
+  };
+
   // Mark quotation as Converted and navigate to the create form with copy
   const handleConvert = async (qid, type) => {
     if (!qid) return;
@@ -2267,6 +2331,10 @@ const QuotationList = () => {
                 <button className="share-btn pdf" onClick={(e) => shareAsPDF(e)}>PDF</button>
                 <button className="share-btn whatsapp" onClick={(e) => shareViaWhatsApp(e)}>WhatsApp</button>
                 <button className="share-btn email" onClick={(e) => shareViaEmail(e)}>Email</button>
+                <button type="button" className="share-btn excel" onClick={(e) => shareAsExcel(e)} title="Export to Excel">
+                  <FaFileExcel style={{ marginRight: 6, verticalAlign: "middle" }} />
+                  Excel
+                </button>
                 <button className="share-btn print" onClick={(e) => printQuotation(e)}>Print</button>
               </div>
             </div>
@@ -2275,6 +2343,9 @@ const QuotationList = () => {
               <div className="activity-create-overlay" onClick={() => setShowActivityModal(false)}>
                 <div className="activity-create-modal" onClick={(e) => e.stopPropagation()}>
                   <div className="activity-modal-title">{activityMode === 'interaction' ? 'Add Interaction' : (activityMode === 'complete_next_action' ? 'Complete Next Action' : 'Add Next Action')}</div>
+                  {(() => {
+                    const selectedTime = get12HourParts(activityForm.time);
+                    return (
                   <div className="activity-form-grid">
                     <label>
                       Date
@@ -2286,11 +2357,32 @@ const QuotationList = () => {
                     </label>
                     <label>
                       Time
-                      <input
-                        type="time"
-                        value={activityForm.time}
-                        onChange={(e) => setActivityForm((prev) => ({ ...prev, time: e.target.value }))}
-                      />
+                      <div className="time-picker-inline">
+                        <select
+                          value={selectedTime.hour}
+                          onChange={(e) => setActivityForm((prev) => ({ ...prev, time: get24HourTime(e.target.value, selectedTime.minute, selectedTime.meridiem) }))}
+                        >
+                          {hourOptions12.map((hour) => (
+                            <option key={`activity-hour-${hour}`} value={hour}>{hour}</option>
+                          ))}
+                        </select>
+                        <span className="time-separator">:</span>
+                        <select
+                          value={selectedTime.minute}
+                          onChange={(e) => setActivityForm((prev) => ({ ...prev, time: get24HourTime(selectedTime.hour, e.target.value, selectedTime.meridiem) }))}
+                        >
+                          {minuteOptions.map((minute) => (
+                            <option key={`activity-minute-${minute}`} value={minute}>{minute}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedTime.meridiem}
+                          onChange={(e) => setActivityForm((prev) => ({ ...prev, time: get24HourTime(selectedTime.hour, selectedTime.minute, e.target.value) }))}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
                     </label>
                     <label>
                       Type
@@ -2303,6 +2395,8 @@ const QuotationList = () => {
                       </select>
                     </label>
                   </div>
+                    );
+                  })()}
                   <label className="activity-note-label">
                     Note
                     <textarea

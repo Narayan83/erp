@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { BASE_URL } from '../config/Config';
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
-    const fetchMenus = async () => {
+    const fetchMenus = useCallback(async () => {
         try {
             // Must not rely on axios.defaults alone: after client-side login defaults were never set
             if (!localStorage.getItem('token')) return;
@@ -74,7 +74,19 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
             console.error("Failed to fetch menus", error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        const onMenusChanged = () => {
+            fetchMenus();
+        };
+        window.addEventListener('menuCreated', onMenusChanged);
+        window.addEventListener('menusUpdated', onMenusChanged);
+        return () => {
+            window.removeEventListener('menuCreated', onMenusChanged);
+            window.removeEventListener('menusUpdated', onMenusChanged);
+        };
+    }, [fetchMenus]);
 
     const login = async (email, password) => {
         try {
@@ -117,12 +129,19 @@ export const AuthProvider = ({ children }) => {
         navigate("/login");
     };
 
+    const normalizePath = (p) => {
+        if (p == null || typeof p !== 'string') return '';
+        if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1);
+        return p;
+    };
+
     const getPermissions = (path) => {
+        const needle = normalizePath(path);
         // flatten the menu tree to find the permission for the path
         let perms = null;
         const find = (items) => {
             for (const item of items) {
-                if (item.url === path) {
+                if (normalizePath(item.url) === needle) {
                     perms = item.permissions;
                     return true;
                 }
@@ -137,7 +156,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, menus, getPermissions, loading, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, menus, getPermissions, refetchMenus: fetchMenus, loading, isAuthenticated: !!token }}>
             {children}
         </AuthContext.Provider>
     );

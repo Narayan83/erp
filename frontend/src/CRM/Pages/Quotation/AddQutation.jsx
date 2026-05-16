@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect,useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 // removed CiSearch import (search button removed)
 import { IoMdPrint, IoIosSearch } from "react-icons/io";
 import { IoDocumentText } from "react-icons/io5";
-import { FaYoutube } from "react-icons/fa";
+import { FaYoutube, FaFileExcel } from "react-icons/fa";
 import { MdEdit, MdModelTraining, MdNoteAdd } from "react-icons/md";
 import { CgMenuGridO } from "react-icons/cg";
 import { IoSettingsSharp } from "react-icons/io5";
@@ -16,6 +16,7 @@ import { MdDeleteOutline } from "react-icons/md";
 import './add_quotation.scss';
 // Replaced MUI components with native HTML elements and small helpers
 import axios from "axios";
+import { exportQuotationToExcelStyled } from "./quotationExcelExport";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import { BASE_URL, getAuthHeaders } from "../../../config/Config";
@@ -107,6 +108,9 @@ const AddQutation = () => {
   };
 
   const [open, setOpen] = useState(false);
+  /** Remount customer modal search when opening (stable <input> identity triggers Edge/Chrome "Saved info"). */
+  const [customerSearchInputMountKey, setCustomerSearchInputMountKey] = useState(0);
+  const customerSearchEditableRef = useRef(null);
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -2203,6 +2207,36 @@ const handleTandCClose = () => setOpenTandCModal(false);
     setTimeout(() => { try { w.print(); } catch (err) {} }, 800);
   };
 
+  /** Excel export — implementation in {@link ./quotationExcelExport}. */
+  const exportQuotationToExcel = async (quotationDataFromSave = null) => {
+    return exportQuotationToExcelStyled({
+      q: quotationDataFromSave || {},
+      printConfig,
+      printerHeader,
+      docType,
+      quotationDate,
+      validTill,
+      references,
+      note,
+      tandcSelections,
+      extrcharges,
+      additiondiscounts,
+      tableItems,
+      selectedBranch,
+      selectedBank,
+      selectedEmployeeObj,
+      selectedBillingAddress,
+      selectedShippingAddress,
+      isSameAsBilling,
+      isGSTStateMatch,
+      qutationNo,
+      selectedCustomer,
+      gstForAddr,
+      getCustomerLegalGstin,
+      normalizeQuotationNumber,
+    });
+  };
+
 const handleSaveQuotation = async () => {
   if (!selectedCustomer) return alert("Select a customer.");
   if (!selectedEmployee) return alert("Select a sales credit.");
@@ -2451,17 +2485,44 @@ const onSelectTemplate = (template) => {
 };
 
 
+  const dismissNativeFieldFocus = () => {
+    const el = document.activeElement;
+    if (el && typeof el.blur === "function" && el !== document.body) {
+      el.blur();
+    }
+  };
+
   // Handle open/close modal
-  const handleOpen = () => setOpen(true);
+  const handleOpen = () => {
+    dismissNativeFieldFocus();
+    setCustomerSearchInputMountKey((k) => k + 1);
+    setOpen(true);
+  };
   const handleClose = () => setOpen(false);
 
-  // Handle search
-  const handleSearch = (e) => {
-    console.log("search cliked");
-    const value = e.target.value;
-    setSearch(value);
-    fetchCustomers(value);
+  // Customer modal filter (contenteditable — not a native <input>, so Edge/Chrome do not offer "Saved info" on it)
+  const applyCustomerModalFilter = (value) => {
+    const v = value ?? "";
+    setSearch(v);
+    fetchCustomers(v);
   };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = customerSearchEditableRef.current;
+    if (!el) return;
+    el.textContent = search;
+    // Intentionally omit `search`: only sync when the modal opens / remounts, not on each keystroke.
+  }, [open, customerSearchInputMountKey]);
+
+  /** Move focus into the modal search so Edge/Chrome "Saved info" is not anchored to the page customer control. */
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => {
+      customerSearchEditableRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, customerSearchInputMountKey]);
 
   // Handle select customer
   const handleSelectCustomer = (cust) => {
@@ -2496,7 +2557,9 @@ const onSelectTemplate = (template) => {
   };
 
   const openSearch = () => {
+    dismissNativeFieldFocus();
     fetchCustomers();
+    setCustomerSearchInputMountKey((k) => k + 1);
     setOpen(true);
   };
 
@@ -3583,6 +3646,15 @@ const  prefillFormData = async (data, shouldUpdateDocType = true, reviseMode = i
             ))}
           </select>
 
+          <button
+            type="button"
+            className="btn btn--excel"
+            onClick={() => exportQuotationToExcel()}
+            title="Download current document as Excel (respects Print Settings)"
+          >
+            <span><FaFileExcel /></span>
+            Export Excel
+          </button>
           <button className="btn btn--print" onClick={handleOpenPrintConfig}>
             <span><IoMdPrint /></span>
             Print Settings
@@ -3602,18 +3674,22 @@ const  prefillFormData = async (data, shouldUpdateDocType = true, reviseMode = i
           <div className="form-group">
             <label htmlFor="customer">Customer :</label>
             <div className="input-with-actions">
-              <input
+              <button
+                type="button"
                 id="customer"
-                type="text"
-                className="form-control"
-                value={
-                  selectedCustomer
-                    ? (selectedCustomer.company_name || "")
-                    : ""
-                }
-                onClick={() => openSearch()}
-                readOnly
-              />
+                className="form-control customer-select-trigger"
+                onClick={openSearch}
+                disabled={isRestrictedEditMode}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                title={isRestrictedEditMode ? "Customer cannot be changed in this mode" : "Select customer"}
+              >
+                {selectedCustomer ? (
+                  (selectedCustomer.company_name || selectedCustomer.company || "").trim() || "\u00A0"
+                ) : (
+                  <span className="customer-select-trigger-placeholder">Click to select customer</span>
+                )}
+              </button>
               <button
                 type="button"
                 className="btn-customer-action btn-customer-add"
@@ -4958,12 +5034,58 @@ const  prefillFormData = async (data, shouldUpdateDocType = true, reviseMode = i
             </div>
 
             <div className="modal-body">
-              <input
-                type="text"
-                className="form-control search-input"
-                placeholder="Search customers..."
-                value={search}
-                onChange={handleSearch}
+              <div
+                key={`customer-search-editable-${customerSearchInputMountKey}`}
+                ref={customerSearchEditableRef}
+                className="form-control search-input customer-search-fake-input"
+                contentEditable="plaintext-only"
+                suppressContentEditableWarning
+                role="searchbox"
+                aria-label="Search customers"
+                data-placeholder="Search customers..."
+                tabIndex={0}
+                onInput={(e) => {
+                  const el = e.currentTarget;
+                  let raw = el.textContent ?? "";
+                  raw = raw.replace(/\r?\n/g, " ");
+                  if (raw !== el.textContent) {
+                    el.textContent = raw;
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    range.collapse(false);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                  }
+                  applyCustomerModalFilter(raw);
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = (e.clipboardData.getData("text/plain") || "").replace(/\r?\n/g, " ");
+                  const el = e.currentTarget;
+                  el.focus();
+                  if (document.queryCommandSupported?.("insertText")) {
+                    document.execCommand("insertText", false, text);
+                  } else {
+                    const sel = window.getSelection();
+                    if (!sel?.rangeCount) {
+                      el.appendChild(document.createTextNode(text));
+                    } else {
+                      const range = sel.getRangeAt(0);
+                      range.deleteContents();
+                      const tn = document.createTextNode(text);
+                      range.insertNode(tn);
+                      range.setStartAfter(tn);
+                      range.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(range);
+                    }
+                  }
+                  applyCustomerModalFilter(el.textContent ?? "");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
               />
 
               <div className="customer-list-container">

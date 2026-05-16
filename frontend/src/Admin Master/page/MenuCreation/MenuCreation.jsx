@@ -146,6 +146,10 @@ const loadMenus = async () => {
         if (typeof onUpdateMenu === "function") {
           onUpdateMenu(res.data);
         }
+        await loadMenus();
+        try {
+          window.dispatchEvent(new CustomEvent('menusUpdated', { detail: res.data }));
+        } catch (e) {}
       } else {
         const res = await axios.post(`${BASE_URL}/api/menus`, newMenu);
         if (typeof onAddMenu === "function") {
