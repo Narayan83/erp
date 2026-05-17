@@ -212,15 +212,17 @@ func main() {
 	// Products
 	api.Post("/products", handler.CreateProduct)
 	api.Get("/products", handler.GetAllProducts)
+	api.Get("/products/ids", handler.GetProductIDs)
+	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
+	api.Get("/products/stats", handler.GetProductStats)
+	api.Post("/products/bulk-image", handler.BulkUploadProductImage)
 	api.Get("/products/:id", handler.GetProductByID)
 	// Soft delete (and restore) route for products
 	api.Delete("/products/:id", handler.DeleteProduct)
 	api.Put("/products/:id", handler.UpdateProduct)
-	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
 	api.Post("/users/import", handler.ImportUsers)
 	api.Post("/products/fix-sequence", handler.FixProductSequence)
-	api.Get("/products/stats", handler.GetProductStats)
 
 	// Product Variants
 	api.Get("/product_variants", handler.GetAllProduct_variant)

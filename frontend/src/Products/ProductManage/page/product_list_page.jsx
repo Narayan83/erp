@@ -35,6 +35,7 @@ import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import ImportDialog from "../../../CommonComponents/ImportDialog";
+import BulkImageUploadDialog from "../../../CommonComponents/BulkImageUploadDialog";
 import "./product_list_page.scss";
 
 import { useAuth } from "../../../context/AuthContext"; 
@@ -2587,6 +2588,7 @@ export default function ProductListPage() {
   const [errorMessage] = useState('');
   const [errorTitle, setErrorTitle] = useState('');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [bulkImageDialogOpen, setBulkImageDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importedData, setImportedData] = useState([]);
@@ -4347,6 +4349,12 @@ export default function ProductListPage() {
       </Dialog>
 
       {/* Import dialog (reusable component) */}
+      <BulkImageUploadDialog
+        open={bulkImageDialogOpen}
+        onClose={() => setBulkImageDialogOpen(false)}
+        onComplete={() => fetchProducts()}
+      />
+
       <ImportDialog
         open={importDialogOpen}
         onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
@@ -4396,6 +4404,23 @@ export default function ProductListPage() {
                 <rect x="15" y="4" width="6" height="7" fill="currentColor" />
                 <rect x="3" y="13" width="6" height="7" fill="currentColor" />
                 <rect x="15" y="13" width="6" height="7" fill="currentColor" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline btn-bulk-images"
+              onClick={() => setBulkImageDialogOpen(true)}
+              title="Bulk upload product images"
+              aria-label="Bulk upload product images"
+            >
+              <svg className="icon-bulk-images" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">
+                <rect x="3" y="5" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
+                <path d="M3 15l4-3 3 2.5 5-4.5 6 5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18 8v8a2 2 0 0 1-2 2H6" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                <path d="M16 6h4v4" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M20 6l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </button>
 

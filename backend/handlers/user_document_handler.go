@@ -1,12 +1,9 @@
 package handler
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
-	"time"
 
+	"erp.local/backend/cloudinaryutil"
 	"erp.local/backend/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -38,20 +35,11 @@ func CreateUserDocument(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "File is required"})
 	}
 
-	// Create uploads folder path
-	uploadDir := "./uploads/documents/"
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to create upload folder"})
-	}
-
-	// Generate unique filename
-	ext := filepath.Ext(file.Filename)
-	fileName := fmt.Sprintf("doc_%d%s", time.Now().UnixNano(), ext)
-	filePath := filepath.Join(uploadDir, fileName)
-
-	// Save file to uploads/documents
-	if err := c.SaveFile(file, filePath); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to save file"})
+	// Upload file to Cloudinary
+	resourceType := cloudinaryutil.ResourceTypeForFile(file.Filename)
+	upResult, err := cloudinaryutil.UploadFile(file, "documents", resourceType)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to upload file: " + err.Error()})
 	}
 
 	// Convert user_id to uint
@@ -62,7 +50,7 @@ func CreateUserDocument(c *fiber.Ctx) error {
 		UserID:    uint(uid),
 		DocType:   docType,
 		DocNumber: docNumber,
-		FileURL:   filePath, // local file path
+		FileURL:   upResult.SecureURL,
 	}
 
 	if err := userDocumentDB.Create(&doc).Error; err != nil {
@@ -119,27 +107,22 @@ func UpdateUserDocument(c *fiber.Ctx) error {
 	// Check if file is uploaded
 	file, err := c.FormFile("file")
 	if err == nil {
-		// Create upload path if not exists
-		uploadDir := "./uploads/documents/"
-		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to create upload folder"})
-		}
-
-		// Delete old file (optional but recommended)
+		// Delete old file from Cloudinary if it was uploaded there
 		if doc.FileURL != "" {
-			_ = os.Remove(doc.FileURL)
+			oldLower := doc.FileURL
+			if len(oldLower) >= 4 && oldLower[:4] == "http" {
+				pubID := cloudinaryutil.ExtractPublicID(doc.FileURL)
+				_ = cloudinaryutil.DeleteFile(pubID, cloudinaryutil.ResourceTypeForFile(doc.FileURL))
+			}
 		}
 
-		// Save new file
-		ext := filepath.Ext(file.Filename)
-		fileName := fmt.Sprintf("doc_%d%s", time.Now().UnixNano(), ext)
-		filePath := filepath.Join(uploadDir, fileName)
-
-		if err := c.SaveFile(file, filePath); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to save new file"})
+		// Upload new file to Cloudinary
+		resourceType := cloudinaryutil.ResourceTypeForFile(file.Filename)
+		upResult, err := cloudinaryutil.UploadFile(file, "documents", resourceType)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload new file: " + err.Error()})
 		}
-
-		doc.FileURL = filePath // update DB path
+		doc.FileURL = upResult.SecureURL
 	}
 
 	// Save updates
@@ -161,6 +144,9 @@ func DeleteUserDocument(c *fiber.Ctx) error {
 	if err := userDocumentDB.First(&doc, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Document not found"})
 	}
+
+	// Delete file from Cloudinary before removing DB record
+	cloudinaryutil.DeleteByURL(doc.FileURL)
 
 	if err := userDocumentDB.Delete(&doc).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete document"})

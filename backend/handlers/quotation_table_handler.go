@@ -303,10 +303,9 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
+	"erp.local/backend/cloudinaryutil"
 	"erp.local/backend/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -440,14 +439,12 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 	// ---------------------------
 	file, err := c.FormFile("attachment")
 	if err == nil {
-		uploadDir := "./uploads/quotations/"
-		_ = os.MkdirAll(uploadDir, 0755)
-
-		filePath := filepath.Join(uploadDir, file.Filename)
-		if err := c.SaveFile(file, filePath); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		upResult, upErr := cloudinaryutil.UploadFile(file, "quotations", cloudinaryutil.ResourceTypeForFile(file.Filename))
+		if upErr != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload attachment: " + upErr.Error()})
 		}
-		req.Quotation.AttachmentPath = &filePath
+		attachmentURL := upResult.SecureURL
+		req.Quotation.AttachmentPath = &attachmentURL
 	}
 
 	// ---------------------------
@@ -719,14 +716,12 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 	// ---------------------------
 	file, err := c.FormFile("attachment")
 	if err == nil {
-		uploadDir := "./uploads/quotations/"
-		_ = os.MkdirAll(uploadDir, 0755)
-
-		filePath := filepath.Join(uploadDir, file.Filename)
-		if err := c.SaveFile(file, filePath); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		upResult, upErr := cloudinaryutil.UploadFile(file, "quotations", cloudinaryutil.ResourceTypeForFile(file.Filename))
+		if upErr != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload attachment: " + upErr.Error()})
 		}
-		req.Quotation.AttachmentPath = &filePath
+		attachmentURL := upResult.SecureURL
+		req.Quotation.AttachmentPath = &attachmentURL
 	}
 
 	tx := quotationTableDB.Begin()
