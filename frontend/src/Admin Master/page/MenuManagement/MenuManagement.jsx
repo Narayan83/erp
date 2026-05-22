@@ -4,6 +4,8 @@ import "../../styles/menu_management.scss";
 import { FaEdit, FaTrash, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
 import { BASE_URL } from "../../../config/Config"; // Add this import
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const defaultOnEdit = () => {};
 
@@ -65,6 +67,9 @@ function collectIdsWithChildren(nodes, acc = new Set()) {
 }
 
 export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMenu = defaultOnEdit }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [search, setSearch] = useState("");
   const [localMenus, setLocalMenus] = useState(() => {
     if (menus) return menus;
@@ -249,22 +254,26 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
               </span>
             </div>
             <div className="menu-tree-row-actions">
-              <button
-                type="button"
-                className="action-btn edit-btn"
-                title="Edit"
-                onClick={() => handleEdit(menu)}
-              >
-                <FaEdit />
-              </button>
-              <button
-                type="button"
-                className="action-btn delete-btn"
-                title="Delete"
-                onClick={() => handleDelete(menu.id)}
-              >
-                <FaTrash />
-              </button>
+              {perms?.can_update && (
+                <button
+                  type="button"
+                  className="action-btn edit-btn"
+                  title="Edit"
+                  onClick={() => handleEdit(menu)}
+                >
+                  <FaEdit />
+                </button>
+              )}
+              {perms?.can_delete && (
+                <button
+                  type="button"
+                  className="action-btn delete-btn"
+                  title="Delete"
+                  onClick={() => handleDelete(menu.id)}
+                >
+                  <FaTrash />
+                </button>
+              )}
             </div>
           </div>
           {menu.description ? (

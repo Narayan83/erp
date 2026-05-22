@@ -11,8 +11,13 @@ import {
 
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function DesignationTable({ rows, onEdit, onDelete, page = 0, rowsPerPage = 10 }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   // Slice rows for pagination (controlled by parent)
   const paginatedRows = rows.slice(
     page * rowsPerPage,
@@ -39,13 +44,16 @@ export default function DesignationTable({ rows, onEdit, onDelete, page = 0, row
                 <TableCell sx={{ width: '60%' }}>{row.name}</TableCell>
                 <TableCell sx={{ width: 120 }}>{row.level}</TableCell>
                 <TableCell sx={{ width: 150, textAlign: 'center' }}>
-                  <IconButton onClick={() => onEdit(row)}>
-                    <EditIcon color="primary" />
-                  </IconButton>
-
-                  <IconButton onClick={() => onDelete(row.id)}>
-                    <DeleteIcon color="error" />
-                  </IconButton>
+                  {perms?.can_update && (
+                    <IconButton onClick={() => onEdit(row)}>
+                      <EditIcon color="primary" />
+                    </IconButton>
+                  )}
+                  {perms?.can_delete && (
+                    <IconButton onClick={() => onDelete(row.id)}>
+                      <DeleteIcon color="error" />
+                    </IconButton>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

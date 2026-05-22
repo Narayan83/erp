@@ -6,12 +6,17 @@ import { MdOutlineClear, MdEdit, MdDelete, MdVisibility } from "react-icons/md";
 import { IoMdMail, IoMdPerson, IoMdCall } from "react-icons/io";
 import './Registration.scss';
 import { BASE_URL, getAuthHeaders } from '../../config/Config';
+import { useAuth } from '../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 const RegistrationView = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
 
   useEffect(() => {
     fetchUsers();
@@ -126,23 +131,27 @@ const RegistrationView = () => {
                           >
                             <MdVisibility /> View
                           </Button>
-                          <Button 
-                            variant="outlined" 
-                            color="secondary" 
-                            size="small"
-                            onClick={() => handleEdit(user.id)}
-                            style={{ marginRight: '5px' }}
-                          >
-                            <MdEdit /> Edit
-                          </Button>
-                          <Button 
-                            variant="outlined" 
-                            color="error" 
-                            size="small"
-                            onClick={() => handleDelete(user.id)}
-                          >
-                            <MdDelete /> Delete
-                          </Button>
+                          {perms?.can_update && (
+                            <Button 
+                              variant="outlined" 
+                              color="secondary" 
+                              size="small"
+                              onClick={() => handleEdit(user.id)}
+                              style={{ marginRight: '5px' }}
+                            >
+                              <MdEdit /> Edit
+                            </Button>
+                          )}
+                          {perms?.can_delete && (
+                            <Button 
+                              variant="outlined" 
+                              color="error" 
+                              size="small"
+                              onClick={() => handleDelete(user.id)}
+                            >
+                              <MdDelete /> Delete
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))

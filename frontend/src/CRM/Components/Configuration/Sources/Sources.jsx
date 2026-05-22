@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
 import { getAuthHeaders } from '../../../../config/Config';
+import { useAuth } from '../../../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import './sources.scss';
 
 const apiBase = '/api';
 
 const Sources = ({ isOpen, onClose }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [sources, setSources] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
@@ -121,7 +126,9 @@ const Sources = ({ isOpen, onClose }) => {
         <div className="tandc-dialog-header">
           <div className="title">Lead Sources</div>
           <div className="actions">
+            {perms?.can_create && (
             <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            )}
             <button className="close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -138,12 +145,16 @@ const Sources = ({ isOpen, onClose }) => {
                   {source.name}
                 </div>
                 <div className="item-actions">
+                  {perms?.can_update && (
                   <button className="icon-button edit" onClick={() => openEdit(source)} title="Edit source">
                     <FaEdit />
                   </button>
+                  )}
+                  {perms?.can_delete && (
                   <button className="icon-button delete" onClick={() => handleDeleteSource(source.id)} title="Delete source">
                     <FaTrash />
                   </button>
+                  )}
                 </div>
               </div>
             ))

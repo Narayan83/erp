@@ -33,6 +33,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { debounce } from "lodash";
 import { BASE_URL } from "../../config/Config";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import ConfirmDialog from "../../CommonComponents/ConfirmDialog";
 import ImportDialog from "../../CommonComponents/ImportDialog";
 import dialCodeToCountry from "../utils/dialCodeToCountry";
@@ -205,6 +207,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
 
 export default function UserListPage() {
   const navigate = useNavigate();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({ name: "", deptHead: '', userType: '', executiveID: '' });
   const [page, setPage] = useState(0);
@@ -1760,15 +1765,17 @@ const getUserDisplayName = (u) => {
             </IconButton>
           </Tooltip>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
-            style={{ marginLeft: 'auto' }}
-            aria-label="Add User"
-          >
-            + Add User
-          </button>
+          {perms?.can_create && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
+              style={{ marginLeft: 'auto' }}
+              aria-label="Add User"
+            >
+              + Add User
+            </button>
+          )}
         </Box>
       </Paper>
 
@@ -2045,8 +2052,12 @@ const getUserDisplayName = (u) => {
                                   <Visibility />
                                 </button>
                               </Tooltip>
-                              <Tooltip title="Edit"><button type="button" className="action-btn edit-btn" onClick={(e) => { e.stopPropagation(); navigate(`/users/${user.id}/edit`); }} aria-label="Edit user"><Edit /></button></Tooltip>
-                              <Tooltip title="Delete"><button type="button" className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }} aria-label="Delete user"><Delete /></button></Tooltip>
+                              {perms?.can_update && (
+                                <Tooltip title="Edit"><button type="button" className="action-btn edit-btn" onClick={(e) => { e.stopPropagation(); navigate(`/users/${user.id}/edit`); }} aria-label="Edit user"><Edit /></button></Tooltip>
+                              )}
+                              {perms?.can_delete && (
+                                <Tooltip title="Delete"><button type="button" className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }} aria-label="Delete user"><Delete /></button></Tooltip>
+                              )}
                               {/* WhatsApp: prefer whatsapp_number, fallback to mobile_number. Use wa.me with digits-only number */}
                               {((user.whatsapp_number || user.mobile_number) && (user.whatsapp_number || user.mobile_number).toString().trim() !== '') ? (
                                 <Tooltip title="WhatsApp">

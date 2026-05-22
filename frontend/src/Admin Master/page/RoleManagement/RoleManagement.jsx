@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import "../../styles/role_management.scss";
 // Icons
 import { FaEdit, FaTrash, FaPlus, FaSearch, FaSync, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import RoleCreation from "../RoleCreation/RoleCreation";
 
 export default function ExistingRoles() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -164,9 +169,11 @@ export default function ExistingRoles() {
 
         {/* right: create button */}
         <div className="button-wrapper">
+          {perms?.can_create && (
           <button className="create-btn" onClick={handleCreate}>
             <FaPlus /> New Role
           </button>
+          )}
         </div>
       </section>
 
@@ -206,8 +213,12 @@ export default function ExistingRoles() {
                     </div>
                   </td>
                   <td className="actions-cell">
-                    <button className="icon-btn edit" onClick={() => handleEdit(role)} title="Edit Role"><FaEdit /></button>
-                    <button className="icon-btn delete" onClick={() => handleDelete(role)} title="Delete Role"><FaTrash /></button>
+                    {perms?.can_update && (
+                      <button className="icon-btn edit" onClick={() => handleEdit(role)} title="Edit Role"><FaEdit /></button>
+                    )}
+                    {perms?.can_delete && (
+                      <button className="icon-btn delete" onClick={() => handleDelete(role)} title="Delete Role"><FaTrash /></button>
+                    )}
                   </td>
                 </tr>
               ))

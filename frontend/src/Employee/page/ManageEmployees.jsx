@@ -3,6 +3,8 @@ import axios from "axios";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import { BASE_URL } from "../../config/Config";
 import "./ManageEmployees.scss";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 function asArray(payload) {
   if (Array.isArray(payload)) return payload;
@@ -36,6 +38,9 @@ function getEmpCode(user = {}, emp = {}) {
 }
 
 export default function ManageEmployees() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
@@ -343,12 +348,16 @@ export default function ManageEmployees() {
                     <td className="col-designation">{designation.name || "-"}</td>
                     <td className="col-actions">
                       <div className="table-actions">
-                        <button className="action-btn edit" onClick={() => openEditModal(row)} aria-label="Edit employee">
-                          <FiEdit2 />
-                        </button>
-                        <button className="action-btn delete" onClick={() => onDelete(row)} aria-label="Delete employee">
-                          <FiTrash2 />
-                        </button>
+                        {perms?.can_update && (
+                          <button className="action-btn edit" onClick={() => openEditModal(row)} aria-label="Edit employee">
+                            <FiEdit2 />
+                          </button>
+                        )}
+                        {perms?.can_delete && (
+                          <button className="action-btn delete" onClick={() => onDelete(row)} aria-label="Delete employee">
+                            <FiTrash2 />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

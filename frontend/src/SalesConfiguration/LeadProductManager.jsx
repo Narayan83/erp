@@ -2,8 +2,13 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiEdit2, FiSlash, FiTrash2 } from 'react-icons/fi';
 import { BASE_URL, getAuthHeaders } from '../config/Config';
+import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 const LeadProductManager = ({ isOpen, onClose }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [items, setItems] = useState([]);
   const [newName, setNewName] = useState('');
   const [editingItem, setEditingItem] = useState(null);
@@ -118,9 +123,11 @@ const LeadProductManager = ({ isOpen, onClose }) => {
               placeholder={editingItem ? 'Edit product name' : 'Enter product name'}
               className={`crm-modal-input ${formError ? 'has-error' : ''}`}
             />
-            <button type="button" className="crm-modal-btn" onClick={handleCreate} disabled={saving || !newName.trim()}>
-              {saving ? (editingItem ? 'Updating...' : 'Saving...') : (editingItem ? 'Update' : 'Add')}
-            </button>
+            {(editingItem ? perms?.can_update : perms?.can_create) && (
+              <button type="button" className="crm-modal-btn" onClick={handleCreate} disabled={saving || !newName.trim()}>
+                {saving ? (editingItem ? 'Updating...' : 'Saving...') : (editingItem ? 'Update' : 'Add')}
+              </button>
+            )}
             {editingItem && (
               <button type="button" className="crm-modal-btn secondary" onClick={cancelEdit} disabled={saving}>
                 Cancel
@@ -155,15 +162,17 @@ const LeadProductManager = ({ isOpen, onClose }) => {
                     <td>{item.active ? 'Active' : 'Inactive'}</td>
                     <td>
                       <div className="crm-action-icons">
-                        <button
-                          type="button"
-                          className="crm-icon-btn edit"
-                          title="Edit"
-                          aria-label={`Edit ${item.name}`}
-                          onClick={() => handleEdit(item)}
-                        >
-                          <FiEdit2 />
-                        </button>
+                        {perms?.can_update && (
+                          <button
+                            type="button"
+                            className="crm-icon-btn edit"
+                            title="Edit"
+                            aria-label={`Edit ${item.name}`}
+                            onClick={() => handleEdit(item)}
+                          >
+                            <FiEdit2 />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="crm-icon-btn disable"
@@ -173,15 +182,17 @@ const LeadProductManager = ({ isOpen, onClose }) => {
                         >
                           <FiSlash />
                         </button>
-                        <button
-                          type="button"
-                          className="crm-icon-btn delete"
-                          title="Delete"
-                          aria-label={`Delete ${item.name}`}
-                          onClick={() => handleDelete(item)}
-                        >
-                          <FiTrash2 />
-                        </button>
+                        {perms?.can_delete && (
+                          <button
+                            type="button"
+                            className="crm-icon-btn delete"
+                            title="Delete"
+                            aria-label={`Delete ${item.name}`}
+                            onClick={() => handleDelete(item)}
+                          >
+                            <FiTrash2 />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

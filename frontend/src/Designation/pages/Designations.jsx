@@ -5,13 +5,17 @@ import {
   updateDesignation,
   deleteDesignation,
 } from "../component/designationApi";
-
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import DesignationFormModal from "../component/DesignationFormModal";
 import DesignationTable from "../component/DesignationTable";
 import Pagination from "../../CommonComponents/Pagination";
 import './Designations.scss';
 
 export default function Designations() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [designations, setDesignations] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
@@ -61,7 +65,9 @@ export default function Designations() {
     <div className="designations-page">
       <div className="page-header">
         <h2>Designations</h2>
-        <button className="btn primary" onClick={handleCreate}>+ Add Designation</button>
+        {perms?.can_create && (
+          <button className="btn primary" onClick={handleCreate}>+ Add Designation</button>
+        )}
       </div>
 
       <div className="table-wrap">

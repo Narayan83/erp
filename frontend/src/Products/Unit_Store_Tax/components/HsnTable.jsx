@@ -45,7 +45,7 @@ export default function HsnTable({ data, onEdit, onDelete, page = 0, rowsPerPage
                 })()}
               </TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                {perms?.can_edit && (
+                {perms?.can_update && (
                   <IconButton size="small" onClick={() => onEdit(hsn)}><EditIcon fontSize="small" /></IconButton>
                 )}
                 {perms?.can_delete && (

@@ -46,6 +46,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL } from "../../config/Config";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import countries from "../../User/utils/countries.js";
 import citiesList from "../../User/utils/cities-name-list.json";
 import stateListData from "../../User/utils/state_list.json";
@@ -153,6 +155,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error = fals
 
 export default function EmployeeListPage() {
   const navigate = useNavigate();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [employees, setEmployees] = useState([]);
   const [filters, setFilters] = useState({ search: "" });
   const [page, setPage] = useState(0);
@@ -1487,14 +1492,16 @@ export default function EmployeeListPage() {
             </div>
 
             <div className="toolbar-right">
-              <button
-                type="button"
-                className="btn btn-primary add-employee-btn"
-                onClick={handleAddEmployee}
-                aria-label="Add Employee"
-              >
-                <AddIcon fontSize="small" style={{ marginRight: 8 }} /> Add Employee
-              </button>
+              {perms?.can_create && (
+                <button
+                  type="button"
+                  className="btn btn-primary add-employee-btn"
+                  onClick={handleAddEmployee}
+                  aria-label="Add Employee"
+                >
+                  <AddIcon fontSize="small" style={{ marginRight: 8 }} /> Add Employee
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1704,26 +1711,30 @@ export default function EmployeeListPage() {
                             <VisibilityIcon />
                           </button>
                         </Tooltip>
-                        <Tooltip title="Edit">
-                          <button 
-                            type="button"
-                            className="action-btn edit-btn"
-                            onClick={(e) => { e.stopPropagation(); handleEditEmployee(employee); }}
-                            aria-label="Edit employee"
-                          >
-                            <EditIcon />
-                          </button>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <button 
-                            type="button"
-                            className="action-btn delete-btn"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(employee); }}
-                            aria-label="Delete employee"
-                          >
-                            <DeleteIcon />
-                          </button>
-                        </Tooltip>
+                        {perms?.can_update && (
+                          <Tooltip title="Edit">
+                            <button 
+                              type="button"
+                              className="action-btn edit-btn"
+                              onClick={(e) => { e.stopPropagation(); handleEditEmployee(employee); }}
+                              aria-label="Edit employee"
+                            >
+                              <EditIcon />
+                            </button>
+                          </Tooltip>
+                        )}
+                        {perms?.can_delete && (
+                          <Tooltip title="Delete">
+                            <button 
+                              type="button"
+                              className="action-btn delete-btn"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(employee); }}
+                              aria-label="Delete employee"
+                            >
+                              <DeleteIcon />
+                            </button>
+                          </Tooltip>
+                        )}
                       </div>
                     </td>
                   </tr>

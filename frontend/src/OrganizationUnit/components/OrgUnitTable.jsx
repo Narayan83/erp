@@ -1,7 +1,12 @@
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import "../Pages/OrganizationUnits.scss";
 
 export default function OrgUnitTable({ rows, onEdit, onDelete }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   return (
     <div className="org-table-container">
       <table className="org-table">
@@ -22,13 +27,16 @@ export default function OrgUnitTable({ rows, onEdit, onDelete }) {
               <td>{row.parent ? row.parent.name : "-"}</td>
 
               <td>
+                {perms?.can_update && (
                 <button className="icon-btn" onClick={() => onEdit(row)} title="Edit">
                   <FaEdit />
                 </button>
-
+                )}
+                {perms?.can_delete && (
                 <button className="icon-btn danger" onClick={() => onDelete(row.id)} title="Delete">
                   <FaTrash />
                 </button>
+                )}
               </td>
             </tr>
           ))}

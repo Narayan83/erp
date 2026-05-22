@@ -4,6 +4,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 import {
   getHierarchy,
@@ -21,7 +23,7 @@ function getEmployeeMeta(node) {
   return { empCode, department, designation };
 }
 
-const TreeNode = ({ node, onEdit, onDelete, seen }) => {
+const TreeNode = ({ node, onEdit, onDelete, seen, perms }) => {
   const [expanded, setExpanded] = useState(true);
   const { empCode, department, designation } = getEmployeeMeta(node);
 
@@ -59,12 +61,16 @@ const TreeNode = ({ node, onEdit, onDelete, seen }) => {
 
         {node.hierarchyItem && (
           <div className="tree-node-actions">
+            {perms?.can_update && (
             <IconButton size="small" onClick={() => onEdit(node.hierarchyItem)}>
               <EditIcon color="primary" fontSize="small" />
             </IconButton>
+            )}
+            {perms?.can_delete && (
             <IconButton size="small" onClick={() => onDelete(node.hierarchyItem.id)}>
               <DeleteIcon color="error" fontSize="small" />
             </IconButton>
+            )}
           </div>
         )}
       </div>
@@ -72,7 +78,7 @@ const TreeNode = ({ node, onEdit, onDelete, seen }) => {
       {expanded && node.children && node.children.length > 0 && (
         <div className="tree-node-children">
           {node.children.map((child) => (
-            <TreeNode key={child.id} node={child} onEdit={onEdit} onDelete={onDelete} seen={nextSeen} />
+            <TreeNode key={child.id} node={child} onEdit={onEdit} onDelete={onDelete} seen={nextSeen} perms={perms} />
           ))}
         </div>
       )}
@@ -81,6 +87,9 @@ const TreeNode = ({ node, onEdit, onDelete, seen }) => {
 };
 
 export default function EmployeeHierarchyPage() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
 
@@ -154,6 +163,7 @@ export default function EmployeeHierarchyPage() {
       <div className="page-header">
         <h2>Employee Hierarchy</h2>
         <div>
+          {perms?.can_create && (
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -163,6 +173,7 @@ export default function EmployeeHierarchyPage() {
           >
             Add New
           </button>
+          )}
         </div>
       </div>
 
@@ -175,6 +186,7 @@ export default function EmployeeHierarchyPage() {
               onEdit={(item) => { setEditData(item); setOpenModal(true); }} 
               onDelete={handleDelete}
               seen={new Set()}
+              perms={perms}
             />
           ))
         ) : (

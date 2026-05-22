@@ -535,13 +535,17 @@ import {
   updateDepartment,
   deleteDepartment,
 } from "../component/departmentApi";
-
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import DepartmentFormModal from "../component/DepartmentFormModal";
 import DepartmentTable from "../component/DepartmentTable";
 import Pagination from "../../CommonComponents/Pagination";
 import './Department.scss';
 
 export default function Departments() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [departments, setDepartments] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
@@ -591,7 +595,9 @@ export default function Departments() {
     <div className="departments-page">
       <div className="page-header">
         <h2>Departments</h2>
-        <button className="btn primary" onClick={handleCreate}>+ Add Department</button>
+        {perms?.can_create && (
+          <button className="btn primary" onClick={handleCreate}>+ Add Department</button>
+        )}
       </div>
 
       <div className="table-wrap">

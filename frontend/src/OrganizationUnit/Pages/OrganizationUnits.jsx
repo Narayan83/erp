@@ -5,7 +5,8 @@ import {
   updateOrgUnit,
   deleteOrgUnit,
 } from "../components/orgUnitApi";
-
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import OrgUnitFormModal from "../components/OrgUnitFormModal";
 import OrgUnitTable from "../components/OrgUnitTable";
 import Pagination from "../../CommonComponents/Pagination";
@@ -13,6 +14,9 @@ import Pagination from "../../CommonComponents/Pagination";
 import "./OrganizationUnits.scss";
 
 export default function OrganizationUnits() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [units, setUnits] = useState([]);
   const [allUnits, setAllUnits] = useState([]); // for parent dropdown
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,9 +79,11 @@ export default function OrganizationUnits() {
         <h2>Organization Units</h2>
 
         <div>
+          {perms?.can_create && (
           <button className="btn btn-primary" onClick={handleCreate}>
             + Add Organization Unit
           </button>
+          )}
         </div>
       </div>
 

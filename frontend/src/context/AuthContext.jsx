@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [menus, setMenus] = useState([]);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
@@ -64,6 +65,16 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
+    const detectSuperAdmin = (items) => {
+        for (const item of items) {
+            if (item.permissions?.can_all === true) return true;
+            if (item.children && item.children.length > 0) {
+                if (detectSuperAdmin(item.children)) return true;
+            }
+        }
+        return false;
+    };
+
     const fetchMenus = useCallback(async () => {
         try {
             // Must not rely on axios.defaults alone: after client-side login defaults were never set
@@ -71,6 +82,7 @@ export const AuthProvider = ({ children }) => {
 
             const response = await axios.get(`${BASE_URL}/api/my-menus`);
             setMenus(response.data);
+            setIsSuperAdmin(detectSuperAdmin(response.data));
         } catch (error) {
             console.error("Failed to fetch menus", error);
         }
@@ -152,11 +164,14 @@ export const AuthProvider = ({ children }) => {
             return false;
         };
         find(menus);
+        if (!perms && isSuperAdmin) {
+            return { can_view: true, can_create: true, can_update: true, can_delete: true };
+        }
         return perms || { can_view: false, can_create: false, can_update: false, can_delete: false };
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, menus, getPermissions, refetchMenus: fetchMenus, loading, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, menus, isSuperAdmin, getPermissions, refetchMenus: fetchMenus, loading, isAuthenticated: !!token }}>
             {children}
         </AuthContext.Provider>
     );

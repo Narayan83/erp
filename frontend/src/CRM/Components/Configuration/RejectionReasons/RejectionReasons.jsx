@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
 import { getAuthHeaders } from '../../../../config/Config';
+import { useAuth } from '../../../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import '../Sources/sources.scss';
 
 const apiBase = '/api';
 
 const RejectionReasons = ({ isOpen, onClose }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [items, setItems] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -102,7 +107,9 @@ const RejectionReasons = ({ isOpen, onClose }) => {
         <div className="tandc-dialog-header">
           <div className="title">Rejection Reasons</div>
           <div className="actions">
+            {perms?.can_create && (
             <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            )}
             <button className="close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -119,12 +126,16 @@ const RejectionReasons = ({ isOpen, onClose }) => {
                   {item.title}
                 </div>
                 <div className="item-actions">
+                  {perms?.can_update && (
                   <button className="icon-button edit" onClick={() => openEdit(item)} title="Edit reason">
                     <FaEdit />
                   </button>
+                  )}
+                  {perms?.can_delete && (
                   <button className="icon-button delete" onClick={() => handleDelete(item.id)} title="Delete reason">
                     <FaTrash />
                   </button>
+                  )}
                 </div>
               </div>
             ))
