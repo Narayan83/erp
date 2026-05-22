@@ -1,0 +1,76 @@
+@import './import_dialog.scss';
+
+.bulk-col-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.bulk-col-dialog.import-dialog {
+  width: 100%;
+  max-width: 820px;
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+}
+
+.bulk-col-reference {
+  margin: 12px 0;
+  font-size: 13px;
+
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #2563eb;
+  }
+}
+
+.bulk-col-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 10px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  th,
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 4px 8px;
+    text-align: left;
+  }
+
+  th {
+    background: #f1f5f9;
+  }
+
+  code {
+    font-size: 11px;
+  }
+}
+
+.bulk-col-loading {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.bulk-col-error {
+  color: #b91c1c;
+  font-size: 14px;
+  margin-top: 8px;
+}

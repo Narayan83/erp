@@ -1,8 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Merriweather+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/geist-sans/700.css";
 
 @import "variables";
 @import "theme-variables";
 @import "shell-theme";
+@import "app-shell";
 // Import Bootstrap source files (Required file)
 @import "../../node_modules/bootstrap/scss/bootstrap.scss";
 
@@ -12,25 +16,57 @@
 // Tabler Icons style
 @import "./icons/tabler-icons/tabler-icons.css";
 
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   margin: 0;
   font-family: $font-family-sans-serif !important;
-  font-size: $font-size-base;
+  font-size: 0.9375rem;
   font-weight: $font-weight-base;
   line-height: $line-height-base;
   color: $body-color;
   background-color: $body-bg;
 }
 
-// TOP BAR SCSS (legacy element styles — app header uses .header in Header.scss)
-header {
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: $primary-bg-subtle;
+  color: $body-color;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+
+  &:hover {
+    background: #94a3b8;
+  }
+}
+
+// Legacy bare <header> — app uses .header.erp-header in _app-shell.scss
+header:not(.erp-header) {
   background: $shell-header-bar;
   width: 100%;
-  min-height: 60px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 100;
+  min-height: $erp-header-h;
   border-bottom: 1px solid $shell-border;
 
   .row {
@@ -50,43 +86,67 @@ header .logo img {
 header .logo span {
   font-size: map-get($font-sizes, 7);
   font-weight: $font-weight-bold;
-  color: $white;
+  color: $shell-header-text;
   margin-left: 5px;
+  letter-spacing: -0.02em;
 }
 
 header .rounded-circle {
   min-width: 40px !important;
   width: 40px !important;
   height: 40px !important;
-  background-color: $white !important;
-  color: $dark;
+  background-color: $gray-200 !important;
+  color: $primary;
   font-size: map-get($font-sizes, 7);
 }
 
 header .rounded-circle:hover svg {
   color: $primary;
-  transition: all 0.3ms ease-in-out;
+  transition: all 0.15s ease;
 }
 
 .searchbox {
   width: $searchbar-width;
-  height: $input-height;
-  background-color: $white;
-  border-radius: $input-border-radius;
+  height: 36px;
+  background-color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 9999px;
   margin-left: 10px;
-  padding: 3px 15px;
+  padding: 0 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--erp-transition);
+
+  &:focus-within {
+    background-color: $white;
+    border-color: $erp-input;
+    box-shadow: var(--focus-ring);
+    color: $primary;
+
+    svg {
+      color: $primary;
+    }
+  }
 
   input {
-    background: $input-bg;
+    background: transparent;
     border: none;
     outline: none;
-    padding-left: 5px;
-    color: $dark;
+    padding-left: 0;
+    color: $shell-header-text;
+    font-size: 0.8125rem;
+    width: 100%;
+
+    &::placeholder {
+      color: $shell-header-text-muted;
+    }
   }
 
   svg {
-    font-size: map-get($font-sizes, 5);
-    font-weight: $font-weight-bold;
+    font-size: 1rem;
+    color: $shell-header-text-muted;
+    flex-shrink: 0;
   }
 }
 
@@ -102,7 +162,7 @@ header .rounded-circle:hover svg {
       overflow: hidden;
       position: relative;
       cursor: pointer;
-      border: 2px solid $white;
+      border: 2px solid $erp-border;
 
       img {
         width: 100%;
@@ -123,11 +183,11 @@ header .rounded-circle:hover svg {
       max-width: 150px;
       max-height: 20px;
       overflow: hidden;
-      color: $white;
+      color: $shell-header-text;
     }
 
     p {
-      color: #f2f2f2;
+      color: $shell-header-text-muted;
       margin-top: 0;
       max-width: 150px;
       max-height: 20px;
@@ -137,212 +197,7 @@ header .rounded-circle:hover svg {
   }
 }
 
-// SIDE BAR SCSS
-
-.main {
-  padding-top: 60px;
-
-  .main-side-bar-wraper {
-    width: 20%;
-    flex: 0 0 20%;
-    transition: all 0.3s ease-in-out;
-
-    .sidebar {
-      width: 20%;
-      height: 100vh;
-      max-height: calc(100% - 60px);
-      overflow-y: scroll;
-      overflow-x: hidden;
-      position: fixed;
-      top: 60px;
-      left: 0;
-      background: $shell-navy-900;
-      border-right: 1px solid $shell-border;
-      /* Slight inner highlight under the header seam (darker rail vs lighter bar) */
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      transition: all 0.5s ease-in-out;
-
-      ul {
-        margin-left: 0 !important;
-        margin-bottom: 0 !important;
-        padding: 8px 10px 16px !important;
-        list-style: none !important;
-        border-left: none !important;
-
-        li {
-          list-style: none;
-
-          a {
-            text-decoration: none;
-            color: inherit;
-          }
-
-          button {
-            text-align: left;
-            justify-content: left;
-            color: $shell-text !important;
-            align-items: center;
-            padding: 12px 14px !important;
-            text-transform: none;
-            font-weight: $font-weight-bold;
-            border-radius: 8px;
-            margin: 2px 0;
-            width: 100% !important;
-            max-width: 100%;
-            transition:
-              background-color 0.2s ease,
-              color 0.2s ease;
-
-            .icon {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 25px;
-              height: 25px;
-              margin-right: 10px;
-
-              svg {
-                color: $shell-text-muted;
-                font-size: map-get($font-sizes, 6);
-                transition: color 0.2s ease;
-              }
-            }
-
-            .arrow-right {
-              margin-left: auto;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 25px;
-              height: 25px;
-
-              svg {
-                color: $shell-text-muted;
-                font-size: map-get($font-sizes, 6);
-              }
-            }
-          }
-
-          button:hover {
-            background-color: $shell-hover !important;
-            color: $shell-text !important;
-
-            .icon svg,
-            .arrow-right svg {
-              color: $shell-text;
-            }
-          }
-        }
-
-        .active {
-          background-color: $shell-active-bg !important;
-          color: $shell-text !important;
-          box-shadow: inset 3px 0 0 0 $shell-accent;
-
-          .icon svg,
-          .arrow-right svg {
-            color: $shell-accent-hover;
-          }
-        }
-
-        .sub-menu-wraper {
-          .submenu {
-            opacity: 1;
-            height: auto;
-            transition:
-              opacity 0.3s ease-in-out,
-              height 0.3s ease-in-out;
-            padding: 4px 12px 8px 12px !important;
-            position: relative;
-
-            li {
-              width: 100%;
-              border-left: 1px solid $shell-divider;
-              padding-left: 10px;
-              margin-left: 5px;
-
-              &:hover {
-                border-left-color: rgba($shell-accent, 0.45);
-              }
-
-              a {
-                list-style: none !important;
-                text-decoration: none;
-                color: $shell-text-muted !important;
-                display: block;
-                padding: 8px 0;
-                font-size: map-get($font-sizes, 3);
-                font-weight: 500;
-                transition: color 0.2s ease;
-
-                &:hover {
-                  color: $shell-text !important;
-                }
-              }
-            }
-          }
-        }
-      }
-
-      .MuiButtonBase-root {
-        font-family: inherit !important;
-      }
-    }
-
-    .sidebar::-webkit-scrollbar-thumb {
-      background: transparent !important;
-    }
-
-    .colapsed {
-      height: 0;
-      opacity: 0;
-      overflow: hidden;
-      transition:
-        opacity 0.5s ease-in-out,
-        height 0.5s ease-in-out;
-    }
-
-    .colapse {
-      height: auto;
-      opacity: 1;
-      overflow: visible;
-    }
-  }
-
-  .main-side-bar-wraper:hover {
-    .sidebar::-webkit-scrollbar {
-      background: $blue transparent !important;
-    }
-  }
-
-  .content {
-    // margin-top: 60px;
-    width: 80%;
-    flex: 0 0 80%;
-    transition: all 0.3s ease-in-out;
-    background: #fff;
-    max-height: 100vh;
-
-    .right-content {
-      padding: 5px;
-      width: 100vw;
-      max-width: 100%;
-    }
-  }
-}
-
-.main-side-bar-wraper.toggle-menu {
-  width: 0;
-  flex: 0 0 0%;
-
-  .sidebar {
-    left: -100%;
-  }
-}
-
-.content.toggle-menu {
-  width: 100%;
-}
+// App shell layout: see _app-shell.scss (.erp-app, .erp-sidebar, .erp-main)
 
 // forms
 
@@ -372,7 +227,8 @@ header .rounded-circle:hover svg {
     }
 
     input:focus {
-      border: 2px solid #1872c3;
+      border: 2px solid $primary;
+      box-shadow: 0 0 0 2px rgba($primary, 0.12);
     }
 
     select {
@@ -388,7 +244,8 @@ header .rounded-circle:hover svg {
     }
 
     select:focus {
-      border: 2px solid #1872c3;
+      border: 2px solid $primary;
+      box-shadow: 0 0 0 2px rgba($primary, 0.12);
     }
 
     textarea {
@@ -551,12 +408,23 @@ header .rounded-circle:hover svg {
 
 .table {
   background: $white !important;
+  border-radius: 12px;
+  overflow: hidden;
 
   .thead-dark {
-    background-color: rgba($color: #b48bf3, $alpha: 0.8);
-    color: $white;
-    border-color: rgba($color: #a976f5, $alpha: 1) !important;
-    font-size: map-get($font-sizes, 3);
+    background-color: $gray-100 !important;
+    color: $body-color !important;
+    border-color: $border-color !important;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  thead th {
+    background: $gray-100 !important;
+    color: $body-color !important;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    border-color: $border-color !important;
   }
 
   th {
@@ -608,8 +476,9 @@ header .rounded-circle:hover svg {
 // card css
 
 .card {
-  background-color: #fff8f8;
+  background-color: $white;
   padding: 10px 22px;
+  border: 1px solid $border-color;
 }
 
 .shadow-small {

@@ -21,9 +21,9 @@
    1) Variables
    ----------------------------- */
 // Aligned with app shell (header / sidebar)
-$primary-500: $shell-accent;
-$accent-500: $shell-accent;
-$accent-600: #2563eb;
+$primary-500: $erp-primary;
+$accent-500: $erp-primary;
+$accent-600: $erp-primary-dark;
 $text-muted: #64748b;
 $muted-bg: #f8fafc;
 
@@ -68,11 +68,14 @@ table tbody tr td {
   border-bottom: 1px solid #999999 !important;
 }
 
-/* Table header color — slate band matching shell accent family */
+/* Table header — matches admin/healthfix data tables */
 table thead th,
 .variants-table thead th {
-  background-color: #e8edf5 !important;
-  border-bottom: 1px solid #cbd5e1 !important;
+  background-color: #f8fafc !important;
+  color: $erp-text !important;
+  border-bottom: 1px solid $erp-border !important;
+  font-weight: 600;
+  font-size: 0.8125rem;
 }
 
 /* -----------------------------
@@ -219,6 +222,7 @@ table thead th,
   }
 
   .btn-display-prefs,
+  .btn-bulk-column,
   .btn-bulk-images,
   .btn-import,
   .btn-export,

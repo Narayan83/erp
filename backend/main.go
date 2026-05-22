@@ -18,9 +18,10 @@ func init() {
 
 	initializers.LoadEnviromentVariables()
 	initializers.ConnectToDb()
-	if err := initializers.DB.AutoMigrate(&models.CRMTag{}, &models.LeadCategory{}, &models.EmployeeUserRelation{}, &models.DocumentInteraction{}, &models.DocumentAction{}, &models.ServiceItem{}); err != nil {
+	if err := initializers.DB.AutoMigrate(&models.CRMTag{}, &models.LeadCategory{}, &models.EmployeeUserRelation{}, &models.DocumentInteraction{}, &models.DocumentAction{}, &models.ServiceItem{}, &models.AuditLog{}); err != nil {
 		log.Fatalf("Failed to migrate tables: %v", err)
 	}
+	initializers.EnsureAuditLogsTable()
 	initializers.CreateRequiredDirectories()
 	seeds.SeedAll()
 }
@@ -89,6 +90,8 @@ func main() {
 	handler.SetLeadProductDB(initializers.DB)
 	handler.SetRejectionReasonDB(initializers.DB)
 	handler.SetServiceItemDB(initializers.DB)
+	handler.SetAuditLogDB(initializers.DB)
+	initializers.EnsureAuditLogsTable()
 
 	// set up fiber
 	app := fiber.New()
@@ -212,10 +215,15 @@ func main() {
 	// Products
 	api.Post("/products", handler.CreateProduct)
 	api.Get("/products", handler.GetAllProducts)
-	api.Get("/products/ids", handler.GetProductIDs)
+	api.Get("/products/codes", handler.GetProductCodes)
 	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Get("/products/stats", handler.GetProductStats)
 	api.Post("/products/bulk-image", handler.BulkUploadProductImage)
+	api.Get("/products/bulk-update/columns", handler.GetProductBulkUpdateColumns)
+	api.Post("/products/bulk-update-column", handler.BulkUpdateProductColumn)
+	api.Get("/audit-logs", handler.ListAuditLogs)
+	api.Get("/audit_logs", handler.ListAuditLogs) // alias (underscore)
+	api.Get("/audit-logs/:id", handler.GetAuditLog)
 	api.Get("/products/:id", handler.GetProductByID)
 	// Soft delete (and restore) route for products
 	api.Delete("/products/:id", handler.DeleteProduct)
@@ -591,6 +599,7 @@ func main() {
 	api.Delete("/employee-org-units/:id", handler.DeleteEmployeeOrgUnit)
 
 	// start server
+	log.Println("Audit logs API: GET /api/audit-logs")
 	log.Fatal(app.Listen(":8000"))
 
 }

@@ -8,5 +8,5 @@ Navigate to Backend Folder.
 
 
 // to remove zone.identifier
-cd 'c:\Users\Admin\Downloads\erp'; Get-ChildItem -Path . -Recurse -Filter '*Zone.Identifier*' -File -Force | Remove-Item -Force -ErrorAction SilentlyContinue; Write-Output 'REMOVE_DONE'
+cd 'd:\VSCode_Projects\erp'; Get-ChildItem -Path . -Recurse -Filter '*Zone.Identifier*' -File -Force | Remove-Item -Force -ErrorAction SilentlyContinue; Write-Output 'REMOVE_DONE'
 REMOVE_DONE

@@ -1,17 +1,19 @@
-// Shared enterprise shell — header + left sidebar (single palette)
-// Header is one step lighter than sidebar so the top band reads separately from the nav column.
-$shell-navy-950: #020617;
-$shell-navy-900: #0f172a;
-$shell-navy-800: #1e293b;
-$shell-header-bar: $shell-navy-800;
-$shell-navy-700: #334155;
-$shell-accent: #3b82f6;
-$shell-accent-hover: #60a5fa;
-$shell-accent-ring: rgba(59, 130, 246, 0.35);
-$shell-active-bg: rgba(59, 130, 246, 0.14);
-$shell-border: rgba(148, 163, 184, 0.16);
-$shell-divider: rgba(255, 255, 255, 0.08);
-$shell-text: #f1f5f9;
-$shell-text-muted: #94a3b8;
-$shell-hover: rgba(255, 255, 255, 0.07);
-$shell-hover-strong: rgba(255, 255, 255, 0.11);
+@import "app-theme";
+
+$shell-navy-950: $erp-chrome;
+$shell-navy-900: $erp-chrome;
+$shell-navy-800: $erp-chrome-elevated;
+$shell-header-bar: $erp-surface;
+$shell-navy-700: $erp-chrome-elevated;
+$shell-accent: $erp-primary;
+$shell-accent-hover: $erp-accent;
+$shell-accent-ring: rgba(0, 134, 116, 0.35);
+$shell-active-bg: $erp-primary;
+$shell-border: $erp-border;
+$shell-divider: $erp-chrome-border;
+$shell-text: $erp-chrome-text;
+$shell-text-muted: $erp-chrome-muted;
+$shell-hover: $erp-chrome-hover;
+$shell-hover-strong: lighten($erp-chrome-elevated, 3%);
+$shell-header-text: $erp-text;
+$shell-header-text-muted: $erp-text-muted;

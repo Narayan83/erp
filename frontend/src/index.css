@@ -1,0 +1,11 @@
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  --primary: #008674;
+  --primary-dark: #006b5c;
+  --sidebar: #0f172a;
+  --header-surface: #ffffff;
+  --border: #e2e8f0;
+  --header-height: 64px;
+  --sidebar-width: 260px;
+}

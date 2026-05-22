@@ -291,6 +291,7 @@ func main() {
 		&models.Tag{},
 		&models.Product{},
 		&models.ProductVariant{},
+		&models.AuditLog{},
 		&models.User{},
 		&models.UserAddress{},
 		&models.UserBankAccount{},

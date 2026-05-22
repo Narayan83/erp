@@ -1,0 +1,88 @@
+@import './import_dialog.scss';
+
+/* No dimming — page stays visible behind the report */
+.bulk-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.bulk-report-dialog.import-dialog {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+  border: 1px solid rgba(10, 20, 40, 0.12);
+}
+
+.bulk-report-done-banner {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  color: #166534;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.bulk-report-done-banner.has-errors {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.bulk-report-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bulk-report-close-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #2563eb, #1e40af);
+  color: #fff;
+}
+
+.bulk-report-close-btn:hover {
+  filter: brightness(1.05);
+}
+
+.bulk-report-header-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.bulk-report-stat-ok {
+  color: #15803d;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.bulk-report-stat-err {
+  color: #b91c1c;
+  font-weight: 600;
+  font-size: 14px;
+}

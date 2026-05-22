@@ -9,35 +9,50 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// GetProductIDs returns all product primary keys (for bulk image pre-validation).
-func GetProductIDs(c *fiber.Ctx) error {
-	var ids []uint
-	if err := productsDB.Model(&models.Product{}).Pluck("id", &ids).Error; err != nil {
+// GetProductCodes returns all product codes (for bulk image pre-validation).
+func GetProductCodes(c *fiber.Ctx) error {
+	var codes []string
+	if err := productsDB.Model(&models.Product{}).Pluck("code", &codes).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(fiber.Map{"ids": ids})
+	return c.JSON(fiber.Map{"codes": codes})
 }
 
-// BulkUploadProductImage accepts one image file named by product id (e.g. 1.jpg -> product_id=1).
-// Updates all variants for that product with the saved image path.
+// BulkUploadProductImage accepts one image per request.
+// Naming: {product_code}.jpg → main_image; {product_code}_1.jpg, _2, … → images (gallery) on all variants.
 func BulkUploadProductImage(c *fiber.Ctx) error {
-	productIDStr := strings.TrimSpace(c.FormValue("product_id"))
-	if productIDStr == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "product_id is required"})
+	productCode := strings.TrimSpace(c.FormValue("product_code"))
+	if productCode == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "product_code is required"})
 	}
-	productID64, err := strconv.ParseUint(productIDStr, 10, 64)
-	if err != nil || productID64 == 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid product_id"})
+
+	imageRole := strings.ToLower(strings.TrimSpace(c.FormValue("image_role")))
+	if imageRole == "" {
+		imageRole = "main"
 	}
-	productID := uint(productID64)
+	if imageRole != "main" && imageRole != "gallery" {
+		return c.Status(400).JSON(fiber.Map{"error": "image_role must be main or gallery"})
+	}
+
+	galleryIndex := -1
+	if imageRole == "gallery" {
+		if idxStr := strings.TrimSpace(c.FormValue("gallery_index")); idxStr != "" {
+			idx, err := strconv.Atoi(idxStr)
+			if err != nil || idx < 1 {
+				return c.Status(400).JSON(fiber.Map{"error": "gallery_index must be a positive integer (e.g. 1 for _1)"})
+			}
+			galleryIndex = idx
+		}
+	}
 
 	var product models.Product
-	if err := productsDB.First(&product, productID).Error; err != nil {
+	if err := productsDB.Where("code = ?", productCode).First(&product).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{
-			"error":      "product_not_found",
-			"product_id": productID,
+			"error":        "product_not_found",
+			"product_code": productCode,
 		})
 	}
+	productID := product.ID
 
 	file, err := c.FormFile("image")
 	if err != nil || file == nil {
@@ -45,7 +60,6 @@ func BulkUploadProductImage(c *fiber.Ctx) error {
 	}
 
 	ext := strings.ToLower(cloudinaryutil.ResourceTypeForFile(file.Filename))
-	// Only allow image files
 	if ext != "image" {
 		return c.Status(400).JSON(fiber.Map{"error": "unsupported image type"})
 	}
@@ -61,36 +75,57 @@ func BulkUploadProductImage(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	if len(variants) == 0 {
-		// Cleanup the uploaded image since there are no variants to assign it to
 		_ = cloudinaryutil.DeleteFile(upResult.PublicID, "image")
 		return c.Status(404).JSON(fiber.Map{
-			"error":      "no_variants",
-			"product_id": productID,
-			"message":    "Product exists but has no variants",
+			"error":        "no_variants",
+			"product_id":   productID,
+			"product_code": productCode,
+			"message":      "Product exists but has no variants",
 		})
 	}
 
-	mainIdx := 0
+	updated := 0
 	for i := range variants {
-		// Delete old images from Cloudinary before replacing
-		for _, oldURL := range variants[i].Images {
-			cloudinaryutil.DeleteByURL(oldURL)
-		}
-		if variants[i].MainImage != "" {
-			cloudinaryutil.DeleteByURL(variants[i].MainImage)
+		if imageRole == "main" {
+			if variants[i].MainImage != "" && variants[i].MainImage != imageURL {
+				cloudinaryutil.DeleteByURL(variants[i].MainImage)
+			}
+			variants[i].MainImage = imageURL
+			mainIdx := 0
+			variants[i].MainImageIndex = &mainIdx
+		} else {
+			imgs := append([]string(nil), variants[i].Images...)
+			if galleryIndex >= 1 {
+				slot := galleryIndex - 1
+				if slot < len(imgs) {
+					if imgs[slot] != "" && imgs[slot] != imageURL {
+						cloudinaryutil.DeleteByURL(imgs[slot])
+					}
+					imgs[slot] = imageURL
+				} else if slot == len(imgs) {
+					imgs = append(imgs, imageURL)
+				} else {
+					// _N uploaded before lower slots: append (folder scan should order _1, _2, …)
+					imgs = append(imgs, imageURL)
+				}
+			} else {
+				imgs = append(imgs, imageURL)
+			}
+			variants[i].Images = models.StringArray(imgs)
 		}
 
-		variants[i].Images = models.StringArray{imageURL}
-		variants[i].MainImage = imageURL
-		variants[i].MainImageIndex = &mainIdx
 		if err := productsDB.Save(&variants[i]).Error; err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
+		updated++
 	}
 
 	return c.JSON(fiber.Map{
 		"product_id":       productID,
+		"product_code":     productCode,
+		"image_role":       imageRole,
+		"gallery_index":    galleryIndex,
 		"image_path":       imageURL,
-		"variants_updated": len(variants),
+		"variants_updated": updated,
 	})
 }

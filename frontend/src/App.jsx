@@ -110,17 +110,17 @@ function AppLayout({ children }) {
       {isNoLayout ? (
         children
       ) : (
-        <>
+        <div className="erp-app">
           <Header />
-          <div className="main d-flex">
-            <div className={`main-side-bar-wraper ${isToggleSideBar === true ? 'toggle-menu' : ''}`}>
+          <div className="erp-body">
+            <aside className={`erp-sidebar ${isToggleSideBar ? "is-collapsed" : ""}`}>
               <MainSideBar />
-            </div>
-            <div className={`content ${isToggleSideBar === true ? 'toggle-menu' : ''}`}>
+            </aside>
+            <main className={`erp-main ${isToggleSideBar ? "sidebar-collapsed" : ""}`}>
               {children}
-            </div>
+            </main>
           </div>
-        </>
+        </div>
       )}
     </myContext.Provider>
   );

@@ -5,17 +5,47 @@ import { BASE_URL } from '../config/Config';
 import './bulk_image_upload_dialog.scss';
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
+const CODE_STEM = /^[A-Za-z0-9_-]+$/;
+const GALLERY_STEM = /^([A-Za-z0-9_-]+)_(\d+)$/;
 
-function parseProductIdFromFilename(name) {
+/**
+ * PP242500.jpg → main image (main_image)
+ * PP242500_1.jpg, PP242500_2.jpg → gallery (images column)
+ */
+function parseProductImageFilename(name) {
   const base = String(name || '').split(/[/\\]/).pop() || '';
   if (!IMAGE_EXT.test(base)) return null;
-  const stem = base.replace(/\.[^.]+$/i, '');
-  if (!/^\d+$/.test(stem)) return null;
-  return parseInt(stem, 10);
+  const stem = base.replace(/\.[^.]+$/i, '').trim();
+  if (!stem) return null;
+
+  const galleryMatch = stem.match(GALLERY_STEM);
+  if (galleryMatch) {
+    const productCode = galleryMatch[1];
+    const sortKey = parseInt(galleryMatch[2], 10);
+    if (!productCode || !Number.isFinite(sortKey) || sortKey < 1) return null;
+    return {
+      productCode,
+      role: 'gallery',
+      galleryIndex: sortKey,
+      sortKey,
+      file: null,
+    };
+  }
+
+  if (!CODE_STEM.test(stem)) return null;
+  return {
+    productCode: stem,
+    role: 'main',
+    galleryIndex: null,
+    sortKey: 0,
+    file: null,
+  };
 }
 
-function sortByProductId(a, b) {
-  return a.productId - b.productId;
+function sortUploadQueue(a, b) {
+  const codeCmp = a.productCode.localeCompare(b.productCode, undefined, { sensitivity: 'base' });
+  if (codeCmp !== 0) return codeCmp;
+  return a.sortKey - b.sortKey;
 }
 
 export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
@@ -23,7 +53,8 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
   const abortRef = useRef(false);
 
   const [files, setFiles] = useState([]);
-  const [notFoundIds, setNotFoundIds] = useState([]);
+  const [scanStats, setScanStats] = useState({ main: 0, gallery: 0 });
+  const [notFoundCodes, setNotFoundCodes] = useState([]);
   const [invalidFiles, setInvalidFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [currentFile, setCurrentFile] = useState(null);
@@ -34,7 +65,8 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
   const resetState = useCallback(() => {
     abortRef.current = false;
     setFiles([]);
-    setNotFoundIds([]);
+    setScanStats({ main: 0, gallery: 0 });
+    setNotFoundCodes([]);
     setInvalidFiles([]);
     setUploading(false);
     setCurrentFile(null);
@@ -56,10 +88,15 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose, uploading, resetState]);
 
-  const loadProductIds = async () => {
-    const res = await axios.get(`${BASE_URL}/api/products/ids`);
-    const ids = res.data?.ids || [];
-    return new Set(ids.map((id) => Number(id)));
+  const loadProductCodes = async () => {
+    const res = await axios.get(`${BASE_URL}/api/products/codes`);
+    const codes = res.data?.codes || [];
+    const map = new Map();
+    codes.forEach((code) => {
+      const key = String(code).trim();
+      if (key) map.set(key.toUpperCase(), key);
+    });
+    return map;
   };
 
   const handleFolderChange = async (e) => {
@@ -69,46 +106,70 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
     setPhase('scanning');
     setLog([{ type: 'info', text: `Scanning ${selected.length} file(s) in folder…` }]);
 
-    const valid = [];
+    const parsed = [];
     const invalid = [];
     selected.forEach((file) => {
-      const productId = parseProductIdFromFilename(file.name);
-      if (productId == null) {
+      const meta = parseProductImageFilename(file.name);
+      if (meta == null) {
         invalid.push(file.name);
         return;
       }
-      valid.push({ productId, file });
+      parsed.push({ ...meta, file });
     });
 
-    valid.sort(sortByProductId);
+    parsed.sort(sortUploadQueue);
 
     const seen = new Set();
     const deduped = [];
-    valid.forEach((entry) => {
-      if (seen.has(entry.productId)) return;
-      seen.add(entry.productId);
+    parsed.forEach((entry) => {
+      const key = `${entry.productCode.toUpperCase()}:${entry.role}:${entry.sortKey}`;
+      if (seen.has(key)) return;
+      seen.add(key);
       deduped.push(entry);
     });
 
     try {
-      const idSet = await loadProductIds();
-      const missing = deduped.filter((entry) => !idSet.has(entry.productId)).map((entry) => entry.productId);
-      const toUpload = deduped.filter((entry) => idSet.has(entry.productId));
+      const codeMap = await loadProductCodes();
+      const missingSet = new Set();
+      const toUpload = [];
+      let mainCount = 0;
+      let galleryCount = 0;
+
+      deduped.forEach((entry) => {
+        const canonical = codeMap.get(entry.productCode.toUpperCase());
+        if (canonical) {
+          toUpload.push({
+            productCode: canonical,
+            role: entry.role,
+            galleryIndex: entry.galleryIndex,
+            sortKey: entry.sortKey,
+            file: entry.file,
+          });
+          if (entry.role === 'main') mainCount += 1;
+          else galleryCount += 1;
+        } else {
+          missingSet.add(entry.productCode);
+        }
+      });
 
       setFiles(toUpload);
-      setNotFoundIds(missing.sort((a, b) => a - b));
+      setScanStats({ main: mainCount, gallery: galleryCount });
+      setNotFoundCodes([...missingSet].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })));
       setInvalidFiles(invalid);
       setPhase('ready');
       setLog([
-        { type: 'info', text: `Found ${deduped.length} image(s) named by product ID.` },
-        { type: 'info', text: `${toUpload.length} will be uploaded; ${missing.length} product ID(s) not in database.` },
+        { type: 'info', text: `Found ${deduped.length} image(s): ${mainCount} main, ${galleryCount} gallery.` },
+        { type: 'info', text: `${toUpload.length} will be uploaded; ${missingSet.size} product code(s) not in database.` },
         ...(invalid.length > 0
-          ? [{ type: 'warn', text: `${invalid.length} file(s) skipped (name must be like 1.jpg, 2.png).` }]
+          ? [{
+              type: 'warn',
+              text: `${invalid.length} file(s) skipped. Use CODE.ext for main or CODE_1.ext, CODE_2.ext for gallery.`,
+            }]
           : []),
       ]);
     } catch (err) {
       setPhase('idle');
-      setLog([{ type: 'error', text: err?.response?.data?.error || err.message || 'Failed to load product IDs' }]);
+      setLog([{ type: 'error', text: err?.response?.data?.error || err.message || 'Failed to load product codes' }]);
     }
   };
 
@@ -132,12 +193,17 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
         break;
       }
 
-      const { productId, file } = files[i];
+      const { productCode, role, galleryIndex, file } = files[i];
       setCurrentFile(file.name);
-      appendLog({ type: 'info', text: `Uploading ${file.name} (product ID ${productId})…` });
+      const roleLabel = role === 'main' ? 'main image' : `gallery _${galleryIndex}`;
+      appendLog({ type: 'info', text: `Uploading ${file.name} (${productCode}, ${roleLabel})…` });
 
       const formData = new FormData();
-      formData.append('product_id', String(productId));
+      formData.append('product_code', productCode);
+      formData.append('image_role', role);
+      if (role === 'gallery' && galleryIndex != null) {
+        formData.append('gallery_index', String(galleryIndex));
+      }
       formData.append('image', file, file.name);
 
       try {
@@ -145,9 +211,10 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         success += 1;
+        const savedAs = res.data?.image_role === 'gallery' ? 'images' : 'main_image';
         appendLog({
           type: 'success',
-          text: `✓ ${file.name} → ${res.data?.image_path || 'saved'} (${res.data?.variants_updated || 0} variant(s))`,
+          text: `✓ ${file.name} → ${savedAs} (${res.data?.variants_updated || 0} variant(s))`,
         });
       } catch (err) {
         failed += 1;
@@ -182,8 +249,15 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
             <strong>Instructions:</strong>
             <ul className="instruction-list">
               <li>Place images in a folder on your computer (e.g. Windows server share).</li>
-              <li>Name each file by <strong>product ID</strong> from the products table: <code>1.jpg</code>, <code>2.png</code>, etc.</li>
-              <li>Select the folder — images upload one by one to the server and update product variant image paths.</li>
+              <li>
+                <strong>Main image</strong> — file name equals product code: <code>PP242500.jpg</code> → saved to{' '}
+                <code>main_image</code>.
+              </li>
+              <li>
+                <strong>Extra images</strong> — underscore + number: <code>PP242500_1.jpg</code>, <code>PP242500_2.png</code>{' '}
+                → saved to <code>images</code> for the same product.
+              </li>
+              <li>Upload order: main image first, then _1, _2, … per product code.</li>
             </ul>
           </div>
 
@@ -203,8 +277,10 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
 
           {phase !== 'idle' && (
             <div className="bulk-summary-stats">
-              <span>Ready to upload: {files.length}</span>
-              <span>Not in DB: {notFoundIds.length}</span>
+              <span>Ready: {files.length}</span>
+              <span>Main: {scanStats.main}</span>
+              <span>Gallery: {scanStats.gallery}</span>
+              <span>Not in DB: {notFoundCodes.length}</span>
             </div>
           )}
 
@@ -222,11 +298,11 @@ export default function BulkImageUploadDialog({ open, onClose, onComplete }) {
             </>
           )}
 
-          {notFoundIds.length > 0 && (
+          {notFoundCodes.length > 0 && (
             <div className="bulk-not-found">
-              <strong>Product IDs not found in database</strong> (images exist in folder):
+              <strong>Product codes not found in database</strong> (images exist in folder):
               <br />
-              {notFoundIds.join(', ')}
+              {notFoundCodes.join(', ')}
             </div>
           )}
 

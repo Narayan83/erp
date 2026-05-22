@@ -1,0 +1,286 @@
+// ERP application shell — layout matches healthfix; colors from _app-theme.scss
+@import "app-theme";
+
+.erp-app {
+  width: 100%;
+  min-height: 100vh;
+  background: $erp-bg;
+}
+
+// ——— Top bar (admin-style light header) ———
+.header.erp-header,
+header.erp-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  height: $erp-header-h;
+  min-height: $erp-header-h;
+  background: $erp-surface !important;
+  border-bottom: 1px solid $erp-border;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 0.04);
+  width: 100%;
+  padding: 0;
+
+  .searchbox {
+    width: min(400px, 42vw);
+    max-width: 100%;
+    height: 36px;
+    margin-left: 0;
+    background: $erp-bg;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    padding: 0 0.875rem;
+
+    &:focus-within {
+      background: $erp-surface;
+      border-color: $erp-input;
+      box-shadow: var(--focus-ring);
+    }
+
+    input {
+      font-size: 0.8125rem;
+      color: $erp-text;
+    }
+
+    svg {
+      color: $erp-text-muted;
+    }
+  }
+}
+
+.erp-body {
+  display: block;
+  width: 100%;
+  padding-top: $erp-header-h;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.erp-sidebar {
+  position: fixed;
+  top: $erp-header-h;
+  left: 0;
+  bottom: 0;
+  width: $erp-sidebar-w;
+  z-index: 1020;
+  background: $erp-chrome;
+  border-right: 1px solid $erp-chrome-border;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: transform 0.25s ease;
+
+  &.is-collapsed {
+    transform: translateX(-100%);
+  }
+
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 1rem 0.625rem 1.5rem !important;
+    margin: 0 !important;
+
+    ul {
+      margin: 0 !important;
+      padding: 0 !important;
+      list-style: none !important;
+    }
+
+    li {
+      list-style: none;
+      margin-bottom: 0.0625rem;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .MuiButtonBase-root,
+    button {
+      display: flex !important;
+      align-items: center !important;
+      width: 100% !important;
+      min-height: auto !important;
+      padding: 0.45rem 0.625rem !important;
+      margin: 0 !important;
+      text-align: left !important;
+      justify-content: flex-start !important;
+      text-transform: none !important;
+      font-family: inherit !important;
+      font-size: 0.8125rem !important;
+      font-weight: 500 !important;
+      line-height: 1.2rem !important;
+      color: $erp-chrome-muted !important;
+      background: transparent !important;
+      border: none !important;
+      border-radius: $erp-radius-md !important;
+      box-shadow: none !important;
+      gap: 0.625rem;
+      transition: var(--erp-transition);
+
+      .icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        margin-right: 0;
+        flex-shrink: 0;
+
+        svg {
+          font-size: 1.125rem !important;
+          color: inherit !important;
+        }
+      }
+
+      .arrow-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        opacity: 0.85;
+
+        svg {
+          font-size: 1.125rem !important;
+          color: inherit !important;
+        }
+      }
+
+      &:hover {
+        background: $erp-chrome-hover !important;
+        color: $erp-chrome-text !important;
+      }
+    }
+
+    .active,
+    button.active {
+      background: $erp-primary !important;
+      color: #fff !important;
+
+      .icon svg,
+      .arrow-right svg {
+        color: #fff !important;
+      }
+    }
+
+    .sub-menu-wraper .submenu {
+      padding: 0.25rem 0 0.15rem 0.5rem !important;
+      margin: 0 !important;
+      list-style: none !important;
+
+      li {
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      a {
+        display: block;
+        padding: 0.45rem 0.625rem 0.45rem 1.5rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: $erp-chrome-muted !important;
+        border-radius: $erp-radius-md;
+        transition: var(--erp-transition);
+
+        &:hover {
+          background: $erp-chrome-hover !important;
+          color: $erp-chrome-text !important;
+        }
+      }
+    }
+
+    .colapsed {
+      height: 0;
+      opacity: 0;
+      overflow: hidden;
+    }
+
+    .colapse {
+      height: auto;
+      opacity: 1;
+      overflow: visible;
+    }
+  }
+}
+
+.erp-main {
+  margin-left: $erp-sidebar-w;
+  min-height: calc(100vh - #{$erp-header-h});
+  width: calc(100% - #{$erp-sidebar-w});
+  max-width: none !important;
+  background: $erp-bg;
+  transition: margin-left 0.25s ease, width 0.25s ease;
+  box-sizing: border-box;
+
+  &.sidebar-collapsed {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  > .right-content,
+  > section.right-content,
+  .right-content,
+  .page-content {
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 1.25rem 1.5rem 1.5rem;
+    box-sizing: border-box;
+    min-height: calc(100vh - #{$erp-header-h});
+  }
+}
+
+// Page wrappers used by admin master modules
+.erp-main {
+  .role-management-container,
+  .menu-creation-container,
+  .existing-menus-container,
+  .existing-roles-container,
+  .audit-logs-container,
+  .user-management-container,
+  .role-creation-container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 1.25rem 1.5rem 1.5rem !important;
+    background: $erp-surface !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none !important;
+    box-sizing: border-box;
+    min-height: calc(100vh - #{$erp-header-h});
+  }
+}
+
+.btn-primary {
+  background-color: $erp-primary !important;
+  border-color: $erp-primary !important;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  border-radius: $erp-radius-md;
+  box-shadow: 0 2px 8px rgb(0 134 116 / 0.22);
+
+  &:hover:not(:disabled) {
+    background-color: $erp-primary-dark !important;
+    border-color: $erp-primary-dark !important;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .erp-sidebar {
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .erp-main {
+    margin-left: 0;
+    width: 100%;
+  }
+}

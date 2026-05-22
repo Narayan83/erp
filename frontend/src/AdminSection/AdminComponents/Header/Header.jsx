@@ -77,7 +77,7 @@ function Header() {
   };
 
   return (
-    <header className="header">
+    <header className="header erp-header">
       <div className="header-container">
         <div className="header-left">
           {/* Logo */}

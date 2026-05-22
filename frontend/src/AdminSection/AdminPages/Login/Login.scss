@@ -1,13 +1,15 @@
-$primary: #1e4e8a;
-$muted: #6b7280;
-$light: #f7f9fb;
+$primary: #008674;
+$primary-dark: #006b5c;
+$muted: #57666b;
+$light: #f5f9fb;
 $card-bg: #ffffff;
 
 .login-page {
   display: flex;
   min-height: 100vh;
-  padding: 80px;  /* Increased from 50px to 80px */
-  font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+  padding: 80px;
+  font-family: "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: $light;
 
   /* Outer combined container: gives a single border and highlight around both panels */
   .combined-wrap {
@@ -27,7 +29,7 @@ $card-bg: #ffffff;
     padding: 60px 40px;
     display: flex;
     align-items: center;
-    background: rgb(218, 229, 231);
+    background: #e8f6f3;
     border-radius: 14px 0 0 14px;
 
     .marketing-wrap {
@@ -36,7 +38,7 @@ $card-bg: #ffffff;
       .app-title {
         font-size: 35px;
         margin: 0 0 12px 0;
-        color: #13283b;
+        color: #070c0e;
         line-height: 1.02;
         font-weight: 700;
       }
@@ -92,7 +94,7 @@ $card-bg: #ffffff;
     align-items: center;
     justify-content: center;
     padding: 40px 48px;
-    background: rgb(218, 229, 231);
+    background: #e8f6f3;
     border-radius: 0 14px 14px 0;
 
     .login-card {

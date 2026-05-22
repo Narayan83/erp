@@ -36,6 +36,7 @@ import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import ImportDialog from "../../../CommonComponents/ImportDialog";
 import BulkImageUploadDialog from "../../../CommonComponents/BulkImageUploadDialog";
+import ProductBulkColumnUploadDialog from "../../../CommonComponents/ProductBulkColumnUploadDialog";
 import "./product_list_page.scss";
 
 import { useAuth } from "../../../context/AuthContext"; 
@@ -2589,6 +2590,7 @@ export default function ProductListPage() {
   const [errorTitle, setErrorTitle] = useState('');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [bulkImageDialogOpen, setBulkImageDialogOpen] = useState(false);
+  const [bulkColumnDialogOpen, setBulkColumnDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importedData, setImportedData] = useState([]);
@@ -4355,6 +4357,12 @@ export default function ProductListPage() {
         onComplete={() => fetchProducts()}
       />
 
+      <ProductBulkColumnUploadDialog
+        open={bulkColumnDialogOpen}
+        onClose={() => setBulkColumnDialogOpen(false)}
+        onComplete={() => fetchProducts()}
+      />
+
       <ImportDialog
         open={importDialogOpen}
         onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
@@ -4404,6 +4412,20 @@ export default function ProductListPage() {
                 <rect x="15" y="4" width="6" height="7" fill="currentColor" />
                 <rect x="3" y="13" width="6" height="7" fill="currentColor" />
                 <rect x="15" y="13" width="6" height="7" fill="currentColor" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline btn-bulk-column"
+              onClick={() => setBulkColumnDialogOpen(true)}
+              title="Bulk update column from Excel"
+              aria-label="Bulk update column from Excel"
+            >
+              <svg className="icon-bulk-column" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false" width="16" height="16">
+                <path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                <rect x="14" y="14" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                <path d="M16 17h2M17 16v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
             </button>
 

@@ -1,65 +1,85 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../../config/Config";
 import "../../styles/auditlogs.scss";
 
-const logs = [
-  {
-    title: "final IR Signal.docx",
-    changes: 1,
-    user: "validator1 assignee",
-    ip: "192.168.102.2",
-    action: "data validation update",
-    datetime: "27/08/2025 16:52",
-    details: "View",
-  },
-  // ...add more logs as needed...
-];
-
 const columns = [
-  { key: "title", label: "Title" },
-  { key: "changes", label: "Changes" },
-  { key: "user", label: "User" },
-  { key: "ip", label: "IP" },
+  { key: "menu_label", label: "Menu / Context" },
   { key: "action", label: "Action" },
-  { key: "datetime", label: "Date/Time" },
+  { key: "entity", label: "Entity" },
+  { key: "user_email", label: "User" },
+  { key: "client_ip", label: "IP" },
+  { key: "created_at", label: "Date/Time" },
   { key: "details", label: "Details" },
 ];
 
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function changeCount(row) {
+  try {
+    const oldObj = row.old_value && typeof row.old_value === "object" ? row.old_value : {};
+    const newObj = row.new_value && typeof row.new_value === "object" ? row.new_value : {};
+    const keys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+    return keys.size || 1;
+  } catch {
+    return 1;
+  }
+}
+
 export default function AuditLogs() {
-  const [sortBy, setSortBy] = useState("");
-  const [sortDir, setSortDir] = useState("asc");
-  const [filters, setFilters] = useState({});
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+  const [page, setPage] = useState(1);
+  const limit = 50;
 
-  // Unique values for filters
-  const getUnique = key =>
-    [...new Set(logs.map(l => l[key]))].filter(v => v !== undefined);
-
-  // Sorting
-  const sortedLogs = [...logs].sort((a, b) => {
-    if (!sortBy) return 0;
-    if (a[sortBy] < b[sortBy]) return sortDir === "asc" ? -1 : 1;
-    if (a[sortBy] > b[sortBy]) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  // Filtering
-  const filteredLogs = sortedLogs.filter(log =>
-    Object.entries(filters).every(
-      ([key, value]) => !value || log[key] === value
-    )
-  );
-
-  const handleSort = key => {
-    if (sortBy === key) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(key);
-      setSortDir("asc");
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await axios.get(`${BASE_URL}/api/audit-logs`, {
+        params: { page, limit },
+      });
+      setRows(res.data?.data || []);
+      setTotal(res.data?.total ?? 0);
+    } catch (err) {
+      const status = err?.response?.status;
+      const base = err?.response?.data?.error || err.message || "Failed to load audit logs";
+      if (status === 404) {
+        setError(
+          `${base} (HTTP 404). Restart the backend (go run main.go) after updating code, then run: go run ./cmd/ensure_audit_logs`
+        );
+      } else {
+        setError(status ? `${base} (HTTP ${status})` : base);
+      }
+      setRows([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [page]);
 
-  const handleFilter = (key, value) => {
-    setFilters({ ...filters, [key]: value });
-  };
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  const needle = search.trim().toLowerCase();
+  const filtered = needle
+    ? rows.filter((r) =>
+        [r.menu_label, r.action, r.entity_type, r.entity_id, r.user_email, r.client_ip]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(needle))
+      )
+    : rows;
 
   return (
     <div className="auditlogs-container">
@@ -70,87 +90,74 @@ export default function AuditLogs() {
         <input
           type="text"
           className="auditlogs-search"
-          placeholder="Search (title/user/action)"
+          placeholder="Search (menu, user, action, entity)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
         <div className="auditlogs-total">
-        <span className="auditlogs-total-badge">
-          Total: {filteredLogs.length} log{filteredLogs.length !== 1 ? "s" : ""}
-        </span>
-        <button className="auditlogs-refresh">Refresh</button>
+          <span className="auditlogs-total-badge">
+            Total: {total} log{total !== 1 ? "s" : ""}{loading ? " (loading…)" : ""}
+          </span>
+          <button type="button" className="auditlogs-refresh" onClick={fetchLogs} disabled={loading}>
+            Refresh
+          </button>
+        </div>
       </div>
-      </div>
+      {error && <p style={{ color: "#b91c1c", padding: "0 16px" }}>{error}</p>}
       <div className="auditlogs-table-wrapper">
         <table className="auditlogs-table">
           <thead>
             <tr>
-              {columns.map(col => (
-                <th key={col.key}>
-                  <span
-                    className={
-                      col.key !== "details" ? "auditlogs-sortable" : ""
-                    }
-                    onClick={
-                      col.key !== "details"
-                        ? () => handleSort(col.key)
-                        : undefined
-                    }
-                    style={{
-                      cursor: col.key !== "details" ? "pointer" : "default",
-                      userSelect: "none",
-                    }}
-                  >
-                    {col.label}
-                    {col.key !== "details" && (
-                      <span className="auditlogs-sort-icon">
-                        {sortBy === col.key
-                          ? sortDir === "asc"
-                            ? " ▲"
-                            : " ▼"
-                          : " ⇅"}
-                      </span>
-                    )}
-                  </span>
-                  {col.key !== "details" && (
-                    <select
-                      className="auditlogs-filter"
-                      value={filters[col.key] || ""}
-                      onChange={e => handleFilter(col.key, e.target.value)}
-                    >
-                      <option value="">All</option>
-                      {getUnique(col.key).map(val => (
-                        <option key={val} value={val}>
-                          {val}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </th>
+              {columns.map((col) => (
+                <th key={col.key}>{col.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filteredLogs.map((log, idx) => (
-              <tr key={idx}>
-                <td>{log.title}</td>
-                <td>
-                  <span className="auditlogs-changes">{log.changes}</span>
-                </td>
-                <td>
-                  <span className="auditlogs-user">{log.user}</span>
-                </td>
-                <td>{log.ip}</td>
-                <td>
-                  <span className="auditlogs-action">{log.action}</span>
-                </td>
-                <td>{log.datetime}</td>
-                <td>
-                  <button className="auditlogs-view">{log.details}</button>
+            {filtered.length === 0 && !loading ? (
+              <tr>
+                <td colSpan={columns.length} style={{ textAlign: "center", padding: 24 }}>
+                  No audit logs found.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((log) => (
+                <React.Fragment key={log.id}>
+                  <tr>
+                    <td>{log.menu_label || "—"}</td>
+                    <td><span className="auditlogs-action">{log.action}</span></td>
+                    <td>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ""}</td>
+                    <td><span className="auditlogs-user">{log.user_email || "—"}</span></td>
+                    <td>{log.client_ip || "—"}</td>
+                    <td>{formatDateTime(log.created_at)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="auditlogs-view"
+                        onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                      >
+                        {expandedId === log.id ? "Hide" : "View"} ({changeCount(log)})
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedId === log.id && (
+                    <tr>
+                      <td colSpan={columns.length}>
+                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap", background: "#f8fafc", padding: 12, borderRadius: 8 }}>
+                          {JSON.stringify({ old_value: log.old_value, new_value: log.new_value }, null, 2)}
+                        </pre>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            )}
           </tbody>
         </table>
       </div>
+      {total > limit && (
+        <div style={{ padding: 16, display: "flex", gap: 8, alignItems: "center" }}><button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</button><span>Page {page}</span><button type="button" disabled={page * limit >= total} onClick={() => setPage((p) => p + 1)}>Next</button></div>
+      )}
     </div>
   );
 }
