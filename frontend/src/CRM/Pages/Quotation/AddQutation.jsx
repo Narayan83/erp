@@ -1904,6 +1904,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       const rate = Number(item.rate) || 0;
       const itemTotal = quantity * rate;
       const discountPct = Number(item.discount_percentage || item.discountPercent || 0);
+      const discountPerUnit = rate * (discountPct / 100);
       const discountAmt = itemTotal * (discountPct / 100);
       const taxable = itemTotal - discountAmt;
       const taxAmount = Number(item.tax_amount || (Number(item.cgst||0) + Number(item.sgst||0) + Number(item.igst||0)));
@@ -1925,7 +1926,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       );
       
       const imgUrl = getProductImage(item.product || item);
-      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; display: block; margin: 0 auto;" />` : '-';
+      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="width: 25px; height: 25px; max-width: 25px; max-height: 25px; object-fit: contain; display: block; margin: 0 auto;" />` : '-';
 
       return `
         <tr>
@@ -1939,7 +1940,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
           ${printConfig.itemFixedRate ? `<td class="col-fixed-rate" style="text-align: center;">${fixedRateValue.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.itemRate ? `<td class="col-rate" style="text-align: center;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.discountRate ? `<td class="col-disc-pct" style="text-align: center;">${Math.round(discountPct)}%</td>` : ''}
-          ${printConfig.discountAmt ? `<td class="col-disc-amt" style="text-align: center;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountAmt ? `<td class="col-disc-amt" style="text-align: center;">${discountPerUnit.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.taxableAmt ? `<td class="col-taxable" style="text-align: center;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
           ${printConfig.gstAmounts ? `<td class="col-gst" style="text-align: center;">${(item.gst || 0)}%</td>` : ''}
           ${printConfig.leadTime ? `<td class="col-lead-time" style="text-align: center;">${item.lead_time || item.leadTime || '-'}</td>` : ''}
@@ -1962,7 +1963,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
             --pdf-font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             --pdf-text-color: #1f2937;
             --pdf-muted-color: #6b7280;
-            --pdf-border-color: #d1d5db;
+            --pdf-border-color: #a0a2a5;
             --pdf-panel-bg: #f9fafb;
             --pdf-alt-row-bg: #f9fafb;
             --pdf-label-bg: #e5e7eb;
@@ -2122,33 +2123,33 @@ const handleTandCClose = () => setOpenTandCModal(false);
             text-align: center; 
             font-size: 9px; 
           }
-          /* Fixed column widths optimized for portrait printing */
+          /* Flexible column widths for responsive layout */
           table.items th:nth-child(1), table.items td:nth-child(1) { width: 24px; min-width: 24px; max-width: 24px; } /* No. */
-          ${printConfig.image ? `table.items th:nth-child(2), table.items td:nth-child(2) { width: 44px; min-width: 44px; max-width: 44px; padding: 2px !important; vertical-align: middle !important; } /* Image */` : ''}
-          table.items th:nth-child(${printConfig.image ? '3' : '2'}), table.items td:nth-child(${printConfig.image ? '3' : '2'}) { min-width: 100px; text-align: left; } /* Item & Description - flexible */
-          table.items .col-item-code { width: 58px; min-width: 58px; max-width: 58px; }
-          table.items .col-hsn { width: 58px; min-width: 58px; max-width: 58px; }
-          table.items .col-qty { width: 30px; min-width: 30px; max-width: 30px; }
-          table.items .col-unit { width: 34px; min-width: 34px; max-width: 34px; }
-          table.items .col-fixed-rate { width: 70px; min-width: 70px; max-width: 70px; }
-          table.items .col-rate { width: 48px; min-width: 48px; max-width: 48px; }
-          table.items .col-disc-pct { width: 60px; min-width: 60px; max-width: 60px; }
-          table.items .col-disc-amt { width: 60px; min-width: 60px; max-width: 60px; }
-          table.items .col-taxable { width: 58px; min-width: 58px; max-width: 58px; }
-          table.items .col-gst { width: 36px; min-width: 36px; max-width: 36px; }
-          table.items .col-lead-time { width: 60px; min-width: 60px; max-width: 60px; }
-          table.items .col-amount { width: 62px; min-width: 62px; max-width: 62px; }
+          ${printConfig.image ? `table.items th:nth-child(2), table.items td:nth-child(2) { width: 44px; min-width: 44px; max-width: 44px; padding: 6px !important; vertical-align: middle !important; } /* Image */` : ''}
+          table.items th:nth-child(${printConfig.image ? '3' : '2'}), table.items td:nth-child(${printConfig.image ? '3' : '2'}) { min-width: 50px; max-width: 200px; text-align: left; } /* Item & Description - flexible */
+          table.items .col-item-code { min-width: 50px; max-width: 90px; }
+          table.items .col-hsn { min-width: 50px; max-width: 90px; }
+          table.items .col-qty { min-width: 30px; max-width: 50px; }
+          table.items .col-unit { min-width: 34px; max-width: 60px; }
+          table.items .col-fixed-rate { min-width: 60px; max-width: 100px; }
+          table.items .col-rate { min-width: 48px; max-width: 80px; }
+          table.items .col-disc-pct { min-width: 50px; max-width: 80px; }
+          table.items .col-disc-amt { min-width: 55px; max-width: 90px; }
+          table.items .col-taxable { min-width: 55px; max-width: 90px; }
+          table.items .col-gst { min-width: 36px; max-width: 60px; }
+          table.items .col-lead-time { min-width: 55px; max-width: 90px; }
+          table.items .col-amount { min-width: 60px; max-width: 100px; }
           
           table.items tbody tr:nth-child(even) { background: var(--pdf-alt-row-bg); }
           table.items tbody tr:nth-child(odd) { background: #fff; }
           table.items td { vertical-align: middle; color: var(--pdf-text-color); }
           
-          /* Fixed image size - fits within the 44px column with 2px padding */
+          /* Fixed image size - fits within the 44px column with padding for spacing */
           table.items img { 
-            width: 40px !important; 
-            height: 40px !important; 
-            max-width: 40px !important; 
-            max-height: 40px !important; 
+            width: 32px !important; 
+            height: 32px !important; 
+            max-width: 32px !important; 
+            max-height: 32px !important; 
             object-fit: contain !important; 
             display: block !important; 
             margin: 0 auto !important;
@@ -2238,7 +2239,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
             color: var(--pdf-heading-color); 
             font-size: 10px; 
             border-top: 2px solid var(--pdf-heading-color); 
-            font-weight: 400;
+            font-weight: 600;
           }
           
           /* Bottom Layout */
@@ -2409,7 +2410,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
               ${printConfig.itemFixedRate ? `<th class="col-fixed-rate">Fixed Rate (₹)</th>` : ''}
               ${printConfig.itemRate ? `<th class="col-rate">Rate (₹)</th>` : ''}
               ${printConfig.discountRate ? `<th class="col-disc-pct">Discount %</th>` : ''}
-              ${printConfig.discountAmt ? `<th class="col-disc-amt">Discount (₹)</th>` : ''}
+              ${printConfig.discountAmt ? `<th class="col-disc-amt">Discounted (₹)</th>` : ''}
               ${printConfig.taxableAmt ? `<th class="col-taxable">Taxable (₹)</th>` : ''}
               ${printConfig.gstAmounts ? `<th class="col-gst">GST %</th>` : ''}
               ${printConfig.leadTime ? `<th class="col-lead-time">Lead Time</th>` : ''}
