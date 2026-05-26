@@ -437,6 +437,7 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
     nonStockItemCode: false,
     autoPadSmallDocs: false,
     headerImageIndex: 0,
+    image: true,
   });
 
   // determine initial doc type from URL (so we can load correct stored settings)
@@ -465,12 +466,18 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
   const handleOpenPrintConfig = () => setOpenPrintConfig(true);
   const handleClosePrintConfig = () => setOpenPrintConfig(false);
   const togglePrintOption = (key) => setPrintConfig(prev => ({ ...prev, [key]: !prev[key] }));
-  const handleSavePrintConfig = (newCfg) => {
+  const handleSavePrintConfig = (newCfg, selectedDocType = null) => {
     try {
       const cfg = newCfg || printConfig;
-      const key = `printConfig_${docType}`;
+      // Use the selected doc type from the dialog if provided, otherwise use the current context
+      const type = selectedDocType || docType;
+      const key = `printConfig_${type}`;
       localStorage.setItem(key, JSON.stringify(cfg));
-      setPrintConfig(cfg);
+      
+      // If saving for the currently displayed type, update the state
+      if (type === docType) {
+        setPrintConfig(cfg);
+      }
     } catch (e) {
       console.warn('Failed to save print config', e);
     }
@@ -953,7 +960,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
       if (item._isService) {
         const qty = Number(item.qty) || 0;
         const rate = Number(item.rate) || 0;
-        const discountAmount = Number(item.discount || 0);
+        const discountPercent = Number(item.discountPercent) || 0;
+        const discountAmount = ((rate * qty) * discountPercent) / 100;
         const gstPercent = Number(item.gst) || 0;
         const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
         const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
@@ -963,6 +971,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
         return {
           ...item,
+          discount: discountAmount,
           taxable: taxRes.amount,
           cgst: taxRes.cgst,
           sgst: taxRes.sgst,
@@ -984,7 +993,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
       const newRate = docType === 'Purchase Order' ? purchaseCost : (salesPrice || Number(item.rate || 0));
       const qty = Number(item.qty) || 0;
-      const discountAmount = Number(item.discount || 0);
+      const discountPercent = Number(item.discountPercent) || 0;
+      const discountAmount = ((newRate * qty) * discountPercent) / 100;
       const gstPercent = Number(item.gst ?? item.gst_percent ?? item.gstPercent ?? (prodFromList?.Tax?.Percentage ?? 0)) || 0;
       const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
       const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
@@ -996,6 +1006,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         ...item,
         rate: Number(newRate),
         fixedRate: Number(newRate),
+        discount: discountAmount,
         taxable: taxRes.amount,
         cgst: taxRes.cgst,
         sgst: taxRes.sgst,
@@ -1623,8 +1634,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
   };
 
   // Helper function to convert number to words (simplified Indian numbering)
-  const numberToWords = (num) => {
+  const numberToWords = (num, includePaisa = false) => {
     if (!num || num === 0) return 'Zero';
+    
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -1637,10 +1649,15 @@ const handleTandCClose = () => setOpenTandCModal(false);
       return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convertLessThanThousand(n % 100) : '');
     };
     
-    const crore = Math.floor(num / 10000000);
-    const lakh = Math.floor((num % 10000000) / 100000);
-    const thousand = Math.floor((num % 100000) / 1000);
-    const remainder = Math.floor(num % 1000);
+    // Separate rupees and paisa
+    const rupees = Math.floor(num);
+    const paisa = Math.round((num - rupees) * 100);
+    
+    // Convert rupees part
+    const crore = Math.floor(rupees / 10000000);
+    const lakh = Math.floor((rupees % 10000000) / 100000);
+    const thousand = Math.floor((rupees % 100000) / 1000);
+    const remainder = Math.floor(rupees % 1000);
     
     let result = '';
     if (crore > 0) result += convertLessThanThousand(crore) + ' Crore ';
@@ -1648,7 +1665,15 @@ const handleTandCClose = () => setOpenTandCModal(false);
     if (thousand > 0) result += convertLessThanThousand(thousand) + ' Thousand ';
     if (remainder > 0) result += convertLessThanThousand(remainder);
     
-    return result.trim() || 'Zero';
+    result = result.trim() || 'Zero';
+    
+    // Add paisa part if includePaisa is true and paisa is not zero
+    if (includePaisa && paisa > 0) {
+      const paisaWords = convertLessThanThousand(paisa);
+      result += ' and ' + paisaWords + ' Paisa';
+    }
+    
+    return result;
   };
 
   const generatePDF = async (quotationDataFromSave = null) => {
@@ -1900,31 +1925,31 @@ const handleTandCClose = () => setOpenTandCModal(false);
       );
       
       const imgUrl = getProductImage(item.product || item);
-      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="max-width: 50px; max-height: 50px; object-fit: contain;" />` : '-';
+      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; display: block; margin: 0 auto;" />` : '-';
 
       return `
         <tr>
           <td style="text-align: center;">${idx + 1}</td>
-          <td style="text-align: center;">${imgHtml}</td>
+          ${printConfig.image ? `<td style="text-align: center; padding: 2px; vertical-align: middle;">${imgHtml}</td>` : ''}
           <td>${item.product_name || item.name || item.description || item.desc || '-'}</td>
-          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
-          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
-          <td style="text-align: center;">${quantity}</td>
-          <td>${item.unit || 'Nos'}</td>
-          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${fixedRateValue.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
-          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
-          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
-          <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
+          ${printConfig.itemCode ? `<td class="col-item-code" style="text-align: center;">${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td class="col-hsn" style="text-align: center;">${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
+          <td class="col-qty" style="text-align: center;">${quantity}</td>
+          <td class="col-unit" style="text-align: center;">${item.unit || 'Nos'}</td>
+          ${printConfig.itemFixedRate ? `<td class="col-fixed-rate" style="text-align: center;">${fixedRateValue.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.itemRate ? `<td class="col-rate" style="text-align: center;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td class="col-disc-pct" style="text-align: center;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td class="col-disc-amt" style="text-align: center;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td class="col-taxable" style="text-align: center;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td class="col-gst" style="text-align: center;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td class="col-lead-time" style="text-align: center;">${item.lead_time || item.leadTime || '-'}</td>` : ''}
+          <td class="col-amount" style="text-align: center;">${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
         </tr>
       `;
     }).join('');
     
     // Count columns for the "No items" row
-    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+    const colCount = 4 + (printConfig.image?1:0) + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
 
     const html = `
       <!DOCTYPE html>
@@ -1936,84 +1961,362 @@ const handleTandCClose = () => setOpenTandCModal(false);
           :root {
             --pdf-font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             --pdf-text-color: #1f2937;
-            --pdf-muted-color: #4b5563;
-            --pdf-border-color: #6b7280;
-            --pdf-panel-bg: #f8fafc;
-            --pdf-alt-row-bg: #f8fafc;
-            --pdf-label-bg: #e2e8f0;
-            --pdf-heading-color: #0f172a;
-            --pdf-body-size: 12px;
-            --pdf-small-size: 11px;
-            --pdf-heading-size: 13px;
-            --pdf-title-size: 24px;
-            --pdf-summary-size: 13px;
-            --pdf-logo-width: 240px;
-            --pdf-logo-height: 110px;
+            --pdf-muted-color: #6b7280;
+            --pdf-border-color: #d1d5db;
+            --pdf-panel-bg: #f9fafb;
+            --pdf-alt-row-bg: #f9fafb;
+            --pdf-label-bg: #e5e7eb;
+            --pdf-heading-color: #111827;
+            --pdf-body-size: 10px;
+            --pdf-small-size: 9px;
+            --pdf-heading-size: 11px;
+            --pdf-title-size: 20px;
+            --pdf-summary-size: 10px;
+            --pdf-logo-width: 200px;
+            --pdf-logo-height: 90px;
           }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           html, body { width: 99%; max-width: 99%; overflow-x: hidden; }
-          body { font-family: var(--pdf-font-family); font-size: var(--pdf-body-size); line-height: 1.4; padding: 10px; color: var(--pdf-text-color); background: #fff; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; border-bottom: 1px solid var(--pdf-border-color); margin-bottom: 12px; gap: 12px; }
-          .pdf-header-logo-wrap { flex: 0 1 var(--pdf-logo-width); width: min(100%, var(--pdf-logo-width)); max-width: 100%; height: var(--pdf-logo-height); overflow: hidden; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
-          .pdf-header-logo { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; object-position: center; display: block; }
+          body { font-family: var(--pdf-font-family); font-size: var(--pdf-body-size); line-height: 1.3; padding: 8px; color: var(--pdf-text-color); background: #fff; }
+          
+          /* Header Logo - positioned at top with 0 space */
+          .pdf-header-logo-wrap { 
+            width: var(--pdf-logo-width); 
+            height: var(--pdf-logo-height); 
+            overflow: hidden; 
+            display: flex; 
+            align-items: flex-start; 
+            justify-content: center; 
+            margin: 0; 
+            padding: 0;
+          }
+          .pdf-header-logo { 
+            width: 100%; 
+            height: 100%; 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            object-position: top center; 
+            display: block; 
+          }
+          
+          /* Company Info - compact and single line where possible */
           .branch-info { flex: 1 1 0; min-width: 0; max-width: none; }
-          .branch-info h2 { font-size: 17px; color: var(--pdf-heading-color); margin-bottom: 6px; font-weight: 700; }
-          .branch-info p { font-size: var(--pdf-body-size); line-height: 1.45; margin: 2px 0; color: var(--pdf-text-color); overflow-wrap: anywhere; }
-          .doc-title { text-align: center; font-size: var(--pdf-title-size); font-weight: 700; margin: 10px 0; text-transform: uppercase; color: var(--pdf-heading-color); letter-spacing: 0.8px; }
-          .quotation-details { min-width: 0; max-width: 100%; border: 1px solid var(--pdf-border-color); }
-          .quotation-details table { width: 100%; font-size: var(--pdf-body-size); border-collapse: collapse; background: #fff; }
-          .quotation-details td { padding: 6px 8px; border: 1px solid #9ca3af; color: var(--pdf-text-color); }
-          .quotation-details td:first-child { font-weight: 600; background: var(--pdf-label-bg); white-space: nowrap; width: 45%; color: var(--pdf-heading-color); }
-          .quotation-details td:last-child { color: var(--pdf-text-color); overflow-wrap: anywhere; }
-          .addresses { display: flex; justify-content: space-between; margin: 8px 0 10px; gap: 0; border: 1px solid var(--pdf-border-color); background: var(--pdf-panel-bg); width: 100%; max-width: 100%; }
-          .address-box { flex: 1; min-width: 0; border: 0; padding: 10px; background: transparent; }
+          .branch-info h2 { 
+            font-size: 12px; 
+            color: var(--pdf-heading-color); 
+            margin-bottom: 3px; 
+            font-weight: 700; 
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .branch-info p { 
+            font-size: 9px; 
+            line-height: 1.35; 
+            margin: 1px 0; 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          
+          /* Document Title */
+          .doc-title { 
+            text-align: center;
+            font-size: var(--pdf-title-size); 
+            font-weight: 700; 
+            margin: 8px 0 20px 0; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+            letter-spacing: 1px; 
+          }
+          
+          /* Top Right Table - smaller */
+          .quotation-details { 
+            min-width: 0; 
+            max-width: 200px; 
+            border: 1px solid var(--pdf-border-color); 
+          }
+          .quotation-details table { 
+            width: 100%; 
+            font-size: 9px; 
+            border-collapse: collapse; 
+            background: #fff; 
+          }
+          .quotation-details td { 
+            padding: 4px 6px; 
+            border: 1px solid var(--pdf-border-color); 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          .quotation-details td:first-child { 
+            background: var(--pdf-label-bg); 
+            white-space: nowrap; 
+            width: 40%; 
+            color: var(--pdf-heading-color); 
+            font-weight: 400;
+          }
+          .quotation-details td:last-child { 
+            color: var(--pdf-text-color); 
+            overflow-wrap: anywhere; 
+            font-weight: 400;
+          }
+          
+          /* Addresses - smaller */
+          .addresses { 
+            display: flex; 
+            justify-content: space-between; 
+            margin: 6px 0 8px; 
+            gap: 0; 
+            border: 1px solid var(--pdf-border-color); 
+            background: var(--pdf-panel-bg); 
+            width: 100%; 
+            max-width: 100%; 
+          }
+          .address-box { 
+            flex: 1; 
+            min-width: 0; 
+            border: 0; 
+            padding: 8px; 
+            background: transparent; 
+          }
           .address-box + .address-box { border-left: 1px solid var(--pdf-border-color); }
-          .address-box h3 { font-size: var(--pdf-heading-size); font-weight: 700; margin-bottom: 6px; border-bottom: 1px solid var(--pdf-border-color); padding-bottom: 4px; text-transform: uppercase; color: var(--pdf-heading-color); }
-          .address-box p { font-size: var(--pdf-body-size); line-height: 1.45; margin: 2px 0; color: var(--pdf-text-color); overflow-wrap: anywhere; }
-          table.items { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0; font-size: 11px; border: 1px solid var(--pdf-border-color); }
-          table.items th, table.items td { border: 1px solid #9ca3af; padding: 5px 4px; overflow-wrap: anywhere; word-break: break-word; }
-          table.items th { background: transparent; color: #111827; font-weight: 600; text-align: center; font-size: var(--pdf-small-size); }
+          .address-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 4px; 
+            border-bottom: 1px solid var(--pdf-border-color); 
+            padding-bottom: 3px; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+          }
+          .address-box p { 
+            font-size: 9px; 
+            line-height: 1.35; 
+            margin: 1px 0; 
+            color: var(--pdf-text-color); 
+            overflow-wrap: anywhere; 
+            font-weight: 400;
+          }
+          
+          /* Items Table - fixed image size and column widths */
+          table.items { 
+            width: 100%; 
+            max-width: 100%; 
+            border-collapse: collapse; 
+            margin: 8px 0; 
+            font-size: 9px; 
+            border: 1px solid var(--pdf-border-color); 
+          }
+          table.items th, table.items td { 
+            border: 1px solid var(--pdf-border-color); 
+            padding: 4px 3px; 
+            white-space: normal; 
+            word-wrap: break-word; 
+            font-weight: 400;
+          }
+          table.items th { 
+            background: var(--pdf-label-bg); 
+            color: var(--pdf-heading-color); 
+            font-weight: 700; 
+            text-align: center; 
+            font-size: 9px; 
+          }
+          /* Fixed column widths optimized for portrait printing */
+          table.items th:nth-child(1), table.items td:nth-child(1) { width: 24px; min-width: 24px; max-width: 24px; } /* No. */
+          ${printConfig.image ? `table.items th:nth-child(2), table.items td:nth-child(2) { width: 44px; min-width: 44px; max-width: 44px; padding: 2px !important; vertical-align: middle !important; } /* Image */` : ''}
+          table.items th:nth-child(${printConfig.image ? '3' : '2'}), table.items td:nth-child(${printConfig.image ? '3' : '2'}) { min-width: 100px; text-align: left; } /* Item & Description - flexible */
+          table.items .col-item-code { width: 58px; min-width: 58px; max-width: 58px; }
+          table.items .col-hsn { width: 58px; min-width: 58px; max-width: 58px; }
+          table.items .col-qty { width: 30px; min-width: 30px; max-width: 30px; }
+          table.items .col-unit { width: 34px; min-width: 34px; max-width: 34px; }
+          table.items .col-fixed-rate { width: 70px; min-width: 70px; max-width: 70px; }
+          table.items .col-rate { width: 48px; min-width: 48px; max-width: 48px; }
+          table.items .col-disc-pct { width: 60px; min-width: 60px; max-width: 60px; }
+          table.items .col-disc-amt { width: 60px; min-width: 60px; max-width: 60px; }
+          table.items .col-taxable { width: 58px; min-width: 58px; max-width: 58px; }
+          table.items .col-gst { width: 36px; min-width: 36px; max-width: 36px; }
+          table.items .col-lead-time { width: 60px; min-width: 60px; max-width: 60px; }
+          table.items .col-amount { width: 62px; min-width: 62px; max-width: 62px; }
+          
           table.items tbody tr:nth-child(even) { background: var(--pdf-alt-row-bg); }
           table.items tbody tr:nth-child(odd) { background: #fff; }
           table.items td { vertical-align: middle; color: var(--pdf-text-color); }
-          .three-col { display: flex; gap: 0; margin-top: 10px; border: 1px solid var(--pdf-border-color); background: #fff; width: 100%; max-width: 100%; }
-          .three-col > div { flex: 1 1 0; min-width: 0; border: 0; padding: 10px; background: #fff; }
+          
+          /* Fixed image size - fits within the 44px column with 2px padding */
+          table.items img { 
+            width: 40px !important; 
+            height: 40px !important; 
+            max-width: 40px !important; 
+            max-height: 40px !important; 
+            object-fit: contain !important; 
+            display: block !important; 
+            margin: 0 auto !important;
+          }
+          
+          /* Three Column Section */
+          .three-col { 
+            display: flex; 
+            gap: 0; 
+            margin-top: 8px; 
+            border: 1px solid var(--pdf-border-color); 
+            background: #fff; 
+            width: 100%; 
+            max-width: 100%; 
+          }
+          .three-col > div { 
+            flex: 1 1 0; 
+            min-width: 0; 
+            border: 0; 
+            padding: 8px; 
+            background: #fff; 
+          }
           .three-col > div + div { border-left: 1px solid var(--pdf-border-color); }
-          .three-col h3 { font-size: var(--pdf-heading-size); font-weight: 700; margin-bottom: 6px; color: var(--pdf-heading-color); padding-bottom: 3px; text-transform: uppercase; }
+          .three-col h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 4px; 
+            color: var(--pdf-heading-color); 
+            padding-bottom: 2px; 
+            text-transform: uppercase; 
+          }
+          
+          /* Bank Details - single line per row */
           .bank-details { flex: 1; }
-          .bank-details table { width: 100%; font-size: var(--pdf-body-size); margin-top: 4px; border-collapse: collapse; }
-          .bank-details td { padding: 3px 0; }
-          .bank-details td:first-child { font-weight: 700; color: var(--pdf-heading-color); width: 25%; padding-right: 6px; white-space: nowrap; }
-          .bank-details td:last-child { padding-left: 2px; }
+          .bank-details p { 
+            font-size: 9px; 
+            line-height: 1.4; 
+            margin: 2px 0; 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          .bank-details p span { 
+            display: inline; 
+            font-weight: 400; 
+          }
+          
+          /* Amount in Words */
           .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: left; }
           .amount-words-box > div { padding: 0; }
-          .amount-words-box strong { display: block; font-size: var(--pdf-body-size); color: var(--pdf-heading-color); margin-bottom: 6px; }
-          .amount-words-box .amount-words-text { font-size: var(--pdf-summary-size); font-weight: 600; color: var(--pdf-heading-color); line-height: 1.45; }
+          .amount-words-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            color: var(--pdf-heading-color); 
+            margin-bottom: 4px; 
+          }
+          .amount-words-box .amount-words-text { 
+            font-size: 10px; 
+            color: var(--pdf-text-color); 
+            line-height: 1.4; 
+            font-weight: 400;
+          }
+          
+          /* Summary */
           .summary { flex: 1; }
-          .summary table { width: 100%; font-size: var(--pdf-body-size); border-collapse: collapse; margin-top: 4px; }
-          .summary td { padding: 6px 8px; border: 1px solid #9ca3af; }
-          .summary td:first-child { text-align: left; font-weight: 500; background: var(--pdf-panel-bg); color: var(--pdf-muted-color); }
-          .summary td:last-child { text-align: right; font-weight: 600; color: var(--pdf-heading-color); }
-          .summary .grand-total td { background: transparent; color: #111827; font-weight: 700; font-size: var(--pdf-summary-size); border-top: 1px solid var(--pdf-heading-color); }
+          .summary table { 
+            width: 100%; 
+            font-size: 9px; 
+            border-collapse: collapse; 
+            margin-top: 4px; 
+          }
+          .summary td { 
+            padding: 4px 6px; 
+            border: 1px solid var(--pdf-border-color); 
+            font-weight: 400;
+          }
+          .summary td:first-child { 
+            text-align: left; 
+            background: var(--pdf-panel-bg); 
+            color: var(--pdf-text-color); 
+          }
+          .summary td:last-child { 
+            text-align: right; 
+            color: var(--pdf-heading-color); 
+          }
+          .summary .grand-total td { 
+            background: var(--pdf-label-bg); 
+            color: var(--pdf-heading-color); 
+            font-size: 10px; 
+            border-top: 2px solid var(--pdf-heading-color); 
+            font-weight: 400;
+          }
+          
+          /* Bottom Layout */
           .bottom-layout { border: 1px solid var(--pdf-border-color); border-top: 0; }
           .bottom-row { display: flex; gap: 0; width: 100%; max-width: 100%; }
           .bottom-row + .bottom-row { border-top: 1px solid var(--pdf-border-color); }
-          .bottom-cell { flex: 1 1 0; min-width: 0; border: 0; padding: 10px; background: #fff; }
+          .bottom-cell { flex: 1 1 0; min-width: 0; border: 0; padding: 8px; background: #fff; }
           .bottom-cell + .bottom-cell { border-left: 1px solid var(--pdf-border-color); }
-          .terms-box h3, .notes-box h3 { font-size: var(--pdf-heading-size); font-weight: 700; margin-bottom: 8px; text-transform: uppercase; color: var(--pdf-heading-color); }
-          .terms-box p, .terms-box div, .notes-box p, .notes-box div { font-size: var(--pdf-body-size); line-height: 1.5; white-space: pre-line; color: var(--pdf-text-color); margin: 2px 0; }
-          .terms-box { min-height: 90px; }
-          .notes-box { min-height: 90px; }
-          .bottom-row.signature-row .bottom-cell { min-height: 126px; }
-          .footer-note { display: flex; align-items: flex-end; font-size: var(--pdf-body-size); color: var(--pdf-text-color); font-style: italic; min-height: 100%; padding-bottom: 4px; }
-          .footer-note span { display: block; }
-          .authorized-sign { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; text-align: center; }
-          .authorized-sign > p:first-child { align-self: flex-end; font-size: var(--pdf-body-size); font-weight: 500; color: var(--pdf-text-color); margin-bottom: 10px; }
-          .authorized-sign .signature-space { width: 180px; min-height: 58px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 10px; }
-          .authorized-sign .signature-image { max-width: 170px; max-height: 54px; object-fit: contain; display: block; }
-          .authorized-sign .sign-line { align-self: flex-end; padding-top: 6px; min-width: 180px; font-weight: 700; font-size: var(--pdf-body-size); color: var(--pdf-heading-color); border-top: 1px solid var(--pdf-border-color); text-align: center; }
+          .terms-box h3, .notes-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 6px; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+          }
+          .terms-box p, .terms-box div, .notes-box p, .notes-box div { 
+            font-size: 9px; 
+            line-height: 1.4; 
+            white-space: pre-line; 
+            color: var(--pdf-text-color); 
+            margin: 1px 0; 
+            font-weight: 400;
+          }
+          .terms-box { min-height: 80px; }
+          .notes-box { min-height: 80px; }
+          .bottom-row.signature-row .bottom-cell { min-height: 110px; }
+          .footer-note { 
+            display: flex; 
+            align-items: flex-end; 
+            font-size: 9px; 
+            color: var(--pdf-muted-color); 
+            font-style: italic; 
+            min-height: 100%; 
+            padding-bottom: 4px; 
+            font-weight: 400;
+          }
+          .footer-note span { display: block; font-weight: 400; }
+          .authorized-sign { 
+            min-height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: flex-start; 
+            align-items: flex-end; 
+            text-align: center; 
+          }
+          .authorized-sign > p:first-child { 
+            align-self: flex-end; 
+            font-size: 9px; 
+            color: var(--pdf-text-color); 
+            margin-bottom: 8px; 
+            font-weight: 400;
+          }
+          .authorized-sign .signature-space { 
+            width: 150px; 
+            min-height: 50px; 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: center; 
+            margin-bottom: 8px; 
+          }
+          .authorized-sign .signature-image { 
+            max-width: 140px; 
+            max-height: 46px; 
+            object-fit: contain; 
+            display: block; 
+          }
+          .authorized-sign .sign-line { 
+            align-self: flex-end; 
+            padding-top: 4px; 
+            min-width: 150px; 
+            font-size: 9px; 
+            color: var(--pdf-heading-color); 
+            border-top: 1px solid var(--pdf-border-color); 
+            text-align: center; 
+            font-weight: 400;
+          }
           @media (max-width: 900px) {
-            .pdf-header-logo-wrap { width: 180px; height: 84px; }
+            .pdf-header-logo-wrap { width: 150px; height: 70px; }
           }
           @media print {
             body { padding: 0; }
@@ -2023,23 +2326,22 @@ const handleTandCClose = () => setOpenTandCModal(false);
       </head>
       <body>
         ${printConfig.header ? `
-        <div class="doc-title" style="margin-bottom:30px;">${docType.toUpperCase()}</div>
+        <div class="doc-title">${docType.toUpperCase()}</div>
 
-        <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:15px; border-bottom:1px solid var(--pdf-border-color); padding-bottom:12px;">
-          <div class="branch-info" style="flex:1; min-width:0; text-align:left; padding:0 10px;">
-            <h2 style="font-size: 18px; color: var(--pdf-heading-color); margin-bottom: 6px;">${branchName || companyName}</h2>
-            <p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;">${branchAddress}</p>
-            <p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
-            ${branchGSTIN ? `<p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
-            ${companyPhone ? `<p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;"><strong>Phone:</strong> ${companyPhone}</p>` : ''}
-            ${companyEmail ? `<p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;"><strong>Email:</strong> ${companyEmail}</p>` : ''}
-            ${companyWebsite ? `<p style="font-size: var(--pdf-body-size); line-height: 1.6; margin: 2px 0;"><strong>Website:</strong> ${companyWebsite}</p>` : ''}
+        <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; border-bottom:1px solid var(--pdf-border-color); padding-bottom:10px;">
+          <div class="branch-info" style="flex:1; min-width:0; text-align:left;">
+            <h2>${branchName || companyName}</h2>
+            <p>${branchAddress}${[branchCity, branchState, branchPincode].filter(Boolean).length ? ', ' + [branchCity, branchState, branchPincode].filter(Boolean).join(', ') : ''}</p>
+            ${branchGSTIN ? `<p>GSTIN: ${branchGSTIN}</p>` : ''}
+            ${companyPhone ? `<p>Phone: ${companyPhone}</p>` : ''}
+            ${companyEmail ? `<p>Email: ${companyEmail}</p>` : ''}
+            ${companyWebsite ? `<p>Website: ${companyWebsite}</p>` : ''}
           </div>
-          <div style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; align-self:center;">
-            ${companyLogo ? `<div class="pdf-header-logo-wrap"><img src="${companyLogo}" alt="${companyName}" class="pdf-header-logo" width="240" height="110" /></div>` : ''}
+          <div style="flex:1; display:flex; align-items:flex-start; justify-content:center;">
+            ${companyLogo ? `<div class="pdf-header-logo-wrap"><img src="${companyLogo}" alt="${companyName}" class="pdf-header-logo" width="200" height="90" /></div>` : ''}
           </div>
-          <div style="flex:1; min-width:0; display:flex; justify-content:flex-end;">
-            <div class="quotation-details" style="min-width:0; max-width:240px; width:100%;">
+          <div style="flex:1; display:flex; justify-content:flex-end;">
+            <div class="quotation-details">
               <table>
                 <tr><td>${docType} No.</td><td>${quotationNumber || '-'}</td></tr>
                 <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
@@ -2052,8 +2354,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
         </div>
         ` : `
         <div class="doc-title">${docType.toUpperCase()}</div>
-        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
-          <div class="quotation-details" style="min-width:0; max-width:240px; width:100%;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+          <div class="quotation-details">
             <table>
               <tr><td>${docType} No.</td><td>${quotationNumber || '-'}</td></tr>
               <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
@@ -2069,27 +2371,27 @@ const handleTandCClose = () => setOpenTandCModal(false);
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
-            ${billingCompanyName ? `<p style="font-weight:700; margin-bottom:6px;">${billingCompanyName}</p>` : ''}
-            ${billingPersonName ? `<p style="margin-bottom:6px;">${billingPersonName}</p>` : ''}
+            ${billingCompanyName ? `<p style="font-weight:600; margin-bottom:4px;">${billingCompanyName}</p>` : ''}
+            ${billingPersonName ? `<p style="margin-bottom:4px;">${billingPersonName}</p>` : ''}
             ${billingAddress1 ? `<p>${billingAddress1}</p>` : ''}
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
             <p>${[billingCity, billingState, [billingCountry, billingPincode].filter(Boolean).join(' - ')].filter(Boolean).join(', ')}</p>
-            ${printConfig.mobile && billingPhone ? `<p><strong>Mobile:</strong> ${billingPhone}</p>` : ''}
-            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
-            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
+            ${printConfig.mobile && billingPhone ? `<p>Mobile: ${billingPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p>Email: ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p>GSTIN: ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
-            ${shippingCompanyName ? `<p style="font-weight:700; margin-bottom:6px;">${shippingCompanyName}</p>` : ''}
-            ${shippingPersonName ? `<p style="margin-bottom:6px;">${shippingPersonName}</p>` : ''}
+            ${shippingCompanyName ? `<p style="font-weight:600; margin-bottom:4px;">${shippingCompanyName}</p>` : ''}
+            ${shippingPersonName ? `<p style="margin-bottom:4px;">${shippingPersonName}</p>` : ''}
             ${shippingAddress1 ? `<p>${shippingAddress1}</p>` : ''}
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
             <p>${[shippingCity, shippingState, [shippingCountry, shippingPincode].filter(Boolean).join(' - ')].filter(Boolean).join(', ')}</p>
-            ${printConfig.mobile && shippingPhone ? `<p><strong>Mobile:</strong> ${shippingPhone}</p>` : ''}
-            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
-            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
+            ${printConfig.mobile && shippingPhone ? `<p>Mobile: ${shippingPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p>Email: ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p>GSTIN: ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
         ` : ''}
@@ -2098,20 +2400,20 @@ const handleTandCClose = () => setOpenTandCModal(false);
           <thead>
             <tr>
               <th>No.</th>
-              <th>Image</th>
+              ${printConfig.image ? `<th>Image</th>` : ''}
               <th>Item & Description</th>
-              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
-              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
-              <th>Qty</th>
-              <th>Unit</th>
-              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
-              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
-              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
-              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
-              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
-              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
-              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
-              <th>Amount (₹)</th>
+              ${printConfig.itemCode ? `<th class="col-item-code">Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th class="col-hsn">HSN / SAC</th>` : ''}
+              <th class="col-qty">Qty</th>
+              <th class="col-unit">Unit</th>
+              ${printConfig.itemFixedRate ? `<th class="col-fixed-rate">Fixed Rate (₹)</th>` : ''}
+              ${printConfig.itemRate ? `<th class="col-rate">Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th class="col-disc-pct">Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th class="col-disc-amt">Discount (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th class="col-taxable">Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th class="col-gst">GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th class="col-lead-time">Lead Time</th>` : ''}
+              <th class="col-amount">Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -2123,18 +2425,17 @@ const handleTandCClose = () => setOpenTandCModal(false);
           ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
-            <table>
-              <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
-              ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
-              ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
-            </table>
+            ${bankName ? `<p>Bank Name: ${bankName}</p>` : ''}
+            ${bankBranch ? `<p>Branch: ${bankBranch}</p>` : ''}
+            ${accountNo ? `<p>Account No.: ${accountNo}</p>` : ''}
+            ${ifscCode ? `<p>IFSC Code: ${ifscCode}</p>` : ''}
+            ${swiftCode ? `<p>SWIFT Code: ${swiftCode}</p>` : ''}
+            ${!bankName && !bankBranch && !accountNo && !ifscCode && !swiftCode ? `<p style="text-align:center;color:#999;margin-top:20px;">Not Available</p>` : ''}
           </div>
           ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
 
           <div class="amount-words-box">
-             <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div class="amount-words-text">Rupees ${numberToWords(grandTotalVal)} only</div></div>
+             <div style="padding: 0"><h3>Amount in Words</h3><div class="amount-words-text">Rupees ${numberToWords(grandTotalVal, roundOffAmount === 0)} only</div></div>
           </div>
 
           <div class="summary">
@@ -2290,6 +2591,7 @@ const handleSaveQuotation = async () => {
       contact_person: contactPerson,
       total_amount: Number(grandTotal) || 0,
       tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
+      include_roundoff: includeRoundOff,
       roundoff_amount: roundoffAmount,
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges,
@@ -2423,6 +2725,7 @@ const handleSaveAsTemplate = async () => {
       contact_person: contactPerson,
       total_amount: Number(grandTotal) || 0,
       tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
+      include_roundoff: includeRoundOff,
       roundoff_amount: roundoffAmount,
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges,
@@ -3322,16 +3625,19 @@ const  prefillFormData = async (data, shouldUpdateDocType = true, reviseMode = i
     setAttachmentPath(data.attachment_path);
   }
 
-  // Pre-fill round off flag: if server sent non-zero roundoff_amount or explicit flags
-  if (data.roundoff_amount !== undefined && data.roundoff_amount !== null) {
+  // Pre-fill round off flag: read from explicit include_roundoff field
+  if (data.include_roundoff !== undefined && data.include_roundoff !== null) {
+    setIncludeRoundOff(Boolean(data.include_roundoff));
+  } else if (data.includeRoundOff !== undefined && data.includeRoundOff !== null) {
+    setIncludeRoundOff(Boolean(data.includeRoundOff));
+  } else if (data.roundoff_amount !== undefined && data.roundoff_amount !== null) {
+    // Fallback for old quotations without the explicit flag
     try {
       const rn = Number(data.roundoff_amount) || 0;
       setIncludeRoundOff(Boolean(rn !== 0));
     } catch (e) {
       // ignore
     }
-  } else if (data.include_roundoff === true || data.includeRoundOff === true || data.include_round_off === true || data.total_before_roundoff === true) {
-    setIncludeRoundOff(true);
   }
 
   // Pre-fill table items with ALL fields from QuotationTableItems

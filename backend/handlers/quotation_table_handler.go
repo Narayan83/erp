@@ -738,15 +738,29 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Explicitly update JSON fields (GORM's Updates may not handle JSON fields properly)
-	// We need to use Select to force update even if the value appears unchanged
-	if err := tx.Model(&existing).Select("terms_and_conditions", "extra_charges", "discounts").Updates(map[string]interface{}{
+	// Explicitly update JSON fields, boolean fields, and amount fields (GORM's Updates may not handle these properly)
+	// We need to use Select to force update even if the value appears unchanged, is false, or is zero
+	if err := tx.Model(&existing).Select(
+		"terms_and_conditions",
+		"extra_charges",
+		"discounts",
+		"include_roundoff",
+		"roundoff_amount",
+		"grand_total",
+		"tax_amount",
+		"total_amount",
+	).Updates(map[string]interface{}{
 		"terms_and_conditions": req.Quotation.TermsAndConditions,
 		"extra_charges":        req.Quotation.ExtraCharges,
 		"discounts":            req.Quotation.Discounts,
+		"include_roundoff":     req.Quotation.IncludeRoundoff,
+		"roundoff_amount":      req.Quotation.RoundoffAmount,
+		"grand_total":          req.Quotation.GrandTotal,
+		"tax_amount":           req.Quotation.TaxAmount,
+		"total_amount":         req.Quotation.TotalAmount,
 	}).Error; err != nil {
 		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update JSON fields: " + err.Error()})
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update fields: " + err.Error()})
 	}
 
 	// Replace quotation items if provided

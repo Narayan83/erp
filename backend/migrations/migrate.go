@@ -266,6 +266,24 @@ func main() {
 				}
 			}
 
+			// Handle include_roundoff column (default to false for existing records)
+			var includeRoundoffExists bool
+			initializers.DB.Raw(`
+				SELECT EXISTS (
+					SELECT 1 FROM information_schema.columns 
+					WHERE table_name = 'quotation_tables' AND column_name = 'include_roundoff'
+				)
+			`).Scan(&includeRoundoffExists)
+
+			if !includeRoundoffExists {
+				log.Println("Adding include_roundoff column to quotation_tables...")
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ADD COLUMN include_roundoff boolean`)
+				// For existing records, set to true if roundoff_amount is non-zero, false otherwise
+				initializers.DB.Exec(`UPDATE quotation_tables SET include_roundoff = (roundoff_amount != 0) WHERE include_roundoff IS NULL`)
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN include_roundoff SET NOT NULL`)
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN include_roundoff SET DEFAULT false`)
+			}
+
 			log.Println("Pre-migration column setup completed.")
 		}
 	}
