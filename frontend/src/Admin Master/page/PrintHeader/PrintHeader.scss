@@ -219,12 +219,114 @@
   background: #e6e6e6;
 }
 
+.logo-grid {
+  margin-top: 10px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.logo-thumb-card {
+  position: relative;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  min-height: 130px;
+  box-sizing: border-box;
+}
+
+// .logo-thumb-card.selected {
+//   border-color: #0b5fff;
+//   box-shadow: 0 0 0 2px rgba(11, 95, 255, 0.2);
+// }
+
+.logo-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.logo-name-input {
+  width: 72px;
+  margin: 4px 0 0 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logo-thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.logo-thumb-remove:hover {
+  background: rgba(15, 23, 42, 0.9);
+}
+
 /* preview removed – upload area centered */
 
 .file-name {
   font-size: 12px;
   color: #666;
   margin-top: 6px;
+}
+
+.file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ensure name and thumb align and don't stretch grid cells */
+.logo-thumb-card .logo-name-input,
+.logo-thumb-card .file-name {
+  width: 72px;
+  max-width: 72px;
+}
+
+@media (max-width: 760px) {
+  .logo-thumb {
+    width: 64px;
+    height: 64px;
+  }
+  .logo-thumb-card {
+    min-height: 120px;
+  }
+  .logo-thumb-card .logo-name-input,
+  .logo-thumb-card .file-name {
+    width: 64px;
+    max-width: 64px;
+  }
 }
 
 .file-name {
@@ -281,6 +383,10 @@
   }
   .upload-area {
     width: 100%;
+  }
+
+  .logo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

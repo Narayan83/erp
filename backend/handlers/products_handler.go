@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"erp.local/backend/cloudinaryutil"
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -51,14 +52,6 @@ func CreateProduct(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid variants JSON"})
 	}
 
-	uploadDir := "uploads"
-	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-		err := os.Mkdir(uploadDir, os.ModePerm)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to create upload directory"})
-		}
-	}
-
 	// Collect any pre-existing image references sent from the client (as strings)
 	// Client appends many 'variant_images' JSON blobs like { sku, image }
 	// We'll gather them into a map and merge below with uploaded files.
@@ -79,17 +72,17 @@ func CreateProduct(c *fiber.Ctx) error {
 		}
 	}
 
-	// Process uploaded images for each variant
+	// Process uploaded images for each variant - upload to Cloudinary
 	imagesMap := make(map[string][]string) // map[variantSKU][]imagePath
 	for key, files := range form.File {
 		if len(files) > 0 && len(key) > 7 && key[:7] == "images_" {
 			variantKey := key[7:] // e.g. sku
 			for _, file := range files {
-				savePath := filepath.Join("uploads", fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename))
-				if err := c.SaveFile(file, savePath); err != nil {
-					return c.Status(500).JSON(fiber.Map{"error": "Failed to save image"})
+				upResult, err := cloudinaryutil.UploadFile(file, "products", cloudinaryutil.ResourceTypeForFile(file.Filename))
+				if err != nil {
+					return c.Status(500).JSON(fiber.Map{"error": "Failed to upload image: " + err.Error()})
 				}
-				imagesMap[variantKey] = append(imagesMap[variantKey], savePath)
+				imagesMap[variantKey] = append(imagesMap[variantKey], upResult.SecureURL)
 			}
 		}
 	}
@@ -1731,14 +1724,16 @@ func DeleteProduct(c *fiber.Ctx) error {
 				if strings.TrimSpace(img) == "" {
 					continue
 				}
-				// Normalize backslashes and ensure local path
 				p := strings.ReplaceAll(img, "\\", "/")
-				// Only delete if file exists locally under uploads/
-				if !strings.HasPrefix(strings.ToLower(p), "http://") && !strings.HasPrefix(strings.ToLower(p), "https://") && !strings.HasPrefix(strings.ToLower(p), "data:") {
+				lower := strings.ToLower(p)
+				if strings.HasPrefix(lower, "https://res.cloudinary.com/") {
+					// Delete from Cloudinary
+					_ = cloudinaryutil.DeleteFile(cloudinaryutil.ExtractPublicID(p), "image")
+				} else if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "data:") {
+					// Legacy local file
 					if _, err := os.Stat(p); err == nil {
 						_ = os.Remove(p)
 					} else {
-						// Also try prefixed with ./ in case stored as relative without leading folder
 						joined := filepath.Join("uploads", filepath.Base(p))
 						if _, err2 := os.Stat(joined); err2 == nil {
 							_ = os.Remove(joined)
@@ -1748,7 +1743,10 @@ func DeleteProduct(c *fiber.Ctx) error {
 			}
 			if v.MainImage != "" {
 				p := strings.ReplaceAll(v.MainImage, "\\", "/")
-				if !strings.HasPrefix(strings.ToLower(p), "http://") && !strings.HasPrefix(strings.ToLower(p), "https://") && !strings.HasPrefix(strings.ToLower(p), "data:") {
+				lower := strings.ToLower(p)
+				if strings.HasPrefix(lower, "https://res.cloudinary.com/") {
+					_ = cloudinaryutil.DeleteFile(cloudinaryutil.ExtractPublicID(p), "image")
+				} else if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "data:") {
 					if _, err := os.Stat(p); err == nil {
 						_ = os.Remove(p)
 					}

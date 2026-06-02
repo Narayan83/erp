@@ -8,9 +8,12 @@ import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import "./allinone.scss";
 import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function SizeSection() {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [sizes, setSizes] = useState([]);
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const [filter, setFilter] = useState("");

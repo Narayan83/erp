@@ -8,9 +8,12 @@ import axios from "axios";
 import { BASE_URL }  from "../../../config/Config";
 import "./category.scss";
 import {useAuth} from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function CategoryPage() {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [categories, setCategories] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -128,6 +131,7 @@ export default function CategoryPage() {
                 setCategoryToDelete(cat);
                 setConfirmOpen(true);
                 }}
+                perms={perms}
         />
       </div>
 

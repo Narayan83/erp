@@ -2,11 +2,8 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"time"
 
+	"erp.local/backend/cloudinaryutil"
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -59,30 +56,20 @@ func CreateProduct_variant(c *fiber.Ctx) error {
 		if err := json.Unmarshal([]byte(raw), &item); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid variant JSON"})
 		}
-		// Save any uploaded files
-		uploadDir := "uploads"
-		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-			if err := os.Mkdir(uploadDir, os.ModePerm); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to create upload directory"})
-			}
-		}
+		// Save any uploaded files to Cloudinary
 		files := form.File["images"]
 		for _, f := range files {
-			savePath := filepath.Join("uploads", fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename))
-			if err := c.SaveFile(f, savePath); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to save image"})
+			upResult, err := cloudinaryutil.UploadFile(f, "products", cloudinaryutil.ResourceTypeForFile(f.Filename))
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to upload image: " + err.Error()})
 			}
-			item.Images = append(item.Images, savePath)
+			item.Images = append(item.Images, upResult.SecureURL)
 		}
 	} else {
 		// JSON body
 		if err := c.BodyParser(&item); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 		}
-	}
-	// Normalize paths (ensure forward slashes)
-	for i := range item.Images {
-		item.Images[i] = filepath.ToSlash(item.Images[i])
 	}
 	if err := product_variantsDB.Create(&item).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -123,25 +110,27 @@ func UpdateProduct_variant(c *fiber.Ctx) error {
 		merged := make([]string, 0, len(payload.Images))
 		merged = append(merged, payload.Images...)
 
-		// Save any uploaded files
-		uploadDir := "uploads"
-		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-			if err := os.Mkdir(uploadDir, os.ModePerm); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to create upload directory"})
-			}
-		}
+		// Save any uploaded files to Cloudinary
 		files := form.File["images"]
 		for _, f := range files {
-			savePath := filepath.Join("uploads", fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename))
-			if err := c.SaveFile(f, savePath); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to save image"})
+			upResult, err := cloudinaryutil.UploadFile(f, "products", cloudinaryutil.ResourceTypeForFile(f.Filename))
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to upload image: " + err.Error()})
 			}
-			merged = append(merged, savePath)
+			merged = append(merged, upResult.SecureURL)
 		}
-		// Normalize slashes
-		for i := range merged {
-			merged[i] = filepath.ToSlash(merged[i])
+
+		// Delete from Cloudinary any images that were removed
+		mergedSet := make(map[string]struct{}, len(merged))
+		for _, u := range merged {
+			mergedSet[u] = struct{}{}
 		}
+		for _, oldURL := range existing.Images {
+			if _, kept := mergedSet[oldURL]; !kept {
+				cloudinaryutil.DeleteByURL(oldURL)
+			}
+		}
+
 		existing.Images = merged
 
 		// Update main image metadata if provided
@@ -170,6 +159,16 @@ func UpdateProduct_variant(c *fiber.Ctx) error {
 	existing.IsActive = payload.IsActive
 	// Replace Images if provided
 	if payload.Images != nil {
+		// Delete from Cloudinary any images that were removed
+		newSet := make(map[string]struct{}, len(payload.Images))
+		for _, u := range payload.Images {
+			newSet[u] = struct{}{}
+		}
+		for _, oldURL := range existing.Images {
+			if _, kept := newSet[oldURL]; !kept {
+				cloudinaryutil.DeleteByURL(oldURL)
+			}
+		}
 		existing.Images = payload.Images
 	}
 	existing.MainImage = payload.MainImage
@@ -182,14 +181,23 @@ func UpdateProduct_variant(c *fiber.Ctx) error {
 }
 
 func DeleteProduct_variant(c *fiber.Ctx) error {
-	{
-		id := c.Params("id")
-		// Hard delete the product variant
-		if err := product_variantsDB.Unscoped().Delete(&models.ProductVariant{}, id).Error; err != nil {
-			{
-				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-			}
-		}
-		return c.SendStatus(204)
+	id := c.Params("id")
+	var existing models.ProductVariant
+	if err := product_variantsDB.First(&existing, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Not found"})
 	}
+
+	// Delete all images from Cloudinary
+	for _, imgURL := range existing.Images {
+		cloudinaryutil.DeleteByURL(imgURL)
+	}
+	if existing.MainImage != "" {
+		cloudinaryutil.DeleteByURL(existing.MainImage)
+	}
+
+	// Hard delete the product variant
+	if err := product_variantsDB.Unscoped().Delete(&models.ProductVariant{}, id).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.SendStatus(204)
 }

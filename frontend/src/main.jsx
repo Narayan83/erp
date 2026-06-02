@@ -8,9 +8,14 @@ function AppWrapper() {
   useEffect(() => {
     // AGGRESSIVE: Use readonly trick to prevent autocomplete
     // Inputs start as readonly, then become editable on focus
+    const skipAggressiveInputHardening = (input) =>
+      input.hasAttribute('data-no-readonly-trick');
+
     const applyReadonlyTrick = () => {
       const inputs = document.querySelectorAll('input, textarea');
       inputs.forEach(input => {
+        if (skipAggressiveInputHardening(input)) return;
+
         const isMuiAutocomplete = input.closest('.MuiAutocomplete-root');
         const isCustomAutocomplete = input.closest('.autocomplete-wrapper');
         
@@ -50,6 +55,10 @@ function AppWrapper() {
       // Handle input, textarea, and select elements
       const inputs = document.querySelectorAll('input, textarea, select');
       inputs.forEach(input => {
+        if (skipAggressiveInputHardening(input)) return;
+        // Native <select> is fully controlled by React; mutating name/autocomplete breaks controlled value
+        if (input.tagName === 'SELECT') return;
+
         const isMuiAutocomplete = input.closest('.MuiAutocomplete-root');
         const isCustomAutocomplete = input.closest('.autocomplete-wrapper');
         

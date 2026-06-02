@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BASE_URL, getAuthHeaders } from "../../../config/Config";
 import "./termsandcond.scss";
 
@@ -197,7 +197,7 @@ import "./termsandcond.scss";
 
 export default function TermsConditionSelector({ open, handleClose, initialSelections = [], end_customer_name, end_dealer_name }) {
   const [tandc, setTandc] = useState([]);
-  const [selectedItems, setSelectedItems] = useState(initialSelections || []);
+  const [selectedItems, setSelectedItems] = useState([]);
   const [openModal, setOpenModal] = useState(false);
   const [openAddModal, setOpenAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -209,17 +209,80 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
   const [showEndDealer, setShowEndDealer] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
+  const handleCloseRef = useRef(handleClose);
+  const lastEmittedStateRef = useRef("");
 
-  const [hasPrefilled, setHasPrefilled] = useState(false);
+  const normalizeSelectionItem = (item) => {
+    if (item == null) return null;
+    if (typeof item === "string" || typeof item === "number") {
+      return { ID: String(item), TandcName: "" };
+    }
+    if (typeof item === "object") {
+      const idValue = item.ID ?? item.id ?? item.tandc_id ?? item.value ?? item.term_id;
+      if (idValue == null || idValue === "") {
+        // If this is a plain custom term object without ID, keep its text so edit/revise still shows it.
+        const termText = item.TandcName ?? item.name ?? item.term ?? item.value ?? "";
+        return termText ? { ID: `custom-${termText}`, TandcName: String(termText) } : null;
+      }
+      return {
+        ...item,
+        ID: String(idValue),
+        TandcName: item.TandcName ?? item.name ?? item.term ?? "",
+      };
+    }
+    return null;
+  };
+
+  const normalizeSelections = (rawSelections) => {
+    let parsed = rawSelections;
+    if (typeof rawSelections === "string") {
+      try {
+        parsed = JSON.parse(rawSelections);
+      } catch {
+        parsed = [rawSelections];
+      }
+    }
+
+    if (!Array.isArray(parsed)) parsed = parsed ? [parsed] : [];
+
+    return parsed
+      .map(normalizeSelectionItem)
+      .filter(Boolean)
+      .filter((item, index, arr) => arr.findIndex((x) => String(x.ID) === String(item.ID)) === index);
+  };
+
+  const sameId = (a, b) => String(a) === String(b);
+
+  const toComparableSelectionShape = (items = []) =>
+    items.map((item) => ({
+      ID: String(item?.ID ?? ""),
+      TandcName: String(item?.TandcName ?? ""),
+    }));
+
+  const areSelectionsEqual = (left = [], right = []) => {
+    if (left.length !== right.length) return false;
+
+    const a = toComparableSelectionShape(left);
+    const b = toComparableSelectionShape(right);
+
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i].ID !== b[i].ID || a[i].TandcName !== b[i].TandcName) {
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   useEffect(() => {
-    // Only prefill once when initialSelections transition from empty to populated.
-    // Or if we need a more dynamic sync, ensure it only happens when they are truly different.
-    if (!hasPrefilled && Array.isArray(initialSelections) && initialSelections.length > 0) {
-      setSelectedItems(initialSelections);
-      setHasPrefilled(true);
-    }
-  }, [initialSelections, hasPrefilled]);
+    // Always sync from parent for edit/revise flows (different docs can be opened in same mounted component).
+    const normalized = normalizeSelections(initialSelections);
+    setSelectedItems((prev) => (areSelectionsEqual(prev, normalized) ? prev : normalized));
+  }, [initialSelections]);
+
+  useEffect(() => {
+    handleCloseRef.current = handleClose;
+  }, [handleClose]);
 
   useEffect(() => {
     setEndCustomer(end_customer_name || "");
@@ -235,12 +298,16 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
         setTandc(masterTandc);
         
         // Sync existing selected items with master data names
-        if (selectedItems.length > 0 && masterTandc.length > 0) {
-          setSelectedItems(prev => prev.map(sel => {
-            const master = masterTandc.find(m => m.ID === sel.ID);
+        setSelectedItems((prev) => {
+          if (!prev.length || !masterTandc.length) return prev;
+
+          const next = prev.map((sel) => {
+            const master = masterTandc.find((m) => sameId(m.ID, sel.ID));
             return master ? { ...sel, TandcName: master.TandcName } : sel;
-          }));
-        }
+          });
+
+          return areSelectionsEqual(prev, next) ? prev : next;
+        });
       } catch (err) {
         console.error("Error fetching TandC:", err);
       }
@@ -248,17 +315,28 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
     fetchData();
   }, []);
 
-  // Notify parent whenever selections or names change, to keep everything in sync
+  // Notify parent whenever selections or names change, but avoid emitting duplicate payloads.
   useEffect(() => {
-    if (typeof handleClose === "function") {
-      handleClose(selectedItems, endCustomer, endDealer);
+    const payloadKey = JSON.stringify({
+      items: toComparableSelectionShape(selectedItems),
+      endCustomer: String(endCustomer || ""),
+      endDealer: String(endDealer || ""),
+    });
+
+    if (payloadKey === lastEmittedStateRef.current) return;
+
+    lastEmittedStateRef.current = payloadKey;
+    if (typeof handleCloseRef.current === "function") {
+      handleCloseRef.current(selectedItems, endCustomer, endDealer);
     }
   }, [selectedItems, endCustomer, endDealer]);
 
   const toggleItem = (item) => {
     setSelectedItems((prev) => {
-      if (prev.find((p) => p.ID === item.ID)) return prev.filter((p) => p.ID !== item.ID);
-      return [...prev, item];
+      const normalized = normalizeSelectionItem(item);
+      if (!normalized) return prev;
+      if (prev.find((p) => sameId(p.ID, normalized.ID))) return prev.filter((p) => !sameId(p.ID, normalized.ID));
+      return [...prev, normalized];
     });
   };
 
@@ -337,21 +415,15 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                         return;
                       }
 
-                      // optimistic update
-                      setSelectedItems((prev) => prev.map((p) => (p.ID === id ? { ...p, TandcName: newName } : p)));
-                      setTandc((prev) => prev.map((t) => (t.ID === id ? { ...t, TandcName: newName } : t)));
+                      // optimistic update (local only, do not save to master)
+                      const updatedItems = selectedItems.map((p) => (sameId(p.ID, id) ? { ...p, TandcName: newName } : p));
+                      setSelectedItems(updatedItems);
                       setEditingId(null);
                       setEditingValue("");
-
-                      // try persisting update, but don't block UI
-                      try {
-                        await fetch(`${BASE_URL}/api/tandc/${id}`, {
-                          method: "PUT",
-                          headers: getAuthHeaders(),
-                          body: JSON.stringify({ TandcName: newName }),
-                        });
-                      } catch (err) {
-                        console.error("Failed to persist TandC edit", err);
+                      
+                      // Immediately sync to parent to ensure changes are captured
+                      if (typeof handleClose === "function") {
+                        handleClose(updatedItems, endCustomer, endDealer);
                       }
                     }}
                   >
@@ -390,7 +462,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                       className="btn-delete"
                       aria-label={`Remove ${it.TandcName}`}
                       title="Remove"
-                      onClick={() => setSelectedItems((prev) => prev.filter((p) => p.ID !== it.ID))}
+                      onClick={() => setSelectedItems((prev) => prev.filter((p) => !sameId(p.ID, it.ID)))}
                     >
                       ✕
                     </button>
@@ -435,7 +507,7 @@ export default function TermsConditionSelector({ open, handleClose, initialSelec
                       <label className="term-item" key={item.ID}>
                         <input 
                           type="checkbox" 
-                          checked={!!selectedItems.find((p) => p.ID === item.ID)} 
+                          checked={!!selectedItems.find((p) => sameId(p.ID, item.ID))} 
                           onChange={() => toggleItem(item)} 
                         />
                         <span className="term-name">{item.TandcName}</span>

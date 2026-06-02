@@ -2,46 +2,48 @@
 // Variables Style
 // ----------------------------------------------
 
-
-// colors
+// colors — professional palette (dashboard/admin)
 $white: #fff !default;
-$smokewhite: #f4efef !default;
-$gray-100: #f6f8fa !default;
-$gray-200: #f5f8fb !default;
-$gray-250: #eeeff1 !default;
-$gray-300: #dbe1e6 !default;
+$smokewhite: #f5f9fb !default;
+$gray-100: #f8fafc !default;
+$gray-200: #f1f5f9 !default;
+$gray-250: #e8f0f3 !default;
+$gray-300: #dee6e9 !default;
 $gray-400: #fbfcfd !default;
-$gray-600: #707a82 !default;
-$gray-900: #3a4752 !default;
+$gray-600: #57666b !default;
+$gray-900: #070c0e !default;
 $black: #000 !default;
 
 // Color
-$blue: #2952ff !default;
-$red: #f25a5a !default;
-$yellow: #f2d15a !default;
-$green: #85d446 !default;
-$cyan: #74dbf7 !default;
-$muted: #b7c2cc !default;
+$blue: #008674 !default;
+$red: #d40924 !default;
+$yellow: #f59e0b !default;
+$green: #00ab6d !default;
+$cyan: #06b6d4 !default;
+$muted: #94a3b8 !default;
 
 $primary: $blue !default;
-$secondary: #74dbf7 !default;
+$secondary: #64748b !default;
 $success: $green !default;
 $inverse: $gray-900 !default;
-$info: #745af2 !default;
+$info: #0ea5e9 !default;
 $warning: $yellow !default;
 $danger: $red !default;
 $light: $gray-100 !default;
 $dark: $gray-900 !default;
-$blue-gradient: linear-gradient(38deg,rgba(3, 29, 55, 1) 42%, rgba(8, 120, 206, 1) 82%);
+$blue-gradient: linear-gradient(
+  38deg,
+  rgba(3, 29, 55, 1) 42%,
+  rgba(8, 120, 206, 1) 82%
+);
 
 // light colors
-$primary-bg-subtle: #e4f1fc !default;
-$secondary-bg-subtle: #e4f8fb !default;
-$success-bg-subtle: #e4f5d6 !default;
-$info-bg-subtle: #e7e3fd !default;
-$warning-bg-subtle: #fdf7e3 !default;
-$danger-bg-subtle: #fde3e3 !default;
-
+$primary-bg-subtle: #e8f6f3 !default;
+$secondary-bg-subtle: #e8f0f3 !default;
+$success-bg-subtle: #d1fae5 !default;
+$info-bg-subtle: #e0f2fe !default;
+$warning-bg-subtle: #fef3c7 !default;
+$danger-bg-subtle: #fee2e2 !default;
 
 // Theme Colorss
 $theme-colors: (
@@ -55,7 +57,6 @@ $theme-colors: (
   "light": $light,
   "dark": $dark,
 ) !default;
-
 
 // Spacer
 $spacer: 1rem !default;
@@ -99,7 +100,7 @@ $btn-box-shadow: unset !default;
 $btn-font-weight: 600 !default;
 
 // Font Family
-$font-family-sans-serif: "Montserrat", sans-serif !default;
+$font-family-sans-serif: "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif !default;
 
 // Font Sizes
 $font-sizes: (
@@ -118,7 +119,6 @@ $font-sizes: (
 
 $font-size-base: 0.875rem !default;
 
-
 // Line Heght
 $line-height-base: 1.5 !default;
 $line-height-sm: 1.25 !default;
@@ -126,15 +126,14 @@ $line-height-lg: 2 !default;
 
 // Body
 $body-bg: $smokewhite !default;
-$body-color: #313a43 !default;
+$body-color: $gray-900 !default;
 
 // Heading
 $headings-color: $dark !default;
 $headings-font-weight: $font-weight-bold !default;
 
-
 // Border Color
-$border-color: #f1f1f4 !default;
+$border-color: #d1d9dc !default;
 
 // Card
 $card-title-color: $dark !default;
@@ -152,15 +151,12 @@ $border-radius-lg: 12px !default; // 24px
 $border-radius-lg: 1.5rem !default; // 24px
 $border-radius-pill: 50rem !default; // 800px
 
-
 // Badges
 $badge-font-size: 13px;
 $badge-font-weight: 500 !default;
 $badge-padding-y: 7px;
 $badge-padding-x: 8px;
 $badge-border-radius: 4px;
-
-
 
 // Table
 $table-cell-padding-y: 17px;
@@ -172,7 +168,7 @@ $table-cell-padding-y-sm: 14px;
 $table-cell-padding-x-sm: 10px;
 
 // Progress
-$progress-height:3px;
+$progress-height: 3px;
 
 // Input
 $input-box-shadow: unset !default;
@@ -180,7 +176,7 @@ $form-label-color: $gray-900;
 $form-select-box-shadow: unset !default;
 $input-group-addon-bg: $gray-200;
 $input-group-addon-border-color: $light;
-$input-border-color: #dbe1e6;
+$input-border-color: #dee6e9;
 $input-bg: transparent;
 $input-padding-y: 8px;
 $input-padding-x: 16px;
@@ -188,8 +184,8 @@ $form-select-padding-y: 10px;
 $form-select-padding-x: $input-padding-x;
 $input-placeholder-color: $dark;
 $input-border-radius: 0.5rem !default;
-$form-check-input-width: 1.450em;
-$form-check-min-height: 1.450em;
+$form-check-input-width: 1.45em;
+$form-check-min-height: 1.45em;
 $form-check-input-border: 1px solid $input-border-color;
 $form-check-input-focus-box-shadow: unset !default;
 $input-padding-y-lg: 9px;
@@ -197,7 +193,6 @@ $input-padding-x-lg: 16px;
 $input-height: 38px;
 $input-phone-height: 30px;
 $input-group-addon-border-color: $input-border-color;
-
 
 // Dropdown
 $dropdown-border-radius: 1.125rem !default;
@@ -212,7 +207,6 @@ $dropdown-link-active-color: $dark;
 $modal-content-border-width: 0 !default;
 $modal-content-border-radius: 1.125rem !default;
 
-
 // navbar
 $navbar-light-color: rgba($gray-600, 1) !default;
 $navbar-light-hover-color: rgba($primary, 1) !default;
@@ -222,8 +216,6 @@ $navbar-dark-hover-color: rgba($primary, 1) !default;
 // logo
 $logo-width: 50px;
 
-
-
 // admintopsearchbar
 
-$searchbar-width:400px;
+$searchbar-width: 400px;

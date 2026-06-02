@@ -3,8 +3,53 @@ import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaFileExport } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import { BASE_URL, getAuthHeaders } from '../../../config/Config';
+import LeadDetails from '../../Components/LeadDetails/LeadDetails';
 import './_sales_interactions.scss';
 
+function normalizeApiList(resp) {
+  if (Array.isArray(resp)) return resp;
+  if (resp && Array.isArray(resp.data)) return resp.data;
+  return [];
+}
+
+function leadIdFromInteraction(inter) {
+  const leadRef = inter.lead || inter.Lead || {};
+  const id = inter.lead_id ?? inter.leadId ?? leadRef.id ?? leadRef.ID;
+  return id !== undefined && id !== null && id !== '' ? id : null;
+}
+
+/**
+ * Load interactions first, then fetch only the leads referenced (GET /api/leads/:id per id).
+ */
+async function fetchSalesInteractionsData() {
+  const interResp = await fetch(`${BASE_URL}/api/lead-interactions`, {
+    headers: getAuthHeaders(),
+  }).then((res) => res.json());
+
+  const interactions = normalizeApiList(interResp);
+
+  const leadIds = [...new Set(interactions.map(leadIdFromInteraction).filter((id) => id != null))];
+
+  const leadsList = await Promise.all(
+    leadIds.map((id) =>
+      fetch(`${BASE_URL}/api/leads/${id}`, { headers: getAuthHeaders() }).then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+    )
+  );
+
+  const leadsMap = {};
+  leadsList.forEach((lead, idx) => {
+    if (!lead) return;
+    const id = lead.id ?? lead.ID ?? lead.lead_id ?? lead.leadId ?? leadIds[idx];
+    if (id === undefined || id === null) return;
+    leadsMap[id] = lead;
+    leadsMap[String(id)] = lead;
+  });
+
+  return { interactions, leadsMap };
+}
 
 const SalesInteractions = () => {
   const navigate = useNavigate();
@@ -25,6 +70,8 @@ const SalesInteractions = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [leadDetails, setLeadDetails] = useState(null);
 
   const handlePeriodChange = (v) => {
     setPeriod(v);
@@ -57,30 +104,17 @@ const SalesInteractions = () => {
       })
       .finally(() => { if (mounted) setLoadingEmployees(false); });
 
-    // Fetch interactions and leads (handle paginated responses)
+    // Fetch interactions first, then only leads referenced by those interactions
     setLoadingInteractions(true);
-    Promise.all([
-      fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(res => res.json()),
-      fetch(`${BASE_URL}/api/leads`, { headers: getAuthHeaders() }).then(res => res.json())
-    ])
-      .then(([interResp, leadsResp]) => {
+    fetchSalesInteractionsData()
+      .then(({ interactions, leadsMap }) => {
         if (!mounted) return;
-
-        const interactions = Array.isArray(interResp) ? interResp : (interResp && interResp.data ? interResp.data : []);
-        const leadsList = Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []);
-
-        // Build a map of leads for quick lookup (support multiple id keys)
-        const leadsMap = {};
-        leadsList.forEach(lead => {
-          const id = lead.id || lead.ID || lead.lead_id || lead.leadId;
-          if (id !== undefined && id !== null) leadsMap[id] = lead;
-        });
 
         const tableRows = interactions.map(inter => {
           // Lead may be nested on interaction or referenced by id
           const leadRef = inter.lead || inter.Lead || {};
           const leadId = inter.lead_id || inter.leadId || leadRef.id || leadRef.ID;
-          const lead = leadsMap[leadId] || leadRef || {};
+          const lead = leadsMap[leadId] || leadsMap[String(leadId)] || leadRef || {};
 
           const tsRaw = inter.timestamp || inter.Timestamp || inter.created_at || inter.createdAt;
           const timestamp = tsRaw ? new Date(tsRaw) : new Date();
@@ -126,6 +160,7 @@ const SalesInteractions = () => {
             executive_id: execId,
             executive: execNameLabel || '',
             lead_id: leadId,
+            lead,
           };
         });
 
@@ -144,26 +179,14 @@ const SalesInteractions = () => {
         if (d.interaction) {
           // reload interactions
           setLoadingInteractions(true);
-          Promise.all([
-            fetch(`${BASE_URL}/api/lead-interactions`, { headers: getAuthHeaders() }).then(res => res.json()),
-            fetch(`${BASE_URL}/api/leads`, { headers: getAuthHeaders() }).then(res => res.json())
-          ])
-            .then(([interResp, leadsResp]) => {
+          fetchSalesInteractionsData()
+            .then(({ interactions, leadsMap }) => {
               if (!mounted) return;
-
-              const interactions = Array.isArray(interResp) ? interResp : (interResp && interResp.data ? interResp.data : []);
-              const leadsList = Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []);
-
-              const leadsMap = {};
-              leadsList.forEach(lead => {
-                const id = lead.id || lead.ID || lead.lead_id || lead.leadId;
-                if (id !== undefined && id !== null) leadsMap[id] = lead;
-              });
 
               const tableRows = interactions.map(inter => {
                 const leadRef = inter.lead || inter.Lead || {};
                 const leadId = inter.lead_id || inter.leadId || leadRef.id || leadRef.ID;
-                const lead = leadsMap[leadId] || leadRef || {};
+                const lead = leadsMap[leadId] || leadsMap[String(leadId)] || leadRef || {};
 
                 const tsRaw = inter.timestamp || inter.Timestamp || inter.created_at || inter.createdAt;
                 const timestamp = tsRaw ? new Date(tsRaw) : new Date();
@@ -185,7 +208,8 @@ const SalesInteractions = () => {
 
                 const interactionText = inter.summary || inter.details || inter.type || inter.note || inter.notes || '';
 
-                const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedTo || lead.assignedToId || null;
+                const execId = inter.assigned_to_id || inter.assignedToId || inter.assignedTo || inter.assignee || inter.assignee_id || inter.owner_id || inter.ownerId || lead.assigned_to_id || lead.assignedToId || lead.assignedTo || lead.assigned_to || null;
+                const execNameLabel = inter.assignedToName || inter.assigned_to_name || inter.assigned_to || inter.assignedTo || lead.assignedToName || lead.assigned_to_name || lead.assigned_to || lead.assignedTo || '';
                 const interactionType = (inter.type || inter.Type || inter.interaction_type || inter.kind || '').toString().trim();
                 return {
                   date: dateStr,
@@ -197,8 +221,9 @@ const SalesInteractions = () => {
                   type: interactionType,
                   interaction: interactionText,
                   executive_id: execId,
-                  executive: '',
+                  executive: execNameLabel || '',
                   lead_id: leadId,
+                  lead,
                 };
               });
 
@@ -493,6 +518,22 @@ const SalesInteractions = () => {
     }
   };
 
+  const openLeadDetails = (row) => {
+    if (!row) return;
+    const resolvedLead = row.lead && typeof row.lead === 'object'
+      ? row.lead
+      : {
+          id: row.lead_id,
+          business: row.business,
+          name: row.contact,
+          since: row.since,
+          transferredOn: row.transferred,
+        };
+
+    setLeadDetails(resolvedLead);
+    setShowLeadDetails(true);
+  };
+
   return (
     <div className="sales-interactions-container">
       <h2 style={{textAlign: 'center'}}>Sales Interactions</h2>
@@ -639,7 +680,11 @@ const SalesInteractions = () => {
                 const hay = [String(r.date||''), String(humanDateLabel||''), String(r.time||''), String(r.type||''), String(r.business||''), String(r.contact||''), String(r.since||''), String(r.transferred||''), String(r.interaction||''), executive, formatDateDisplay(r.date)].join(' ').toLowerCase();
                 const isMatch = term ? hay.includes(term) : false;
                 return (
-                  <tr key={i} className={isMatch ? 'match-row' : ''}>
+                  <tr
+                    key={i}
+                    className={`${isMatch ? 'match-row' : ''} clickable-row`.trim()}
+                    onClick={() => openLeadDetails(r)}
+                  >
                     <td>{highlightMatch(formatISOtoDDMMYYYY(r.date), searchTerm)}</td>
                     <td>{highlightMatch(r.time, searchTerm)}</td>
                     <td>{highlightMatch(r.business, searchTerm)}</td>
@@ -676,6 +721,15 @@ const SalesInteractions = () => {
           </div>
         </div>
       )}
+
+      <LeadDetails
+        isOpen={showLeadDetails}
+        lead={leadDetails}
+        onClose={() => {
+          setShowLeadDetails(false);
+          setLeadDetails(null);
+        }}
+      />
 
     </div>
   );

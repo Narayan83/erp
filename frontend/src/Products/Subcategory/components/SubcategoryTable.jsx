@@ -7,13 +7,16 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Pagination from "../../../CommonComponents/Pagination";
 import {useAuth} from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const SubcategoryTable = ({
   data, page, limit, total,
   onPageChange, onRowsPerPageChange,
   onEdit, onDelete
 }) => {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   return (
     <>
     <TableContainer component={Paper}>

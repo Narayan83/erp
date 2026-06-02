@@ -497,7 +497,8 @@ export default function ProductVariantManager() {
                             imgSrc = `${BASE_URL}/uploads/${normalizedImg}`;
                           }
                         } else {
-                          imgSrc = 'https://via.placeholder.com/40?text=No+Image';
+                          // Use SVG data URI instead of external placeholder to avoid network errors
+                          imgSrc = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f0f0f0" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23bbb" font-size="8" font-family="sans-serif"%3Eno img%3C/text%3E%3C/svg%3E';
                         }
                         
                         console.log(`Rendering image ${i} for variant ${v.SKU}:`, {
@@ -514,6 +515,11 @@ export default function ProductVariantManager() {
                               className="variant-image"
                               onLoad={() => console.log(`Successfully loaded image ${i} for ${v.SKU}`)}
                               onError={(e) => {
+                                // Prevent infinite loop by checking if we're already using a data URI
+                                if (e.target.src.startsWith('data:')) {
+                                  return;
+                                }
+                                
                                 console.error(`Failed to load image for ${v.SKU}:`, {
                                   src: e.target.src,
                                   originalImg: img,
@@ -531,8 +537,8 @@ export default function ProductVariantManager() {
                                   
                                   const tryNextPath = (pathIndex) => {
                                     if (pathIndex >= altPaths.length) {
-                                      // If all alternatives fail, use placeholder
-                                      e.target.src = 'https://via.placeholder.com/40?text=Not+Found';
+                                      // If all alternatives fail, use a data URI placeholder (no network call needed)
+                                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f0f0f0" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="10" font-family="sans-serif"%3E--%3C/text%3E%3C/svg%3E';
                                       return;
                                     }
                                     
@@ -543,7 +549,8 @@ export default function ProductVariantManager() {
                                   
                                   tryNextPath(0);
                                 } else {
-                                  e.target.src = 'https://via.placeholder.com/40?text=Error';
+                                  // Use a data URI placeholder instead of external URL to avoid network errors and loops
+                                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23f0f0f0" width="40" height="40"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="10" font-family="sans-serif"%3E?%3C/text%3E%3C/svg%3E';
                                 }
                               }}
                             />

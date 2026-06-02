@@ -4,15 +4,21 @@ export default function DesignationFormModal({ open, onClose, onSubmit, initialD
   const [name, setName] = useState("");
   const [level, setLevel] = useState("");
 
+  // Reset or hydrate whenever the modal opens (open + initialData); avoids stale values when reopening "New"
   useEffect(() => {
+    if (!open) return;
     if (initialData) {
       setName(initialData.name || "");
-      setLevel(initialData.level ?? "");
+      setLevel(
+        initialData.level !== null && initialData.level !== undefined
+          ? String(initialData.level)
+          : ""
+      );
     } else {
       setName("");
       setLevel("");
     }
-  }, [initialData]);
+  }, [open, initialData]);
 
   const handleSubmit = () => {
     onSubmit({
@@ -98,10 +104,17 @@ export default function DesignationFormModal({ open, onClose, onSubmit, initialD
           <label style={styles.label}>
             Designation Name
             <input
+              type="text"
+              name="designation_name"
+              data-no-readonly-trick="true"
+              data-testid="designation-form-name"
               style={styles.input}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              autoComplete="off"
+              readOnly={false}
+              disabled={false}
               autoFocus
             />
           </label>
@@ -111,15 +124,20 @@ export default function DesignationFormModal({ open, onClose, onSubmit, initialD
             <input
               style={styles.input}
               type="number"
+              name="designation_level"
+              data-no-readonly-trick="true"
               value={level}
               onChange={(e) => setLevel(e.target.value)}
+              autoComplete="off"
+              readOnly={false}
+              disabled={false}
             />
           </label>
         </div>
 
         <div style={styles.actions}>
-          <button style={{ ...styles.btn, ...styles.cancel }} onClick={onClose}>Cancel</button>
-          <button style={{ ...styles.btn, ...styles.primary }} onClick={handleSubmit}>{initialData ? "Update" : "Create"}</button>
+          <button type="button" style={{ ...styles.btn, ...styles.cancel }} onClick={onClose}>Cancel</button>
+          <button type="button" style={{ ...styles.btn, ...styles.primary }} onClick={handleSubmit}>{initialData ? "Update" : "Create"}</button>
         </div>
       </div>
     </div>

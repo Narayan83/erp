@@ -1,10 +1,18 @@
 package handler
 
 import (
+	"strconv"
+
 	"erp.local/backend/models"
+	"erp.local/backend/rolemenu"
+	"erp.local/backend/seeds"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
+
+func syncMenusSeedFile(db *gorm.DB) {
+	_ = seeds.SaveMenusSeedJSONFromDB(db)
+}
 
 var menusDB *gorm.DB
 
@@ -91,6 +99,9 @@ func CreateMenu(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to load created menu"})
 	}
 
+	_ = rolemenu.ExportMenusJSONFile(menusDB, rolemenu.MenusExportPath())
+	syncMenusSeedFile(menusDB)
+
 	return c.Status(201).JSON(item)
 }
 
@@ -115,20 +126,30 @@ func UpdateMenu(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to load updated menu"})
 	}
 
+	_ = rolemenu.ExportMenusJSONFile(menusDB, rolemenu.MenusExportPath())
+	syncMenusSeedFile(menusDB)
+
 	return c.JSON(item)
 }
 
 func DeleteMenu(c *fiber.Ctx) error {
 	id := c.Params("id")
+	idUint, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid menu id"})
+	}
 
 	var item models.Menu
 	if err := menusDB.First(&item, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Menu not found"})
 	}
 
-	if err := menusDB.Delete(&item).Error; err != nil {
+	if err := rolemenu.DeleteMenusSubtree(menusDB, uint(idUint)); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	_ = rolemenu.ExportMenusJSONFile(menusDB, rolemenu.MenusExportPath())
+	syncMenusSeedFile(menusDB)
 
 	return c.SendStatus(204)
 }
@@ -181,6 +202,9 @@ func ReorderMenus(c *fiber.Ctx) error {
 	if err := tx.Commit().Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	_ = rolemenu.ExportMenusJSONFile(menusDB, rolemenu.MenusExportPath())
+	syncMenusSeedFile(menusDB)
 
 	return c.JSON(fiber.Map{"message": "Menus reordered successfully"})
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
-import { FaCopy, FaTimes } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
 import "./copyFromQuotationModal.scss";
 
 const CopyFromQuotationModal = ({ 
@@ -18,6 +18,18 @@ const CopyFromQuotationModal = ({
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 5;
+
+  const documentTypeOptions = useMemo(
+    () => [
+      { value: "All", label: "All Documents" },
+      { value: "Quotation", label: "Quotation" },
+      { value: "Proforma Invoice", label: "Proforma Invoice" },
+      { value: "Transfer Order", label: "Transfer Order" },
+      { value: "Sales Order", label: "Sales Order" },
+      { value: "Purchase Order", label: "Purchase Order" },
+    ],
+    []
+  );
 
   // Generate year range options (last 5 financial years)
   const yearRangeOptions = useMemo(() => {
@@ -39,10 +51,15 @@ const CopyFromQuotationModal = ({
   }, []);
 
   const [selectedYearRange, setSelectedYearRange] = useState(yearRangeOptions[0] || "");
+  const [selectedDocType, setSelectedDocType] = useState(docType || "All");
 
   // Get display label for document type
-  const getDocTypeLabel = () => {
-    switch (docType) {
+  const getDocTypeLabel = (value) => {
+    switch (value) {
+      case "All":
+        return "Documents";
+      case "Quotation":
+        return "Quotation";
       case "Proforma Invoice":
         return "Proforma Invoice";
       case "Transfer Order":
@@ -69,8 +86,8 @@ const CopyFromQuotationModal = ({
       });
       
       // Add doc_type filter
-      if (docType && docType !== "All") {
-        params.append("doc_type", docType);
+      if (selectedDocType && selectedDocType !== "All") {
+        params.append("doc_type", selectedDocType);
       }
       
       if (selectedYearRange) {
@@ -92,16 +109,22 @@ const CopyFromQuotationModal = ({
   };
 
   useEffect(() => {
+    if (open) {
+      setSelectedDocType(docType || "All");
+    }
+  }, [docType, open]);
+
+  useEffect(() => {
     if (open && customerId) {
       setPage(1);
     }
-  }, [open, customerId, selectedYearRange, docType]);
+  }, [open, customerId, selectedYearRange, selectedDocType]);
 
   useEffect(() => {
     if (open && customerId) {
       fetchQuotations();
     }
-  }, [open, customerId, page, selectedYearRange, docType]);
+  }, [open, customerId, page, selectedYearRange, selectedDocType]);
 
   // Format date for display (DD-MMM-YY)
   const formatDate = (dateStr) => {
@@ -173,13 +196,16 @@ const CopyFromQuotationModal = ({
     onClose();
   };
 
+  const activeDocTypeLabel = getDocTypeLabel(selectedDocType);
+  const showDocumentTypeColumn = selectedDocType === "All";
+
   if (!open) return null;
 
   return (
     <div className="copy-quotation-modal-overlay" onClick={onClose}>
       <div className="copy-quotation-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h5>Create {docType || "Quotation"}</h5>
+          <h5>Copy From {activeDocTypeLabel}</h5>
           <button className="btn-close" onClick={onClose}>
             <FaTimes />
           </button>
@@ -189,20 +215,36 @@ const CopyFromQuotationModal = ({
           <span>
             <strong>{customerName || "Customer"}</strong>
           </span>
-          <select
-            className="year-select"
-            value={selectedYearRange}
-            onChange={(e) => {
-              setSelectedYearRange(e.target.value);
-              setPage(1);
-            }}
-          >
-            {yearRangeOptions.map((yr) => (
-              <option key={yr} value={yr}>
-                {yr}
-              </option>
-            ))}
-          </select>
+          <div className="modal-filters">
+            <select
+              className="doc-type-select"
+              value={selectedDocType}
+              onChange={(e) => {
+                setSelectedDocType(e.target.value);
+                setPage(1);
+              }}
+            >
+              {documentTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="year-select"
+              value={selectedYearRange}
+              onChange={(e) => {
+                setSelectedYearRange(e.target.value);
+                setPage(1);
+              }}
+            >
+              {yearRangeOptions.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="modal-body">
@@ -210,13 +252,14 @@ const CopyFromQuotationModal = ({
             <div className="loading-text">Loading...</div>
           ) : quotations.length === 0 ? (
             <div className="no-data-text">
-              No {docType || "documents"} found for this customer in {selectedYearRange}.
+              No {activeDocTypeLabel.toLowerCase()} found for this customer in {selectedYearRange}.
             </div>
           ) : (
             <table className="quotation-table">
               <thead>
                 <tr>
-                  <th>{docType || "Quotation"} No.</th>
+                  <th>{showDocumentTypeColumn ? "Document No." : `${activeDocTypeLabel} No.`}</th>
+                  {showDocumentTypeColumn && <th>Type</th>}
                   <th>Date</th>
                   <th className="text-right">Taxable (₹)</th>
                   <th className="text-right">Amount (₹)</th>
@@ -227,6 +270,7 @@ const CopyFromQuotationModal = ({
                   const quotationId = q.quotation_id || q.QuotationID || q.id;
                   const quotationNo = q.quotation_number || q.QuotationNumber || "-";
                   const quotationDate = q.quotation_date || q.QuotationDate;
+                  const quotationDocType = q.document_type || q.DocumentType || q.type || q.Type || "Quotation";
                   const taxableAmt = getTaxableAmount(q);
                   const totalAmt = q.grand_total || q.GrandTotal || q.final_total || q.FinalTotal || 0;
 
@@ -238,6 +282,7 @@ const CopyFromQuotationModal = ({
                       title="Click to copy this document"
                     >
                       <td className="quotation-number">{quotationNo}</td>
+                      {showDocumentTypeColumn && <td>{quotationDocType}</td>}
                       <td>{formatDate(quotationDate)}</td>
                       <td className="text-right">{formatCurrency(taxableAmt)}</td>
                       <td className="text-right amount-cell">{formatCurrency(totalAmt)}</td>

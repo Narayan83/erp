@@ -14,6 +14,7 @@ type LeadFollowUp struct {
 
 	Title      string    `json:"title"`
 	Notes      string    `json:"notes"`
+	Source     string    `json:"source"` // origin of this follow-up (e.g. "quotation", "crm")
 	FollowUpOn time.Time `json:"followup_on"`
 	Status     string    `json:"status"` // pending, done, skipped, cancelled
 

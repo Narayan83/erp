@@ -102,64 +102,69 @@
 }
 
 // ============================================
-// Users Grid
+// Unassigned users (list + toolbar)
 // ============================================
 
-.users-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 12px;
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.user-card {
+.unassigned-toolbar {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #fff;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-bottom: 12px;
 }
 
-.user-card:hover {
-  background-color: #f9f9f9;
-  border-color: #bbb;
+.unassigned-search {
+  flex: 1 1 220px;
+  min-width: 200px;
+  margin-bottom: 0;
 }
 
-.user-card.selected {
-  background-color: #e3f2fd;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+.unassigned-filter {
+  flex: 0 1 220px;
+  min-width: 180px;
 }
 
-.user-card input[type="checkbox"] {
-  margin-top: 2px;
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #1976d2;
-}
-
-.user-info {
-  flex: 1;
-}
-
-.user-primary {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #333;
-  word-break: break-word;
-}
-
-.user-secondary {
+.unassigned-filter .inline-label {
+  margin-bottom: 4px;
   font-size: 0.85rem;
-  color: #666;
-  margin-top: 4px;
+}
+
+.filter-select {
+  width: 100%;
+}
+
+.unassigned-table-wrapper {
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  margin-bottom: 0;
+}
+
+.mappings-table.unassigned-users-table tbody tr.unassigned-row {
+  cursor: pointer;
+}
+
+.mappings-table.unassigned-users-table tbody tr.unassigned-row:hover {
+  background-color: #f5f9ff;
+}
+
+.mappings-table.unassigned-users-table tbody tr.unassigned-row.selected {
+  background-color: #e3f2fd;
+}
+
+.mappings-table.unassigned-users-table {
+  table-layout: fixed;
+}
+
+.mappings-table.current-mappings-table {
+  table-layout: fixed;
+}
+
+.mappings-table.unassigned-users-table thead {
+  background: linear-gradient(180deg, #f2f6fc 0%, #e8eef7 100%);
+}
+
+.mappings-table.current-mappings-table thead {
+  background: linear-gradient(180deg, #f7f7f7 0%, #eceff3 100%);
 }
 
 // ============================================
@@ -313,6 +318,38 @@
 .col-action {
   text-align: center;
   width: 80px;
+}
+
+.col-user-code {
+  width: 18%;
+}
+
+.col-name-company {
+  width: 44%;
+}
+
+.col-user-type {
+  width: 18%;
+}
+
+.col-emp-code {
+  width: 11%;
+}
+
+.col-emp-name {
+  width: 20%;
+}
+
+.col-map-user-code {
+  width: 13%;
+}
+
+.col-company-name {
+  width: 23%;
+}
+
+.col-map-user-type {
+  width: 13%;
 }
 
 .no-data {
@@ -498,10 +535,6 @@
     font-size: 1.5rem;
   }
 
-  .users-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  }
-
   .shift-form {
     flex-direction: column;
     align-items: stretch;
@@ -554,14 +587,8 @@
     margin-bottom: 12px;
   }
 
-  .users-grid {
-    grid-template-columns: 1fr;
-    max-height: 300px;
-  }
-
-  .user-card {
-    gap: 10px;
-    padding: 10px;
+  .unassigned-table-wrapper {
+    max-height: min(360px, 50vh);
   }
 
   .mappings-table {
@@ -577,6 +604,17 @@
   .col-slno,
   .col-action {
     width: 60px;
+  }
+
+  .col-user-code,
+  .col-name-company,
+  .col-user-type,
+  .col-emp-code,
+  .col-emp-name,
+  .col-map-user-code,
+  .col-company-name,
+  .col-map-user-type {
+    width: auto;
   }
 
   .pagination-wrapper {
@@ -621,9 +659,8 @@
     margin-bottom: 12px;
   }
 
-  .users-grid {
-    grid-template-columns: 1fr;
-    max-height: 250px;
+  .unassigned-table-wrapper {
+    max-height: min(320px, 45vh);
   }
 
   .mappings-table {

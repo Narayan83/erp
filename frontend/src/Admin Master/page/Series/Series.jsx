@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { BASE_URL, getAuthHeaders } from "../../../config/Config";
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import "./series.scss";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 export default function Series() {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [seriesList, setSeriesList] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -349,9 +354,11 @@ export default function Series() {
             value={searchQuery}
             onChange={handleSearch}
           />
+          {perms?.can_create && (
           <button className="add-btn" onClick={handleAddSeries}>
             Add Series
           </button>
+          )}
         </div>
       </section>
 
@@ -510,6 +517,7 @@ export default function Series() {
                       </span>
                     </td>
                     <td>
+                      {perms?.can_update && (
                       <button 
                         className="action-btn edit-btn" 
                         onClick={() => handleEdit(series)}
@@ -517,6 +525,8 @@ export default function Series() {
                       >
                         <FaEdit />
                       </button>
+                      )}
+                      {perms?.can_delete && (
                       <button 
                         className="action-btn delete-btn" 
                         onClick={() => handleDelete(series)}
@@ -524,6 +534,7 @@ export default function Series() {
                       >
                         <FaTrash />
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))

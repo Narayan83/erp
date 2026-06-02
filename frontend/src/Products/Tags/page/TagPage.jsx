@@ -8,10 +8,13 @@ import axios from "axios";
 import { BASE_URL }  from "../../../config/Config";
 import "./tagpage.scss";
 import {useAuth} from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function TagPage() {
   const [tags, setTags] = useState([]);
-    const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);

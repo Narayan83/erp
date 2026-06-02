@@ -464,32 +464,13 @@ func boolPtrToBool(b *bool) bool {
 	return *b
 }
 
-func GetUsers(c *fiber.Ctx) error {
-	pageStr := c.Query("page", "1")
-	limitStr := c.Query("limit", "10")
-	search := c.Query("filter", "")
-	userType := c.Query("user_type", "")
-	employeeIDStr := c.Query("employee_id", "")
-	deptHeadIDStr := c.Query("dept_head", "")
-
-	page := 1
-	limit := 10
-	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-		page = p
+// applyUserListSearchFilter matches GetUsers search semantics (filter query param).
+func applyUserListSearchFilter(query *gorm.DB, search string) *gorm.DB {
+	if search == "" {
+		return query
 	}
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-		limit = l
-	}
-	offset := (page - 1) * limit
-
-	var users []models.User
-	var total int64
-	query := userDB.Model(&models.User{})
-
-	// Apply search filter
-	if search != "" {
-		searchTerm := "%" + search + "%"
-		sql := `
+	searchTerm := "%" + search + "%"
+	sql := `
 			firstname ILIKE ? OR 
 			lastname ILIKE ? OR 
 			email ILIKE ? OR 
@@ -535,35 +516,64 @@ func GetUsers(c *fiber.Ctx) error {
 				)
 			)
 		`
-		args := make([]interface{}, 34)
-		for i := range args {
-			args[i] = searchTerm
-		}
-		query = query.Where(sql, args...)
+	args := make([]interface{}, 34)
+	for i := range args {
+		args[i] = searchTerm
 	}
+	return query.Where(sql, args...)
+}
 
-	// Apply user type filter
+// applyUserListTypeFilter applies user_type query param. When userType is empty and excludeEmployeesWhenUnspecified is true,
+// excludes is_employee (GetUsers default). Unassigned-users uses excludeEmployeesWhenUnspecified=false so all types show by default.
+func applyUserListTypeFilter(query *gorm.DB, userType string, excludeEmployeesWhenUnspecified bool) *gorm.DB {
 	if userType != "" {
 		switch userType {
 		case "user":
-			query = query.Where("is_user = ?", true)
+			return query.Where("is_user = ?", true)
 		case "customer":
-			query = query.Where("is_customer = ?", true)
+			return query.Where("is_customer = ?", true)
 		case "supplier":
-			query = query.Where("is_supplier = ?", true)
+			return query.Where("is_supplier = ?", true)
 		case "dealer":
-			query = query.Where("is_dealer = ?", true)
+			return query.Where("is_dealer = ?", true)
 		case "distributor":
-			query = query.Where("is_distributor = ?", true)
+			return query.Where("is_distributor = ?", true)
 		case "employee":
-			query = query.Where("is_employee = ?", true)
+			return query.Where("is_employee = ?", true)
 		case "all":
-			// No filter, show everyone
+			return query
 		}
-	} else {
-		// Default: exclude employees to keep user list separate (use user_type=all to include them)
-		query = query.Where("is_employee = ?", false)
 	}
+	if excludeEmployeesWhenUnspecified {
+		return query.Where("is_employee = ?", false)
+	}
+	return query
+}
+
+func GetUsers(c *fiber.Ctx) error {
+	pageStr := c.Query("page", "1")
+	limitStr := c.Query("limit", "10")
+	search := c.Query("filter", "")
+	userType := c.Query("user_type", "")
+	employeeIDStr := c.Query("employee_id", "")
+	deptHeadIDStr := c.Query("dept_head", "")
+
+	page := 1
+	limit := 10
+	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		page = p
+	}
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+	offset := (page - 1) * limit
+
+	var users []models.User
+	var total int64
+	query := userDB.Model(&models.User{})
+
+	query = applyUserListSearchFilter(query, search)
+	query = applyUserListTypeFilter(query, userType, true)
 
 	// Filter by employee (users assigned to a specific employee)
 	if employeeIDStr != "" {
@@ -594,6 +604,62 @@ func GetUsers(c *fiber.Ctx) error {
 		Limit(limit).
 		Offset(offset).
 		Find(&users).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"data":  users,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+// GetUnassignedUsers returns users with no row in employee_user_relations (Assign User to Employee screen).
+// Query: page, limit, filter (same as GetUsers), user_type (same values; empty = all types including employees).
+func GetUnassignedUsers(c *fiber.Ctx) error {
+	pageStr := c.Query("page", "1")
+	limitStr := c.Query("limit", "25")
+	search := c.Query("filter", "")
+	userType := c.Query("user_type", "")
+	excludeAdmin := strings.ToLower(strings.TrimSpace(c.Query("exclude_admin", "true"))) != "false"
+
+	page := 1
+	limit := 25
+	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		page = p
+	}
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		if l > 500 {
+			l = 500
+		}
+		limit = l
+	}
+	offset := (page - 1) * limit
+
+	query := userDB.Model(&models.User{}).
+		Where("id NOT IN (SELECT user_id FROM employee_user_relations)")
+	query = applyUserListSearchFilter(query, search)
+	query = applyUserListTypeFilter(query, userType, true)
+
+	if excludeAdmin {
+		query = query.Where(`
+			COALESCE(usercode, '') NOT ILIKE 'ADM%' AND
+			COALESCE(usercode, '') NOT ILIKE 'ADMIN%' AND
+			COALESCE(username, '') NOT ILIKE 'admin' AND
+			COALESCE(username, '') NOT ILIKE 'admin@%' AND
+			COALESCE(email, '') NOT ILIKE 'admin@%' AND
+			LOWER(TRIM(COALESCE(firstname, '') || ' ' || COALESCE(lastname, ''))) <> 'admin'
+		`)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var users []models.User
+	if err := query.Order("id asc").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 

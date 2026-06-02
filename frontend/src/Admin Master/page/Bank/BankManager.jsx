@@ -2,8 +2,13 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
 import "../../styles/master.scss";
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function BankManager({ isOpen = false, onClose = () => {} }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -282,7 +287,9 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
         <div className="tandc-dialog-header">
           <div className="title">Manage Bank Details</div>
           <div className="actions">
-            <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            {perms?.can_create && (
+              <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            )}
             <button className="close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -307,11 +314,14 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
                 </div>
 
                 <div className="bank-actions">
-                  <button className="icon-button edit" title="Edit" onClick={() => setEditingBank(it)}>
+                  {perms?.can_update && (
+                    <button className="icon-button edit" title="Edit" onClick={() => setEditingBank(it)}>
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                       <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" fill="currentColor"/>
                     </svg>
                   </button>
+                  )}
+                  {perms?.can_delete && (
                   <button className="icon-button delete" title="Delete" onClick={async () => {
                     if (!confirm('Delete this bank detail?')) return;
                     try {
@@ -330,6 +340,7 @@ export default function BankManager({ isOpen = false, onClose = () => {} }) {
                       <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
                     </svg>
                   </button>
+                  )}
                 </div>
               </div>
             ))

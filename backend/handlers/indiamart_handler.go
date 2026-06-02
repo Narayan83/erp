@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -44,10 +46,11 @@ func FetchIndiaMartLeads(c *fiber.Ctx) error {
 			mobile = body.Mobile
 		}
 	} else {
-		fmt.Printf("DEBUG - BodyParser error: %v\n", err)
+		log.Printf("indiamart fetch-leads: BodyParser note: %v", err)
 	}
 
-	fmt.Printf("DEBUG - Received request: apiKey=%s, mobile=%s, startTime=%s, endTime=%s\n", apiKey, mobile, startTime, endTime)
+	log.Printf("indiamart fetch-leads: request apiKey(len)=%d mobile=%s startTime=%s endTime=%s",
+		len(strings.TrimSpace(apiKey)), mobile, startTime, endTime)
 
 	if apiKey == "" {
 		return c.Status(400).JSON(fiber.Map{
@@ -69,7 +72,7 @@ func FetchIndiaMartLeads(c *fiber.Ctx) error {
 		apiURL += "&start_time=" + encodeIndiaMartParam(startTime) + "&end_time=" + encodeIndiaMartParam(endTime)
 	}
 
-	fmt.Println("DEBUG - Calling URL:", apiURL)
+	log.Printf("indiamart fetch-leads: calling upstream URL (key redacted): %s", redactIndiaMartURL(apiURL))
 
 	// Make request
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -97,10 +100,59 @@ func FetchIndiaMartLeads(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return raw response
-	return c.JSON(fiber.Map{
-		"success":  true,
-		"response": string(responseBody),
-		"url":      apiURL,
-	})
+	bodyStr := string(responseBody)
+	logIndiaMartResponseBody(bodyStr)
+
+	var parsed interface{}
+	parseErr := json.Unmarshal(responseBody, &parsed)
+
+	out := fiber.Map{
+		"success":          true,
+		"response":         bodyStr,
+		"url":              apiURL,
+		"upstream_http":    resp.StatusCode,
+		"response_bytes":   len(responseBody),
+		"response_is_json": parseErr == nil,
+	}
+	if parseErr == nil {
+		out["data"] = parsed
+	} else {
+		out["data"] = nil
+		out["parse_error"] = parseErr.Error()
+	}
+
+	return c.JSON(out)
+}
+
+// redactIndiaMartURL hides glusr_crm_key in logs.
+func redactIndiaMartURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "[unparseable-url]"
+	}
+	q := u.Query()
+	if q.Get("glusr_crm_key") != "" {
+		q.Set("glusr_crm_key", "***REDACTED***")
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
+}
+
+// logIndiaMartResponseBody prints the full IndiaMART body to server logs (pretty JSON when valid).
+func logIndiaMartResponseBody(body string) {
+	if body == "" {
+		log.Print("indiamart fetch-leads: upstream empty body")
+		return
+	}
+	var tmp interface{}
+	if err := json.Unmarshal([]byte(body), &tmp); err != nil {
+		log.Printf("indiamart fetch-leads: upstream body is not JSON (%v), full raw body:\n%s", err, body)
+		return
+	}
+	pretty, err := json.MarshalIndent(tmp, "", "  ")
+	if err != nil {
+		log.Printf("indiamart fetch-leads: could not indent JSON, raw body:\n%s", body)
+		return
+	}
+	log.Printf("indiamart fetch-leads: upstream JSON response (full, %d bytes):\n%s", len(body), string(pretty))
 }

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -42,6 +44,10 @@ func CreateCompany(c *fiber.Ctx) error {
 	}
 
 	if err := companyDB.Create(&company).Error; err != nil {
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "duplicate key") || strings.Contains(strings.ToLower(errMsg), "unique constraint") || strings.Contains(strings.ToLower(errMsg), "sqlstate 23505") {
+			return c.Status(409).JSON(fiber.Map{"error": "Company code already exists"})
+		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 

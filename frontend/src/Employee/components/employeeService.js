@@ -2,15 +2,19 @@ import axios from "axios";
 
 import { BASE_URL } from "../../config/Config";
 
-//  Fetch all departments
+// Fetch departments for dropdowns (API defaults to page=1, limit=10 — too few for selects)
 export const fetchDepartments = async () => {
-  const res = await axios.get(`${BASE_URL}/api/departments`);
+  const res = await axios.get(`${BASE_URL}/api/departments`, {
+    params: { page: 1, limit: 2000 },
+  });
   return res.data?.data ?? res.data;
 };
 
-//  Fetch all designations
+// Fetch designations for dropdowns
 export const fetchDesignations = async () => {
-  const res = await axios.get(`${BASE_URL}/api/designations`);
+  const res = await axios.get(`${BASE_URL}/api/designations`, {
+    params: { page: 1, limit: 2000 },
+  });
   return res.data?.data ?? res.data;
 };
 

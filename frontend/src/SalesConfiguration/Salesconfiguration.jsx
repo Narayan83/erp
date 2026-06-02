@@ -9,6 +9,7 @@ import { FaUsers, FaTag, FaBox, FaBoxOpen, FaCity, FaPlus, FaTimesCircle, FaThum
 import Sources from "../CRM/Components/Configuration/Sources/Sources";
 import Tags from "../CRM/Components/Configuration/Tags/Tags";
 import RejectionReasons from "../CRM/Components/Configuration/RejectionReasons/RejectionReasons";
+import LeadCategory from "../CRM/Components/Configuration/Categories/LeadCategory";
 import TandCManager from "../Admin Master/page/TANDC/TandCManager";
 import CompanyManager from "../Admin Master/page/Company/CompanyManager";
 import BranchManager from "../Admin Master/page/Branch/BranchManager";
@@ -21,6 +22,7 @@ import Email from "../Admin Master/page/Email/Email";
 import Integrations from "../Admin Master/page/Integrations/Integrations";
 import QrCode from "../Admin Master/page/QrCode/QrCode";
 import SavedTemplate from "../Admin Master/page/SavedTemplate/SavedTemplate";
+import LeadProductManager from "./LeadProductManager";
 
 const Salesconfiguration = () => {
 	const navigate = useNavigate();
@@ -69,10 +71,12 @@ const Salesconfiguration = () => {
 	const [showIntegrations, setShowIntegrations] = useState(false);
 	const [showQrCode, setShowQrCode] = useState(false);
 	const [showSavedTemplates, setShowSavedTemplates] = useState(false);
+	const [showLeadProducts, setShowLeadProducts] = useState(false);
+	const [showCrmCategories, setShowCrmCategories] = useState(false);
 
 	const formats = [
 		{ title: "Print Header", desc: "Upload or create a header image to include in printables.", key: "header", icon: FaFileAlt },
-		{ title: "Print Footer", desc: "Upload or create a footer image to include in printables.", key: "footer", icon: FaFileAlt },
+		// { title: "Print Footer", desc: "Upload or create a footer image to include in printables.", key: "footer", icon: FaFileAlt },
 		{ title: "Digital Signature", desc: "Upload the digital signature of your company to include in printables.", key: "signature", icon: FaSignature },
 		{ title: "Company / Firm Name", desc: "Set or update your company's official name to display on documents.", key: "company-name", icon: FaFileAlt },
 		{ title: "Branch", desc: "Manage branch details that appear on invoices and orders.", key: "branch", icon: FaCity },
@@ -81,13 +85,13 @@ const Salesconfiguration = () => {
 	];
 
 	const integrations = [
-		{ title: "QR Code", desc: "Upload your company QR Code to include in invoices and documents.", key: "qrcode", icon: FaQrcode },
-		{ title: "Payment Link", desc: "Add Payment Link of your company to enable quicker payments.", key: "payment", icon: FaMoneyBillWave },
-		{ title: "Email Account", desc: "Link your own email account to send emails from.", key: "email", icon: FaEnvelope },
+		// { title: "QR Code", desc: "Upload your company QR Code to include in invoices and documents.", key: "qrcode", icon: FaQrcode },
+		// { title: "Payment Link", desc: "Add Payment Link of your company to enable quicker payments.", key: "payment", icon: FaMoneyBillWave },
+		// { title: "Email Account", desc: "Link your own email account to send emails from.", key: "email", icon: FaEnvelope },
 		{ title: "Lead Platforms", desc: "Integrate with other lead platforms like IndiaMART, TradeIndia, Razorpay, JustDial & WhatsApp.", key: "leads", icon: FaShareAlt },
-		{ title: "Google Reviews", desc: "Add Google Review Link of your company to get google reviews from your customers.", key: "greviews", icon: FaStar },
-		{ title: "Website API Integration", desc: "Get API for website integration.", key: "api", icon: FaCode },
-		{ title: "E-Invoice (Beta)", desc: "Set up your credentials to enable e-invoice facility.(Gold editions only)", key: "einvoice", icon: FaFileInvoiceDollar }
+		// { title: "Google Reviews", desc: "Add Google Review Link of your company to get google reviews from your customers.", key: "greviews", icon: FaStar },
+		// { title: "Website API Integration", desc: "Get API for website integration.", key: "api", icon: FaCode },
+		// { title: "E-Invoice (Beta)", desc: "Set up your credentials to enable e-invoice facility.(Gold editions only)", key: "einvoice", icon: FaFileInvoiceDollar }
 	];
 
 	const salesDocuments = [
@@ -120,15 +124,18 @@ const Salesconfiguration = () => {
 		{ id: 'sources', title: 'Sources', description: 'Add all the different sources from where your leads are coming.', icon: FaUsers, color: 'sources-card' },
 		{ id: 'tags', title: 'Tags', description: 'Manage the master entries of tags used for prospects & connections.', icon: FaTag, color: 'tags-card' },
 		{ id: 'rejection-reasons', title: 'Rejection Reasons', description: 'List reasons why a prospect may reject your appointment request.', icon: FaThumbsDown, color: 'rejection-reasons-card' },
-		{ id: 'inactive-reasons', title: 'Inactive Reasons', description: 'List reasons why a lead or prospect may become inactive.', icon: FaTimesCircle, color: 'inactive-reasons-card' },
+		// { id: 'inactive-reasons', title: 'Inactive Reasons', description: 'List reasons why a lead or prospect may become inactive.', icon: FaTimesCircle, color: 'inactive-reasons-card' },
 		{ id: 'products', title: 'Product List', description: 'Add products or services provided by you.', icon: FaBox, color: 'products-card' },
-		{ id: 'cities', title: 'City List', description: 'Manage the master entries of cities used for leads & connections.', icon: FaCity, color: 'cities-card' }
+		// { id: 'cities', title: 'City List', description: 'Manage the master entries of cities used for leads & connections.', icon: FaCity, color: 'cities-card' }
+		{ id: 'category', title: 'CRM Categories', description: 'Manage categories for your CRM leads.', icon: FaBoxOpen, color: 'category-card' }
 	];
 
 	const handleCrmCardClick = (cardId) => {
 		if (cardId === 'sources') { setShowSources(true); return; }
 		if (cardId === 'tags') { setShowTags(true); return; }
 		if (cardId === 'rejection-reasons') { setShowRejectionReasons(true); return; }
+		if (cardId === 'products') { setShowLeadProducts(true); return; }
+		if (cardId === 'category') { setShowCrmCategories(true); return; }
 		navigate(`/configuration/${cardId}`);
 	};
 
@@ -189,7 +196,7 @@ const Salesconfiguration = () => {
 				<div className="cards-grid crm-cards">
 					{configurationCards.map((card) => {
 						const Icon = card.icon;
-						const clickableIds = ['sources', 'tags', 'rejection-reasons'];
+						const clickableIds = ['sources', 'tags', 'rejection-reasons', 'products', 'category'];
 						if (clickableIds.includes(card.id)) {
 							return (
 								<button key={card.id} className={`config-card ${card.color}`} onClick={() => handleCrmCardClick(card.id)}>
@@ -217,6 +224,8 @@ const Salesconfiguration = () => {
 			<Sources isOpen={showSources} onClose={() => setShowSources(false)} />
 			<Tags isOpen={showTags} onClose={() => setShowTags(false)} />
 			<RejectionReasons isOpen={showRejectionReasons} onClose={() => setShowRejectionReasons(false)} />
+			<LeadProductManager isOpen={showLeadProducts} onClose={() => setShowLeadProducts(false)} />
+			<LeadCategory isOpen={showCrmCategories} onClose={() => setShowCrmCategories(false)} />
 		<TandCManager isOpen={showTandc} onClose={() => setShowTandc(false)} />
 	<CompanyManager isOpen={showCompany} onClose={() => setShowCompany(false)} />
 	<BranchManager isOpen={showBranch} onClose={() => setShowBranch(false)} />

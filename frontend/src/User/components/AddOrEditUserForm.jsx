@@ -37,6 +37,112 @@ const accountTypes = [
 // Indian states list (used when country is India)
 const indiaStates = Object.values(stateList);
 
+const GST_STATE_CODE_TO_STATE_KEY = {
+  '01': 'INJK',
+  '02': 'INHP',
+  '03': 'INPB',
+  '04': 'INCH',
+  '05': 'INUT',
+  '06': 'INHR',
+  '07': 'INDL',
+  '08': 'INRJ',
+  '09': 'INUP',
+  '10': 'INBR',
+  '11': 'INSK',
+  '12': 'INAR',
+  '13': 'INNL',
+  '14': 'INMN',
+  '15': 'INMZ',
+  '16': 'INTR',
+  '17': 'INML',
+  '18': 'INAS',
+  '19': 'INWB',
+  '20': 'INJH',
+  '21': 'INOR',
+  '22': 'INCT',
+  '23': 'INMP',
+  '24': 'INGJ',
+  '25': 'INDH',
+  '26': 'INDH',
+  '27': 'INMH',
+  '28': 'INAP',
+  '29': 'INKA',
+  '30': 'INGA',
+  '31': 'INLD',
+  '32': 'INKL',
+  '33': 'INTN',
+  '34': 'INPY',
+  '35': 'INAN',
+  '36': 'INTG',
+  '37': 'INAP',
+  '38': 'INLA'
+};
+
+const GST_STATE_CODE_MAP = Object.fromEntries(
+  Object.entries(GST_STATE_CODE_TO_STATE_KEY).map(([code, stateKey]) => [code, stateList[stateKey]])
+);
+
+const normalizeLookupValue = (value) => String(value || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const CITY_OPTIONS_MAP = new Map(
+  citiesList
+    .filter(Boolean)
+    .map((city) => [normalizeLookupValue(city), city])
+);
+
+const STATE_OPTIONS_MAP = new Map(
+  indiaStates
+    .filter(Boolean)
+    .map((state) => [normalizeLookupValue(state), state])
+);
+
+[
+  ['andaman and nicobar islands', stateList.INAN],
+  ['dadra and nagar haveli and daman and diu', stateList.INDH],
+  ['nct of delhi', stateList.INDL],
+  ['new delhi', stateList.INDL],
+  ['odisha', stateList.INOR],
+  ['pondicherry', stateList.INPY],
+  ['uttarakhand', stateList.INUT]
+].forEach(([alias, state]) => {
+  STATE_OPTIONS_MAP.set(normalizeLookupValue(alias), state);
+});
+
+const resolveCityName = (value) => {
+  const normalized = normalizeLookupValue(value);
+  return CITY_OPTIONS_MAP.get(normalized) || value || '';
+};
+
+const resolveStateName = (value, gstin = '') => {
+  const raw = String(value || '').trim();
+  const normalized = normalizeLookupValue(raw);
+
+  if (/^\d{1,2}$/.test(raw)) {
+    return GST_STATE_CODE_MAP[raw.padStart(2, '0')] || raw;
+  }
+
+  if (normalized && STATE_OPTIONS_MAP.has(normalized)) {
+    return STATE_OPTIONS_MAP.get(normalized) || raw;
+  }
+
+  if (normalized) {
+    const partialMatch = indiaStates.find((state) => {
+      const normalizedState = normalizeLookupValue(state);
+      return normalized.includes(normalizedState) || normalizedState.includes(normalized);
+    });
+    if (partialMatch) return partialMatch;
+  }
+
+  const gstState = GST_STATE_CODE_MAP[String(gstin || '').slice(0, 2)];
+  return gstState || raw;
+};
+
 const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser }) => {
   const navigate = useNavigate();
   const {
@@ -216,7 +322,7 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
     });
   };
 
-  // Fetch GSTIN details from backend and try to auto-fill address fields.
+  // Fetch GSTIN details from backend and auto-fill address, city, state, business/company name.
   const fetchGSTAndFill = async (gstin, idx = null) => {
     if (!gstin || String(gstin).trim() === '') return;
     try {
@@ -227,71 +333,122 @@ const AddOrEditUserForm = ({ defaultValues = null, hierarchy = [], onSubmitUser 
         try { payload = JSON.parse(payload); } catch (e) { /* keep as string */ }
       }
 
-      // Recursive search for address-like fields
-      const found = { address: [], city: '', state: '', pincode: '' };
-      const walk = (obj) => {
-        if (!obj) return;
-        if (typeof obj === 'string') {
-          // try extract pincode
-          const pinMatch = obj.match(/\b\d{6}\b/);
-          if (pinMatch && !found.pincode) found.pincode = pinMatch[0];
-          // push longer strings as possible address lines
-          if (obj.length > 10) found.address.push(obj);
-          return;
+      // ── Helper: find a value by exact normalized key names anywhere in the tree ──
+      const findByKeys = (obj, keyPatterns) => {
+        if (!obj || typeof obj !== 'object') return '';
+        // Check own keys first
+        for (const k of Object.keys(obj)) {
+          const lk = k.toLowerCase().replace(/[_\s]/g, '');
+          if (keyPatterns.includes(lk)) {
+            const v = obj[k];
+            if (typeof v === 'string' && v.trim()) return v.trim();
+          }
         }
-        if (typeof obj !== 'object') return;
+        // Recurse into nested objects (skip arrays to avoid false positives)
         for (const k of Object.keys(obj)) {
           const v = obj[k];
-          const lk = String(k).toLowerCase();
-          if (/city|district|taluk|town/.test(lk) && typeof v === 'string' && !found.city) found.city = v;
-          if (/state|st_name|statename/.test(lk) && typeof v === 'string' && !found.state) found.state = v;
-          if (/pin|pincode|postal/.test(lk) && typeof v === 'string' && !found.pincode) {
-            const pm = v.match(/\d{6}/);
-            if (pm) found.pincode = pm[0];
+          if (v && typeof v === 'object' && !Array.isArray(v)) {
+            const result = findByKeys(v, keyPatterns);
+            if (result) return result;
           }
-          if (/addr|address|pradr|trade|lgnm|premise|building/.test(lk)) {
-            if (typeof v === 'string') found.address.push(v);
-            else walk(v);
-            continue;
-          }
-          walk(v);
         }
+        return '';
       };
 
-      walk(payload);
+      // ── 1. Extract trade name → business_name ───────────────────────────
+      // GST API: tradeNam (GSTN official), tradeName / trade_name (variants)
+      const tradeName = findByKeys(payload, ['tradenam', 'tradename', 'tradnam', 'trade_name']);
 
-      // Normalize address lines
-      const uniqueAddr = Array.from(new Set(found.address)).slice(0, 3);
+      // ── 2. Extract legal / company name → companyname ───────────────────
+      // GST API: lgnm (GSTN official), legalName / legal_name (variants)
+      const legalName = findByKeys(payload, ['lgnm', 'legalname', 'legalnam', 'legalnm', 'legal_name', 'companyname']);
 
+      // ── 3. Locate the structured address object ──────────────────────────
+      // Preferred path: payload → (data) → pradr → addr
+      const findAddressObj = (obj) => {
+        if (!obj || typeof obj !== 'object') return null;
+        // Unwrap common "data" envelope first
+        if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+          const r = findAddressObj(obj.data);
+          if (r) return r;
+        }
+        // pradr.addr is the GSTN principal address structure
+        if (obj.pradr) {
+          const pradr = obj.pradr;
+          if (pradr.addr && typeof pradr.addr === 'object') return pradr.addr;
+          if (typeof pradr === 'object') return pradr;
+        }
+        // Fallback: look for any top-level address-like key
+        for (const k of Object.keys(obj)) {
+          const lk = k.toLowerCase();
+          if (['addr', 'address', 'pradr', 'principal_place', 'place_of_business', 'principalplace'].includes(lk)) {
+            const v = obj[k];
+            if (v && typeof v === 'object') {
+              if (v.addr && typeof v.addr === 'object') return v.addr;
+              return v;
+            }
+          }
+        }
+        return null;
+      };
+
+      const addrObj = findAddressObj(payload) || {};
+
+      // ── 4. Pull address fields from the address object ───────────────────
+      // GSTN field names: bno=building no, bnm=building name, flno=floor no,
+      //   st=street, loc=locality, dst=district, stcd=state code, pncd=pincode
+      const s = (v) => String(v || '').trim();
+      const bno  = s(addrObj.bno  || addrObj.house_no  || addrObj.house);
+      const bnm  = s(addrObj.bnm  || addrObj.building  || addrObj.premise);
+      const flno = s(addrObj.flno || addrObj.floor      || addrObj.floor_no);
+      const st   = s(addrObj.st   || addrObj.street     || addrObj.road   || addrObj.strt);
+      const loc  = s(addrObj.loc  || addrObj.locality   || addrObj.area   || addrObj.village);
+      const dst  = s(addrObj.dst  || addrObj.district   || addrObj.town);
+      const stcd = s(addrObj.stcd || addrObj.statecd    || addrObj.state_code || addrObj.stateCode);
+      const pncd = s(addrObj.pncd || addrObj.pincode    || addrObj.pin    || addrObj.postal_code);
+
+      // ── 5. Build clean address lines ─────────────────────────────────────
+      const joinParts = (...parts) => parts.map(s).filter(Boolean).join(', ');
+      const addressLines = [
+        joinParts(bno, bnm),   // line 1: building number + building name
+        joinParts(flno, st),   // line 2: floor + street
+        loc,                   // line 3: locality
+      ].filter(Boolean);
+
+      // City: prefer explicit city field, then locality, then district
+      const rawCity  = s(addrObj.city) || loc || dst;
+      // State: use numeric state code (e.g. "27") — resolveStateName maps it
+      const rawState = stcd;
+      // Pincode: extract 6-digit number
+      const pinMatch = pncd.match(/\d{6}/);
+      const pincode  = pinMatch ? pinMatch[0] : '';
+
+      const matchedCity  = rawCity  ? resolveCityName(rawCity)           : '';
+      const matchedState = rawState ? resolveStateName(rawState, gstin)  : '';
+
+      // ── 6. Fill form fields ──────────────────────────────────────────────
       if (idx == null) {
-        // permanent address
-        if (uniqueAddr[0]) setValue('address1', uniqueAddr[0]);
-        if (uniqueAddr[1]) setValue('address2', uniqueAddr[1]);
-        if (uniqueAddr[2]) setValue('address3', uniqueAddr[2]);
-        if (found.city) {
-          const matchedCity = citiesList.find(c => c.toLowerCase() === found.city.toLowerCase()) || found.city;
-          setValue('city', matchedCity);
-        }
-        if (found.state) {
-          const matchedState = indiaStates.find(s => s.toLowerCase() === found.state.toLowerCase()) || found.state;
-          setValue('state', matchedState);
-        }
-        if (found.pincode) setValue('pincode', found.pincode);
-        // Auto-fill country for GST
-        setValue('permanent_country', 'India');
+        // Business name & company name (only on permanent/primary GST lookup)
+        if (tradeName) setValue('business_name', tradeName);
+        if (legalName) setValue('companyname', legalName);
+        // Address lines
+        if (addressLines[0]) setValue('address1', addressLines[0]);
+        if (addressLines[1]) setValue('address2', addressLines[1]);
+        if (addressLines[2]) setValue('address3', addressLines[2]);
+        if (matchedCity)  setValue('city',    matchedCity);
+        if (matchedState) setValue('state',   matchedState);
+        if (pincode)      setValue('pincode', pincode);
+        setValue('permanent_country',      'India');
         setValue('permanent_country_code', '+91');
       } else {
-        // additional address slot
-        const matchedCity = found.city ? (citiesList.find(c => c.toLowerCase() === found.city.toLowerCase()) || found.city) : '';
-        const matchedState = found.state ? (indiaStates.find(s => s.toLowerCase() === found.state.toLowerCase()) || found.state) : '';
-        handleAdditionalAddressChange(idx, 'address1', uniqueAddr[0] || '');
-        handleAdditionalAddressChange(idx, 'address2', uniqueAddr[1] || '');
-        handleAdditionalAddressChange(idx, 'address3', uniqueAddr[2] || '');
-        handleAdditionalAddressChange(idx, 'city', matchedCity);
-        handleAdditionalAddressChange(idx, 'state', matchedState);
-        handleAdditionalAddressChange(idx, 'pincode', found.pincode || '');
-        // Auto-fill country for GST
-        handleAdditionalAddressChange(idx, 'country', 'India');
+        // Additional address slot — address fields only
+        handleAdditionalAddressChange(idx, 'address1',     addressLines[0] || '');
+        handleAdditionalAddressChange(idx, 'address2',     addressLines[1] || '');
+        handleAdditionalAddressChange(idx, 'address3',     addressLines[2] || '');
+        handleAdditionalAddressChange(idx, 'city',         matchedCity);
+        handleAdditionalAddressChange(idx, 'state',        matchedState);
+        handleAdditionalAddressChange(idx, 'pincode',      pincode);
+        handleAdditionalAddressChange(idx, 'country',      'India');
         handleAdditionalAddressChange(idx, 'country_code', '+91');
       }
     } catch (err) {

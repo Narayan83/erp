@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -44,6 +45,9 @@ func CreateQuotationTemplate(c *fiber.Ctx) error {
 
 	req.Quotation.QuotationNumber = tplQNo
 	req.Quotation.Status = models.Qt_Draft
+	if strings.TrimSpace(req.Quotation.QuoteStatus) == "" {
+		req.Quotation.QuoteStatus = "C"
+	}
 
 	if err := tx.Create(&req.Quotation).Error; err != nil {
 		tx.Rollback()

@@ -303,10 +303,9 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
+	"erp.local/backend/cloudinaryutil"
 	"erp.local/backend/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -336,6 +335,54 @@ type QuotationRequest struct {
 // ================================
 func generateQuotationNumber(series *models.Series, quotationID uint) string {
 	return fmt.Sprintf("%s%d%s", series.Prefix, quotationID, series.Postfix)
+}
+
+func sanitizeQuotationSegment(segment string) string {
+	cleaned := strings.TrimSpace(segment)
+	cleaned = strings.ReplaceAll(cleaned, "\\", "/")
+	for strings.Contains(cleaned, "//") {
+		cleaned = strings.ReplaceAll(cleaned, "//", "/")
+	}
+	return strings.Trim(cleaned, "/")
+}
+
+func buildQuotationNumberParts(parts ...string) string {
+	segments := make([]string, 0, len(parts))
+	for _, part := range parts {
+		cleaned := sanitizeQuotationSegment(part)
+		if cleaned != "" {
+			segments = append(segments, cleaned)
+		}
+	}
+
+	return strings.Join(segments, "/")
+}
+
+// normalizeQuoteLifecycleStatus: C=creation, M=modification, R=revise (new document from revise flow)
+func normalizeQuoteLifecycleStatus(input string) string {
+	s := strings.TrimSpace(strings.ToUpper(input))
+	if s == "R" || s == "C" || s == "M" {
+		return s
+	}
+	return "C"
+}
+
+func normalizeNonSeriesQuotationNumber(documentType, quotationNumber string, seriesID *uint) string {
+	normalized := buildQuotationNumberParts(quotationNumber)
+	if normalized == "" {
+		return ""
+	}
+
+	if seriesID != nil || strings.Contains(normalized, "/") {
+		return normalized
+	}
+
+	resolvedDocType := strings.TrimSpace(documentType)
+	if resolvedDocType == "" || strings.EqualFold(resolvedDocType, "All") || strings.EqualFold(resolvedDocType, "All Type") {
+		resolvedDocType = "Quotation"
+	}
+
+	return buildQuotationNumberParts(resolvedDocType, normalized)
 }
 
 // ================================
@@ -392,14 +439,12 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 	// ---------------------------
 	file, err := c.FormFile("attachment")
 	if err == nil {
-		uploadDir := "./uploads/quotations/"
-		_ = os.MkdirAll(uploadDir, 0755)
-
-		filePath := filepath.Join(uploadDir, file.Filename)
-		if err := c.SaveFile(file, filePath); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		upResult, upErr := cloudinaryutil.UploadFile(file, "quotations", cloudinaryutil.ResourceTypeForFile(file.Filename))
+		if upErr != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload attachment: " + upErr.Error()})
 		}
-		req.Quotation.AttachmentPath = &filePath
+		attachmentURL := upResult.SecureURL
+		req.Quotation.AttachmentPath = &attachmentURL
 	}
 
 	// ---------------------------
@@ -418,6 +463,13 @@ func CreateQuotationTable(c *fiber.Ctx) error {
 
 	// Set defaults
 	req.Quotation.Status = models.Qt_Open
+	qs := normalizeQuoteLifecycleStatus(req.Quotation.QuoteStatus)
+	// New DB rows are only created as Creation or Revise, never as "Modification"
+	if qs == "M" {
+		qs = "C"
+	}
+	req.Quotation.QuoteStatus = qs
+	req.Quotation.QuotationNumber = normalizeNonSeriesQuotationNumber(req.Quotation.DocumentType, req.Quotation.QuotationNumber, req.Quotation.SeriesID)
 
 	// If client provided a quotation number, validate uniqueness and use it.
 	providedQNo := strings.TrimSpace(req.Quotation.QuotationNumber)
@@ -664,14 +716,12 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 	// ---------------------------
 	file, err := c.FormFile("attachment")
 	if err == nil {
-		uploadDir := "./uploads/quotations/"
-		_ = os.MkdirAll(uploadDir, 0755)
-
-		filePath := filepath.Join(uploadDir, file.Filename)
-		if err := c.SaveFile(file, filePath); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		upResult, upErr := cloudinaryutil.UploadFile(file, "quotations", cloudinaryutil.ResourceTypeForFile(file.Filename))
+		if upErr != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload attachment: " + upErr.Error()})
 		}
-		req.Quotation.AttachmentPath = &filePath
+		attachmentURL := upResult.SecureURL
+		req.Quotation.AttachmentPath = &attachmentURL
 	}
 
 	tx := quotationTableDB.Begin()
@@ -688,15 +738,29 @@ func UpdateQuotationTable(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Explicitly update JSON fields (GORM's Updates may not handle JSON fields properly)
-	// We need to use Select to force update even if the value appears unchanged
-	if err := tx.Model(&existing).Select("terms_and_conditions", "extra_charges", "discounts").Updates(map[string]interface{}{
+	// Explicitly update JSON fields, boolean fields, and amount fields (GORM's Updates may not handle these properly)
+	// We need to use Select to force update even if the value appears unchanged, is false, or is zero
+	if err := tx.Model(&existing).Select(
+		"terms_and_conditions",
+		"extra_charges",
+		"discounts",
+		"include_roundoff",
+		"roundoff_amount",
+		"grand_total",
+		"tax_amount",
+		"total_amount",
+	).Updates(map[string]interface{}{
 		"terms_and_conditions": req.Quotation.TermsAndConditions,
 		"extra_charges":        req.Quotation.ExtraCharges,
 		"discounts":            req.Quotation.Discounts,
+		"include_roundoff":     req.Quotation.IncludeRoundoff,
+		"roundoff_amount":      req.Quotation.RoundoffAmount,
+		"grand_total":          req.Quotation.GrandTotal,
+		"tax_amount":           req.Quotation.TaxAmount,
+		"total_amount":         req.Quotation.TotalAmount,
 	}).Error; err != nil {
 		tx.Rollback()
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update JSON fields: " + err.Error()})
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update fields: " + err.Error()})
 	}
 
 	// Replace quotation items if provided
@@ -744,5 +808,61 @@ func GetScpCountBySeriesID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"series_id":               seriesID,
 		"max_quotation_scp_count": maxScpCount,
+	})
+}
+
+// ================================
+// MAX SCP COUNT BY DOCUMENT TYPE (Specific)
+// ================================
+func GetMaxScpCountByDocumentType(c *fiber.Ctx) error {
+	documentType := c.Params("document_type")
+
+	var maxScpCount uint
+
+	err := quotationTableDB.
+		Model(&models.QuotationTable{}).
+		Where("document_type = ?", documentType).
+		Where("series_id IS NULL").
+		Select("COALESCE(MAX(quotation_scp_count), 0)").
+		Scan(&maxScpCount).Error
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"document_type":           documentType,
+		"max_quotation_scp_count": maxScpCount,
+	})
+}
+
+// ================================
+// MAX SCP COUNT GROUPED BY DOCUMENT TYPE (All)
+// ================================
+func GetMaxScpCountGroupedByDocumentType(c *fiber.Ctx) error {
+	type Result struct {
+		DocumentType string `json:"document_type" gorm:"column:document_type"`
+		MaxCount     uint   `json:"max_quotation_scp_count" gorm:"column:max_count"`
+	}
+
+	var results []Result
+
+	err := quotationTableDB.
+		Model(&models.QuotationTable{}).
+		Select("document_type, COALESCE(MAX(quotation_scp_count), 0) as max_count").
+		Where("series_id IS NULL").
+		Group("document_type").
+		Scan(&results).Error
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"data": results,
 	})
 }

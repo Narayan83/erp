@@ -1,12 +1,12 @@
-@use '../../Styles/variable' as *;
+@use "../../Styles/variable" as *;
 
 .reports-container {
   max-width: 100%;
   width: 100vw;
   padding: 20px;
   height: auto;
-  
-  .header {
+
+  .reports-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -32,7 +32,7 @@
       font-size: 14px;
       font-weight: 500;
       transition: all 0.2s ease;
-      
+
       &:hover {
         background: $primary-white;
         color: $primary-blue;
@@ -45,8 +45,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 10px;
-    
-    
+
     .report-card {
       background: $primary-white;
       padding: 0;

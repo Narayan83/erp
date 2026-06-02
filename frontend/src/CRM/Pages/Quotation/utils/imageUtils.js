@@ -31,15 +31,15 @@ export const getProductImage = (p) => {
   const variants = Array.isArray(p.Variants)
     ? p.Variants
     : Array.isArray(p.variants)
-    ? p.variants
-    : [];
+      ? p.variants
+      : [];
   for (const v of variants) {
     // MainImageIndex and Images
     const imgs = Array.isArray(v?.Images)
       ? v.Images
       : Array.isArray(v?.images)
-      ? v.images
-      : [];
+        ? v.images
+        : [];
     if (Array.isArray(imgs) && imgs.length > 0) {
       const url = normalizeImageUrl(imgs[0]);
       if (url) return url;
@@ -70,4 +70,23 @@ export const splitQuotationNumber = (full, prefix, postfix) => {
     number: middle,
     postfix,
   };
+};
+
+const sanitizeQuotationSegment = (segment) => {
+  if (segment === undefined || segment === null) return "";
+  return String(segment)
+    .trim()
+    .replace(/[\\/]+/g, "/")
+    .replace(/^\/+|\/+$/g, "");
+};
+
+export const buildQuotationNumber = (...segments) =>
+  segments
+    .map((segment) => sanitizeQuotationSegment(segment))
+    .filter(Boolean)
+    .join("/");
+
+export const normalizeQuotationNumber = (value) => {
+  if (value === undefined || value === null) return "";
+  return buildQuotationNumber(...String(value).split("/"));
 };

@@ -65,7 +65,9 @@
           -moz-appearance: none;
           appearance: none;
           padding-right: 36px; /* room for caret */
-          transition: box-shadow 0.12s ease, border-color 0.12s ease;
+          transition:
+            box-shadow 0.12s ease,
+            border-color 0.12s ease;
 
           &:focus {
             outline: none;
@@ -300,6 +302,14 @@
 
     tbody tr.match-row {
       background: rgba(10, 21, 51, 0.03);
+    }
+
+    tbody tr.clickable-row {
+      cursor: pointer;
+    }
+
+    tbody tr.clickable-row:hover {
+      background: rgba(10, 21, 51, 0.04);
     }
 
     /* highlight for matched text */

@@ -7,10 +7,13 @@ import Pagination from "../../../CommonComponents/Pagination";
 import { BASE_URL }  from "../../../config/Config";
 import "./allinone.scss";
 import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 
 export default function UnitSection() {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [units, setUnits] = useState([]);
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);

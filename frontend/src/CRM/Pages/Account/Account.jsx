@@ -45,7 +45,7 @@ const AccountsDashboard = () => {
 
       <div className="dashboard-content">
         <div className="left-column">
-          <div className="header">
+          <div className="groups-ledgers-header">
             <h2>Groups & Ledgers</h2>
             <div className="controls">
               <label>

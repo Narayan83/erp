@@ -51,6 +51,7 @@ export const menuItems = [
     title: "Employee Masters",
     icon: FiUserCheck,
     submenu: [
+      { title: "Manage Employees", path: "/manage-employees" },
       { title: "Employee Management", path: "/employeemanagement" },
       { title: "Deparments", path: "/departmentmaster" },
       { title: "Designations", path: "/designation" },

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaChartLine, FaUsersCog, FaCalendarCheck, FaUserClock, FaRoute, FaArrowLeft, FaBan, FaUserSlash } from 'react-icons/fa';
-import { MdMissedVideoCall } from 'react-icons/md';
+import { FaChartLine, FaUsersCog } from 'react-icons/fa';
 import './_report.scss';
 
 const ReportCard = ({ title, description, icon, onClick }) => (
@@ -29,46 +28,22 @@ const Report = () => {
 
   const reports = [
     {
-      title: "Sales Interactions",
-      description: "Monitor interaction efforts by your team with your leads.",
+      title: "All Reports",
+      description: "View Sales Interactions, Follow-ups, Travel History, Rejected Leads, and Inactive Leads with report type filtering.",
       icon: <FaChartLine />,
-      path: '/reports/sales-interactions'
+      path: '/reports/all-reports?reportType=sales-interactions'
     },
     {
-      title: "No Interactions",
+      title: "Performance Report",
       description: "Identify team members who have no interactions , no appointments , or missed appointments.",
       icon: <FaUsersCog />,
       path: '/reports/no-reports'
-    },
-    {
-      title: "Follow-ups",
-      description: "Track scheduled follow-ups to ensure timely engagement.",
-      icon: <FaCalendarCheck />,
-      path: '/reports/followups'
-    },
-    {
-      title: "Travel History",
-      description: "Track travel record of sales team.",
-      icon: <FaRoute />,
-      path: '/reports/travel-report'
-    },
-    {
-      title: "Rejected Leads",
-      description: "View all leads that have been rejected with their rejection reasons.",
-      icon: <FaBan />,
-      path: '/reports/rejected-leads'
-    },
-    {
-      title: "Inactive Leads",
-      description: "Track leads that have become inactive and need re-engagement.",
-      icon: <FaUserSlash />,
-      path: '/reports/inactive-leads'
     }
   ];
 
   return (
     <div className="reports-container">
-      <div className="header">
+      <div className="reports-header">
         <h2>Lead Reports</h2>
         {/* <button className="back-btn" onClick={handleBack}>
           <FaArrowLeft style={{ marginRight: '5px' }} />

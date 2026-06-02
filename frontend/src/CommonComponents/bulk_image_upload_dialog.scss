@@ -1,0 +1,98 @@
+@import './import_dialog.scss';
+
+.bulk-image-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.bulk-image-dialog.import-dialog {
+  width: 100%;
+  max-width: 760px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(10, 20, 40, 0.04);
+}
+
+.bulk-image-dialog .import-dialog-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.bulk-folder-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bulk-progress-bar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.bulk-progress-fill {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.2s ease;
+}
+
+.bulk-current-file {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e40af;
+  margin: 8px 0;
+}
+
+.bulk-not-found {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #9a3412;
+}
+
+.bulk-log {
+  margin-top: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.bulk-log-line {
+  margin: 4px 0;
+  word-break: break-word;
+}
+
+.bulk-log-line.info { color: #334155; }
+.bulk-log-line.success { color: #15803d; }
+.bulk-log-line.warn { color: #b45309; }
+.bulk-log-line.error { color: #b91c1c; }
+
+.bulk-summary-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #475569;
+  margin-top: 8px;
+}

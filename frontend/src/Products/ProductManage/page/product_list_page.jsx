@@ -35,9 +35,14 @@ import debounce from 'lodash/debounce';
 import ConfirmDialog from "../../../CommonComponents/ConfirmDialog";
 import Pagination from "../../../CommonComponents/Pagination";
 import ImportDialog from "../../../CommonComponents/ImportDialog";
+import BulkImageUploadDialog from "../../../CommonComponents/BulkImageUploadDialog";
+import ProductBulkColumnUploadDialog from "../../../CommonComponents/ProductBulkColumnUploadDialog";
 import "./product_list_page.scss";
 
 import { useAuth } from "../../../context/AuthContext"; 
+
+// Fallback image (local data URI SVG instead of external service)
+const FALLBACK_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect width="100%" height="100%" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="10">No Image</text></svg>';
 
 // RAL colors data (complete list from color.csv)
 const ralColors = [
@@ -395,6 +400,7 @@ const DisplayPreferences = memo(function DisplayPreferences({ columns, setColumn
               </label>
             </div>
 
+            <label className="form-control-label"><input type="checkbox" checked={columns.primaryKey} onChange={handleColumnToggle('primaryKey')} /> <span>Primary Key</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.name} onChange={handleColumnToggle('name')} /> <span>Name</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.code} onChange={handleColumnToggle('code')} /> <span>Code</span></label>
             <label className="form-control-label"><input type="checkbox" checked={columns.category} onChange={handleColumnToggle('category')} /> <span>Category</span></label>
@@ -513,6 +519,9 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, pe
             />
           </TableCell>
           <TableCell className="sl-cell" sx={{ py: 0.5, whiteSpace: 'nowrap' }}>{page * limit + idx + 1}</TableCell>
+          {visibleColumns.primaryKey && (
+            <TableCell sx={{ py: 0.5, whiteSpace: 'nowrap' }}>{p.ID}</TableCell>
+          )}
           {visibleColumns.serialnumber && (
             <TableCell sx={{ py: 0.5, width: 20, whiteSpace: 'nowrap' }}>
               {p.SerialNumber ?? p.serial_number ?? ''}
@@ -661,7 +670,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, pe
                         onClick={(e) => handleImageClick(e, imgSrc)}
                         onError={(e) => {
                           console.error('Failed to load main product image:', { src: e.target.src, productId: p.ID });
-                          e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="100%" height="100%" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="8">No Img</text></svg>';
+                          e.target.src = FALLBACK_IMAGE;
                         }}
                         title="Click to open in new tab, hover to preview"
                       />
@@ -679,7 +688,7 @@ const ProductTableBody = memo(function ProductTableBody({ products, navigate, pe
                   <IconButton 
                     size="small"
                     onClick={() => onView && onView(p.ID)}
-                    sx={{ color: '#1976d2' }}
+                    sx={{ color: '#3b82f6' }}
                   >
                     <Visibility fontSize="small" />
                   </IconButton>
@@ -790,6 +799,7 @@ const FiltersRow = memo(function FiltersRow({
     <TableRow>
       <TableCell sx={{ width: 60 }} />
       <TableCell className="sl-filter" />
+      {visibleColumns.primaryKey && <TableCell sx={{ width: 40 }} />}
       {visibleColumns.name && (
         <TableCell className="filter-cell" sx={{ width: 150 }}>
           <div className="filter-control">
@@ -1499,7 +1509,7 @@ export default function ProductListPage() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
   // Sorting state for Name and Stock columns
-  const [nameSort, setNameSort] = useState(null); // null | 'asc' | 'desc'
+  const [nameSort, setNameSort] = useState('asc'); // default: numbers and A-Z
   const [stockSort, setStockSort] = useState(null); // null | 'asc' | 'desc'
   const [leadTimeSort, setLeadTimeSort] = useState(null); // null | 'asc' | 'desc'
   const [purchaseCostSort, setPurchaseCostSort] = useState(null); // null | 'asc' | 'desc'
@@ -1511,8 +1521,8 @@ export default function ProductListPage() {
   // Apply sort when navigated with state.sortByName (from Add/Edit pages)
   React.useEffect(() => {
     if (location && location.state && location.state.sortByName) {
-      const dir = location.state.sortDirection || 'asc';
-      setNameSort(dir);
+      // Keep product list default order consistent after create/edit/update.
+      setNameSort('asc');
       setStockSort(null);
       setLeadTimeSort(null);
       setPurchaseCostSort(null);
@@ -1540,6 +1550,7 @@ export default function ProductListPage() {
   const [visibleColumns, setVisibleColumns] = useState(() => {
     // Default columns configuration
     const defaultColumns = {
+      primaryKey: false,
       name: true,
       code: true,
       category: true,
@@ -2578,6 +2589,8 @@ export default function ProductListPage() {
   const [errorMessage] = useState('');
   const [errorTitle, setErrorTitle] = useState('');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [bulkImageDialogOpen, setBulkImageDialogOpen] = useState(false);
+  const [bulkColumnDialogOpen, setBulkColumnDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importedData, setImportedData] = useState([]);
@@ -2998,6 +3011,9 @@ export default function ProductListPage() {
       const exportData = productsToExport.map(p => {
         const row = {};
         
+        // Primary Key - include when visible (for filtered) or always for 'all' export
+        if (!shouldRespectVisibleColumns || visibleColumns.primaryKey) row['Primary Key'] = p.ID;
+        
         // Product details - include all for 'all' export, or only visible for 'filtered'
         if (!shouldRespectVisibleColumns || visibleColumns.name) row.Name = p.Name;
         if (!shouldRespectVisibleColumns || visibleColumns.code) row.Code = p.Code;
@@ -3082,6 +3098,7 @@ export default function ProductListPage() {
       
       // Build ordered headers to match table column order
       const columnOrder = [
+        { key: 'Primary Key', visibleKey: 'primaryKey' },
         { key: 'Name', visibleKey: 'name' },
         { key: 'Code', visibleKey: 'code' },
         { key: 'Category', visibleKey: 'category' },
@@ -3858,6 +3875,8 @@ export default function ProductListPage() {
         params: {
           page: 1,
           limit: 50,
+          sort_by: 'name',
+          sort_order: 'asc',
         },
         timeout: 15000
       });
@@ -4239,7 +4258,7 @@ export default function ProductListPage() {
                                   <td className="images-cell">
                                     <div className="images-inner">
                                       {(Array.isArray(v.Images) && v.Images.length > 0) ? v.Images.map((img, idx) => {
-                                        const imgSrc = normalizeImageUrl(img) || 'https://via.placeholder.com/60?text=No+Image';
+                                        const imgSrc = normalizeImageUrl(img) || FALLBACK_IMAGE;
                                         const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === idx) || (v.MainImage && v.MainImage === img);
                                         return (
                                           <div 
@@ -4253,7 +4272,7 @@ export default function ProductListPage() {
                                               src={imgSrc}
                                               alt={`img-${idx}`}
                                               onClick={(e) => handleDetailsImageClick(e, imgSrc)}
-                                              onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Image'; }}
+                                              onError={(e) => { e.target.src = FALLBACK_IMAGE; }}
                                               title="Click to open in new tab, hover to preview"
                                             />
                                             {isMain && (
@@ -4332,6 +4351,18 @@ export default function ProductListPage() {
       </Dialog>
 
       {/* Import dialog (reusable component) */}
+      <BulkImageUploadDialog
+        open={bulkImageDialogOpen}
+        onClose={() => setBulkImageDialogOpen(false)}
+        onComplete={() => fetchProducts()}
+      />
+
+      <ProductBulkColumnUploadDialog
+        open={bulkColumnDialogOpen}
+        onClose={() => setBulkColumnDialogOpen(false)}
+        onComplete={() => fetchProducts()}
+      />
+
       <ImportDialog
         open={importDialogOpen}
         onClose={() => { setImportDialogOpen(false); setImportFile(null); setImportLoading(false); }}
@@ -4381,6 +4412,37 @@ export default function ProductListPage() {
                 <rect x="15" y="4" width="6" height="7" fill="currentColor" />
                 <rect x="3" y="13" width="6" height="7" fill="currentColor" />
                 <rect x="15" y="13" width="6" height="7" fill="currentColor" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline btn-bulk-column"
+              onClick={() => setBulkColumnDialogOpen(true)}
+              title="Bulk update column from Excel"
+              aria-label="Bulk update column from Excel"
+            >
+              <svg className="icon-bulk-column" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false" width="16" height="16">
+                <path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                <rect x="14" y="14" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                <path d="M16 17h2M17 16v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline btn-bulk-images"
+              onClick={() => setBulkImageDialogOpen(true)}
+              title="Bulk upload product images"
+              aria-label="Bulk upload product images"
+            >
+              <svg className="icon-bulk-images" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">
+                <rect x="3" y="5" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
+                <path d="M3 15l4-3 3 2.5 5-4.5 6 5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18 8v8a2 2 0 0 1-2 2H6" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                <path d="M16 6h4v4" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M20 6l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </button>
 
@@ -4450,6 +4512,7 @@ export default function ProductListPage() {
                   />
                 </TableCell>
                 <TableCell className="sl-header" sx={{fontWeight : "bold"}}>SL</TableCell>
+                {visibleColumns.primaryKey && <TableCell sx={{fontWeight : "bold", minWidth: 20}}>Primary Key</TableCell>}
                 {visibleColumns.name && (
                   <TableCell sx={{fontWeight : "bold", minWidth: 200}}>
                     <Box display="flex" alignItems="center" gap={0.5}>
@@ -4462,7 +4525,7 @@ export default function ProductListPage() {
                       >
                         <ArrowUpward
                           fontSize="inherit"
-                          sx={{ color: nameSort === 'asc' ? 'primary.main' : 'inherit', opacity: nameSort === 'asc' ? 1 : 0.5 }}
+                          sx={{ color: nameSort === 'asc' ? '#3b82f6' : 'inherit', opacity: nameSort === 'asc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                       <IconButton
@@ -4473,7 +4536,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: stockSort === 'desc' ? 'primary.main' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: nameSort === 'desc' ? '#3b82f6' : 'inherit', opacity: nameSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
@@ -4498,7 +4561,7 @@ export default function ProductListPage() {
                       >
                         <ArrowUpward
                           fontSize="inherit"
-                          sx={{ color: stockSort === 'asc' ? 'primary.main' : 'inherit', opacity: stockSort === 'asc' ? 1 : 0.5 }}
+                          sx={{ color: stockSort === 'asc' ? '#3b82f6' : 'inherit', opacity: stockSort === 'asc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                       <IconButton
@@ -4510,7 +4573,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: stockSort === 'desc' ? 'primary.main' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: stockSort === 'desc' ? '#3b82f6' : 'inherit', opacity: stockSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
@@ -4531,7 +4594,7 @@ export default function ProductListPage() {
                       >
                         <ArrowUpward
                           fontSize="inherit"
-                          sx={{ color: leadTimeSort === 'asc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'asc' ? 1 : 0.5 }}
+                          sx={{ color: leadTimeSort === 'asc' ? '#3b82f6' : 'inherit', opacity: leadTimeSort === 'asc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                       <IconButton
@@ -4543,7 +4606,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: leadTimeSort === 'desc' ? 'primary.main' : 'inherit', opacity: leadTimeSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: leadTimeSort === 'desc' ? '#3b82f6' : 'inherit', opacity: leadTimeSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
@@ -4572,7 +4635,7 @@ export default function ProductListPage() {
                       >
                         <ArrowUpward
                           fontSize="inherit"
-                          sx={{ color: purchaseCostSort === 'asc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'asc' ? 1 : 0.5 }}
+                          sx={{ color: purchaseCostSort === 'asc' ? '#3b82f6' : 'inherit', opacity: purchaseCostSort === 'asc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                       <IconButton
@@ -4584,7 +4647,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: purchaseCostSort === 'desc' ? 'primary.main' : 'inherit', opacity: purchaseCostSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: purchaseCostSort === 'desc' ? '#3b82f6' : 'inherit', opacity: purchaseCostSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>
@@ -4603,7 +4666,7 @@ export default function ProductListPage() {
                       >
                         <ArrowUpward
                           fontSize="inherit"
-                          sx={{ color: salesPriceSort === 'asc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'asc' ? 1 : 0.5 }}
+                          sx={{ color: salesPriceSort === 'asc' ? '#3b82f6' : 'inherit', opacity: salesPriceSort === 'asc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                       <IconButton
@@ -4615,7 +4678,7 @@ export default function ProductListPage() {
                       >
                         <ArrowDownward
                           fontSize="inherit"
-                          sx={{ color: salesPriceSort === 'desc' ? 'primary.main' : 'inherit', opacity: salesPriceSort === 'desc' ? 1 : 0.5 }}
+                          sx={{ color: salesPriceSort === 'desc' ? '#3b82f6' : 'inherit', opacity: salesPriceSort === 'desc' ? 1 : 0.5 }}
                         />
                       </IconButton>
                     </Box>

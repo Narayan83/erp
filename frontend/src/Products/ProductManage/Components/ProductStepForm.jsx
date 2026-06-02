@@ -385,10 +385,12 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* HSN Dropdown */}
           <div className="form-field">
             <label className="field-label">HSN Code</label>
-            <select 
-              value={watch('hsnID') || ''}
-              {...register('hsnID')}
-              onChange={(e) => setValue('hsnID', e.target.value)}
+            <select
+              value={watch("hsnID") ?? ""}
+              {...register("hsnID")}
+              onChange={(e) =>
+                setValue("hsnID", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
             >
               <option value="">Select HSN Code</option>
               {hsnCodes.map(h => (
@@ -417,10 +419,18 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
             <label className="field-label">Minimum Stock</label>
             <input type="number" placeholder="0" {...register("minimumStock", { valueAsNumber: true })} />
           </div>
-          {/* Category */}
+          {/* Category — controlled value + setValue onChange (register alone conflicts with value={watch} in React 19 / RHF) */}
           <div className="form-field">
             <label className="field-label required">Category</label>
-            <select value={watch("categoryID") || ''} {...register("categoryID", { required: true })}>
+            <select
+              value={watch("categoryID") ?? ""}
+              {...register("categoryID", { required: true })}
+              onChange={(e) => {
+                const v = e.target.value;
+                setValue("categoryID", v, { shouldValidate: true, shouldDirty: true });
+                setValue("subcategoryID", "", { shouldValidate: true });
+              }}
+            >
               <option value="">Select Category</option>
               {categories.map(cat => <option key={cat.ID || cat.id} value={cat.ID || cat.id}>{cat.Name || cat.name}</option>)}
             </select>
@@ -428,7 +438,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* Subcategory */}
           <div className="form-field">
             <label className="field-label">Subcategory</label>
-            <select value={watch("subcategoryID") || ''} {...register("subcategoryID")}>
+            <select
+              value={watch("subcategoryID") ?? ""}
+              {...register("subcategoryID")}
+              onChange={(e) =>
+                setValue("subcategoryID", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
+            >
               <option value="">Select Subcategory</option>
               {subcategories.length > 0 ? (
                 subcategories.map(sub => <option key={sub.ID || sub.id} value={sub.ID || sub.id}>{sub.Name || sub.name}</option>)
@@ -440,7 +456,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* Unit */}
           <div className="form-field">
             <label className="field-label">Unit</label>
-            <select value={watch("unitID") || ''} {...register("unitID")}>
+            <select
+              value={watch("unitID") ?? ""}
+              {...register("unitID")}
+              onChange={(e) =>
+                setValue("unitID", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
+            >
               <option value="">Select Unit</option>
               {units.map(unit => <option key={unit.ID || unit.id} value={unit.ID || unit.id}>{unit.Name || unit.name}</option>)}
             </select>
@@ -448,7 +470,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* Product Mode */}
           <div className="form-field">
             <label className="field-label">Product Mode</label>
-            <select value={watch('product_mode') || ''} {...register("product_mode")} onChange={(e) => setValue('product_mode', e.target.value)}>
+            <select
+              value={watch("product_mode") ?? ""}
+              {...register("product_mode")}
+              onChange={(e) =>
+                setValue("product_mode", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
+            >
               <option value="">Select Mode</option>
               <option value="Purchase">Purchase</option>
               <option value="Internal Manufacturing">Internal Manufacturing</option>
@@ -463,7 +491,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* Store */}
           <div className="form-field">
             <label className="field-label">Store</label>
-            <select value={watch("storeID") || ''} {...register("storeID")}>
+            <select
+              value={watch("storeID") ?? ""}
+              {...register("storeID")}
+              onChange={(e) =>
+                setValue("storeID", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
+            >
               <option value="">Select Store</option>
               {stores.map(store => <option key={store.ID || store.id} value={store.ID || store.id}>{store.Name || store.name}</option>)}
             </select>
@@ -471,7 +505,13 @@ export default function ProductStepForm({ defaultValues, onNext, resetForm }) {
           {/* Tax */}
           <div className="form-field">
             <label className="field-label">Tax</label>
-            <select value={watch("taxID") || ''} {...register("taxID")}>
+            <select
+              value={watch("taxID") ?? ""}
+              {...register("taxID")}
+              onChange={(e) =>
+                setValue("taxID", e.target.value, { shouldValidate: true, shouldDirty: true })
+              }
+            >
               <option value="">Select Tax</option>
               {taxes.map(tax => <option key={tax.ID || tax.id} value={tax.ID || tax.id}>{tax.Name || tax.name}</option>)}
             </select>

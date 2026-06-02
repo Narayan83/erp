@@ -33,6 +33,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { debounce } from "lodash";
 import { BASE_URL } from "../../config/Config";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import ConfirmDialog from "../../CommonComponents/ConfirmDialog";
 import ImportDialog from "../../CommonComponents/ImportDialog";
 import dialCodeToCountry from "../utils/dialCodeToCountry";
@@ -104,6 +106,8 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
   const getDropdownOptions = (key, row = {}) => {
     const cleanKey = String(key).replace(/\s*\*\s*$/g, '');
     const normalizedKey = cleanKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const countryVal = (row['Country'] || row['Permanent Country'] || '').toString().toLowerCase();
+    const isIndia = countryVal.includes('india') || countryVal.includes('+91') || countryVal.includes('091');
     if (normalizedKey === 'salutation') {
       return { options: ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sir', 'Madam'], multiple: false };
     } else if (normalizedKey === 'gender') {
@@ -112,9 +116,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
       return { options: ['Yes', 'No'], multiple: false };
     } else if (normalizedKey === 'country' || normalizedKey === 'permanentcountry') {
       return { options: IMPORT_COUNTRY_OPTIONS, multiple: false };
-    } else if (normalizedKey === 'state' && (row['Country'] === 'India (+91)' || row['Permanent Country'] === 'India (+91)')) {
+    } else if (normalizedKey === 'state' && isIndia) {
       return { options: Object.values(stateList), multiple: false };
-    } else if (normalizedKey === 'city' && (row['Country'] === 'India (+91)' || row['Permanent Country'] === 'India (+91)')) {
+    } else if (normalizedKey === 'city' && isIndia) {
       return { options: citiesList, multiple: false };
     } else if (normalizedKey.includes('accounttype') || (normalizedKey.includes('account') && normalizedKey.includes('type'))) {
       return { options: IMPORT_ACCOUNT_TYPES, multiple: true };
@@ -203,6 +207,9 @@ const SimpleEditableCell = ({ value, rowIndex, columnKey, onUpdate, error, error
 
 export default function UserListPage() {
   const navigate = useNavigate();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({ name: "", deptHead: '', userType: '', executiveID: '' });
   const [page, setPage] = useState(0);
@@ -978,6 +985,8 @@ const getUserDisplayName = (u) => {
     const genders = ['Male','Female','Other','Prefer not to say'];
     const activeOptions = ['Yes','No'];
     const accountTypes = ['Customer','Supplier','Dealer','Distributor'];
+    const stateOptions = Object.values(stateList || {}).filter(Boolean);
+    const cityOptions = Array.isArray(citiesList) ? citiesList.filter(Boolean) : [];
 
     // Build countries list from imported countriesData if IMPORT_COUNTRY_OPTIONS isn't present
     const countries = (typeof IMPORT_COUNTRY_OPTIONS !== 'undefined' && Array.isArray(IMPORT_COUNTRY_OPTIONS) && IMPORT_COUNTRY_OPTIONS.length > 0)
@@ -986,7 +995,8 @@ const getUserDisplayName = (u) => {
 
     // Write lists into the Lists sheet (each list in its own column)
     // For template download we do NOT include IndustrySegment dropdown (large list)
-    const lists = [salutations, genders, countries, activeOptions, accountTypes];
+    // Columns: A=salutation, B=gender, C=country, D=active, E=accountTypes, F=state, G=city
+    const lists = [salutations, genders, countries, activeOptions, accountTypes, stateOptions, cityOptions];
     lists.forEach((arr, colIdx) => {
       for (let i = 0; i < arr.length; i++) {
         listsSheet.getCell(i + 1, colIdx + 1).value = arr[i];
@@ -1002,6 +1012,8 @@ const getUserDisplayName = (u) => {
       2: { sheetCol: 'A', length: salutations.length },
       6: { sheetCol: 'B', length: genders.length },
       7: { sheetCol: 'C', length: countries.length },
+      17: { sheetCol: 'G', length: cityOptions.length },
+      18: { sheetCol: 'F', length: stateOptions.length },
       19: { sheetCol: 'C', length: countries.length },
       37: { sheetCol: 'D', length: activeOptions.length },
       38: { sheetCol: 'E', length: accountTypes.length }
@@ -1753,15 +1765,17 @@ const getUserDisplayName = (u) => {
             </IconButton>
           </Tooltip>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
-            style={{ marginLeft: 'auto' }}
-            aria-label="Add User"
-          >
-            + Add User
-          </button>
+          {perms?.can_create && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => window.open(`${window.location.origin}/users/add`, '_blank', 'noopener,noreferrer')}
+              style={{ marginLeft: 'auto' }}
+              aria-label="Add User"
+            >
+              + Add User
+            </button>
+          )}
         </Box>
       </Paper>
 
@@ -2038,8 +2052,12 @@ const getUserDisplayName = (u) => {
                                   <Visibility />
                                 </button>
                               </Tooltip>
-                              <Tooltip title="Edit"><button type="button" className="action-btn edit-btn" onClick={(e) => { e.stopPropagation(); navigate(`/users/${user.id}/edit`); }} aria-label="Edit user"><Edit /></button></Tooltip>
-                              <Tooltip title="Delete"><button type="button" className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }} aria-label="Delete user"><Delete /></button></Tooltip>
+                              {perms?.can_update && (
+                                <Tooltip title="Edit"><button type="button" className="action-btn edit-btn" onClick={(e) => { e.stopPropagation(); navigate(`/users/${user.id}/edit`); }} aria-label="Edit user"><Edit /></button></Tooltip>
+                              )}
+                              {perms?.can_delete && (
+                                <Tooltip title="Delete"><button type="button" className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); openConfirmDelete(user); }} aria-label="Delete user"><Delete /></button></Tooltip>
+                              )}
                               {/* WhatsApp: prefer whatsapp_number, fallback to mobile_number. Use wa.me with digits-only number */}
                               {((user.whatsapp_number || user.mobile_number) && (user.whatsapp_number || user.mobile_number).toString().trim() !== '') ? (
                                 <Tooltip title="WhatsApp">

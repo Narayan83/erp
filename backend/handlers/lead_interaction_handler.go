@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -23,6 +24,7 @@ type CreateLeadInteractionRequest struct {
 	Summary      string `json:"summary"`
 	Details      string `json:"details"`
 	AssignedToID *uint  `json:"assigned_to_id"`
+	Source       string `json:"source"`
 }
 
 type UpdateLeadInteractionRequest struct {
@@ -50,6 +52,7 @@ func CreateLeadInteraction(c *fiber.Ctx) error {
 		Type:         body.Type,
 		Summary:      body.Summary,
 		Details:      body.Details,
+		Source:       body.Source,
 		AssignedToID: body.AssignedToID,
 		Timestamp:    time.Now(),
 	}
@@ -69,6 +72,12 @@ func GetLeadInteractions(c *fiber.Ctx) error {
 
 	if leadID != 0 {
 		query = query.Where("lead_id = ?", leadID)
+	}
+
+	// By default exclude interactions sourced from quotations (quotation module)
+	incl := strings.ToLower(c.Query("include_quotation", "false"))
+	if !(incl == "1" || incl == "true") {
+		query = query.Where("(source IS NULL OR trim(source) = '' OR source != ?)", "quotation")
 	}
 
 	query.Order("timestamp desc").Find(&interactions)
@@ -154,6 +163,7 @@ func CreateLeadInteractionForLead(c *fiber.Ctx) error {
 
 	// parse body
 	var payload struct {
+		Source      string `json:"source"`
 		Interaction struct {
 			Date        string `json:"date"`
 			Time        string `json:"time"`
@@ -221,6 +231,7 @@ func CreateLeadInteractionForLead(c *fiber.Ctx) error {
 			Type:      payload.Interaction.Type,
 			Summary:   payload.Interaction.Note,
 			Details:   "",
+			Source:    payload.Source,
 			Timestamp: interactionTime,
 		}
 	}
@@ -251,6 +262,7 @@ func CreateLeadInteractionForLead(c *fiber.Ctx) error {
 			LeadID: lid,
 			Title:  payload.NextAppointment.Type,
 			Notes:  payload.NextAppointment.Note,
+			Source: payload.Source,
 			Status: "pending",
 		}
 		// parse follow-up datetime

@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"strings"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -28,6 +31,89 @@ type UpdateLeadSourceRequest struct {
 	Active      *bool   `json:"active"`
 }
 
+func sanitizeLeadSourceCode(name string) string {
+	upper := strings.ToUpper(strings.TrimSpace(name))
+	if upper == "" {
+		return "LS"
+	}
+	upper = strings.ReplaceAll(upper, " ", "_")
+	upper = strings.ReplaceAll(upper, "-", "_")
+	if len(upper) > 20 {
+		upper = upper[:20]
+	}
+	return fmt.Sprintf("LS_%s", upper)
+}
+
+func nextLeadSourceCode(name string, excludeID uint) (string, error) {
+	baseCode := sanitizeLeadSourceCode(name)
+	if leadSourceDB == nil {
+		return baseCode, fmt.Errorf("lead source database not initialized")
+	}
+
+	for attempt := 0; attempt < 1000; attempt++ {
+		candidate := baseCode
+		if attempt > 0 {
+			candidate = fmt.Sprintf("%s_%d", baseCode, attempt+1)
+		}
+
+		var existing models.LeadSource
+		err := leadSourceDB.Where("code = ?", candidate).First(&existing).Error
+		if err == gorm.ErrRecordNotFound {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+		if excludeID != 0 && existing.ID == excludeID {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to generate unique code for lead source %q", name)
+}
+
+func EnsureLeadSourceByName(name string) (*models.LeadSource, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if leadSourceDB == nil {
+		return nil, fmt.Errorf("lead source database not initialized")
+	}
+
+	var existing models.LeadSource
+	if err := leadSourceDB.Where("LOWER(name) = ?", strings.ToLower(trimmed)).First(&existing).Error; err == nil {
+		if !existing.Active {
+			existing.Active = true
+			if saveErr := leadSourceDB.Save(&existing).Error; saveErr != nil {
+				return nil, saveErr
+			}
+		}
+		return &existing, nil
+	} else if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	code, err := nextLeadSourceCode(trimmed, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	newItem := models.LeadSource{
+		Code:   code,
+		Name:   trimmed,
+		Active: true,
+	}
+	if err := leadSourceDB.Create(&newItem).Error; err != nil {
+		var retryExisting models.LeadSource
+		if findErr := leadSourceDB.Where("LOWER(name) = ?", strings.ToLower(trimmed)).First(&retryExisting).Error; findErr == nil {
+			return &retryExisting, nil
+		}
+		return nil, err
+	}
+	return &newItem, nil
+}
+
 /* ========== HANDLERS ========== */
 
 func CreateLeadSource(c *fiber.Ctx) error {
@@ -36,13 +122,23 @@ func CreateLeadSource(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	if body.Code == "" || body.Name == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Code and Name are required"})
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Name is required"})
+	}
+
+	code := strings.TrimSpace(body.Code)
+	if code == "" {
+		generated, err := nextLeadSourceCode(name, 0)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		code = generated
 	}
 
 	source := models.LeadSource{
-		Code:        body.Code,
-		Name:        body.Name,
+		Code:        code,
+		Name:        name,
 		Description: body.Description,
 		Active:      true,
 	}

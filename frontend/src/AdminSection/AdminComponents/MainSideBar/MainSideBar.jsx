@@ -155,7 +155,31 @@ const MainSideBar = () => {
           path: child.url,
         })) : null
       }));
-      setDisplayMenuItems(transformed);
+
+      const withManageEmployees = transformed.map((item) => {
+        const title = String(item.title || "").toLowerCase();
+        const isHrOrEmployeeMenu =
+          title.includes("hr") ||
+          title.includes("employee");
+
+        if (!isHrOrEmployeeMenu || !Array.isArray(item.submenu)) {
+          return item;
+        }
+
+        const hasManageEmployees = item.submenu.some(
+          (sub) => String(sub.path).toLowerCase() === "/manage-employees"
+        );
+
+        if (hasManageEmployees) {
+          return item;
+        }
+
+        return {
+          ...item,
+          submenu: [{ title: "Manage Employees", path: "/manage-employees" }, ...item.submenu],
+        };
+      });
+      setDisplayMenuItems(withManageEmployees);
     } else {
       // If no menus from backend, show nothing or just the dashboard if you want a safety net
       // For strict permissions as requested, we show empty list.

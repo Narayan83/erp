@@ -5,6 +5,34 @@ import { BASE_URL, getAuthHeaders } from '../../../../config/Config';
 import './InteractionModal.scss';
 
 const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => {
+  const hourOptions = ['12', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11'];
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+  const to12HourParts = (time24) => {
+    const [hourStr = '00', minuteStr = '00'] = String(time24 || '00:00').split(':');
+    const hour24 = Number(hourStr);
+    if (Number.isNaN(hour24)) {
+      return { hour: '12', minute: '00', meridiem: 'AM' };
+    }
+    const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 || 12;
+    return {
+      hour: String(hour12).padStart(2, '0'),
+      minute: String(Number(minuteStr) || 0).padStart(2, '0'),
+      meridiem,
+    };
+  };
+
+  const to24HourTime = (hour12, minute, meridiem) => {
+    let parsedHour = Number(hour12);
+    if (Number.isNaN(parsedHour) || parsedHour < 1 || parsedHour > 12) parsedHour = 12;
+    const safeMinute = String(Number(minute) || 0).padStart(2, '0');
+    const normalizedMeridiem = meridiem === 'PM' ? 'PM' : 'AM';
+    let hour24 = parsedHour % 12;
+    if (normalizedMeridiem === 'PM') hour24 += 12;
+    return `${String(hour24).padStart(2, '0')}:${safeMinute}`;
+  };
+
   const [interactionDate, setInteractionDate] = useState('');
   const [interactionTime, setInteractionTime] = useState('');
   const [tagLocation, setTagLocation] = useState(false);
@@ -116,6 +144,8 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
   if (!isOpen) return null;
 
   const interactionTypes = ['Call', 'Meeting', 'Online', 'Email', 'Message', 'Other'];
+  const interactionTimeParts = to12HourParts(interactionTime);
+  const nextTimeParts = to12HourParts(nextTime);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -231,7 +261,32 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
             <div className="row inputs-row">
               <div className="time-group">
                 <input type="date" value={interactionDate} onChange={e=>setInteractionDate(e.target.value)} />
-                <input type="time" value={interactionTime} onChange={e=>setInteractionTime(e.target.value)} />
+                <div className="time-selector-group">
+                  <select
+                    value={interactionTimeParts.hour}
+                    onChange={(e) => setInteractionTime(to24HourTime(e.target.value, interactionTimeParts.minute, interactionTimeParts.meridiem))}
+                  >
+                    {hourOptions.map((hour) => (
+                      <option key={`interaction-hour-${hour}`} value={hour}>{hour}</option>
+                    ))}
+                  </select>
+                  <span className="time-separator">:</span>
+                  <select
+                    value={interactionTimeParts.minute}
+                    onChange={(e) => setInteractionTime(to24HourTime(interactionTimeParts.hour, e.target.value, interactionTimeParts.meridiem))}
+                  >
+                    {minuteOptions.map((minute) => (
+                      <option key={`interaction-minute-${minute}`} value={minute}>{minute}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={interactionTimeParts.meridiem}
+                    onChange={(e) => setInteractionTime(to24HourTime(interactionTimeParts.hour, interactionTimeParts.minute, e.target.value))}
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
                 <label className="tag-location"><input type="checkbox" checked={tagLocation} onChange={e=>setTagLocation(e.target.checked)} /> Tag Location</label>
               </div>
             </div>
@@ -261,7 +316,32 @@ const InteractionModal = ({ isOpen, onClose, lead, mode = 'both', onSaved }) => 
             <div className="row inputs-row">
               <div className="time-group">
                 <input type="date" value={nextDate} onChange={e=>setNextDate(e.target.value)} />
-                <input type="time" value={nextTime} onChange={e=>setNextTime(e.target.value)} />
+                <div className="time-selector-group">
+                  <select
+                    value={nextTimeParts.hour}
+                    onChange={(e) => setNextTime(to24HourTime(e.target.value, nextTimeParts.minute, nextTimeParts.meridiem))}
+                  >
+                    {hourOptions.map((hour) => (
+                      <option key={`next-hour-${hour}`} value={hour}>{hour}</option>
+                    ))}
+                  </select>
+                  <span className="time-separator">:</span>
+                  <select
+                    value={nextTimeParts.minute}
+                    onChange={(e) => setNextTime(to24HourTime(nextTimeParts.hour, e.target.value, nextTimeParts.meridiem))}
+                  >
+                    {minuteOptions.map((minute) => (
+                      <option key={`next-minute-${minute}`} value={minute}>{minute}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={nextTimeParts.meridiem}
+                    onChange={(e) => setNextTime(to24HourTime(nextTimeParts.hour, nextTimeParts.minute, e.target.value))}
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
                 <select value={nextAssignee} onChange={e=>setNextAssignee(e.target.value)}>
                   <option value="">Select Assignee</option>
                   {employees.map(emp => (

@@ -5,6 +5,7 @@ import PrintHeader from '../../../Admin Master/page/PrintHeader/PrintHeader';
 import Sources from './Sources/Sources';
 import Tags from './Tags/Tags';
 import RejectionReasons from './RejectionReasons/RejectionReasons';
+import LeadCategory from './Categories/LeadCategory';
 import './configuration.scss';
 
 const Configuration = () => {
@@ -13,6 +14,7 @@ const Configuration = () => {
   const [showSources, setShowSources] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showRejectionReasons, setShowRejectionReasons] = useState(false);
+  const [showLeadCategories, setShowLeadCategories] = useState(false);
 
   // Configuration cards data
   const configurationCards = [
@@ -52,6 +54,13 @@ const Configuration = () => {
       color: 'products-card'
     },
     {
+      id: 'category',
+      title: 'CRM Categories',
+      description: 'Manage categories for your CRM leads.',
+      icon: FaBox,
+      color: 'products-card'
+    },
+    {
       id: 'cities',
       title: 'City List',
       description: 'Manage the master entries of cities used for leads & connections.',
@@ -72,6 +81,10 @@ const Configuration = () => {
     }
     if (cardId === 'rejection-reasons') {
       setShowRejectionReasons(true);
+      return;
+    }
+    if (cardId === 'category') {
+      setShowLeadCategories(true);
       return;
     }
     navigate(`/configuration/${cardId}`);
@@ -122,6 +135,7 @@ const Configuration = () => {
       <Sources isOpen={showSources} onClose={() => setShowSources(false)} />
       <Tags isOpen={showTags} onClose={() => setShowTags(false)} />
       <RejectionReasons isOpen={showRejectionReasons} onClose={() => setShowRejectionReasons(false)} />
+        <LeadCategory isOpen={showLeadCategories} onClose={() => setShowLeadCategories(false)} />
   {/* Print Header page/modal when route is /configuration/header */}
   {type === 'header' && (
     <PrintHeader

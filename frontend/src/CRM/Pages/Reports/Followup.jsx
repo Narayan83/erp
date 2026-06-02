@@ -2,10 +2,40 @@ import React, { useEffect, useState } from 'react';
 import { FaCheck, FaTimes, FaFileExport, FaSearch } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import { BASE_URL, getAuthHeaders } from '../../../config/Config';
+import LeadDetails from '../../Components/LeadDetails/LeadDetails';
 import './_sales_interactions.scss';
 import './followup.scss';
 
 const FILTERS = ['All', 'Today', 'Tomorrow', 'This Week', 'This Month', 'Custom'];
+
+const normalizeApiList = (resp) => {
+  if (Array.isArray(resp)) return resp;
+  if (resp && Array.isArray(resp.data)) return resp.data;
+  return [];
+};
+
+const leadIdFromAny = (leadLike) => {
+  if (!leadLike || typeof leadLike !== 'object') return null;
+  const id = leadLike.id ?? leadLike.ID ?? leadLike.lead_id ?? leadLike.leadId ?? leadLike.LeadID;
+  return id !== undefined && id !== null && id !== '' ? id : null;
+};
+
+const followupLeadId = (fup) => {
+  if (!fup || typeof fup !== 'object') return null;
+  const leadRef = fup.lead || fup.Lead || {};
+  const id = fup.lead_id ?? fup.leadId ?? fup.LeadID ?? leadIdFromAny(leadRef);
+  return id !== undefined && id !== null && id !== '' ? id : null;
+};
+
+const leadDisplayFields = (lead) => {
+  const obj = lead && typeof lead === 'object' ? lead : {};
+  return {
+    business: obj.business || obj.Business || obj.company || obj.companyName || obj.organisation || obj.organization || '',
+    contact: obj.name || obj.Name || obj.contact || obj.contactPerson || obj.contact_name || '',
+    mobile: obj.mobile || obj.Mobile || obj.phone || obj.Phone || obj.contact_number || obj.contactNumber || '',
+    email: obj.email || obj.Email || obj.emailAddress || obj.contact_email || obj.email_id || '',
+  };
+};
 
 const formatTime12 = (iso) => {
   if (!iso) return '';
@@ -74,6 +104,11 @@ const Followup = () => {
   const [search, setSearch] = useState('');
   const [selectedOtherMonth, setSelectedOtherMonth] = useState('');
   const [selectedOtherYear, setSelectedOtherYear] = useState(new Date().getFullYear());
+  const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [leadDetails, setLeadDetails] = useState(null);
+  const [editedNotes, setEditedNotes] = useState({});
+  const [dirtyNotes, setDirtyNotes] = useState({});
+  const [savingNotes, setSavingNotes] = useState({});
 
   // load data helper so we can refresh on events
   const loadData = async () => {
@@ -93,7 +128,33 @@ const Followup = () => {
       const fu = Array.isArray(fups) ? fups : (fups && fups.data ? fups.data : []);
       console.log('loadData: normalized followups count:', fu.length);
       setFollowups(fu);
-      setLeads(Array.isArray(leadsResp) ? leadsResp : (leadsResp && leadsResp.data ? leadsResp.data : []));
+      setEditedNotes({});
+      setDirtyNotes({});
+      setSavingNotes({});
+
+      const leadIds = [...new Set(fu.map(followupLeadId).filter((id) => id != null))];
+      const leadsFromIds = await Promise.all(
+        leadIds.map((id) =>
+          fetch(`${BASE_URL}/api/leads/${id}`, { headers: getAuthHeaders() }).then(async (res) => {
+            if (!res.ok) return null;
+            return res.json();
+          }).catch(() => null)
+        )
+      );
+
+      const mergedLeadsById = {};
+      const addLeadToMap = (lead, fallbackId = null) => {
+        if (!lead || typeof lead !== 'object') return;
+        const id = leadIdFromAny(lead) ?? fallbackId;
+        if (id === undefined || id === null || id === '') return;
+        mergedLeadsById[String(id)] = lead;
+      };
+
+      normalizeApiList(leadsResp).forEach((lead) => addLeadToMap(lead));
+      leadsFromIds.forEach((lead, idx) => addLeadToMap(lead, leadIds[idx]));
+      setLeads(Object.values(mergedLeadsById));
+
+      console.log('loadData: merged leads count:', Object.keys(mergedLeadsById).length);
       const normEmps = Array.isArray(emps) ? emps.map(e => ({
         ...e,
         id: e.id || e.ID || e.employee_id || e.empid,
@@ -146,7 +207,82 @@ const Followup = () => {
     return () => { window.removeEventListener('lead:interaction.saved', handler); };
   }, []);
 
-  const getLead = (id) => leads.find(l => String(l.id) === String(id)) || {};
+  const getLead = (leadRef) => {
+    // If API already embedded full lead details on followup, use it directly.
+    if (leadRef && typeof leadRef === 'object') {
+      const embedded = leadDisplayFields(leadRef);
+      if (embedded.business || embedded.contact || embedded.mobile || embedded.email) {
+        return leadRef;
+      }
+    }
+
+    const refId =
+      (leadRef && typeof leadRef === 'object')
+        ? leadIdFromAny(leadRef)
+        : leadRef;
+
+    if (refId === undefined || refId === null || refId === '') return {};
+
+    return leads.find((l) => {
+      const id = leadIdFromAny(l);
+      return id !== null && String(id) === String(refId);
+    }) || (leadRef && typeof leadRef === 'object' ? leadRef : {});
+  };
+  const getFollowupId = (fup) => String(fup?.id ?? fup?.ID ?? '');
+  const getFollowupNote = (fup) => (fup?.notes ?? fup?.Notes ?? '').toString();
+  const getEditableNote = (fup) => {
+    const id = getFollowupId(fup);
+    if (id && Object.prototype.hasOwnProperty.call(editedNotes, id)) return editedNotes[id];
+    return getFollowupNote(fup);
+  };
+
+  const handleNoteChange = (fup, value) => {
+    const id = getFollowupId(fup);
+    if (!id) return;
+    setEditedNotes(prev => ({ ...prev, [id]: value }));
+    setDirtyNotes(prev => ({ ...prev, [id]: true }));
+  };
+
+  const saveFollowupNote = async (fup, providedNote = null) => {
+    const id = getFollowupId(fup);
+    if (!id) return false;
+
+    const noteToSave = providedNote !== null ? providedNote : getEditableNote(fup);
+    setSavingNotes(prev => ({ ...prev, [id]: true }));
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/lead-followups/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ notes: noteToSave }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to update follow-up note' }));
+        alert(`Failed to update follow-up note: ${err.error || 'Unknown error'}`);
+        return false;
+      }
+
+      const updated = await res.json().catch(() => null);
+      const finalNote = (updated?.notes ?? noteToSave).toString();
+
+      setFollowups(prev => prev.map(p => {
+        const pid = String(p.id ?? p.ID ?? '');
+        if (pid !== id) return p;
+        return { ...p, notes: finalNote, Notes: finalNote };
+      }));
+
+      setEditedNotes(prev => ({ ...prev, [id]: finalNote }));
+      setDirtyNotes(prev => ({ ...prev, [id]: false }));
+      return true;
+    } catch (err) {
+      console.error('Failed to save follow-up note', err);
+      alert('Failed to save follow-up note. Please try again.');
+      return false;
+    } finally {
+      setSavingNotes(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   const filterMatches = (fup) => {
     const dtStr = fup.followup_on || fup.FollowUpOn || fup.followupOn || '';
@@ -181,15 +317,16 @@ const Followup = () => {
   const matchesSearch = (fup) => {
     if (!search || !search.trim()) return true;
     const term = search.toLowerCase();
-    const lead = getLead(fup.lead_id || fup.LeadID || fup.lead);
-    const business = (lead.business || lead.company || lead.companyName || '').toString().toLowerCase();
-    const contact = (lead.name || lead.contact || lead.contactPerson || '').toString().toLowerCase();
-    const mobile = (lead.mobile || lead.phone || lead.contact_number || '').toString().toLowerCase();
-    const email = (lead.email || lead.emailAddress || lead.contact_email || lead.email_id || '').toString().toLowerCase();
+    const lead = getLead(fup.lead || fup.Lead || fup.lead_id || fup.LeadID || fup.leadId);
+    const { business, contact, mobile, email } = leadDisplayFields(lead);
+    const businessVal = business.toString().toLowerCase();
+    const contactVal = contact.toString().toLowerCase();
+    const mobileVal = mobile.toString().toLowerCase();
+    const emailVal = email.toString().toLowerCase();
     const note = (fup.notes || fup.Notes || '').toString().toLowerCase();
     const title = (fup.title || fup.Title || '').toString().toLowerCase();
     const typeField = (fup.type || fup.Type || fup.followup_type || fup.FollowupType || '').toString().toLowerCase();
-    return [business, contact, mobile, email, note, title, typeField].join(' ').includes(term);
+    return [businessVal, contactVal, mobileVal, emailVal, note, title, typeField].join(' ').includes(term);
   };
 
   const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -229,6 +366,17 @@ const Followup = () => {
       return;
     }
 
+    const followupId = getFollowupId(fup);
+    const noteFromEdit = followupId && Object.prototype.hasOwnProperty.call(editedNotes, followupId)
+      ? editedNotes[followupId]
+      : null;
+    const finalNote = noteFromEdit !== null ? noteFromEdit : getFollowupNote(fup);
+
+    if (followupId && dirtyNotes[followupId]) {
+      const saved = await saveFollowupNote(fup, finalNote);
+      if (!saved) return;
+    }
+
     // Set saving flag on this followup
     setFollowups(prev => prev.map(p => p.id === fup.id ? {...p, _saving: true} : p));
 
@@ -240,7 +388,7 @@ const Followup = () => {
           date: now.toISOString().slice(0,10),
           time: now.toTimeString().slice(0,5),
           type: fupType,
-          note: fup.notes || fup.Notes || '',
+          note: finalNote,
         }
       };
 
@@ -282,6 +430,23 @@ const Followup = () => {
 
       // Remove followup from UI
       setFollowups(prev => prev.filter(p => p.id !== fup.id));
+      if (followupId) {
+        setEditedNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+        setDirtyNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+        setSavingNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+      }
 
       // Notify other parts of the app
       try { window.dispatchEvent(new CustomEvent('lead:interaction.saved', { detail: { interaction: result.interaction || null, followup: result.followup || null, lead_id: leadId } })); } catch (e) {}
@@ -315,6 +480,24 @@ const Followup = () => {
 
       // Remove followup from UI
       setFollowups(prev => prev.filter(p => p.id !== fup.id));
+      const followupId = getFollowupId(fup);
+      if (followupId) {
+        setEditedNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+        setDirtyNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+        setSavingNotes(prev => {
+          const next = { ...prev };
+          delete next[followupId];
+          return next;
+        });
+      }
       console.log('cancel followup: deleted followup', fup.id);
     } catch (err) {
       console.error('Error cancelling followup', err);
@@ -354,11 +537,8 @@ const Followup = () => {
       }
 
       const exportData = visible.map(f => {
-        const lead = getLead(f.lead_id || f.LeadID || f.lead || (f.Lead && f.Lead.id));
-        const business = lead.business || lead.company || lead.companyName || '';
-        const contact = lead.name || lead.contact || lead.contactPerson || '';
-        const mobile = lead.mobile || lead.phone || lead.contact_number || '';
-        const email = lead.email || lead.emailAddress || lead.contact_email || lead.email_id || '';
+        const lead = getLead(f.lead || f.Lead || f.lead_id || f.LeadID || f.leadId);
+        const { business, contact, mobile, email } = leadDisplayFields(lead);
         const type = f.type || f.Type || f.followup_type || f.FollowupType || f.title || f.Title || '';
         const leadIdKey = String(lead.id || lead.ID || lead.lead_id || lead.leadId || '');
         const li = latestInteractions[leadIdKey];
@@ -391,6 +571,12 @@ const Followup = () => {
     } finally {
       setExporting(false);
     }
+  };
+
+  const openLeadDetails = (lead) => {
+    if (!lead) return;
+    setLeadDetails(lead);
+    setShowLeadDetails(true);
   };
 
   return (
@@ -481,36 +667,60 @@ const Followup = () => {
             ) : visible.length === 0 ? (
               <tr><td colSpan={11} style={{textAlign:'center', padding:20}}>No follow-ups</td></tr>
             ) : paged.map((f, i) => {
-              const lead = getLead(f.lead_id || f.LeadID || f.lead || (f.Lead && f.Lead.id));
-              const business = lead.business || lead.company || lead.companyName || '-';
-              const contact = lead.name || lead.contact || '-';
-              const mobile = lead.mobile || lead.phone || '-';
-              const email = lead.email || lead.emailAddress || lead.contact_email || lead.email_id || '-';
+              const lead = getLead(f.lead || f.Lead || f.lead_id || f.LeadID || f.leadId);
+              const details = leadDisplayFields(lead);
+              const business = details.business || '-';
+              const contact = details.contact || '-';
+              const mobile = details.mobile || '-';
+              const email = details.email || '-';
               const type = f.type || f.Type || f.followup_type || f.FollowupType || f.title || f.Title || '-';
               const leadIdKey = String(lead.id || lead.ID || lead.lead_id || lead.leadId || '');
               const li = latestInteractions[leadIdKey];
               const lastTalk = li ? `${formatDateShort(li.ts)}${li.type ? ` - ${li.type}` : ''}` : '-';
               const assigned = (f.assigned_to ? formatEmployeeName(f.assigned_to) : '') || (employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo)) ? formatEmployeeName(employees.find(e => String(e.id) === String(f.assigned_to_id || f.AssignedToID || f.assignedTo))) : '') || '-';
+              const followupId = getFollowupId(f);
+              const noteValue = getEditableNote(f);
+              const noteDirty = !!dirtyNotes[followupId];
+              const noteSaving = !!savingNotes[followupId];
 
               const term = search && search.trim() ? search.toLowerCase() : '';
-              const hay = [String(formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn) || ''), String(business||''), String(contact||''), String(mobile||''), String(email||''), String(f.notes||''), String(type||''), String(lastTalk||''), String(assigned||'')].join(' ').toLowerCase();
+              const hay = [String(formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn) || ''), String(business||''), String(contact||''), String(mobile||''), String(email||''), String(noteValue||''), String(type||''), String(lastTalk||''), String(assigned||'')].join(' ').toLowerCase();
               const isMatch = term ? hay.includes(term) : false;
 
               return (
-                <tr key={f.id || i} className={`${f.status === 'done' ? 'done' : f.status === 'cancelled' ? 'cancelled' : ''} ${isMatch ? 'match-row' : ''}`}>
+                <tr
+                  key={f.id || i}
+                  className={`${f.status === 'done' ? 'done' : f.status === 'cancelled' ? 'cancelled' : ''} ${isMatch ? 'match-row' : ''} clickable-row`}
+                  onClick={() => openLeadDetails(lead)}
+                >
                   <td>{highlightMatch(formatDateShort(f.followup_on || f.FollowUpOn || f.followupOn), search)}</td>
                   <td>{highlightMatch(formatTime12(f.followup_on || f.FollowUpOn || f.followupOn), search)}</td>
                   <td>{highlightMatch(business, search)}</td>
                   <td>{highlightMatch(contact, search)}</td> 
                   <td>{highlightMatch(mobile, search)}</td>
                   <td>{highlightMatch(email, search)}</td>
-                  <td>{highlightMatch(f.notes || f.Notes || '-', search)}</td>
+                  <td className="fu-note-cell" onClick={(e) => e.stopPropagation()}>
+                    <textarea
+                      className="fu-note-input"
+                      value={noteValue}
+                      onChange={(e) => handleNoteChange(f, e.target.value)}
+                      placeholder="Add follow-up note"
+                    />
+                    <button
+                      className="fu-note-save-btn"
+                      onClick={(e) => { e.stopPropagation(); saveFollowupNote(f); }}
+                      disabled={!noteDirty || noteSaving || !!f._saving}
+                      title={noteSaving ? 'Saving...' : 'Save note'}
+                    >
+                      {noteSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </td>
                   <td>{highlightMatch(type, search)}</td>
                   <td>{highlightMatch(lastTalk, search)}</td>
                   <td>{highlightMatch(assigned, search)}</td>
                   <td className="actions-cell">
-                    <button className="icon-btn success" title={f._saving ? 'Saving...' : 'Mark done'} onClick={() => markDone(f)} disabled={!!f._saving} aria-busy={!!f._saving}><FaCheck/></button>
-                    <button className="icon-btn danger" title="Cancel" onClick={() => cancelFollowup(f)} disabled={!!f._saving}><FaTimes/></button>
+                    <button className="icon-btn success" title={f._saving ? 'Saving...' : 'Mark done'} onClick={(e) => { e.stopPropagation(); markDone(f); }} disabled={!!f._saving} aria-busy={!!f._saving}><FaCheck/></button>
+                    <button className="icon-btn danger" title="Cancel" onClick={(e) => { e.stopPropagation(); cancelFollowup(f); }} disabled={!!f._saving}><FaTimes/></button>
                   </td>
                 </tr>
               );
@@ -538,6 +748,16 @@ const Followup = () => {
         </div>
       </div>
       )}
+
+      <LeadDetails
+        isOpen={showLeadDetails}
+        lead={leadDetails}
+        onClose={() => {
+          setShowLeadDetails(false);
+          setLeadDetails(null);
+        }}
+        onStatusUpdate={loadData}
+      />
     </div>
   );
 };

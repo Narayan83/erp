@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect,useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 // removed CiSearch import (search button removed)
 import { IoMdPrint, IoIosSearch } from "react-icons/io";
 import { IoDocumentText } from "react-icons/io5";
-import { FaYoutube } from "react-icons/fa";
+import { FaYoutube, FaFileExcel } from "react-icons/fa";
 import { MdEdit, MdModelTraining, MdNoteAdd } from "react-icons/md";
 import { CgMenuGridO } from "react-icons/cg";
 import { IoSettingsSharp } from "react-icons/io5";
@@ -16,6 +16,7 @@ import { MdDeleteOutline } from "react-icons/md";
 import './add_quotation.scss';
 // Replaced MUI components with native HTML elements and small helpers
 import axios from "axios";
+import { exportQuotationToExcelStyled } from "./quotationExcelExport";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import { BASE_URL, getAuthHeaders } from "../../../config/Config";
@@ -28,8 +29,10 @@ import CopyFromQuotationModal from "./CopyFromQuotationModal";
 import {
   TextField,
   SearchableSelect,
+  buildQuotationNumber,
   getProductImage,
   normalizeImageUrl,
+  normalizeQuotationNumber,
   splitQuotationNumber,
   doGSTsMatchState
 } from "./utils";
@@ -38,7 +41,76 @@ import {
 
 
 const AddQutation = () => {
+  const getHeaderLogoList = (header) => {
+    if (!header) return [];
+    const list = [];
+    const raw = header.logos_data ?? header.LogosData;
+    if (Array.isArray(raw)) {
+      raw.forEach((v) => {
+        if (typeof v === 'string' && v.trim()) list.push({ name: '', data: v.trim() });
+        else if (v && typeof v === 'object' && typeof v.data === 'string' && v.data.trim())
+          list.push({ name: String(v.name || '').trim(), data: v.data.trim() });
+      });
+    } else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((v) => {
+            if (typeof v === 'string' && v.trim()) list.push({ name: '', data: v.trim() });
+            else if (v && typeof v === 'object' && typeof v.data === 'string' && v.data.trim())
+              list.push({ name: String(v.name || '').trim(), data: v.data.trim() });
+          });
+        }
+      } catch (e) {
+        // ignore malformed value
+      }
+    }
+    const fallback = header.logo_data || header.LogoData;
+    if (fallback) list.push({ name: '', data: fallback });
+
+    // Deduplicate while preferring named entries
+    const map = new Map();
+    for (const item of list) {
+      if (!item || !item.data) continue;
+      const data = item.data;
+      const name = String(item.name || '').trim();
+      const existing = map.get(data);
+      if (!existing) map.set(data, { name, data });
+      else if (!existing.name && name) map.set(data, { name, data });
+    }
+    return Array.from(map.values());
+  };
+
+  const getNextRevisionLetter = (currentLetter) => {
+    const normalized = String(currentLetter || '').trim().toUpperCase();
+    if (!normalized || normalized === 'R') return 'A';
+
+    const code = normalized.charCodeAt(0);
+    if (Number.isNaN(code) || code < 65 || code > 90) return 'A';
+    if (code >= 90) return 'Z';
+    return String.fromCharCode(code + 1);
+  };
+
+  const parseSequenceParts = (sequenceValue) => {
+    const clean = String(sequenceValue || '').trim();
+    const match = clean.match(/^(\d+)([a-zA-Z]?)$/);
+    if (!match) {
+      return {
+        numberPart: clean.replace(/[^0-9]/g, ''),
+        letterPart: '',
+      };
+    }
+
+    return {
+      numberPart: match[1] || '',
+      letterPart: (match[2] || '').toUpperCase(),
+    };
+  };
+
   const [open, setOpen] = useState(false);
+  /** Remount customer modal search when opening (stable <input> identity triggers Edge/Chrome "Saved info"). */
+  const [customerSearchInputMountKey, setCustomerSearchInputMountKey] = useState(0);
+  const customerSearchEditableRef = useRef(null);
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -50,8 +122,15 @@ const AddQutation = () => {
     if (!selectedEmployee) return null;
     const idStr = String(selectedEmployee);
     return (employees || []).find((emp) => {
-      const cand = String(emp?.id || emp?.ID || emp?.user_id || "");
-      return cand === idStr;
+      const candidates = [
+        emp?.user_id,
+        emp?.id,
+        emp?.ID,
+        emp?.id_user,
+      ]
+        .filter((v) => v !== undefined && v !== null)
+        .map((v) => String(v));
+      return candidates.includes(idStr);
     }) || null;
   }, [employees, selectedEmployee]);
   const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
@@ -155,10 +234,57 @@ const AddQutation = () => {
   const [totalTaxable, setTotalTaxable] = useState(0);
   const [totalTaxAmount, setTotalTaxAmount] = useState(0);
   const [printerHeader, setPrinterHeader] = useState(null);
+  const [digitalSignature, setDigitalSignature] = useState(null);
 
   const [isGSTStateMatch, setIsGSTStateMatch]  = useState(true);
   const [branchGstNumber,setBranchGstNumber]  = useState("");
   const [custAddressGst,setCustAddressGst]  = useState("");
+
+  const normalizeEmployeeOption = (emp = {}) => {
+    const userObj = emp.user || emp.User || {};
+    const userIdRaw =
+      emp.user_id ??
+      emp.userId ??
+      userObj.id ??
+      userObj.ID ??
+      emp.id_user ??
+      emp.id ??
+      emp.ID;
+
+    const employeeIdRaw = emp.id ?? emp.ID ?? null;
+
+    const mobileRaw =
+      emp.mobile_number ??
+      emp.mobile ??
+      emp.phone ??
+      emp.contact ??
+      userObj.mobile_number ??
+      userObj.mobile ??
+      userObj.phone ??
+      userObj.contact ??
+      '';
+
+    const emailRaw =
+      emp.email ??
+      emp.work_email ??
+      userObj.email ??
+      '';
+
+    const salutation = emp.salutation || userObj.salutation || '';
+    const first = emp.firstname || emp.first_name || emp.firstName || userObj.firstname || userObj.first_name || userObj.firstName || emp.name || emp.Name || '';
+    const last = emp.lastname || emp.last_name || emp.lastName || userObj.lastname || userObj.last_name || userObj.lastName || '';
+    const fullName = `${salutation} ${first} ${last}`.trim();
+
+    return {
+      ...emp,
+      id: userIdRaw,
+      user_id: userIdRaw,
+      employee_id: employeeIdRaw,
+      mobile_number: mobileRaw,
+      email: emailRaw,
+      display_name: fullName || emailRaw || 'Unnamed',
+    };
+  };
 
 const [productSelections, setProductSelections] = useState({});
   // IDs of products checked in the product selection modal
@@ -218,7 +344,9 @@ const [prevQutationNo, setPrevQutationNo] = useState('');
 // Editable middle sequence and year-range parts
 const [seqNumber, setSeqNumber] = useState('');
 const [yearRange, setYearRange] = useState('');
+const [revisionLetter, setRevisionLetter] = useState(''); // Revision letter for revise mode
 const [currentScpCount,setCurrentScpCount] = useState({});
+const [docTypeScpCounts, setDocTypeScpCounts] = useState({});
 
 
 
@@ -308,6 +436,8 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
     itemRate: true,
     nonStockItemCode: false,
     autoPadSmallDocs: false,
+    headerImageIndex: 0,
+    image: true,
   });
 
   // determine initial doc type from URL (so we can load correct stored settings)
@@ -336,16 +466,43 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
   const handleOpenPrintConfig = () => setOpenPrintConfig(true);
   const handleClosePrintConfig = () => setOpenPrintConfig(false);
   const togglePrintOption = (key) => setPrintConfig(prev => ({ ...prev, [key]: !prev[key] }));
-  const handleSavePrintConfig = (newCfg) => {
+  const handleSavePrintConfig = (newCfg, selectedDocType = null) => {
     try {
       const cfg = newCfg || printConfig;
-      const key = `printConfig_${docType}`;
+      // Use the selected doc type from the dialog if provided, otherwise use the current context
+      const type = selectedDocType || docType;
+      const key = `printConfig_${type}`;
       localStorage.setItem(key, JSON.stringify(cfg));
-      setPrintConfig(cfg);
+      
+      // If saving for the currently displayed type, update the state
+      if (type === docType) {
+        setPrintConfig(cfg);
+      }
     } catch (e) {
       console.warn('Failed to save print config', e);
     }
     setOpenPrintConfig(false);
+  };
+
+  const fetchDigitalSignature = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/integrations`, {
+        params: { type: 'digital_signature', provider: 'custom' },
+      });
+      const payload = Array.isArray(res.data)
+        ? res.data[0]
+        : Array.isArray(res.data?.data)
+          ? res.data.data[0]
+          : res.data;
+      const config = payload?.config || {};
+      const signatureImage = normalizeImageUrl(config.dataUrl || config.image || null) || null;
+      setDigitalSignature(signatureImage);
+      return signatureImage;
+    } catch (e) {
+      console.error('Failed to fetch digital signature', e);
+      setDigitalSignature(null);
+      return null;
+    }
   };
 
   const { id } = useParams(); 
@@ -378,6 +535,7 @@ const selectedBank = selectedBankId ? bankDetails.find(b => String(b.id) === Str
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [isReviseMode, setIsReviseMode] = useState(false);
+  const canRegenerateDocumentNumber = !isEditMode || isReviseMode;
   const [quotationData, setQuotationData] = useState(null);
 
 useEffect(()=>{
@@ -408,6 +566,13 @@ useEffect(()=>{console.log(customers)},[customers]);
 //   setOpenTandCModal(open);
 // }, [open]);
 
+// Reset revisionLetter when exiting revise mode
+useEffect(() => {
+  if (!isReviseMode) {
+    setRevisionLetter('');
+  }
+}, [isReviseMode]);
+
   // Fetch customers from API (use user_type filter supported by backend)
   const fetchCustomers = async (query = "") => {
     try {
@@ -434,7 +599,8 @@ useEffect(()=>{console.log(customers)},[customers]);
         const res = await fetch(`${BASE_URL}/api/employees/non-heads`, { headers: getAuthHeaders() });
         if (res.ok) {
           data = await res.json();
-          setEmployees(Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
+          const list = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+          setEmployees((list || []).map(normalizeEmployeeOption));
           return;
         }
       } catch (e) {
@@ -443,7 +609,8 @@ useEffect(()=>{console.log(customers)},[customers]);
 
       const res2 = await fetch(`${BASE_URL}/api/users?page=1&limit=50&user_type=employee`, { headers: getAuthHeaders() });
       const data2 = await res2.json();
-      setEmployees(data2.data || data2 || []);
+      const list2 = data2.data || data2 || [];
+      setEmployees((Array.isArray(list2) ? list2 : []).map(normalizeEmployeeOption));
     } catch (err) {
       console.error("Error fetching employees:", err);
     }
@@ -690,6 +857,7 @@ useEffect(()=>{console.log(customers)},[customers]);
 
   useEffect(() => {
     fetchPrinterHeaders();
+    fetchDigitalSignature();
   }, []);
 
   // listen for print-header updates so the editor/print preview reflects saved changes immediately
@@ -792,7 +960,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
       if (item._isService) {
         const qty = Number(item.qty) || 0;
         const rate = Number(item.rate) || 0;
-        const discountAmount = Number(item.discount || 0);
+        const discountPercent = Number(item.discountPercent) || 0;
+        const discountAmount = ((rate * qty) * discountPercent) / 100;
         const gstPercent = Number(item.gst) || 0;
         const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
         const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
@@ -802,6 +971,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
         return {
           ...item,
+          discount: discountAmount,
           taxable: taxRes.amount,
           cgst: taxRes.cgst,
           sgst: taxRes.sgst,
@@ -823,7 +993,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
       const newRate = docType === 'Purchase Order' ? purchaseCost : (salesPrice || Number(item.rate || 0));
       const qty = Number(item.qty) || 0;
-      const discountAmount = Number(item.discount || 0);
+      const discountPercent = Number(item.discountPercent) || 0;
+      const discountAmount = ((newRate * qty) * discountPercent) / 100;
       const gstPercent = Number(item.gst ?? item.gst_percent ?? item.gstPercent ?? (prodFromList?.Tax?.Percentage ?? 0)) || 0;
       const sellerGSTIN = selectedBranch?.gst_number || selectedBranch?.gst || selectedBranch?.GST || '';
       const buyerGSTIN = gstForAddr(selectedShippingAddress) || gstForAddr(selectedBillingAddress) || '';
@@ -835,6 +1006,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
         ...item,
         rate: Number(newRate),
         fixedRate: Number(newRate),
+        discount: discountAmount,
         taxable: taxRes.amount,
         cgst: taxRes.cgst,
         sgst: taxRes.sgst,
@@ -854,7 +1026,7 @@ const handleTandCClose = () => setOpenTandCModal(false);
       setBillingModalValues(prev => ({ ...prev, rate: Number(newRate), fixedRate: Number(newRate) }));
     }
 
-  }, [docType, selectedBranch, selectedShippingAddress, selectedBillingAddress]);
+  }, [docType, selectedBranch, selectedShippingAddress, selectedBillingAddress, isGSTStateMatch]);
 
   // Add product to table with calculations
   const handleSelectProduct = (prod, forceNewRow = false) => {
@@ -1161,6 +1333,57 @@ const handleTandCClose = () => setOpenTandCModal(false);
     return addr.gst_in || addr.gstin || addr.GSTIN || addr.gst || addr.gst_number || addr.gst_no || addr.gstNo || '';
   };
 
+  // Helper: resolve customer contact values (address-level first, then customer-level fallback)
+  const getCustomerMobileForAddr = (addr) => {
+    const fromAddr = addr?.mobile || addr?.phone || addr?.phone_number || addr?.mobile_number || addr?.contact_number || addr?.telephone || addr?.contact || '';
+    if (fromAddr && String(fromAddr).trim() !== '') return fromAddr;
+    const cust = selectedCustomer || {};
+    return cust.mobile || cust.phone || cust.phone_number || cust.mobile_number || cust.contact_number || cust.telephone || cust.contact || '';
+  };
+
+  const getCustomerEmailForAddr = (addr) => {
+    const fromAddr = addr?.email || addr?.email_address || addr?.contact_email || '';
+    if (fromAddr && String(fromAddr).trim() !== '') return fromAddr;
+    const cust = selectedCustomer || {};
+    return cust.email || cust.email_address || cust.contact_email || '';
+  };
+
+  const formatAddressCountryName = (country) => {
+    const raw = String(country || '').trim();
+    if (!raw) return '';
+    // Convert values like "India (+91)" or "India +91" to "India".
+    return raw
+      .replace(/\s*\(\s*(?:\+|00)\d{1,4}\s*\)\s*/g, ' ')
+      .replace(/\s+(?:\+|00)\d{1,4}\s*$/g, '')
+      .trim();
+  };
+
+  const formatAddressPostalCode = (postalCode) => {
+    const raw = String(postalCode || '').trim();
+    if (!raw) return '';
+    // Remove embedded country code prefix like (+91) before pincode.
+    return raw.replace(/^\s*(?:\(\+\d{1,4}\)|\+\d{1,4}|00\d{1,4})\s*[-,:]?\s*/i, '');
+  };
+
+  const getCountryDialCode = (country) => {
+    const c = String(country || '').trim().toLowerCase();
+    if (!c || c === 'india') return '+91';
+    if (c === 'united states' || c === 'usa' || c === 'us') return '+1';
+    if (c === 'united kingdom' || c === 'uk') return '+44';
+    if (c === 'united arab emirates' || c === 'uae') return '+971';
+    return '+91';
+  };
+
+  const formatMobileWithCountryCode = (mobile, country) => {
+    const raw = String(mobile || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('+')) return raw;
+    if (raw.startsWith('00')) return `+${raw.slice(2)}`;
+    const digitsOnly = raw.replace(/\D/g, '');
+    if (!digitsOnly) return '';
+    return `${getCountryDialCode(country)} ${digitsOnly}`;
+  };
+
   // GST calculation helper: returns cgst, sgst, igst, totalTax and grandTotal (rounded to 2 decimals)
   const gstCalculation = (amount, gstPercent = 0, sellerGSTIN = '', buyerGSTIN = '', isMatch = null) => {
     const pct = Number(gstPercent) || 0;
@@ -1198,6 +1421,49 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const s = String(v).replace(/[^0-9\.\-]/g, '');
     const n = parseFloat(s);
     return isNaN(n) ? '' : n;
+  };
+
+  // Extract a meaningful API/server validation message for user-facing alerts.
+  const getApiErrorMessage = (err, fallback = 'Something went wrong.') => {
+    const data = err?.response?.data;
+
+    if (typeof data === 'string' && data.trim()) {
+      return data.trim();
+    }
+
+    const direct = [data?.message, data?.error, data?.detail, data?.title, err?.message]
+      .find((v) => typeof v === 'string' && v.trim());
+    if (direct) return direct.trim();
+
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      const items = data.errors
+        .map((e) => {
+          if (typeof e === 'string') return e.trim();
+          if (e && typeof e === 'object') {
+            return (e.message || e.error || e.detail || e.msg || '').toString().trim();
+          }
+          return '';
+        })
+        .filter(Boolean);
+      if (items.length > 0) return items.join('\n');
+    }
+
+    if (data?.errors && typeof data.errors === 'object') {
+      const fieldErrors = Object.entries(data.errors)
+        .map(([field, value]) => {
+          if (Array.isArray(value)) {
+            return `${field}: ${value.join(', ')}`;
+          }
+          if (typeof value === 'string') {
+            return `${field}: ${value}`;
+          }
+          return `${field}: ${JSON.stringify(value)}`;
+        })
+        .filter(Boolean);
+      if (fieldErrors.length > 0) return fieldErrors.join('\n');
+    }
+
+    return fallback;
   };
 
   // Country list and Indian states for the address modal
@@ -1368,8 +1634,9 @@ const handleTandCClose = () => setOpenTandCModal(false);
   };
 
   // Helper function to convert number to words (simplified Indian numbering)
-  const numberToWords = (num) => {
+  const numberToWords = (num, includePaisa = false) => {
     if (!num || num === 0) return 'Zero';
+    
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -1382,10 +1649,15 @@ const handleTandCClose = () => setOpenTandCModal(false);
       return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convertLessThanThousand(n % 100) : '');
     };
     
-    const crore = Math.floor(num / 10000000);
-    const lakh = Math.floor((num % 10000000) / 100000);
-    const thousand = Math.floor((num % 100000) / 1000);
-    const remainder = Math.floor(num % 1000);
+    // Separate rupees and paisa
+    const rupees = Math.floor(num);
+    const paisa = Math.round((num - rupees) * 100);
+    
+    // Convert rupees part
+    const crore = Math.floor(rupees / 10000000);
+    const lakh = Math.floor((rupees % 10000000) / 100000);
+    const thousand = Math.floor((rupees % 100000) / 1000);
+    const remainder = Math.floor(rupees % 1000);
     
     let result = '';
     if (crore > 0) result += convertLessThanThousand(crore) + ' Crore ';
@@ -1393,18 +1665,46 @@ const handleTandCClose = () => setOpenTandCModal(false);
     if (thousand > 0) result += convertLessThanThousand(thousand) + ' Thousand ';
     if (remainder > 0) result += convertLessThanThousand(remainder);
     
-    return result.trim() || 'Zero';
+    result = result.trim() || 'Zero';
+    
+    // Add paisa part if includePaisa is true and paisa is not zero
+    if (includePaisa && paisa > 0) {
+      const paisaWords = convertLessThanThousand(paisa);
+      result += ' and ' + paisaWords + ' Paisa';
+    }
+    
+    return result;
   };
 
-  const generatePDF = (quotationDataFromSave = null) => {
+  const generatePDF = async (quotationDataFromSave = null) => {
     // If we have quotationDataFromSave, use it, else try to use current state
     const q = quotationDataFromSave || {};
+    const signatureImageUrl = printConfig.digitalSignature
+      ? (digitalSignature || await fetchDigitalSignature())
+      : null;
+    const quotationNumber = normalizeQuotationNumber(q.quotation_number || qutationNo || '');
     const cust = q.customer || selectedCustomer || {};
     const branch = q.company_branch || selectedBranch || {};
     const items = q.quotation_items || q.items || tableItems || [];
     const company = q.company || branch.company || {};
     
-    const customerName = cust.company_name || `${cust.salutation || ''} ${cust.firstname || ''} ${cust.lastname || ''}`.replace(/\s+/g, ' ').trim() || 'Guest';
+    const firstNonEmpty = (...vals) => {
+      for (const v of vals) {
+        if (v === undefined || v === null) continue;
+        const s = String(v).trim();
+        if (s) return s;
+      }
+      return '';
+    };
+
+    const customerFallbackName = `${cust.firstname || ''} ${cust.lastname || ''}`.replace(/\s+/g, ' ').trim();
+    const customerName = firstNonEmpty(
+      cust.company_name,
+      cust.business_name,
+      cust.customer_name,
+      customerFallbackName,
+      'Guest'
+    );
     
     // addresses
     const bAddr = q.billing_address || selectedBillingAddress || {};
@@ -1415,8 +1715,8 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const billingAddress3 = bAddr.address3 || '';
     const billingCity = bAddr.city || '';
     const billingState = bAddr.state || '';
-    const billingCountry = bAddr.country || 'India';
-    const billingPincode = bAddr.postal_code || bAddr.pincode || '';
+    const billingCountry = formatAddressCountryName(bAddr.country || 'India');
+    const billingPincode = formatAddressPostalCode(bAddr.postal_code || bAddr.pincode || '');
 
     const sAddr = isSameAsBilling ? bAddr : (q.shipping_address || selectedShippingAddress || {});
     const shippingTitle = sAddr.title || customerName;
@@ -1426,11 +1726,52 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const shippingAddress3 = sAddr.address3 || '';
     const shippingCity = sAddr.city || '';
     const shippingState = sAddr.state || '';
-    const shippingCountry = sAddr.country || 'India';
-    const shippingPincode = sAddr.postal_code || sAddr.pincode || '';
+    const shippingCountry = formatAddressCountryName(sAddr.country || 'India');
+    const shippingPincode = formatAddressPostalCode(sAddr.postal_code || sAddr.pincode || '');
+
+    const formatAddressPersonName = (addr = {}) => {
+      const salutation = firstNonEmpty(addr.salutation, cust.salutation, cust.title);
+      const personFirst = firstNonEmpty(addr.firstname, addr.first_name, cust.firstname, cust.first_name);
+      const personLast = firstNonEmpty(addr.lastname, addr.last_name, cust.lastname, cust.last_name);
+      const fullName = [personFirst, personLast].filter(Boolean).join(' ').trim();
+      if (fullName) return [salutation, fullName].filter(Boolean).join(' ').trim();
+
+      const fallbackPerson = firstNonEmpty(
+        addr.contact_person,
+        addr.contactPerson,
+        addr.contact_name,
+        cust.contact_person,
+        cust.contactPerson,
+        cust.contact_name,
+        cust.contact
+      );
+      if (!fallbackPerson) return '';
+
+      const lower = fallbackPerson.toLowerCase();
+      const salLower = (salutation || '').toLowerCase();
+      if (salLower && (lower === salLower || lower.startsWith(`${salLower} `))) return fallbackPerson;
+      return [salutation, fallbackPerson].filter(Boolean).join(' ').trim();
+    };
+
+    const billingCompanyName = firstNonEmpty(
+      bAddr.company_name,
+      bAddr.business_name,
+      bAddr.customer_name,
+      bAddr.name,
+      customerName
+    );
+    const shippingCompanyName = firstNonEmpty(
+      sAddr.company_name,
+      sAddr.business_name,
+      sAddr.customer_name,
+      sAddr.name,
+      customerName
+    );
+    const billingPersonName = formatAddressPersonName(bAddr);
+    const shippingPersonName = formatAddressPersonName(sAddr);
     
-    // Prefer common phone fields used across APIs (match QuotationList.getCustomerPhone)
-    const custPhone = cust.mobile || cust.phone || cust.phone_number || cust.mobile_number || cust.contact_number || cust.telephone || cust.contact || '';
+    const billingPhone = formatMobileWithCountryCode(getCustomerMobileForAddr(bAddr), billingCountry || bAddr.country || 'India');
+    const shippingPhone = formatMobileWithCountryCode(getCustomerMobileForAddr(sAddr), shippingCountry || sAddr.country || 'India');
     const custEmail = cust.email || cust.email_address || cust.contact_email || '';
 
     // Issued by (use sales_credit_person from saved quotation or selected employee in form)
@@ -1438,6 +1779,10 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const issuerName = (issuerObj && ((issuerObj.firstname || issuerObj.first_name) ? `${issuerObj.firstname || issuerObj.first_name} ${issuerObj.lastname || issuerObj.last_name || ''}`.trim() : (issuerObj.name || issuerObj.Name || '')) ) || '';
     const issuerPhone = issuerObj.mobile || issuerObj.mobile_number || issuerObj.phone || issuerObj.contact || '';
     const issuerEmail = issuerObj.email || issuerObj.email_address || '';
+    const issuedByLines = [issuerName, issuerPhone, issuerEmail]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean);
+    const issuedByHtml = issuedByLines.length ? issuedByLines.map((line) => `<div>${line}</div>`).join('') : '-';
     
     const companyName = printerHeader?.header_title || (branch.name || branch.company_name) || company.company_name || 'Canares Automation Pvt Ltd';
     const branchName = printerHeader?.header_subtitle || (branch.name || branch.branch_name || '');
@@ -1449,8 +1794,14 @@ const handleTandCClose = () => setOpenTandCModal(false);
     const companyPhone = printerHeader?.mobile || branch.phone || company.phone || '';
     const companyEmail = printerHeader?.email || branch.email || company.email || '';
     const companyWebsite = printerHeader?.website || company.website || '';
-    const companyLogo = normalizeImageUrl(printerHeader?.logo_data || null);
+    const headerLogos = getHeaderLogoList(printerHeader);
+    const selectedHeaderLogo = headerLogos[Number(printConfig?.headerImageIndex) || 0]?.data || printerHeader?.logo_data || null;
+    const companyLogo = normalizeImageUrl(selectedHeaderLogo);
     const headerAlignment = printerHeader?.alignment || 'left';
+    const safeSignatureImageUrl = signatureImageUrl ? String(signatureImageUrl).replace(/"/g, '&quot;') : '';
+    const signatureImageHtml = safeSignatureImageUrl
+      ? `<img class="signature-image" src="${safeSignatureImageUrl}" alt="Digital Signature" />`
+      : '';
     
     // Bank details
     const bankB = q.company_branch_bank || branch.company_branch_bank || selectedBank || {};
@@ -1491,182 +1842,527 @@ const handleTandCClose = () => setOpenTandCModal(false);
 
     const taxableAmount = subtotalVal;
     const totalTax = Number(q.tax_amount || items.reduce((s, it) => s + (Number(it.tax_amount) || (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0))), 0));
-    
-    // TAX SPLIT LOGIC
-    let cgst = 0, sgst = 0, igst = 0;
-    if (isGSTStateMatch) {
-        cgst = totalTax / 2;
-        sgst = totalTax / 2;
-    } else {
-        igst = totalTax;
+
+    let cgst = Number(q.cgst_amount || 0);
+    let sgst = Number(q.sgst_amount || 0);
+    let igst = Number(q.igst_amount || 0);
+
+    if (cgst === 0 && sgst === 0 && igst === 0) {
+      cgst = items.reduce((s, it) => s + Number(it.cgst || 0), 0);
+      sgst = items.reduce((s, it) => s + Number(it.sgst || 0), 0);
+      igst = items.reduce((s, it) => s + Number(it.igst || 0), 0);
     }
 
-    const grandTotalVal = Number(q.grand_total || (taxableAmount + totalTax));
+    const getGstinStateCode = (gstin) => {
+      const gstinStr = String(gstin || '').trim();
+      const match = gstinStr.match(/^(\d{2})/);
+      return match ? match[1] : '';
+    };
+    const normalizeState = (v) => String(v || '').trim().toLowerCase();
+    const sellerStateCode = getGstinStateCode(branchGSTIN);
+    const buyerStateCode = getGstinStateCode(shippingGSTIN || billingGSTIN);
+    const isIntraStateByCode = !!(sellerStateCode && buyerStateCode && sellerStateCode === buyerStateCode);
+    const isIntraStateByName = !!(normalizeState(branchState) && normalizeState(shippingState) && normalizeState(branchState) === normalizeState(shippingState));
+    const inferredIntraState = isIntraStateByCode || (!sellerStateCode && !buyerStateCode && isIntraStateByName) || !!isGSTStateMatch;
+
+    let displayCgst = cgst;
+    let displaySgst = sgst;
+    let displayIgst = igst;
+    if (totalTax > 0 && displayCgst === 0 && displaySgst === 0 && displayIgst === 0) {
+      if (inferredIntraState) {
+        displayCgst = totalTax / 2;
+        displaySgst = totalTax / 2;
+      } else {
+        displayIgst = totalTax;
+      }
+    }
+
     const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 0), 0);
-    
+
     const extraChargesArr = Array.isArray(q.extra_charges || extrcharges) ? (q.extra_charges || extrcharges) : [];
     const discountsArr = Array.isArray(q.discounts || additiondiscounts) ? (q.discounts || additiondiscounts) : [];
+    const toNumber = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const summaryBaseTotal = toNumber(taxableAmount) + toNumber(totalTax);
+    const extraChargesTotal = extraChargesArr.reduce((sum, c) => {
+      const val = toNumber(c?.value);
+      return sum + (c?.type === 'percent' ? (summaryBaseTotal * val / 100) : val);
+    }, 0);
+    const discountsTotal = discountsArr.reduce((sum, d) => {
+      const val = toNumber(d?.value);
+      return sum + (d?.type === 'percent' ? (summaryBaseTotal * val / 100) : val);
+    }, 0);
+    const roundOffAmount = toNumber(q.roundoff_amount);
+    const computedGrandTotal = summaryBaseTotal + extraChargesTotal - discountsTotal + roundOffAmount;
+    const storedGrandTotal = toNumber(q.grand_total);
+    const grandTotalVal = Math.abs(storedGrandTotal - computedGrandTotal) < 0.01 ? storedGrandTotal : computedGrandTotal;
 
     const itemRows = items.map((item, idx) => {
       const quantity = Number(item.quantity || item.qty) || 0;
       const rate = Number(item.rate) || 0;
       const itemTotal = quantity * rate;
       const discountPct = Number(item.discount_percentage || item.discountPercent || 0);
+      const discountPerUnit = rate * (discountPct / 100);
       const discountAmt = itemTotal * (discountPct / 100);
       const taxable = itemTotal - discountAmt;
       const taxAmount = Number(item.tax_amount || (Number(item.cgst||0) + Number(item.sgst||0) + Number(item.igst||0)));
       const finalAmount = Number(item.line_total || item.amount || (taxable + taxAmount));
+      const fixedRateValue = Number(
+        item.fixedRate ??
+        item.fixed_rate ??
+        item.fixed_price ??
+        item.fixedPrice ??
+        item.FixedRate ??
+        item.fixedrate ??
+        item.rate ??
+        item.unit_price ??
+        item.product?.fixed_rate ??
+        item.product?.FixedRate ??
+        item.product?.PurchaseCost ??
+        item.product?.StdSalesPrice ??
+        0
+      );
       
       const imgUrl = getProductImage(item.product || item);
-      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="max-width: 50px; max-height: 50px; object-fit: contain;" />` : '-';
+      const imgHtml = imgUrl ? `<img src="${imgUrl}" style="width: 25px; height: 25px; max-width: 25px; max-height: 25px; object-fit: contain; display: block; margin: 0 auto;" />` : '-';
 
       return `
         <tr>
           <td style="text-align: center;">${idx + 1}</td>
-          <td style="text-align: center;">${imgHtml}</td>
+          ${printConfig.image ? `<td style="text-align: center; padding: 2px; vertical-align: middle;">${imgHtml}</td>` : ''}
           <td>${item.product_name || item.name || item.description || item.desc || '-'}</td>
-          ${printConfig.itemCode ? `<td>${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
-          ${printConfig.hsnSac ? `<td>${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
-          <td style="text-align: center;">${quantity}</td>
-          <td>${item.unit || 'Nos'}</td>
-          ${printConfig.itemFixedRate ? `<td style="text-align: right;">${(Number(item.fixedRate || item.fixed_rate || item.fixed_price || item.fixedPrice || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.itemRate ? `<td style="text-align: right;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.discountRate ? `<td style="text-align: right;">${Math.round(discountPct)}%</td>` : ''}
-          ${printConfig.discountAmt ? `<td style="text-align: right;">${discountAmt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.taxableAmt ? `<td style="text-align: right;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
-          ${printConfig.gstAmounts ? `<td style="text-align: right;">${(item.gst || 0)}%</td>` : ''}
-          ${printConfig.leadTime ? `<td>${item.lead_time || item.leadTime || '-'}</td>` : ''}
-          <td style="text-align: right;"><strong>${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></td>
+          ${printConfig.itemCode ? `<td class="col-item-code" style="text-align: center;">${item.product_code || item.item_code || item.sku || '-'}</td>` : ''}
+          ${printConfig.hsnSac ? `<td class="col-hsn" style="text-align: center;">${item.hsncode || item.hsn_code || item.hsn || '-'}</td>` : ''}
+          <td class="col-qty" style="text-align: center;">${quantity}</td>
+          <td class="col-unit" style="text-align: center;">${item.unit || 'Nos'}</td>
+          ${printConfig.itemFixedRate ? `<td class="col-fixed-rate" style="text-align: center;">${fixedRateValue.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.itemRate ? `<td class="col-rate" style="text-align: center;">${rate.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.discountRate ? `<td class="col-disc-pct" style="text-align: center;">${Math.round(discountPct)}%</td>` : ''}
+          ${printConfig.discountAmt ? `<td class="col-disc-amt" style="text-align: center;">${discountPerUnit.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.taxableAmt ? `<td class="col-taxable" style="text-align: center;">${taxable.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>` : ''}
+          ${printConfig.gstAmounts ? `<td class="col-gst" style="text-align: center;">${(item.gst || 0)}%</td>` : ''}
+          ${printConfig.leadTime ? `<td class="col-lead-time" style="text-align: center;">${item.lead_time || item.leadTime || '-'}</td>` : ''}
+          <td class="col-amount" style="text-align: center;">${finalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
         </tr>
       `;
     }).join('');
     
     // Count columns for the "No items" row
-    const colCount = 5 + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
+    const colCount = 4 + (printConfig.image?1:0) + (printConfig.itemCode?1:0) + (printConfig.hsnSac?1:0) + (printConfig.itemRate?1:0) + (printConfig.itemFixedRate?1:0) + (printConfig.discountRate?1:0) + (printConfig.discountAmt?1:0) + (printConfig.taxableAmt?1:0) + (printConfig.gstAmounts?1:0) + (printConfig.leadTime?1:0);
 
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>${docType} ${q.quotation_number || qutationNo}</title>
+        <title>${docType} ${quotationNumber}</title>
           <style>
+          :root {
+            --pdf-font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            --pdf-text-color: #1f2937;
+            --pdf-muted-color: #6b7280;
+            --pdf-border-color: #a0a2a5;
+            --pdf-panel-bg: #f9fafb;
+            --pdf-alt-row-bg: #f9fafb;
+            --pdf-label-bg: #e5e7eb;
+            --pdf-heading-color: #111827;
+            --pdf-body-size: 10px;
+            --pdf-small-size: 9px;
+            --pdf-heading-size: 11px;
+            --pdf-title-size: 20px;
+            --pdf-summary-size: 10px;
+            --pdf-logo-width: 200px;
+            --pdf-logo-height: 90px;
+          }
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px 20px 60px 20px; color: #000; background: #fff; }
-          .pdf-footer { position: fixed; left: 20px; right: 20px; bottom: 12px; text-align: center; font-size: 10px; color: #333; font-style: italic; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #333; margin-bottom: 20px; gap: 20px; }
-          .branch-info { flex: 0 0 auto; max-width: 50%; }
-          .branch-info h2 { font-size: 16px; color: #333; margin-bottom: 8px; font-weight: 700; }
-          .branch-info p { font-size: 10px; line-height: 1.6; margin: 3px 0; color: #333; }
-          .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 20px 0; text-transform: uppercase; color: #333; letter-spacing: 1px; }
-          .quotation-details { min-width: 300px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-          .quotation-details table { width: 100%; font-size: 10px; border-collapse: collapse; background: #fff; }
-          .quotation-details td { padding: 6px 10px; border: 1px solid #ddd; }
-          .quotation-details td:first-child { font-weight: 600; background: #E3F2FD; white-space: nowrap; width: 45%; color: #333; }
-          .quotation-details td:last-child { color: #333; }
-          .addresses { display: flex; justify-content: space-between; margin: 10px 0; gap: 0px; }
-          .address-box { flex: 1; border: 1px solid #333; padding: 12px; background: #FAFAFA; }
-          .address-box h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase; color: #333; }
-          .address-box p { font-size: 10px; line-height: 1.7; margin: 4px 0; color: #333; }
-          table.items { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-          table.items th, table.items td { border: 1px solid #ccc; padding: 8px 6px; }
-          table.items th { background: linear-gradient(to bottom, #333, #333); color: #fff; font-weight: 600; text-align: center; font-size: 10px; }
-          table.items tbody tr:nth-child(even) { background: #F5F5F5; }
+          html, body { width: 99%; max-width: 99%; overflow-x: hidden; }
+          body { font-family: var(--pdf-font-family); font-size: var(--pdf-body-size); line-height: 1.3; padding: 8px; color: var(--pdf-text-color); background: #fff; }
+          
+          /* Header Logo - positioned at top with 0 space */
+          .pdf-header-logo-wrap { 
+            width: var(--pdf-logo-width); 
+            height: var(--pdf-logo-height); 
+            overflow: hidden; 
+            display: flex; 
+            align-items: flex-start; 
+            justify-content: center; 
+            margin: 0; 
+            padding: 0;
+          }
+          .pdf-header-logo { 
+            width: 100%; 
+            height: 100%; 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            object-position: top center; 
+            display: block; 
+          }
+          
+          /* Company Info - compact and single line where possible */
+          .branch-info { flex: 1 1 0; min-width: 0; max-width: none; }
+          .branch-info h2 { 
+            font-size: 12px; 
+            color: var(--pdf-heading-color); 
+            margin-bottom: 3px; 
+            font-weight: 700; 
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .branch-info p { 
+            font-size: 9px; 
+            line-height: 1.35; 
+            margin: 1px 0; 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          
+          /* Document Title */
+          .doc-title { 
+            text-align: center;
+            font-size: var(--pdf-title-size); 
+            font-weight: 700; 
+            margin: 8px 0 20px 0; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+            letter-spacing: 1px; 
+          }
+          
+          /* Top Right Table - smaller */
+          .quotation-details { 
+            min-width: 0; 
+            max-width: 200px; 
+            border: 1px solid var(--pdf-border-color); 
+          }
+          .quotation-details table { 
+            width: 100%; 
+            font-size: 9px; 
+            border-collapse: collapse; 
+            background: #fff; 
+          }
+          .quotation-details td { 
+            padding: 4px 6px; 
+            border: 1px solid var(--pdf-border-color); 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          .quotation-details td:first-child { 
+            background: var(--pdf-label-bg); 
+            white-space: nowrap; 
+            width: 40%; 
+            color: var(--pdf-heading-color); 
+            font-weight: 400;
+          }
+          .quotation-details td:last-child { 
+            color: var(--pdf-text-color); 
+            overflow-wrap: anywhere; 
+            font-weight: 400;
+          }
+          
+          /* Addresses - smaller */
+          .addresses { 
+            display: flex; 
+            justify-content: space-between; 
+            margin: 6px 0 8px; 
+            gap: 0; 
+            border: 1px solid var(--pdf-border-color); 
+            background: var(--pdf-panel-bg); 
+            width: 100%; 
+            max-width: 100%; 
+          }
+          .address-box { 
+            flex: 1; 
+            min-width: 0; 
+            border: 0; 
+            padding: 8px; 
+            background: transparent; 
+          }
+          .address-box + .address-box { border-left: 1px solid var(--pdf-border-color); }
+          .address-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 4px; 
+            border-bottom: 1px solid var(--pdf-border-color); 
+            padding-bottom: 3px; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+          }
+          .address-box p { 
+            font-size: 9px; 
+            line-height: 1.35; 
+            margin: 1px 0; 
+            color: var(--pdf-text-color); 
+            overflow-wrap: anywhere; 
+            font-weight: 400;
+          }
+          
+          /* Items Table - fixed image size and column widths */
+          table.items { 
+            width: 100%; 
+            max-width: 100%; 
+            border-collapse: collapse; 
+            margin: 8px 0; 
+            font-size: 9px; 
+            border: 1px solid var(--pdf-border-color); 
+          }
+          table.items th, table.items td { 
+            border: 1px solid var(--pdf-border-color); 
+            padding: 4px 3px; 
+            white-space: normal; 
+            word-wrap: break-word; 
+            font-weight: 400;
+          }
+          table.items th { 
+            background: var(--pdf-label-bg); 
+            color: var(--pdf-heading-color); 
+            font-weight: 700; 
+            text-align: center; 
+            font-size: 9px; 
+          }
+          /* Flexible column widths for responsive layout */
+          table.items th:nth-child(1), table.items td:nth-child(1) { width: 24px; min-width: 24px; max-width: 24px; } /* No. */
+          ${printConfig.image ? `table.items th:nth-child(2), table.items td:nth-child(2) { width: 44px; min-width: 44px; max-width: 44px; padding: 6px !important; vertical-align: middle !important; } /* Image */` : ''}
+          table.items th:nth-child(${printConfig.image ? '3' : '2'}), table.items td:nth-child(${printConfig.image ? '3' : '2'}) { min-width: 50px; max-width: 200px; text-align: left; } /* Item & Description - flexible */
+          table.items .col-item-code { min-width: 50px; max-width: 90px; }
+          table.items .col-hsn { min-width: 50px; max-width: 90px; }
+          table.items .col-qty { min-width: 30px; max-width: 50px; }
+          table.items .col-unit { min-width: 34px; max-width: 60px; }
+          table.items .col-fixed-rate { min-width: 60px; max-width: 100px; }
+          table.items .col-rate { min-width: 48px; max-width: 80px; }
+          table.items .col-disc-pct { min-width: 50px; max-width: 80px; }
+          table.items .col-disc-amt { min-width: 55px; max-width: 90px; }
+          table.items .col-taxable { min-width: 55px; max-width: 90px; }
+          table.items .col-gst { min-width: 36px; max-width: 60px; }
+          table.items .col-lead-time { min-width: 55px; max-width: 90px; }
+          table.items .col-amount { min-width: 60px; max-width: 100px; }
+          
+          table.items tbody tr:nth-child(even) { background: var(--pdf-alt-row-bg); }
           table.items tbody tr:nth-child(odd) { background: #fff; }
-          table.items tbody tr:hover { background: #E3F2FD; }
-          table.items td { vertical-align: middle; color: #333; }
-          .three-col { display: flex; gap: 0px; margin: 10px 0; }
-          .three-col > div { border: 1px solid #333; padding: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-          .three-col h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #333; padding-bottom: 4px; text-transform: uppercase; }
+          table.items td { vertical-align: middle; color: var(--pdf-text-color); }
+          
+          /* Fixed image size - fits within the 44px column with padding for spacing */
+          table.items img { 
+            width: 32px !important; 
+            height: 32px !important; 
+            max-width: 32px !important; 
+            max-height: 32px !important; 
+            object-fit: contain !important; 
+            display: block !important; 
+            margin: 0 auto !important;
+          }
+          
+          /* Three Column Section */
+          .three-col { 
+            display: flex; 
+            gap: 0; 
+            margin-top: 8px; 
+            border: 1px solid var(--pdf-border-color); 
+            background: #fff; 
+            width: 100%; 
+            max-width: 100%; 
+          }
+          .three-col > div { 
+            flex: 1 1 0; 
+            min-width: 0; 
+            border: 0; 
+            padding: 8px; 
+            background: #fff; 
+          }
+          .three-col > div + div { border-left: 1px solid var(--pdf-border-color); }
+          .three-col h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 4px; 
+            color: var(--pdf-heading-color); 
+            padding-bottom: 2px; 
+            text-transform: uppercase; 
+          }
+          
+          /* Bank Details - single line per row */
           .bank-details { flex: 1; }
-          .bank-details table { width: 100%; font-size: 10px; margin-top: 8px; }
-          .bank-details td { padding: 4px 6px; }
-          .bank-details td:first-child { font-weight: 600; color: #555; width: 45%; }
-          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: center; }
-          .amount-words-box > div { padding: 10px; }
-          .amount-words-box strong { display: block; font-size: 11px; color: #F57F17; margin-bottom: 8px; }
-          .amount-words-box div div { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; }
+          .bank-details p { 
+            font-size: 9px; 
+            line-height: 1.4; 
+            margin: 2px 0; 
+            color: var(--pdf-text-color); 
+            font-weight: 400;
+          }
+          .bank-details p span { 
+            display: inline; 
+            font-weight: 400; 
+          }
+          
+          /* Amount in Words */
+          .amount-words-box { flex: 1; display: flex; justify-content: flex-start; text-align: left; }
+          .amount-words-box > div { padding: 0; }
+          .amount-words-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            color: var(--pdf-heading-color); 
+            margin-bottom: 4px; 
+          }
+          .amount-words-box .amount-words-text { 
+            font-size: 10px; 
+            color: var(--pdf-text-color); 
+            line-height: 1.4; 
+            font-weight: 400;
+          }
+          
+          /* Summary */
           .summary { flex: 1; }
-          .summary table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; }
-          .summary td { padding: 6px 10px; border: 1px solid #ddd; }
-          .summary td:first-child { text-align: left; font-weight: 500; background: #F5F5F5; color: #555; }
-          .summary td:last-child { text-align: right; font-weight: 600; color: #333; }
-          .summary .grand-total td { background: linear-gradient(to right, #333, #333); color: #fff; font-weight: 700; font-size: 13px; border-top: 3px solid #333; }
-          .terms { margin: 10px 0; border: 1px solid #333; padding: 15px; background: #FAFAFA; }
-          .terms h3 { font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: #333; padding-bottom: 5px; }
-          .terms p, .terms div { font-size: 10px; line-height: 1.8; white-space: pre-line; color: #333; margin: 4px 0; }
-          .terms .tc-columns { column-count: 2; column-gap: 20px; }
-          .terms .tc-columns > div { break-inside: avoid-column; -webkit-column-break-inside: avoid; padding-bottom: 6px; }
-          .notes-signature { display: flex; gap: 0px; margin-top: 10px; }
-          .notes { flex: 2; border: 1px solid #333; padding: 15px; min-height: 100px; background: #FAFAFA; }
-          .notes strong { display: block; font-size: 11px; color: #333; margin-bottom: 8px; padding-bottom: 4px; }
-          .notes p { font-size: 10px; line-height: 1.7; color: #333; }
-          .authorized-sign { flex: 1; border: 1px solid #333; padding: 15px; text-align: center; background: #FAFAFA; }
-          .authorized-sign > p:first-child { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 10px; }
-          .authorized-sign .sign-line { display: inline-block; margin-top: 50px; border-top: 2px solid #333; padding-top: 8px; min-width: 200px; font-weight: 700; font-size: 11px; color: #333; }
-          .authorized-sign > div { margin-top: 10px; font-style: italic; color: #666; font-size: 9px; }
+          .summary table { 
+            width: 100%; 
+            font-size: 9px; 
+            border-collapse: collapse; 
+            margin-top: 4px; 
+          }
+          .summary td { 
+            padding: 4px 6px; 
+            border: 1px solid var(--pdf-border-color); 
+            font-weight: 400;
+          }
+          .summary td:first-child { 
+            text-align: left; 
+            background: var(--pdf-panel-bg); 
+            color: var(--pdf-text-color); 
+          }
+          .summary td:last-child { 
+            text-align: right; 
+            color: var(--pdf-heading-color); 
+          }
+          .summary .grand-total td { 
+            background: var(--pdf-label-bg); 
+            color: var(--pdf-heading-color); 
+            font-size: 10px; 
+            border-top: 2px solid var(--pdf-heading-color); 
+            font-weight: 600;
+          }
+          
+          /* Bottom Layout */
+          .bottom-layout { border: 1px solid var(--pdf-border-color); border-top: 0; }
+          .bottom-row { display: flex; gap: 0; width: 100%; max-width: 100%; }
+          .bottom-row + .bottom-row { border-top: 1px solid var(--pdf-border-color); }
+          .bottom-cell { flex: 1 1 0; min-width: 0; border: 0; padding: 8px; background: #fff; }
+          .bottom-cell + .bottom-cell { border-left: 1px solid var(--pdf-border-color); }
+          .terms-box h3, .notes-box h3 { 
+            font-size: var(--pdf-heading-size); 
+            font-weight: 700; 
+            margin-bottom: 6px; 
+            text-transform: uppercase; 
+            color: var(--pdf-heading-color); 
+          }
+          .terms-box p, .terms-box div, .notes-box p, .notes-box div { 
+            font-size: 9px; 
+            line-height: 1.4; 
+            white-space: pre-line; 
+            color: var(--pdf-text-color); 
+            margin: 1px 0; 
+            font-weight: 400;
+          }
+          .terms-box { min-height: 80px; }
+          .notes-box { min-height: 80px; }
+          .bottom-row.signature-row .bottom-cell { min-height: 110px; }
+          .footer-note { 
+            display: flex; 
+            align-items: flex-end; 
+            font-size: 9px; 
+            color: var(--pdf-muted-color); 
+            font-style: italic; 
+            min-height: 100%; 
+            padding-bottom: 4px; 
+            font-weight: 400;
+          }
+          .footer-note span { display: block; font-weight: 400; }
+          .authorized-sign { 
+            min-height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: flex-start; 
+            align-items: flex-end; 
+            text-align: center; 
+          }
+          .authorized-sign > p:first-child { 
+            align-self: flex-end; 
+            font-size: 9px; 
+            color: var(--pdf-text-color); 
+            margin-bottom: 8px; 
+            font-weight: 400;
+          }
+          .authorized-sign .signature-space { 
+            width: 150px; 
+            min-height: 50px; 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: center; 
+            margin-bottom: 8px; 
+          }
+          .authorized-sign .signature-image { 
+            max-width: 140px; 
+            max-height: 46px; 
+            object-fit: contain; 
+            display: block; 
+          }
+          .authorized-sign .sign-line { 
+            align-self: flex-end; 
+            padding-top: 4px; 
+            min-width: 150px; 
+            font-size: 9px; 
+            color: var(--pdf-heading-color); 
+            border-top: 1px solid var(--pdf-border-color); 
+            text-align: center; 
+            font-weight: 400;
+          }
+          @media (max-width: 900px) {
+            .pdf-header-logo-wrap { width: 150px; height: 70px; }
+          }
           @media print {
-            body { padding: 10px; }
-            @page { margin: 10mm; }
-            table.items tbody tr:hover { background: inherit; }
+            body { padding: 0; }
+            @page { margin: 8mm; }
           }
         </style>
       </head>
       <body>
         ${printConfig.header ? `
-        <div class="header">
-          ${headerAlignment === 'right' ? `
-            ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
-            <div class="branch-info" style="text-align: right; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
-              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
-              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
-              ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
-              ${companyPhone ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Phone:</strong> ${companyPhone}</p>` : ''}
-              ${companyEmail ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Email:</strong> ${companyEmail}</p>` : ''}
-              ${companyWebsite ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Website:</strong> ${companyWebsite}</p>` : ''}
-            </div>
-          ` : `
-            <div class="branch-info" style="text-align: left; padding: 0 10px;">
-              <h2 style="font-size: 14px; color: #333; margin-bottom: 6px;">${branchName || companyName}</h2>
-              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${branchAddress}</p>
-              <p style="font-size: 10px; line-height: 1.5; margin: 2px 0;">${[branchCity, branchState, branchPincode].filter(Boolean).join(', ')}</p>
-              ${branchGSTIN ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>GSTIN:</strong> ${branchGSTIN}</p>` : ''}
-              ${companyPhone ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Phone:</strong> ${companyPhone}</p>` : ''}
-              ${companyEmail ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Email:</strong> ${companyEmail}</p>` : ''}
-              ${companyWebsite ? `<p style="font-size: 10px; line-height: 1.5; margin: 2px 0;"><strong>Website:</strong> ${companyWebsite}</p>` : ''}
-            </div>
-            ${companyLogo ? `<div style="flex: 0 0 auto;"><img src="${companyLogo}" style="max-height: 80px; max-width: 200px;" /></div>` : '<div style="flex: 0 0 auto;"></div>'}
-          `}
-        </div>
+        <div class="doc-title">${docType.toUpperCase()}</div>
 
-        <div style="display:flex; align-items:flex-start; gap:20px; margin-bottom: 15px;">
-          <div style="width:260px;"></div>
-          <div style="flex:1; text-align:center;">
-            <div class="doc-title">${docType.toUpperCase()}</div>
+        <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; border-bottom:1px solid var(--pdf-border-color); padding-bottom:10px;">
+          <div class="branch-info" style="flex:1; min-width:0; text-align:left;">
+            <h2>${branchName || companyName}</h2>
+            <p>${branchAddress}${[branchCity, branchState, branchPincode].filter(Boolean).length ? ', ' + [branchCity, branchState, branchPincode].filter(Boolean).join(', ') : ''}</p>
+            ${branchGSTIN ? `<p>GSTIN: ${branchGSTIN}</p>` : ''}
+            ${companyPhone ? `<p>Phone: ${companyPhone}</p>` : ''}
+            ${companyEmail ? `<p>Email: ${companyEmail}</p>` : ''}
+            ${companyWebsite ? `<p>Website: ${companyWebsite}</p>` : ''}
           </div>
-          <div style="width:260px;">
-            <div class="quotation-details" style="min-width:250px;">
+          <div style="flex:1; display:flex; align-items:flex-start; justify-content:center;">
+            ${companyLogo ? `<div class="pdf-header-logo-wrap"><img src="${companyLogo}" alt="${companyName}" class="pdf-header-logo" width="200" height="90" /></div>` : ''}
+          </div>
+          <div style="flex:1; display:flex; justify-content:flex-end;">
+            <div class="quotation-details">
               <table>
-                <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
+                <tr><td>${docType} No.</td><td>${quotationNumber || '-'}</td></tr>
                 <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
                 ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
                 <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
-                <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
+                <tr><td>Issued By</td><td>${issuedByHtml}</td></tr>
               </table>
             </div>
           </div>
         </div>
         ` : `
         <div class="doc-title">${docType.toUpperCase()}</div>
-        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
-          <div class="quotation-details" style="min-width:250px;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+          <div class="quotation-details">
             <table>
-              <tr><td>${docType} No.</td><td>${q.quotation_number || qutationNo || '-'}</td></tr>
+              <tr><td>${docType} No.</td><td>${quotationNumber || '-'}</td></tr>
               <tr><td>Date</td><td>${quotationDate ? new Date(quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}</td></tr>
               ${printConfig.validTill ? `<tr><td>Valid Till</td><td>${validTill ? new Date(validTill).toLocaleDateString('en-IN') : '-'}</td></tr>` : ''}
               <tr><td>Ref.</td><td>${references || q.references || '-'}</td></tr>
-              <tr><td>Issued By</td><td>${issuerName ? `${issuerName}${issuerPhone ? ' • ' + issuerPhone : ''}${issuerEmail ? ' • ' + issuerEmail : ''}` : '-'}</td></tr>
+              <tr><td>Issued By</td><td>${issuedByHtml}</td></tr>
             </table>
           </div>
         </div>
@@ -1676,27 +2372,27 @@ const handleTandCClose = () => setOpenTandCModal(false);
         <div class="addresses">
           <div class="address-box">
             <h3>Billing Address</h3>
-            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
-            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
+            ${billingCompanyName ? `<p style="font-weight:600; margin-bottom:4px;">${billingCompanyName}</p>` : ''}
+            ${billingPersonName ? `<p style="margin-bottom:4px;">${billingPersonName}</p>` : ''}
             ${billingAddress1 ? `<p>${billingAddress1}</p>` : ''}
             ${billingAddress2 ? `<p>${billingAddress2}</p>` : ''}
             ${billingAddress3 ? `<p>${billingAddress3}</p>` : ''}
-            <p>${[billingCity, billingState, billingCountry, billingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
-            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${billingGSTIN}</p>` : ''}
+            <p>${[billingCity, billingState, [billingCountry, billingPincode].filter(Boolean).join(' - ')].filter(Boolean).join(', ')}</p>
+            ${printConfig.mobile && billingPhone ? `<p>Mobile: ${billingPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p>Email: ${custEmail}</p>` : ''}
+            ${printConfig.gstin && billingGSTIN && billingGSTIN !== '-' ? `<p>GSTIN: ${billingGSTIN}</p>` : ''}
           </div>
           <div class="address-box">
             <h3>Shipping Address</h3>
-            ${customerName ? `<p style="font-weight:700; margin-bottom:6px;">${customerName}</p>` : ''}
-            ${(() => { const cn = (cust.contact_person || cust.contactPerson || cust.contact || `${(cust.firstname||'').trim()} ${(cust.lastname||'').trim()}`.trim()); return cn ? `<p style="margin-bottom:6px;"><strong></strong> ${cn}</p>` : ''; })()}
+            ${shippingCompanyName ? `<p style="font-weight:600; margin-bottom:4px;">${shippingCompanyName}</p>` : ''}
+            ${shippingPersonName ? `<p style="margin-bottom:4px;">${shippingPersonName}</p>` : ''}
             ${shippingAddress1 ? `<p>${shippingAddress1}</p>` : ''}
             ${shippingAddress2 ? `<p>${shippingAddress2}</p>` : ''}
             ${shippingAddress3 ? `<p>${shippingAddress3}</p>` : ''}
-            <p>${[shippingCity, shippingState, shippingCountry, shippingPincode].filter(Boolean).join(', ')}</p>
-            ${printConfig.mobile && custPhone ? `<p><strong>Phone:</strong> ${custPhone}</p>` : ''}
-            ${printConfig.email && custEmail ? `<p><strong>Email:</strong> ${custEmail}</p>` : ''}
-            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p><strong>GSTIN:</strong> ${shippingGSTIN}</p>` : ''}
+            <p>${[shippingCity, shippingState, [shippingCountry, shippingPincode].filter(Boolean).join(' - ')].filter(Boolean).join(', ')}</p>
+            ${printConfig.mobile && shippingPhone ? `<p>Mobile: ${shippingPhone}</p>` : ''}
+            ${printConfig.email && custEmail ? `<p>Email: ${custEmail}</p>` : ''}
+            ${printConfig.gstin && shippingGSTIN && shippingGSTIN !== '-' ? `<p>GSTIN: ${shippingGSTIN}</p>` : ''}
           </div>
         </div>
         ` : ''}
@@ -1705,20 +2401,20 @@ const handleTandCClose = () => setOpenTandCModal(false);
           <thead>
             <tr>
               <th>No.</th>
-              <th>Image</th>
+              ${printConfig.image ? `<th>Image</th>` : ''}
               <th>Item & Description</th>
-              ${printConfig.itemCode ? `<th>Item Code</th>` : ''}
-              ${printConfig.hsnSac ? `<th>HSN / SAC</th>` : ''}
-              <th>Qty</th>
-              <th>Unit</th>
-              ${printConfig.itemFixedRate ? `<th>Fixed Rate (₹)</th>` : ''}
-              ${printConfig.itemRate ? `<th>Rate (₹)</th>` : ''}
-              ${printConfig.discountRate ? `<th>Discount %</th>` : ''}
-              ${printConfig.discountAmt ? `<th>Discount (₹)</th>` : ''}
-              ${printConfig.taxableAmt ? `<th>Taxable (₹)</th>` : ''}
-              ${printConfig.gstAmounts ? `<th>GST %</th>` : ''}
-              ${printConfig.leadTime ? `<th>Lead Time</th>` : ''}
-              <th>Amount (₹)</th>
+              ${printConfig.itemCode ? `<th class="col-item-code">Item Code</th>` : ''}
+              ${printConfig.hsnSac ? `<th class="col-hsn">HSN / SAC</th>` : ''}
+              <th class="col-qty">Qty</th>
+              <th class="col-unit">Unit</th>
+              ${printConfig.itemFixedRate ? `<th class="col-fixed-rate">Fixed Rate (₹)</th>` : ''}
+              ${printConfig.itemRate ? `<th class="col-rate">Rate (₹)</th>` : ''}
+              ${printConfig.discountRate ? `<th class="col-disc-pct">Discount %</th>` : ''}
+              ${printConfig.discountAmt ? `<th class="col-disc-amt">Discounted (₹)</th>` : ''}
+              ${printConfig.taxableAmt ? `<th class="col-taxable">Taxable (₹)</th>` : ''}
+              ${printConfig.gstAmounts ? `<th class="col-gst">GST %</th>` : ''}
+              ${printConfig.leadTime ? `<th class="col-lead-time">Lead Time</th>` : ''}
+              <th class="col-amount">Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -1730,74 +2426,74 @@ const handleTandCClose = () => setOpenTandCModal(false);
           ${printConfig.bankDetails ? `
           <div class="bank-details">
             <h3>Bank Details</h3>
-            <table>
-              <tr><td>Bank Name</td><td>${bankName || '-'}</td></tr>
-              <tr><td>Branch</td><td>${bankBranch || '-'}</td></tr>
-              <tr><td>Account No.</td><td>${accountNo || '-'}</td></tr>
-              ${ifscCode ? `<tr><td>IFSC Code</td><td>${ifscCode}</td></tr>` : ''}
-              ${swiftCode ? `<tr><td>SWIFT Code</td><td>${swiftCode}</td></tr>` : ''}
-            </table>
+            ${bankName ? `<p>Bank Name: ${bankName}</p>` : ''}
+            ${bankBranch ? `<p>Branch: ${bankBranch}</p>` : ''}
+            ${accountNo ? `<p>Account No.: ${accountNo}</p>` : ''}
+            ${ifscCode ? `<p>IFSC Code: ${ifscCode}</p>` : ''}
+            ${swiftCode ? `<p>SWIFT Code: ${swiftCode}</p>` : ''}
+            ${!bankName && !bankBranch && !accountNo && !ifscCode && !swiftCode ? `<p style="text-align:center;color:#999;margin-top:20px;">Not Available</p>` : ''}
           </div>
           ` : `<div class="bank-details"><h3>Bank Details</h3><p style="text-align:center;color:#999;margin-top:20px;">Not Available</p></div>`}
 
           <div class="amount-words-box">
-             <div style="padding: 0"><h3 style="margin: 0; text-align: left;">Amount in Words</h3><br><div><h5>Rupees ${numberToWords(grandTotalVal)} only</h5></div></div>
+             <div style="padding: 0"><h3>Amount in Words</h3><div class="amount-words-text">Rupees ${numberToWords(grandTotalVal, roundOffAmount === 0)} only</div></div>
           </div>
 
           <div class="summary">
             <h3>Summary</h3>
             <table>
-              <tr><td>Total Amount before Tax</td><td>₹ ${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              <tr><td>Total Amount before Tax (₹)</td><td>${taxableAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
               ${printConfig.totalQuantity ? `<tr><td>Total Quantity</td><td>${totalQuantity}</td></tr>` : ''}
 
               ${printConfig.gstSummary ? `
-                ${igst > 0 ? `<tr><td>iGST</td><td>₹ ${igst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-                ${cgst > 0 ? `<tr><td>CGST</td><td>₹ ${cgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-                ${sgst > 0 ? `<tr><td>SGST</td><td>₹ ${sgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
-                <tr><td>Total Tax Amount</td><td>₹ ${totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+                ${displayIgst > 0 ? `<tr><td>IGST (₹)</td><td>${displayIgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${displayCgst > 0 ? `<tr><td>CGST (₹)</td><td>${displayCgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+                ${displaySgst > 0 ? `<tr><td>SGST (₹)</td><td>${displaySgst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
               ` : ''}
 
-              <tr style="border-top: 1px solid #000;"><td>Total</td><td>₹ ${(taxableAmount + totalTax).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              <tr style="border-top: 1px solid #000;"><td>Total (₹)</td><td>${summaryBaseTotal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
 
               ${extraChargesArr.map(c => `
                 <tr>
                   <td>${c.title} (${c.type === 'percent' ? `${c.value}%` : `₹${c.value}`})</td>
-                  <td>₹ ${(c.type === 'percent' ? ((taxableAmount + totalTax) * c.value / 100) : Number(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                  <td>₹ ${(c.type === 'percent' ? (summaryBaseTotal * toNumber(c.value) / 100) : toNumber(c.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                 </tr>
               `).join('')}
 
               ${discountsArr.map(d => `
                 <tr>
                   <td>${d.title} (${d.type === 'percent' ? `${d.value}%` : `₹${d.value}`})</td>
-                  <td>- ₹ ${(d.type === 'percent' ? ((taxableAmount + totalTax) * d.value / 100) : Number(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                  <td>- ₹ ${(d.type === 'percent' ? (summaryBaseTotal * toNumber(d.value) / 100) : toNumber(d.value)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                 </tr>
               `).join('')}
 
-              ${q.roundoff_amount ? `<tr><td>Round off</td><td>₹ ${q.roundoff_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
+              ${roundOffAmount ? `<tr><td>Round off (₹)</td><td>${roundOffAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>` : ''}
 
-              <tr class="grand-total"><td>Grand Total</td><td>₹ ${grandTotalVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
+              <tr class="grand-total"><td>Grand Total (₹)</td><td>${grandTotalVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>
             </table>
           </div>
         </div>
 
-        <div class="terms">
-          <h3>Terms & Conditions</h3>
-          <div class="tc-columns">${termsAndConditionsHtml || '<p>-</p>'}</div>
-        </div>
-
-        <div class="notes-signature">
-          <div class="notes">
-            <strong>Additional Notes</strong>
-            ${printConfig.notes && (q.note || note || notesHtml) ? ((q.note || note) ? `<p>${q.note || note}</p>` : notesHtml.replace('<div style="margin-top: 10px;"><strong>Notes:</strong><br/>', '<p>').replace('</div>', '</p>')) : '<p style="color:#999;font-style:italic;">No additional notes</p>'}
+        <div class="bottom-layout">
+          <div class="bottom-row">
+            <div class="bottom-cell terms-box">
+              <h3>Terms & Conditions</h3>
+              ${termsAndConditionsHtml || '<p>-</p>'}
+            </div>
+            <div class="bottom-cell notes-box">
+              <h3>Additional Notes</h3>
+              ${printConfig.notes && (q.note || note || notesHtml) ? ((q.note || note) ? `<p>${q.note || note}</p>` : notesHtml.replace('<div style="margin-top: 10px;"><strong>Notes:</strong><br/>', '<p>').replace('</div>', '</p>')) : '<p style="color:#999;font-style:italic;">No additional notes</p>'}
+            </div>
           </div>
-          <div class="authorized-sign">
-            <p>For ${companyName}</p>
-            <div class="sign-line">Authorised Signatory</div>
-            ${printConfig.digitalSignature ? `<div>Digitally Signed</div>` : ''}
+          <div class="bottom-row signature-row">
+            <div class="bottom-cell footer-note"><span>This is a computer-generated quotation. E. &amp; O. E.</span></div>
+            <div class="bottom-cell authorized-sign">
+              <p>For ${companyName}</p>
+              <div class="signature-space">${signatureImageHtml}</div>
+              <div class="sign-line">Authorised Signatory</div>
+            </div>
           </div>
         </div>
-
-        <div class="pdf-footer">This is a computer-generated quotation. E. &amp; O. E.</div>
 
       </body>
       </html>
@@ -1811,6 +2507,36 @@ const handleTandCClose = () => setOpenTandCModal(false);
     w.document.close();
     w.focus();
     setTimeout(() => { try { w.print(); } catch (err) {} }, 800);
+  };
+
+  /** Excel export — implementation in {@link ./quotationExcelExport}. */
+  const exportQuotationToExcel = async (quotationDataFromSave = null) => {
+    return exportQuotationToExcelStyled({
+      q: quotationDataFromSave || {},
+      printConfig,
+      printerHeader,
+      docType,
+      quotationDate,
+      validTill,
+      references,
+      note,
+      tandcSelections,
+      extrcharges,
+      additiondiscounts,
+      tableItems,
+      selectedBranch,
+      selectedBank,
+      selectedEmployeeObj,
+      selectedBillingAddress,
+      selectedShippingAddress,
+      isSameAsBilling,
+      isGSTStateMatch,
+      qutationNo,
+      selectedCustomer,
+      gstForAddr,
+      getCustomerLegalGstin,
+      normalizeQuotationNumber,
+    });
   };
 
 const handleSaveQuotation = async () => {
@@ -1831,6 +2557,23 @@ const handleSaveQuotation = async () => {
   const roundoffAmount = includeRoundOff ? Number((Math.round(totalBeforeRound) - totalBeforeRound).toFixed(2)) : 0;
   const grandTotalToSend = includeRoundOff ? Number(Math.round(totalBeforeRound)) : Number(Number(totalBeforeRound).toFixed(2));
   const computedTaxAmount = tableItems.reduce((s, it) => s + (Number(it.cgst || 0) + Number(it.sgst || 0) + Number(it.igst || 0)), 0);
+  const savingAsRevise = isEditMode && isReviseMode;
+
+  const normalizedQuotationNumber = (() => {
+    const currentNumber = isEditMode
+      ? (qutationNo || quotationData?.quotation_number || '')
+      : (qutationNo && qutationNo.toString().trim() !== '' ? qutationNo : '');
+
+    if (!currentNumber) return null;
+
+    if (isEditMode || selectedSeries) {
+      return normalizeQuotationNumber(currentNumber);
+    }
+
+    return buildDocumentTypeQuotationNumber(docType, seqNumber || currentNumber);
+  })();
+
+  const quoteLifecycleStatus = savingAsRevise ? 'R' : isEditMode ? 'M' : 'C';
 
   const payload = {
     quotation: {
@@ -1838,17 +2581,18 @@ const handleSaveQuotation = async () => {
       company_branch_id: selectedBranch && (selectedBranch.id || selectedBranch.ID) ? Number(selectedBranch.id || selectedBranch.ID) : 0,
       company_id: selectedBranch && (selectedBranch.company_id || selectedBranch.companyID) ? Number(selectedBranch.company_id || selectedBranch.companyID) : 0,
       company_branch_bank_id: selectedBankId ? Number(selectedBankId) : null,
-      quotation_number: isEditMode ? (qutationNo || quotationData?.quotation_number || '') : (qutationNo && qutationNo.toString().trim() !== '' ? qutationNo : null),
+      quotation_number: normalizedQuotationNumber,
       quotation_date: new Date(quotationDate).toISOString(),
       customer_id: Number(selectedCustomer.id),
       sales_credit_person_id: selectedEmployee ? Number(selectedEmployee) : 0,
-      quotation_scp_count: isEditMode 
-        ? Number(currentScpCount?.max_quotation_scp_count || 0) 
+      quotation_scp_count: isEditMode && !savingAsRevise
+        ? Number(currentScpCount?.max_quotation_scp_count || 0)
         : Number(currentScpCount?.max_quotation_scp_count || 0) + 1,
       valid_until: new Date(validTill).toISOString(),
       contact_person: contactPerson,
       total_amount: Number(grandTotal) || 0,
       tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
+      include_roundoff: includeRoundOff,
       roundoff_amount: roundoffAmount,
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges,
@@ -1856,7 +2600,8 @@ const handleSaveQuotation = async () => {
       document_type: docType || null,
       type: docType || null,
       is_proforma: (docType && String(docType).toLowerCase().includes('proforma')) || false,
-      status: isEditMode ? (quotationData?.status || "Open") : "Open",
+      status: isEditMode && !savingAsRevise ? (quotationData?.status || "Open") : "Open",
+      quote_status: quoteLifecycleStatus,
       created_by: Number(selectedEmployee),
       billing_address_id: selectedBillingAddressId ? Number(selectedBillingAddressId) : 0,
       shipping_address_id: isSameAsBilling ? (selectedBillingAddressId ? Number(selectedBillingAddressId) : 0) : (selectedShippingAddressId ? Number(selectedShippingAddressId) : 0),
@@ -1894,14 +2639,14 @@ const handleSaveQuotation = async () => {
     setSaving(true);
     let savedQuotation = null;
     if (!selectedFile) {
-      if (isEditMode && id) {
+      if (isEditMode && id && !savingAsRevise) {
         const res = await axios.put(`${BASE_URL}/api/quotations/${id}`, payload);
         savedQuotation = res.data?.data || res.data;
-        alert("Quotation updated successfully.");
+        alert(`${docType} updated successfully.`);
       } else {
         const res = await axios.post(`${BASE_URL}/api/quotations`, payload);
-        savedQuotation = res.data?.data || res.data;
-        alert("Quotation saved successfully.");
+        savedQuotation = res.data?.quotation || res.data?.data || res.data;
+        alert(savingAsRevise ? `Revised ${docType} saved as a new document.` : `${docType} saved successfully.`);
       }
     } else {
       const formData = new FormData();
@@ -1909,19 +2654,19 @@ const handleSaveQuotation = async () => {
       formData.append("quotation_items", JSON.stringify(payload.quotation_items));
       formData.append("attachment", selectedFile);
 
-      if (isEditMode && id) {
+      if (isEditMode && id && !savingAsRevise) {
         const res = await axios.put(`${BASE_URL}/api/quotations/${id}`, formData);
         savedQuotation = res.data?.data || res.data;
-        alert("Quotation updated successfully.");
+        alert(`${docType} updated successfully.`);
       } else {
         const res = await axios.post(`${BASE_URL}/api/quotations`, formData);
-        savedQuotation = res.data?.data || res.data;
-        alert("Quotation saved successfully.");
+        savedQuotation = res.data?.quotation || res.data?.data || res.data;
+        alert(savingAsRevise ? `Revised ${docType} saved as a new document.` : `${docType} saved successfully.`);
       }
     }
 
     if (printAfterSave) {
-      generatePDF(savedQuotation);
+      await generatePDF(savedQuotation);
     }
 
     if (saveAsTemplate) {
@@ -1941,7 +2686,8 @@ const handleSaveQuotation = async () => {
     navigate("/quotation-list");
   } catch (err) {
     console.error(err?.response?.data || err);
-    alert(`Failed to ${isEditMode ? 'update' : 'save'} quotation.`);
+    const fallback = `Failed to ${isEditMode && !savingAsRevise ? 'update' : 'save'} quotation.`;
+    alert(getApiErrorMessage(err, fallback));
   } finally {
     setSaving(false);
   }
@@ -1980,6 +2726,7 @@ const handleSaveAsTemplate = async () => {
       contact_person: contactPerson,
       total_amount: Number(grandTotal) || 0,
       tax_amount: Number(computedTaxAmount.toFixed(2)) || 0,
+      include_roundoff: includeRoundOff,
       roundoff_amount: roundoffAmount,
       grand_total: Number(grandTotalToSend.toFixed(2)) || 0,
       extra_charges: extrcharges,
@@ -2027,7 +2774,7 @@ const handleSaveAsTemplate = async () => {
     setTemplateName("");
   } catch (err) {
     console.error(err?.response?.data || err);
-    alert("Failed to save template.");
+    alert(getApiErrorMessage(err, "Failed to save template."));
   } finally {
     setSaving(false);
   }
@@ -2042,17 +2789,44 @@ const onSelectTemplate = (template) => {
 };
 
 
+  const dismissNativeFieldFocus = () => {
+    const el = document.activeElement;
+    if (el && typeof el.blur === "function" && el !== document.body) {
+      el.blur();
+    }
+  };
+
   // Handle open/close modal
-  const handleOpen = () => setOpen(true);
+  const handleOpen = () => {
+    dismissNativeFieldFocus();
+    setCustomerSearchInputMountKey((k) => k + 1);
+    setOpen(true);
+  };
   const handleClose = () => setOpen(false);
 
-  // Handle search
-  const handleSearch = (e) => {
-    console.log("search cliked");
-    const value = e.target.value;
-    setSearch(value);
-    fetchCustomers(value);
+  // Customer modal filter (contenteditable — not a native <input>, so Edge/Chrome do not offer "Saved info" on it)
+  const applyCustomerModalFilter = (value) => {
+    const v = value ?? "";
+    setSearch(v);
+    fetchCustomers(v);
   };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = customerSearchEditableRef.current;
+    if (!el) return;
+    el.textContent = search;
+    // Intentionally omit `search`: only sync when the modal opens / remounts, not on each keystroke.
+  }, [open, customerSearchInputMountKey]);
+
+  /** Move focus into the modal search so Edge/Chrome "Saved info" is not anchored to the page customer control. */
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => {
+      customerSearchEditableRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, customerSearchInputMountKey]);
 
   // Handle select customer
   const handleSelectCustomer = (cust) => {
@@ -2087,7 +2861,9 @@ const onSelectTemplate = (template) => {
   };
 
   const openSearch = () => {
+    dismissNativeFieldFocus();
     fetchCustomers();
+    setCustomerSearchInputMountKey((k) => k + 1);
     setOpen(true);
   };
 
@@ -2168,20 +2944,81 @@ const onSelectTemplate = (template) => {
     handleCloseBankModal();
   };
 
-  useEffect(()=>{
-    console.log(qutationNo);
-  },[qutationNo])
+  const buildDocumentTypeQuotationNumber = (documentType, sequenceValue) => {
+    const resolvedDocType = (documentType || 'Quotation').toString().trim() || 'Quotation';
+    const resolvedSequence = sequenceValue === undefined || sequenceValue === null
+      ? ''
+      : String(sequenceValue).trim();
+
+    return buildQuotationNumber(resolvedDocType, resolvedSequence);
+  };
+
+  const generateSequenceForDocumentType = async (documentType, groupedCounts = null) => {
+    if (!canRegenerateDocumentNumber || selectedSeries) return;
+
+    const resolvedDocType = (documentType || 'Quotation').toString().trim();
+    if (!resolvedDocType) return;
+
+    try {
+      let maxCount;
+
+      if (
+        groupedCounts &&
+        Object.prototype.hasOwnProperty.call(groupedCounts, resolvedDocType)
+      ) {
+        maxCount = Number(groupedCounts[resolvedDocType] || 0);
+      } else {
+        const res = await axios.get(
+          `${BASE_URL}/api/quotations/max-scp-count/doc-type/${encodeURIComponent(resolvedDocType)}`
+        );
+        maxCount = Number(res?.data?.max_quotation_scp_count || 0);
+      }
+
+      const nextNumber = maxCount + 1;
+      setCurrentScpCount({
+        document_type: resolvedDocType,
+        max_quotation_scp_count: maxCount,
+      });
+
+      if (isEditMode && isReviseMode) {
+        return;
+      }
+
+      setSeqNumber(String(nextNumber));
+      setQutationNo(buildDocumentTypeQuotationNumber(resolvedDocType, nextNumber));
+      setPrevQutationNo(maxCount > 0 ? buildDocumentTypeQuotationNumber(resolvedDocType, maxCount) : '');
+    } catch (error) {
+      console.error('Failed to generate quotation number by document type:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!canRegenerateDocumentNumber) return;
+
+    const fetchGroupedScpCountsByDocumentType = async () => {
+      try {
+        const res = await axios.get(`${BASE_URL}/api/quotations/max-scp-count/grouped-by-doc-type`);
+        const grouped = (res?.data?.data || []).reduce((acc, item) => {
+          const key = (item?.document_type || 'Quotation').toString().trim();
+          if (!key) return acc;
+          acc[key] = Number(item?.max_quotation_scp_count || 0);
+          return acc;
+        }, {});
+        setDocTypeScpCounts(grouped);
+      } catch (error) {
+        console.error('Failed to fetch grouped SCP counts by document type:', error);
+      }
+    };
+
+    fetchGroupedScpCountsByDocumentType();
+  }, [canRegenerateDocumentNumber]);
 
   // generate next sequence and quotation number for a given series id
   const generateSequenceForSeries = async (seriesId) => {
-    // When editing an existing quotation, do NOT auto-generate or overwrite the existing
-    // quotation number. Preserve the original `qutationNo` unless the user explicitly
-    // chooses to change it via the UI.
-    if (isEditMode) return;
+    if (!canRegenerateDocumentNumber) return;
 
     if (!seriesId) {
-      // When no series is selected, show only the normal number (seqNumber)
-      setQutationNo(seqNumber || '');
+      setQutationNo(buildDocumentTypeQuotationNumber(docType, seqNumber || ''));
       setPrevQutationNo('');
       return;
     }
@@ -2205,17 +3042,26 @@ const onSelectTemplate = (template) => {
       const yrRange = `${String(currentYear).slice(-2)}-${String(nextYear).slice(-2)}`;
       setYearRange(yrRange);
 
+      if (isEditMode && isReviseMode) {
+        const existingSequence = `${seqNumber || ''}${revisionLetter || ''}`;
+        if (existingSequence) {
+          setQutationNo(buildQuotationNumber(seriesPrefix, seriesPrefixNumber, existingSequence, yrRange));
+        }
+        setPrevQutationNo(maxCount > 0 ? buildQuotationNumber(seriesPrefix, seriesPrefixNumber, maxCount, yrRange) : '');
+        return;
+      }
+
       // Generate next number (editable middle part)
       const nextNumber = Number(maxCount) + 1;
       const prevNumber = Number(maxCount);
       setSeqNumber(String(nextNumber));
 
       // Build full quotation string and previous
-      const qtno = `${seriesPrefix}/${seriesPrefixNumber}/${nextNumber}/${yrRange}`;
+      const qtno = buildQuotationNumber(seriesPrefix, seriesPrefixNumber, nextNumber, yrRange);
       setQutationNo(qtno);
 
       if (prevNumber > 0) {
-        const prevQtno = `${seriesPrefix}/${seriesPrefixNumber}/${prevNumber}/${yrRange}`;
+        const prevQtno = buildQuotationNumber(seriesPrefix, seriesPrefixNumber, prevNumber, yrRange);
         setPrevQutationNo(prevQtno);
       } else {
         setPrevQutationNo('');
@@ -2232,16 +3078,15 @@ const onSelectTemplate = (template) => {
 
   // whenever selectedSeries changes (programmatic or user selection), compute sequence
   useEffect(() => {
+    if (!canRegenerateDocumentNumber) return;
+
     if (!selectedSeries) {
-      // reset when no series
-      setQutationNo(seqNumber || '');
-      setPrevQutationNo('');
+      generateSequenceForDocumentType(docType, docTypeScpCounts);
       return;
     }
 
-    // generate sequence for the newly selected series
     generateSequenceForSeries(selectedSeries);
-  }, [selectedSeries]);
+  }, [selectedSeries, docType, docTypeScpCounts, canRegenerateDocumentNumber]);
 
   const handleOnchabgeSalesCredit = async (e) => {
     setSelectedEmployee(e.target.value);
@@ -2294,17 +3139,20 @@ const onSelectTemplate = (template) => {
   useEffect(() => {
     const isValidId = /^\d+$/.test(String(id || ""));
     // detect revise param (e.g. ?revise=1)
+    let reviseModeFromQuery = false;
     try {
       const params = new URLSearchParams(location.search || "");
       const revise = params.get('revise');
-      setIsReviseMode(Boolean(revise && String(revise) !== '0' && String(revise).toLowerCase() !== 'false'));
+      reviseModeFromQuery = Boolean(revise && String(revise) !== '0' && String(revise).toLowerCase() !== 'false');
+      setIsReviseMode(reviseModeFromQuery);
     } catch (err) {
+      reviseModeFromQuery = false;
       setIsReviseMode(false);
     }
 
     if (isValidId) {
       setIsEditMode(true);
-      fetchQuotationData();
+      fetchQuotationData(reviseModeFromQuery);
     } else if (id) {
       console.warn("Invalid quotation id param:", id);
       alert("Invalid quotation ID in URL. Returning to list.");
@@ -2547,7 +3395,7 @@ const onSelectTemplate = (template) => {
   }, [selectedBillingAddress, selectedBranch]);
 
 
-const fetchQuotationData = async () => {
+const fetchQuotationData = async (reviseMode = false) => {
     try {
       const response = await axios.get(`${BASE_URL}/api/quotations/${id}`);
       const data = response.data;
@@ -2555,7 +3403,7 @@ const fetchQuotationData = async () => {
       
       // Pre-fill all the form data
       console.log('Fetched quotation data:', data);
-      prefillFormData(data);
+      prefillFormData(data, true, reviseMode);
     } catch (error) {
       console.error("Error fetching quotation data:", error);
       if (error.response?.status === 404) {
@@ -2570,7 +3418,7 @@ const fetchQuotationData = async () => {
 
 
 
-const  prefillFormData = async (data, shouldUpdateDocType = true) => {
+const  prefillFormData = async (data, shouldUpdateDocType = true, reviseMode = isReviseMode) => {
   console.log('Prefilling form with data:', data);
   // Ensure docType is set from saved data so UI matches saved document type (only in edit mode)
   if (shouldUpdateDocType) {
@@ -2685,26 +3533,48 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
 
   // Pre-fill quotation number
   if (data.quotation_number) {
-    setQutationNo(data.quotation_number);
+    setQutationNo(normalizeQuotationNumber(data.quotation_number));
+
+    if (!(data.series_id || data.SeriesID || data.seriesID)) {
+      const parts = normalizeQuotationNumber(data.quotation_number).split('/').filter(Boolean);
+      if (parts.length > 0) {
+        setSeqNumber(String(parts[parts.length - 1] || ''));
+      }
+    }
   }
 
   // If we have a quotation_number and series, try to parse seq and year for display
   if (data.quotation_number && data.series_id) {
     try {
-      const parts = String(data.quotation_number).split('/');
-      // Expecting format: PREFIX / PREFIX_NUMBER / SEQ / YEAR_RANGE
-      if (parts.length >= 3) {
-        const seq = parts[2] || '';
-        setSeqNumber(String(seq));
-        if (parts.length >= 4) setYearRange(parts[3]);
-        const seqNum = parseInt(seq, 10);
-        if (!isNaN(seqNum) && seqNum > 0) {
-          const prev = seqNum - 1;
-          const s = seriesList.find(x => String(x.id) === String(data.series_id));
-          const p = s?.prefix || parts[0] || '';
-          const pn = s?.prefix_number || parts[1] || '';
-          const yr = parts[3] || '';
-          setPrevQutationNo(`${p}/${pn}/${prev}/${yr}`);
+      const parts = normalizeQuotationNumber(data.quotation_number).split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        const seq = parts[parts.length - 2] || '';
+        const yr = parts[parts.length - 1] || '';
+        
+        // Extract revision letter from sequence if it exists (e.g., "1A" -> seq="1", revLetter="A")
+        const seqMatch = seq.match(/^(\d+)([a-zA-Z]?)$/);
+        if (seqMatch) {
+          const numericSeq = seqMatch[1];
+          const revLetter = seqMatch[2] || '';
+          setSeqNumber(String(numericSeq));
+          setRevisionLetter(revLetter);
+          
+          if (yr) setYearRange(yr);
+          
+          // Calculate previous for display
+          const seqNum = parseInt(numericSeq, 10);
+          if (!isNaN(seqNum) && seqNum > 0) {
+            const prev = seqNum - 1;
+            const s = seriesList.find(x => String(x.id) === String(data.series_id));
+            const p = s?.prefix || parts[0] || '';
+            const fallbackPrefixNumber = parts.length > 3 ? parts.slice(1, -2).join('/') : '';
+            const pn = s?.prefix_number || fallbackPrefixNumber;
+            setPrevQutationNo(buildQuotationNumber(p, pn, prev, yr));
+          }
+        } else {
+          setSeqNumber(String(seq));
+          setRevisionLetter('');
+          if (yr) setYearRange(yr);
         }
       }
     } catch (e) {
@@ -2716,7 +3586,29 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
     setNote(data.note);
   }
 
-  if(data.references){
+  if (reviseMode) {
+    const originalDocNumber = normalizeQuotationNumber(data.references || data.quotation_number || '');
+    setReferences(originalDocNumber);
+
+    const originalParts = originalDocNumber.split('/').filter(Boolean);
+    if (originalParts.length >= 2) {
+      const originalSequence = originalParts[originalParts.length - 2] || '';
+      const originalYearRange = originalParts[originalParts.length - 1] || '';
+      const prefixParts = originalParts.slice(0, -2);
+
+      const { numberPart, letterPart } = parseSequenceParts(originalSequence);
+      const nextRevisionLetter = getNextRevisionLetter(letterPart);
+      const revisedSequence = `${numberPart}${nextRevisionLetter}`;
+
+      setSeqNumber(numberPart);
+      setRevisionLetter(nextRevisionLetter);
+      if (originalYearRange) setYearRange(originalYearRange);
+
+      if (prefixParts.length > 0 && revisedSequence) {
+        setQutationNo(buildQuotationNumber(...prefixParts, revisedSequence, originalYearRange));
+      }
+    }
+  } else if (data.references) {
     setReferences(data.references);
   }
 
@@ -2734,16 +3626,19 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
     setAttachmentPath(data.attachment_path);
   }
 
-  // Pre-fill round off flag: if server sent non-zero roundoff_amount or explicit flags
-  if (data.roundoff_amount !== undefined && data.roundoff_amount !== null) {
+  // Pre-fill round off flag: read from explicit include_roundoff field
+  if (data.include_roundoff !== undefined && data.include_roundoff !== null) {
+    setIncludeRoundOff(Boolean(data.include_roundoff));
+  } else if (data.includeRoundOff !== undefined && data.includeRoundOff !== null) {
+    setIncludeRoundOff(Boolean(data.includeRoundOff));
+  } else if (data.roundoff_amount !== undefined && data.roundoff_amount !== null) {
+    // Fallback for old quotations without the explicit flag
     try {
       const rn = Number(data.roundoff_amount) || 0;
       setIncludeRoundOff(Boolean(rn !== 0));
     } catch (e) {
       // ignore
     }
-  } else if (data.include_roundoff === true || data.includeRoundOff === true || data.include_round_off === true || data.total_before_roundoff === true) {
-    setIncludeRoundOff(true);
   }
 
   // Pre-fill table items with ALL fields from QuotationTableItems
@@ -2803,10 +3698,25 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
       else if (item.product && item.product.Tax && item.product.Tax.Percentage) gstPercent = Number(item.product.Tax.Percentage);
       else if (taxable && taxAmount) gstPercent = Number(((taxAmount / taxable) * 100).toFixed(2));
 
-      // Compute CGST/SGST amounts from taxable and gstPercent when tax_amount not provided
-      const computedTaxTotal = Number(((taxable * (gstPercent || 0)) / 100).toFixed(2));
-      const cgstAmt = (taxAmount ? Number((taxAmount / 2).toFixed(2)) : Number((computedTaxTotal / 2).toFixed(2)));
-      const sgstAmt = (taxAmount ? Number((taxAmount / 2).toFixed(2)) : Number((computedTaxTotal / 2).toFixed(2)));
+      const savedCgst = Number(item.cgst ?? item.cgst_amount ?? 0);
+      const savedSgst = Number(item.sgst ?? item.sgst_amount ?? 0);
+      const savedIgst = Number(item.igst ?? item.igst_amount ?? 0);
+      const computedTaxTotal = Number((taxAmount || ((taxable * (gstPercent || 0)) / 100)).toFixed(2));
+
+      let cgstAmt = 0;
+      let sgstAmt = 0;
+      let igstAmt = 0;
+
+      if (savedCgst > 0 || savedSgst > 0 || savedIgst > 0) {
+        cgstAmt = Number(savedCgst.toFixed(2));
+        sgstAmt = Number(savedSgst.toFixed(2));
+        igstAmt = Number(savedIgst.toFixed(2));
+      } else if (isGSTStateMatch) {
+        cgstAmt = Number((computedTaxTotal / 2).toFixed(2));
+        sgstAmt = Number((computedTaxTotal / 2).toFixed(2));
+      } else {
+        igstAmt = Number(computedTaxTotal.toFixed(2));
+      }
 
       // Normalize image into a URL string when possible (handles object shapes)
       let normalizedImage = null;
@@ -2842,7 +3752,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
         taxable: Number((taxable || 0).toFixed(2)),
         cgst: cgstAmt,
         sgst: sgstAmt,
-        igst: 0,
+        igst: igstAmt,
         amount: lineTotal || 0,
         desc: item.description || item.product?.Name || item.product?.name || '',
         leadTime: item.lead_time || item.product?.LeadTime || item.product?.lead_time || '',
@@ -2947,7 +3857,11 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
 
 
   const titleBase = (docType === 'All' || docType === 'All Type' || !docType) ? 'Quotation' : docType;
+  const isRestrictedEditMode = isEditMode && !isReviseMode;
   const formTitle = isEditMode ? (isReviseMode ? `Revise ${titleBase}` : `Edit ${titleBase}`) : `Create ${titleBase}`;
+  const actionDocLabel = titleBase;
+  const primaryActionLabel = isEditMode ? `Update ${actionDocLabel}` : `Save ${actionDocLabel}`;
+  const primaryActionBusyLabel = isEditMode ? `Updating ${actionDocLabel}...` : `Saving ${actionDocLabel}...`;
 
   const handleDocTypeChange = (value) => {
     setDocType(value);
@@ -3007,7 +3921,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
 
   // auto-select series when single match and not in edit mode
   useEffect(() => {
-    if (isEditMode) return; // don't overwrite existing selection in edit
+    if (!canRegenerateDocumentNumber) return; // keep existing selection in restricted edit mode
     try {
       if ((!selectedSeries || selectedSeries === '') && filteredSeries && filteredSeries.length === 1) {
         setSelectedSeries(String(filteredSeries[0].id));
@@ -3019,7 +3933,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
     } catch (e) {
       console.warn('Failed to auto-select series', e);
     }
-  }, [filteredSeries, isEditMode]);
+  }, [filteredSeries, canRegenerateDocumentNumber]);
 
   return (
     <section className="right-content create-quotation">
@@ -3031,14 +3945,23 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
             value={docType}
             onChange={(e) => handleDocTypeChange(e.target.value)}
             aria-label="Document type"
-            disabled={isEditMode}
-            title={isEditMode ? 'Document type cannot be changed in edit mode' : 'Document type'}
+            disabled={isRestrictedEditMode}
+            title={isRestrictedEditMode ? 'Document type cannot be changed in edit mode' : 'Document type'}
           >
             {docTypes.map(dt => (
               <option key={dt} value={dt}>{dt}</option>
             ))}
           </select>
 
+          <button
+            type="button"
+            className="btn btn--excel"
+            onClick={() => exportQuotationToExcel()}
+            title="Download current document as Excel (respects Print Settings)"
+          >
+            <span><FaFileExcel /></span>
+            Export Excel
+          </button>
           <button className="btn btn--print" onClick={handleOpenPrintConfig}>
             <span><IoMdPrint /></span>
             Print Settings
@@ -3047,34 +3970,33 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
             <span><FaLongArrowAltLeft /></span>
             Back
           </button> */}
-          {isEditMode && (
-            <button className="btn btn--save" onClick={() => handleSaveQuotation()} disabled={saving}>
-              <MdEdit /> Update
-            </button>
-          )}
           <button className="btn btn--save" onClick={() => handleSaveQuotation()} disabled={saving}>
-            <FaCheck /> Save
+            {isEditMode ? <><MdEdit /> {saving ? primaryActionBusyLabel : primaryActionLabel}</> : <><FaCheck /> {saving ? primaryActionBusyLabel : primaryActionLabel}</>}
           </button>
         </div>
       </div>
-      <div className={`section-card basic-info-card ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
+      <div className={`section-card basic-info-card ${isRestrictedEditMode ? 'edit-disabled' : ''}`}>
         <h6 className="section-title">Basic Information</h6>
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="customer">Customer :</label>
             <div className="input-with-actions">
-              <input
+              <button
+                type="button"
                 id="customer"
-                type="text"
-                className="form-control"
-                value={
-                  selectedCustomer
-                    ? (selectedCustomer.company_name || "")
-                    : ""
-                }
-                onClick={() => openSearch()}
-                readOnly
-              />
+                className="form-control customer-select-trigger"
+                onClick={openSearch}
+                disabled={isRestrictedEditMode}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                title={isRestrictedEditMode ? "Customer cannot be changed in this mode" : "Select customer"}
+              >
+                {selectedCustomer ? (
+                  (selectedCustomer.company_name || selectedCustomer.company || "").trim() || "\u00A0"
+                ) : (
+                  <span className="customer-select-trigger-placeholder">Click to select customer</span>
+                )}
+              </button>
               <button
                 type="button"
                 className="btn-customer-action btn-customer-add"
@@ -3148,8 +4070,8 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
               className="form-control"
               value={selectedSeries}
               onChange={(e) => handleOnChangeSeriesSelect(e)}
-              disabled={isEditMode}
-              title={isEditMode ? 'Series cannot be changed in edit mode' : ''}
+              disabled={isRestrictedEditMode}
+              title={isRestrictedEditMode ? 'Series cannot be changed in edit mode' : ''}
             >
               <option value="">Select</option>
               {filteredSeries && filteredSeries.length > 0 ? (
@@ -3166,7 +4088,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
         </div>
       </div>
 
-      <div className={`section-card party-details-wrapper ${isEditMode && !isReviseMode ? 'edit-disabled' : ''}`}>
+      <div className="section-card party-details-wrapper">
         <div className="party-details-container">
           <div className="party-details-left">
             <h6 className="section-title">Party Details</h6>
@@ -3195,7 +4117,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                 >
                   <option value="">None</option>
                   {employees.map((emp) => {
-                    const id = emp.id || emp.ID || emp.user_id || emp.id_user;
+                    const id = emp.user_id || emp.id || emp.ID || emp.id_user;
                     const salutation = emp.salutation || '';
                     const first = emp.firstname || emp.first_name || emp.firstName || emp.name || emp.Name || '';
                     const last = emp.lastname || emp.last_name || emp.lastName || '';
@@ -3273,9 +4195,15 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                         <div>
                           {selectedBillingAddress.city && <span>{selectedBillingAddress.city}</span>}
                           {selectedBillingAddress.state && <span>{selectedBillingAddress.state ? (selectedBillingAddress.city ? ', ' : '') + selectedBillingAddress.state : ''}</span>}
-                          {selectedBillingAddress.country && <span>{selectedBillingAddress.country ? (selectedBillingAddress.city || selectedBillingAddress.state ? ', ' : '') + selectedBillingAddress.country : ''}</span>}
-                          {selectedBillingAddress.postal_code && <span>{selectedBillingAddress.postal_code ? ' - ' + selectedBillingAddress.postal_code : ''}</span>}
+                          {formatAddressCountryName(selectedBillingAddress.country) && <span>{(selectedBillingAddress.city || selectedBillingAddress.state ? ', ' : '') + formatAddressCountryName(selectedBillingAddress.country)}</span>}
+                          {formatAddressPostalCode(selectedBillingAddress.postal_code) && <span>{' - ' + formatAddressPostalCode(selectedBillingAddress.postal_code)}</span>}
                         </div>
+                      )}
+                      {formatMobileWithCountryCode(getCustomerMobileForAddr(selectedBillingAddress), selectedBillingAddress.country) && (
+                        <div><strong>Mobile :</strong> {formatMobileWithCountryCode(getCustomerMobileForAddr(selectedBillingAddress), selectedBillingAddress.country)}</div>
+                      )}
+                      {getCustomerEmailForAddr(selectedBillingAddress) && (
+                        <div><strong>Email :</strong> {getCustomerEmailForAddr(selectedBillingAddress)}</div>
                       )}
                       {gstForAddr(selectedBillingAddress) && (
                         <div><strong>GSTIN :</strong> {gstForAddr(selectedBillingAddress)}</div>
@@ -3367,9 +4295,15 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                         <div>
                           {selectedShippingAddress.city && <span>{selectedShippingAddress.city}</span>}
                           {selectedShippingAddress.state && <span>{selectedShippingAddress.state ? (selectedShippingAddress.city ? ', ' : '') + selectedShippingAddress.state : ''}</span>}
-                          {selectedShippingAddress.country && <span>{selectedShippingAddress.country ? (selectedShippingAddress.city || selectedShippingAddress.state ? ', ' : '') + selectedShippingAddress.country : ''}</span>}
-                          {selectedShippingAddress.postal_code && <span>{selectedShippingAddress.postal_code ? ' - ' + selectedShippingAddress.postal_code : ''}</span>}
+                          {formatAddressCountryName(selectedShippingAddress.country) && <span>{(selectedShippingAddress.city || selectedShippingAddress.state ? ', ' : '') + formatAddressCountryName(selectedShippingAddress.country)}</span>}
+                          {formatAddressPostalCode(selectedShippingAddress.postal_code) && <span>{' - ' + formatAddressPostalCode(selectedShippingAddress.postal_code)}</span>}
                         </div>
+                      )}
+                      {formatMobileWithCountryCode(getCustomerMobileForAddr(selectedShippingAddress), selectedShippingAddress.country) && (
+                        <div><strong>Mobile :</strong> {formatMobileWithCountryCode(getCustomerMobileForAddr(selectedShippingAddress), selectedShippingAddress.country)}</div>
+                      )}
+                      {getCustomerEmailForAddr(selectedShippingAddress) && (
+                        <div><strong>Email :</strong> {getCustomerEmailForAddr(selectedShippingAddress)}</div>
                       )}
                       {gstForAddr(selectedShippingAddress) && (
                         <div><strong>GSTIN :</strong> {gstForAddr(selectedShippingAddress)}</div>
@@ -3390,14 +4324,14 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
             </div>
           </div>
 
-          <div className="document-details-box">
+          <div className={`document-details-box ${isRestrictedEditMode ? 'edit-disabled' : ''}`}>
             <h6 className="section-title">Document Details</h6>
             
             <div className="form-field-vertical">
               <label>{`${titleBase} No. :`}</label>
               <div className="field-column">
                 <div className="input-inline-group">
-                  {!isEditMode && selectedSeries && (
+                  {canRegenerateDocumentNumber && selectedSeries && (
                     <div className="seq-prefix">
                       {(() => {
                         const s = seriesList.find(x => String(x.id) === String(selectedSeries));
@@ -3408,7 +4342,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                     </div>
                   )}
 
-                  {isEditMode ? (
+                  {!canRegenerateDocumentNumber ? (
                     <div className="form-control edit-mode-display">
                       {qutationNo || quotationData?.quotation_number || ''}
                     </div>
@@ -3419,17 +4353,33 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                           id="quotationSeq"
                           type="text"
                           className="form-control seq-input"
-                          value={seqNumber}
+                          value={isReviseMode ? `${seqNumber || ''}${revisionLetter || ''}` : seqNumber}
                           onChange={(e) => {
-                            const v = e.target.value.replace(/[^0-9]/g, '');
-                            setSeqNumber(v);
+                            const rawValue = e.target.value || '';
+                            let nextSeq = rawValue;
+                            let nextRevision = revisionLetter;
+
+                            if (isReviseMode) {
+                              const sanitized = rawValue.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                              const match = sanitized.match(/^(\d*)([A-Z]?).*$/);
+                              nextSeq = match?.[1] || '';
+                              nextRevision = match?.[2] || '';
+                              setRevisionLetter(nextRevision);
+                            } else {
+                              nextSeq = rawValue.replace(/[^0-9]/g, '');
+                            }
+
+                            setSeqNumber(nextSeq);
                             const s = seriesList.find(x => String(x.id) === String(selectedSeries));
                             const p = s?.prefix || 'QTN';
                             const pn = s?.prefix_number || '';
                             const yr = yearRange || (() => {
                               const d = new Date(); const y = d.getFullYear(); return `${String(y).slice(-2)}-${String(y+1).slice(-2)}`;
                             })();
-                            setQutationNo(`${p}/${pn}/${v || ''}/${yr}`);
+                            const sequenceWithRevision = isReviseMode
+                              ? `${nextSeq}${nextRevision}`
+                              : (nextRevision ? `${nextSeq}${nextRevision}` : nextSeq || '');
+                            setQutationNo(buildQuotationNumber(p, pn, sequenceWithRevision, yr));
                           }}
                         />
                         <div className="seq-divider">/</div>
@@ -3440,11 +4390,23 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
                         id="quotationSeq"
                         type="text"
                         className="form-control"
-                        value={seqNumber}
+                        value={isReviseMode ? `${seqNumber || ''}${revisionLetter || ''}` : seqNumber}
                         onChange={(e) => {
-                          const v = e.target.value;
+                          const rawValue = e.target.value || '';
+                          if (isReviseMode) {
+                            const sanitized = rawValue.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                            const match = sanitized.match(/^(\d*)([A-Z]?).*$/);
+                            const nextSeq = match?.[1] || '';
+                            const nextRevision = match?.[2] || '';
+                            setSeqNumber(nextSeq);
+                            setRevisionLetter(nextRevision);
+                            setQutationNo(buildDocumentTypeQuotationNumber(docType, `${nextSeq}${nextRevision}`));
+                            return;
+                          }
+
+                          const v = rawValue;
                           setSeqNumber(v);
-                          setQutationNo(v);
+                          setQutationNo(buildDocumentTypeQuotationNumber(docType, v));
                         }}
                         placeholder={`${titleBase} No.`}
                       />
@@ -3828,7 +4790,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
           </div>
         </div>
 
-      <div className="quotation-summary-layout">
+      <div className={`quotation-summary-layout ${isRestrictedEditMode ? 'edit-disabled' : ''}`}>
         <div className="summary-left-side">
           {/* Terms & Conditions Section */}
           <div className="summary-card tandc-card">
@@ -3962,6 +4924,10 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
             {tableItems.length === 0 ? (
               <div className="totals-content">
                 <div className="total-row">
+                  <span>Total Quantity:</span>
+                  <strong>0</strong>
+                </div>
+                <div className="total-row">
                   <span>Total Amount before Taxes:</span>
                   <strong>₹ 0.00</strong>
                 </div>
@@ -4041,6 +5007,10 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
               </div>
             ) : (
               <div className="totals-content">
+                <div className="total-row">
+                  <span>Total Quantity:</span>
+                  <strong>{tableItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}</strong>
+                </div>
                 <div className="total-row">
                   <span>Total Amount before Tax :</span>
                   <strong>₹ {totalTaxable.toFixed(2)}</strong>
@@ -4139,7 +5109,7 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
         </div>
       </div>
 
-      <div className="summary-full-width">
+      <div className={`summary-full-width ${isRestrictedEditMode ? 'edit-disabled' : ''}`}>
         <div className="summary-card next-actions-card">
           <h5>Next Actions</h5>
           <div className="actions-list">
@@ -4186,18 +5156,20 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
 
           <div className="final-actions-footer">
             <button className="btn btn--save" onClick={handleSaveQuotation} disabled={saving}>
-              {isEditMode ? <><MdEdit /> {saving ? 'Updating...' : 'Update Quotation'}</> : <><FaCheck /> {saving ? 'Saving...' : 'Save Quotation'}</>}
+              {isEditMode ? <><MdEdit /> {saving ? primaryActionBusyLabel : primaryActionLabel}</> : <><FaCheck /> {saving ? primaryActionBusyLabel : primaryActionLabel}</>}
             </button>
 
-            <button className="btn btn--secondary" onClick={async ()=>{
-              await handleSaveQuotation();
-              setSelectedCustomer(null);
-              setTableItems([]);
-              setGrandTotal(0);
-              alert("Saved successfully!");
-            }} disabled={saving}>
-              Save & Create New
-            </button>
+            {!isEditMode && (
+              <button className="btn btn--secondary" onClick={async ()=>{
+                await handleSaveQuotation();
+                setSelectedCustomer(null);
+                setTableItems([]);
+                setGrandTotal(0);
+                alert("Saved successfully!");
+              }} disabled={saving}>
+                {`Save ${actionDocLabel} & Create New`}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -4349,7 +5321,11 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
       {openPrintConfig && (
         <PrintSettingsDialog
           onClose={handleClosePrintConfig}
-          initialConfig={printConfig}
+          initialConfig={{
+            ...printConfig,
+            headerLogosSource: getHeaderLogoList(printerHeader),
+            headerLogoFallback: printerHeader?.logo_data || null,
+          }}
           onSave={handleSavePrintConfig}
           docType={docType}
         />
@@ -4365,12 +5341,58 @@ const  prefillFormData = async (data, shouldUpdateDocType = true) => {
             </div>
 
             <div className="modal-body">
-              <input
-                type="text"
-                className="form-control search-input"
-                placeholder="Search customers..."
-                value={search}
-                onChange={handleSearch}
+              <div
+                key={`customer-search-editable-${customerSearchInputMountKey}`}
+                ref={customerSearchEditableRef}
+                className="form-control search-input customer-search-fake-input"
+                contentEditable="plaintext-only"
+                suppressContentEditableWarning
+                role="searchbox"
+                aria-label="Search customers"
+                data-placeholder="Search customers..."
+                tabIndex={0}
+                onInput={(e) => {
+                  const el = e.currentTarget;
+                  let raw = el.textContent ?? "";
+                  raw = raw.replace(/\r?\n/g, " ");
+                  if (raw !== el.textContent) {
+                    el.textContent = raw;
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    range.collapse(false);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                  }
+                  applyCustomerModalFilter(raw);
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = (e.clipboardData.getData("text/plain") || "").replace(/\r?\n/g, " ");
+                  const el = e.currentTarget;
+                  el.focus();
+                  if (document.queryCommandSupported?.("insertText")) {
+                    document.execCommand("insertText", false, text);
+                  } else {
+                    const sel = window.getSelection();
+                    if (!sel?.rangeCount) {
+                      el.appendChild(document.createTextNode(text));
+                    } else {
+                      const range = sel.getRangeAt(0);
+                      range.deleteContents();
+                      const tn = document.createTextNode(text);
+                      range.insertNode(tn);
+                      range.setStartAfter(tn);
+                      range.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(range);
+                    }
+                  }
+                  applyCustomerModalFilter(el.textContent ?? "");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
               />
 
               <div className="customer-list-container">

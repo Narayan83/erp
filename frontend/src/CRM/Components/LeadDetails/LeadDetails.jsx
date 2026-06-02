@@ -4,8 +4,13 @@ import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import UpdateStatusModal from './UpdateStatusModal/UpdateStatusModal';
 import InteractionModal from './InteractionModal/InteractionModal';
 import './leadDetails.scss';
+import { useAuth } from '../../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [showUpdateStatus, setShowUpdateStatus] = useState(false);
   const [showInteraction, setShowInteraction] = useState(false);
   const [interactionMode, setInteractionMode] = useState('both'); // 'interaction', 'appointment', or 'both'
@@ -16,10 +21,6 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
   useEffect(() => {
     setLocalStage(lead?.stage || 'Unqualified');
   }, [lead]);
-
-  if (!isOpen || !lead) return null;
-
-  const contactName = lead.name || lead.contact || [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
 
   const handleStatusChange = async (data) => {
     try {
@@ -322,6 +323,10 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
     }
   };
 
+  if (!isOpen || !lead) return null;
+
+  const contactName = lead.name || lead.contact || [lead.prefix, lead.firstName, lead.lastName].filter(Boolean).join(' ');
+
   return (
     <div className="lead-details-overlay">
       <div className="lead-details-modal" onClick={e => e.stopPropagation()}>
@@ -331,8 +336,12 @@ const LeadDetails = ({ isOpen, lead, onClose, onEdit, onStatusUpdate }) => {
           </div>
 
           <div className="header-actions">
-            <button className="icon-btn edit-btn" title="Edit Lead" onClick={() => { if (onEdit) onEdit(lead); }}><FaEdit /></button>
-            <button className="icon-btn delete-btn" title="Delete Lead" onClick={handleDelete} disabled={deleting}><FaTrash /></button>
+            {perms?.can_update && (
+              <button className="icon-btn edit-btn" title="Edit Lead" onClick={() => { if (onEdit) onEdit(lead); }}><FaEdit /></button>
+            )}
+            {perms?.can_delete && (
+              <button className="icon-btn delete-btn" title="Delete Lead" onClick={handleDelete} disabled={deleting}><FaTrash /></button>
+            )}
             <button className="close-btn" onClick={onClose}><FaTimes /></button>
           </div>
         </div>

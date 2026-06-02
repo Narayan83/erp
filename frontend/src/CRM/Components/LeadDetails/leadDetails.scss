@@ -266,7 +266,6 @@
 }
 .business-interactions .bi-title {
   font-weight: 700;
-  margin-bottom: 6px;
   font-size: 13px;
   color: #666;
 }
@@ -276,7 +275,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   /* show only one interaction by default and allow scrolling for older items */
   max-height: 80px; /* approx height of one .interaction-item */
   overflow-y: auto;

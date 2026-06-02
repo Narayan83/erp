@@ -42,51 +42,135 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
   const [productOptions, setProductOptions] = useState([]);
   const [assignedOptions, setAssignedOptions] = useState([]);
   // Source options (sync with AddLead - can be extended via localStorage 'leadSources')
-  const [sourceOptions, setSourceOptions] = useState(['Website', 'Referral', 'Social Media', 'Direct', 'Partner']);
+  const [sourceOptions, setSourceOptions] = useState(['Manual', 'Indiamart', 'Exhibition']);
 
-  // Required fields for import (now including Source and Since; Salutation and Assigned To made optional)
-  const requiredFields = ['Business', 'Name', 'Mobile', 'Email', 'Product', 'Source', 'Since'];
+  // Required fields for import
+  const requiredFields = ['Business', 'Name', 'Source', 'Since'];
 
   // Dropdown options for preview table (product/assigned filled from backend)
   const dropdownFields = {
     'Salutation': ['Mr.', 'Ms.', 'Mrs.'],
-    'Source': sourceOptions,
     'Stage': ['Discussion', 'Appointment', 'Demo', 'Decided', 'Inactive'],
     'Category': ['Software', 'Hardware', 'Services', 'Consulting', 'Training'],
     'Country': countries.map(c => c.name).slice(0, 50),
     'State': Object.values(stateList).slice(0, 36),
     'City': Array.isArray(cities) ? cities.slice(0, 100) : [],
-    'Product': productOptions,
-    'Product *': productOptions,
     'Assigned To': assignedOptions,
     'Assigned To *': assignedOptions,
   };
 
   // Column widths for preview table (label -> CSS width)
+  const selectionColumnWidth = '56px';
+  const rowNumberColumnWidth = '64px';
+  const defaultColumnWidth = '160px';
   const columnWidths = {
     'Business': '220px',
-    'Salutation': '50px',
+    'Salutation': '100px',
     'Name': '220px',
-    'Designation': '150px',
+    'Designation': '170px',
     'Mobile': '120px',
     'Email': '240px',
     'Address Line 1': '220px',
-    'Address Line 2': '200px',
-    'City': '120px',
-    'State': '120px',
-    'Country': '120px',
-    'GSTIN': '140px',
-    'Source': '140px',
-    'Stage': '120px',
-    'Potential (₹)': '140px',
-    'Since': '140px',
-    'Requirement': '200px',
-    'Category': '130px',
-    'Product': '180px',
-    'Website': '180px',
-    'Notes': '200px',
-    'Tags': '160px',
-    'Assigned To': '180px'
+    'Address Line 2': '220px',
+    'City': '180px',
+    'State': '180px',
+    'Country': '180px',
+    'GSTIN': '170px',
+    'Source': '170px',
+    'Stage': '150px',
+    'Potential (₹)': '120px',
+    'Since': '120px',
+    'Requirement': '220px',
+    'Category': '170px',
+    'Product': '220px',
+    'Website': '220px',
+    'Notes': '240px',
+    'Tags': '180px',
+    'Assigned To': '200px'
+  };
+
+  const getColumnWidth = (columnName) => columnWidths[columnName] || defaultColumnWidth;
+
+  const previewHeaderCellSx = {
+    fontWeight: 700,
+    fontSize: '0.8rem',
+    color: '#1f2937',
+    backgroundColor: '#eef3fb',
+    borderBottom: '1px solid #d7dfec',
+    padding: '12px 10px',
+    whiteSpace: 'nowrap',
+  };
+
+  const previewBodyCellSx = {
+    padding: '6px',
+    borderBottom: '1px solid #e5eaf3',
+    verticalAlign: 'middle',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  };
+
+  const inlineInputSx = {
+    width: '100%',
+    '& .MuiOutlinedInput-root': {
+      height: 34,
+      fontSize: '0.85rem',
+      backgroundColor: '#ffffff',
+      borderRadius: '6px',
+      '& fieldset': {
+        borderColor: '#cfd7e6',
+      },
+      '&:hover fieldset': {
+        borderColor: '#9aa9c2',
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#2f6fed',
+        borderWidth: 1,
+      },
+    },
+    '& .MuiOutlinedInput-input': {
+      padding: '8px 10px',
+    },
+  };
+
+  const selectorDisplaySx = {
+    cursor: 'pointer',
+    padding: '8px 10px',
+    borderRadius: '6px',
+    minHeight: '34px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    backgroundColor: '#eef4ff',
+    border: '1px solid #cad8f0',
+    color: '#1e3a5f',
+    fontSize: '0.85rem',
+  };
+
+  const selectorInputSx = {
+    width: '100%',
+    '& .MuiOutlinedInput-root': {
+      height: 34,
+      fontSize: '0.85rem',
+      backgroundColor: '#eef4ff',
+      borderRadius: '6px',
+      '& fieldset': {
+        borderColor: '#cad8f0',
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#2f6fed',
+      },
+    },
+    '& .MuiSelect-select': {
+      display: 'flex',
+      alignItems: 'center',
+    },
+    '& .MuiSelect-icon': {
+      color: '#1e3a5f',
+      right: '8px',
+    },
   };
 
   // Fetch products and employees for dropdowns
@@ -94,7 +178,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     let mounted = true;
     const fetchLists = async () => {
       try {
-        const prodRes = await axios.get(`${BASE_URL}/api/products?page=1&limit=1000`);
+      const prodRes = await axios.get(`${BASE_URL}/api/lead-products?active=true`);
         const prodData = prodRes.data?.data || prodRes.data || [];
         const prodNames = prodData.map(p => p.Name || p.name || '').filter(Boolean);
         if (mounted) setProductOptions(prodNames);
@@ -144,20 +228,89 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     setImportedData(newData);
   };
 
-  // Helper: format various date strings to YYYY-MM-DD for date input
-  const formatDateForInput = (val) => {
+  // Helper: normalize date-like input to DD-MM-YYYY
+  const formatDateForDisplay = (val) => {
     if (!val) return '';
     if (typeof val !== 'string') val = String(val);
-    // ISO-like
-    const iso = val.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (iso) return iso[1];
-    // D-M-Y or DD-MM-YYYY
-    const dmy = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+
+    // DD-MM-YYYY (or D-M-YYYY)
+    const dmyDash = val.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmyDash) {
+      const dd = String(dmyDash[1]).padStart(2, '0');
+      const mm = String(dmyDash[2]).padStart(2, '0');
+      const yyyy = dmyDash[3];
+      return `${dd}-${mm}-${yyyy}`;
+    }
+
+    // DD/MM/YYYY (or D/M/YYYY)
+    const dmySlash = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmySlash) {
+      const dd = String(dmySlash[1]).padStart(2, '0');
+      const mm = String(dmySlash[2]).padStart(2, '0');
+      const yyyy = dmySlash[3];
+      return `${dd}-${mm}-${yyyy}`;
+    }
+
+    // YYYY-MM-DD (or ISO prefix)
+    const ymd = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (ymd) return `${ymd[3]}-${ymd[2]}-${ymd[1]}`;
+
     // Fallback to Date parse
     const dt = new Date(val);
-    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
+    if (!isNaN(dt)) {
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const yyyy = dt.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    }
     return '';
+  };
+
+  // Convert DD-MM-YYYY / DD/MM/YYYY / YYYY-MM-DD to ISO string for backend
+  const parseSinceToISO = (val) => {
+    if (!val) return null;
+    const raw = String(val).trim();
+    if (!raw) return null;
+
+    const dmyDash = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmyDash) {
+      const dd = Number(dmyDash[1]);
+      const mm = Number(dmyDash[2]);
+      const yyyy = Number(dmyDash[3]);
+      const dt = new Date(yyyy, mm - 1, dd);
+      if (dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd) {
+        return dt.toISOString();
+      }
+      return raw;
+    }
+
+    const dmySlash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmySlash) {
+      const dd = Number(dmySlash[1]);
+      const mm = Number(dmySlash[2]);
+      const yyyy = Number(dmySlash[3]);
+      const dt = new Date(yyyy, mm - 1, dd);
+      if (dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd) {
+        return dt.toISOString();
+      }
+      return raw;
+    }
+
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) {
+      const yyyy = Number(ymd[1]);
+      const mm = Number(ymd[2]);
+      const dd = Number(ymd[3]);
+      const dt = new Date(yyyy, mm - 1, dd);
+      if (dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd) {
+        return dt.toISOString();
+      }
+      return raw;
+    }
+
+    const dt = new Date(raw);
+    if (!isNaN(dt)) return dt.toISOString();
+    return raw;
   };
 
   // Render editable cell
@@ -165,67 +318,45 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     const lookupField = fieldName.replace(/\*/g, '').trim();
     const lookupLower = lookupField.toLowerCase();
     const isDropdownField = dropdownFields[lookupField];
-    const isProductField = lookupField.toLowerCase() === 'product';
     const cellKey = `${rowIndex}-${lookupField}`;
 
+    // Non-selector columns are always inline-editable.
+    if (!isDropdownField) {
+      const inlineValue = lookupLower === 'since' ? formatDateForDisplay(value) : (value || '');
+      return (
+        <TextField
+          type="text"
+          value={inlineValue}
+          onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
+          size="small"
+          placeholder={lookupLower === 'since' ? 'DD-MM-YYYY' : ''}
+          sx={inlineInputSx}
+        />
+      );
+    }
+
     if (editingCell?.row === rowIndex && editingCell?.field === fieldName) {
-      if (isDropdownField) {
-        return (
-          <Select
-            value={value || ''}
-            onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
-            size="small"
-            autoFocus
-            open={openDropdown === cellKey}
-            onOpen={() => setOpenDropdown(cellKey)}
-            onClose={() => {
-              setOpenDropdown(null);
-              setEditingCell(null);
-            }}
-            sx={{ width: '100%' }}
-          >
-            {isDropdownField.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </Select>
-        );
-      } else if (lookupLower === 'since') {
-        // Render a native date picker for 'Since' field
-        const dateVal = formatDateForInput(value);
-        return (
-          <TextField
-            type="date"
-            value={dateVal}
-            onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
-            size="small"
-            autoFocus
-            onBlur={() => setEditingCell(null)}
-            inputProps={{ style: { padding: '8px 10px' } }}
-            sx={{ width: '100%' }}
-          />
-        );
-      } else {
-        // For non-dropdown fields, allow text input
-        return (
-          <TextField
-            value={value || ''}
-            onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
-            size="small"
-            autoFocus
-            onBlur={() => setEditingCell(null)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setEditingCell(null);
-              } else if (e.key === 'Escape') {
-                setEditingCell(null);
-              }
-            }}
-            sx={{ width: '100%' }}
-          />
-        );
-      }
+      return (
+        <Select
+          value={value || ''}
+          onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
+          size="small"
+          autoFocus
+          open={openDropdown === cellKey}
+          onOpen={() => setOpenDropdown(cellKey)}
+          onClose={() => {
+            setOpenDropdown(null);
+            setEditingCell(null);
+          }}
+          sx={selectorInputSx}
+        >
+          {isDropdownField.map((option) => (
+            <MenuItem key={option} value={option}>
+              {option}
+            </MenuItem>
+          ))}
+        </Select>
+      );
     }
 
     return (
@@ -235,18 +366,33 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
           if (isDropdownField) setOpenDropdown(cellKey);
         }}
         sx={{
-          cursor: 'pointer',
-          padding: '8px',
-          borderRadius: '4px',
-          minHeight: '36px',
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: isDropdownField ? '#cfdaf5ff' : 'transparent',
-          border: isProductField && value && !isDropdownField?.includes(value) ? '2px solid #ff6b6b' : 'none',
+          ...selectorDisplaySx,
         }}
-        title={isProductField && value && !isDropdownField?.includes(value) ? 'Invalid product selection. Please select from dropdown.' : ''}
       >
-        {value || ''}
+        <Box
+          component="span"
+          sx={{
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+          }}
+        >
+          {value || ''}
+        </Box>
+        <Box
+          component="span"
+          aria-hidden="true"
+          sx={{
+            flexShrink: 0,
+            color: '#1e3a5f',
+            fontSize: '1.2rem',
+            lineHeight: 1,
+          }}
+        >
+          ▾
+        </Box>
       </Box>
     );
   };
@@ -258,8 +404,8 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'Salutation',
       'Name *',
       'Designation',
-      'Mobile *',
-      'Email *',
+      'Mobile',
+      'Email',
       'Address Line 1',
       'Address Line 2',
       'City',
@@ -272,7 +418,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       'Since *',
       'Requirement',
       'Category',
-      'Product *',
+      'Product',
       'Website',
       'Notes',
       'Tags',
@@ -296,7 +442,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       (sourceOptions && sourceOptions.length > 0) ? sourceOptions[0] : 'LinkedIn',
       'Negotiation',
       '50000',
-      '2024-01-15',
+      '15-01-2024',
       'Product A, Product B',
       'Electronics',
       'Sample Product',
@@ -308,12 +454,12 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
     // Dropdown options
     const salutationOptions = ['Mr.', 'Ms.', 'Mrs.'];
-    const defaultSourceOptions = ['Website', 'Referral', 'Social Media', 'Direct', 'Partner'];
+    const defaultSourceOptions = ['Manual', 'Indiamart', 'Exhibition',];
     const stageOptions = ['Discussion','Appointment', 'Demo', 'Decided', 'Inactive'];
     const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
-    const countryOptions = countries.map(c => c.name).slice(0, 50); // Top countries
-    const stateOptions = Object.values(stateList).slice(0, 36); // All Indian states
-    const cityOptions = Array.isArray(cities) ? cities.slice(0, 100) : []; // Top cities
+    const countryOptions = countries.map(c => c.name).filter(Boolean);
+    const stateOptions = Object.values(stateList).filter(Boolean);
+    const cityOptions = Array.isArray(cities) ? cities.filter(Boolean) : [];
 
     // Use component `sourceOptions` state when available, otherwise fallback to defaults
     const sourceList = (sourceOptions && sourceOptions.length > 0) ? sourceOptions : defaultSourceOptions;
@@ -358,7 +504,6 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
       // Add lists data to the hidden sheet
       const salutationRow = ['Salutation', ...salutationOptions];
-      const sourceRow = ['Source', ...sourceList];
       const stageRow = ['Stage', ...stageOptions];
       const categoryRow = ['Category', ...categoryOptions];
       const countryRow = ['Country', ...countryOptions];
@@ -366,7 +511,6 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       const cityRow = ['City', ...cityOptions];
 
       listsSheet.addRow(salutationRow);
-      listsSheet.addRow(sourceRow);
       listsSheet.addRow(stageRow);
       listsSheet.addRow(categoryRow);
       listsSheet.addRow(countryRow);
@@ -421,7 +565,6 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
       // Get column indices
       const salutationCol = headerMap['salutation'];
-      const sourceCol = headerMap['source'];
       const stageCol = headerMap['stage'];
       const categoryCol = headerMap['category'];
       const countryCol = headerMap['country'];
@@ -430,16 +573,15 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
 
       // Apply validations
       if (salutationCol) applyValidationToColumn(salutationCol, `=${makeRange(1, salutationOptions.length)}`);
-      if (sourceCol) applyValidationToColumn(sourceCol, `=${makeRange(2, sourceList.length)}`);
-      if (stageCol) applyValidationToColumn(stageCol, `=${makeRange(3, stageOptions.length)}`);
-      if (categoryCol) applyValidationToColumn(categoryCol, `=${makeRange(4, categoryOptions.length)}`);
-      if (countryCol) applyValidationToColumn(countryCol, `=${makeRange(5, countryOptions.length)}`);
-      if (stateCol) applyValidationToColumn(stateCol, `=${makeRange(6, stateOptions.length)}`);
-      if (cityCol) applyValidationToColumn(cityCol, `=${makeRange(7, cityOptions.length)}`);
+      if (stageCol) applyValidationToColumn(stageCol, `=${makeRange(2, stageOptions.length)}`);
+      if (categoryCol) applyValidationToColumn(categoryCol, `=${makeRange(3, categoryOptions.length)}`);
+      if (countryCol) applyValidationToColumn(countryCol, `=${makeRange(4, countryOptions.length)}`);
+      if (stateCol) applyValidationToColumn(stateCol, `=${makeRange(5, stateOptions.length)}`);
+      if (cityCol) applyValidationToColumn(cityCol, `=${makeRange(6, cityOptions.length)}`);
 
       // Highlight header cells for dropdown columns
       const headerRow = templateSheet.getRow(1);
-      [salutationCol, sourceCol, stageCol, categoryCol, countryCol, stateCol, cityCol].forEach((colIndex) => {
+      [salutationCol, stageCol, categoryCol, countryCol, stateCol, cityCol].forEach((colIndex) => {
         if (!colIndex) return;
         const hdrCell = headerRow.getCell(colIndex);
         hdrCell.font = { bold: true };
@@ -454,9 +596,6 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       const requiredFieldsMap = {
         'business': true,
         'name': true,
-        'mobile': true,
-        'email': true,
-        'product': true,
         'source': true,
         'since': true
       };
@@ -610,9 +749,6 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
     const fieldMapping = {
       'Business': ['Business', 'Business *', 'business'],
       'Name': ['Name', 'Name *', 'name'],
-      'Mobile': ['Mobile', 'Mobile *', 'mobile'],
-      'Email': ['Email', 'Email *', 'email'],
-      'Product': ['Product', 'Product *', 'product'],
       'Source': ['Source', 'Source *', 'source'],
       'Since': ['Since', 'Since *', 'since']
     };
@@ -694,7 +830,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
         return;
       }
 
-      // Ensure required textual fields (Source / Assigned To) exist for selected rows
+      // Ensure required textual fields exist for selected rows
       const missingSpecial = [];
       selectedArray.forEach((row, idx) => {
         const sourceKey = Object.keys(row).find(k => k.replace(/\*/g, '').trim().toLowerCase() === 'source');
@@ -740,15 +876,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
           else if (lowerKey === 'next talk') apiKey = 'nextTalk';
           else if (lowerKey === 'transferred on') apiKey = 'transferredOn';
 
-          // Treat common placeholder values as empty - only for assignedToName and productName
-          // Only filter if value exactly matches placeholder (not substring match)
-          const placeholders = ['user name', 'sample product'];
-          if (value && typeof value === 'string' && (apiKey === 'assignedToName' || apiKey === 'productName')) {
-            const valueLower = value.toLowerCase().trim();
-            if (placeholders.includes(valueLower)) {
-              value = '';
-            }
-          }
+          // Keep imported text as-is; do not drop product values because they may be valid labels.
 
           // Convert empty strings to null/empty for optional fields
           if (value === '' || value === null || value === undefined) {
@@ -759,15 +887,9 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
             }
           }
 
-          // Additional validation: ensure required 'since' is a date when provided
+          // Normalize 'since' to ISO when value is a supported date format
           if (apiKey === 'since' && value) {
-            const dt = new Date(value);
-            if (isNaN(dt)) {
-              // keep raw value; validation will catch invalid/missing required fields later
-            } else {
-              // normalize to ISO date
-              value = dt.toISOString();
-            }
+            value = parseSinceToISO(value);
           }
 
           // Convert potential to number
@@ -849,8 +971,19 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
       // Broadcast import success to other components/tabs
       try {
         const createdCount = response.data && (response.data.created || response.data.created === 0) ? response.data.created : 0;
+        const importedProductNames = Array.from(new Set(
+          normalizedArray
+            .map((row) => (row.productName || '').toString().trim())
+            .filter(Boolean)
+        ));
         window.dispatchEvent(new CustomEvent('leads:imported', { detail: { count: createdCount } }));
+        window.dispatchEvent(new CustomEvent('lead-products:updated', { detail: { names: importedProductNames } }));
         localStorage.setItem('leads:imported', JSON.stringify({ ts: Date.now(), count: createdCount }));
+        localStorage.setItem('lead-products:updated', JSON.stringify({ ts: Date.now(), names: importedProductNames }));
+
+        if (importedProductNames.length > 0) {
+          setProductOptions((prev) => Array.from(new Set([...(prev || []), ...importedProductNames])));
+        }
       } catch (e) { /* ignore */ }
 
       // Clear data if fully successful
@@ -902,7 +1035,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
         instructions={[
           'Download the template Excel file below',
           'Fill in your lead data following the template format',
-          'Required fields marked with ★ (Business, Name, Mobile, Email, Product, Source, Since)',
+          'Required fields marked with ★ (Business, Name, Source, Since)',
           'Save the file as CSV format',
           'Upload the completed CSV file'
         ]}
@@ -940,10 +1073,28 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
           </Typography>
 
           <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
-            <Table stickyHeader size="small">
+            <Table
+              stickyHeader
+              size="small"
+              sx={{
+                tableLayout: 'fixed',
+                minWidth: 'max-content',
+                '& .MuiTableRow-root:hover .MuiTableCell-root': {
+                  backgroundColor: '#f8fbff',
+                },
+              }}
+            >
+              <colgroup>
+                <col style={{ width: selectionColumnWidth }} />
+                <col style={{ width: rowNumberColumnWidth }} />
+                {importedData.length > 0 && Object.keys(importedData[0]).map((header) => {
+                  const cleanedHeader = header.replace(/\*/g, '').trim();
+                  return <col key={`col-${header}`} style={{ width: getColumnWidth(cleanedHeader) }} />;
+                })}
+              </colgroup>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ width: 60 }}>
+                  <TableCell sx={{ ...previewHeaderCellSx, width: selectionColumnWidth, minWidth: selectionColumnWidth, maxWidth: selectionColumnWidth }}>
                     <Checkbox
                       size="small"
                       checked={
@@ -965,21 +1116,22 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>No.</TableCell>
+                  <TableCell sx={{ ...previewHeaderCellSx, width: rowNumberColumnWidth, minWidth: rowNumberColumnWidth, maxWidth: rowNumberColumnWidth }}>No.</TableCell>
                   {importedData.length > 0 &&
                     Object.keys(importedData[0]).map((header) => {
                       const cleanedHeader = header.replace(/\*/g, '').trim();
                       const isRequired = requiredFields.includes(cleanedHeader);
+                      const colWidth = getColumnWidth(cleanedHeader);
                       return (
                         <TableCell
                           key={header}
                           sx={{
-                            fontWeight: 'bold',
+                            ...previewHeaderCellSx,
                             color: isRequired ? '#d32f2f' : 'inherit',
                             backgroundColor: isRequired ? '#ffebee' : 'transparent',
-                            padding: '12px 8px',
-                            width: columnWidths[cleanedHeader] || 'auto',
-                            minWidth: columnWidths[cleanedHeader] || '80px'
+                            width: colWidth,
+                            minWidth: colWidth,
+                            maxWidth: colWidth,
                           }}
                         >
                           {cleanedHeader}
@@ -991,8 +1143,16 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
               </TableHead>
               <TableBody>
                 {importedData.map((row, rowIndex) => (
-                  <TableRow key={rowIndex} hover>
-                    <TableCell>
+                  <TableRow
+                    key={rowIndex}
+                    hover
+                    sx={{
+                      '& .MuiTableCell-root': {
+                        backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#fbfcfe',
+                      },
+                    }}
+                  >
+                    <TableCell sx={{ ...previewBodyCellSx, width: selectionColumnWidth, minWidth: selectionColumnWidth, maxWidth: selectionColumnWidth }}>
                       <Checkbox
                         size="small"
                         checked={importSelectedRows.has(rowIndex)}
@@ -1006,26 +1166,27 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                         }}
                       />
                     </TableCell>
-                    <TableCell>{rowIndex + 1}</TableCell>
+                    <TableCell sx={{ ...previewBodyCellSx, width: rowNumberColumnWidth, minWidth: rowNumberColumnWidth, maxWidth: rowNumberColumnWidth, textAlign: 'center', color: '#475467', fontWeight: 600 }}>
+                      {rowIndex + 1}
+                    </TableCell>
                     {Object.keys(row).map((key, cellIndex) => {
                       const cleanedKey = key.replace(/\*/g, '').trim();
                       const isDropdown = !!dropdownFields[cleanedKey];
-                      const colWidth = columnWidths[cleanedKey] || 'auto';
+                      const colWidth = getColumnWidth(cleanedKey);
                       return (
                       <TableCell
                         key={`${rowIndex}-${cellIndex}`}
                         sx={{
+                          ...previewBodyCellSx,
                           width: colWidth,
-                          minWidth: colWidth === 'auto' ? '80px' : colWidth,
-                          padding: 0,
+                          minWidth: colWidth,
+                          maxWidth: colWidth,
+                          padding: '4px 6px',
                           backgroundColor: isDropdown
-                            ? '#fffef0'
+                            ? '#f7faff'
                             : requiredFields.includes(cleanedKey)
-                            ? '#ffebee'
+                            ? '#fff7f7'
                             : 'transparent',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
                         }}
                       >
                         {renderEditableCell(rowIndex, key, row[key])}
@@ -1207,7 +1368,7 @@ const LeadsCSVImport = ({ isOpen, onClose, onImportSuccess }) => {
                     <strong>Required Fields (must be filled):</strong>
                   </Typography>
                   <Typography variant="body2" color="warning.dark" sx={{ mb: 1, ml: 2 }}>
-                    • Business, Name, Mobile, Email, Product, Source, Since
+                    • Business, Name, Source, Since
                   </Typography>
                   <Typography variant="body2" color="warning.dark">
                     <strong>How to proceed:</strong><br/>

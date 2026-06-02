@@ -173,16 +173,16 @@ const TravelReport = () => {
         exec = found.name || '';
         execId = found.id !== undefined && found.id !== null ? String(found.id) : '';
       } else if (lead.assignedTo) {
-        exec = lead.assignedTo;
+        exec = getEmpName(lead.assignedTo);
         execId = lead.assigned_to_id ?? lead.assignedToId ?? '';
       } else if (lead.assigned_to) {
-        exec = lead.assigned_to;
+        exec = getEmpName(lead.assigned_to);
         execId = lead.assigned_to_id ?? lead.assignedToId ?? '';
       } else if (lead.assignedToName) {
-        exec = lead.assignedToName;
+        exec = String(lead.assignedToName || '');
         execId = lead.assigned_to_id ?? lead.assignedToId ?? '';
       } else if (lead.assigned_to_name) {
-        exec = lead.assigned_to_name;
+        exec = String(lead.assigned_to_name || '');
         execId = lead.assigned_to_id ?? lead.assignedToId ?? '';
       }
     }

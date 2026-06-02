@@ -15,6 +15,7 @@ type LeadInteraction struct {
 	Type      string    `json:"type"`      // call, meeting, whatsapp, email, site-visit
 	Summary   string    `json:"summary"`   // short line
 	Details   string    `json:"details"`   // long notes
+	Source    string    `json:"source"`    // origin of this interaction (e.g. "quotation", "crm")
 	Timestamp time.Time `json:"timestamp"` // defaults to now
 
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`

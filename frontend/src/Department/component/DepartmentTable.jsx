@@ -10,8 +10,13 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function DepartmentTable({ rows, onEdit, onDelete, page = 0, rowsPerPage = 10 }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   // Slice rows for pagination (controlled by parent)
   const paginatedRows = rows.slice(
     page * rowsPerPage,
@@ -39,13 +44,16 @@ export default function DepartmentTable({ rows, onEdit, onDelete, page = 0, rows
                 <TableCell sx={{ width: '40%' }}>{row.description}</TableCell>
 
                 <TableCell align="center" sx={{ width: 160 }}>
-                  <IconButton onClick={() => onEdit(row)}>
-                    <EditIcon color="primary" />
-                  </IconButton>
-
-                  <IconButton onClick={() => onDelete(row.id)}>
-                    <DeleteIcon color="error" />
-                  </IconButton>
+                  {perms?.can_update && (
+                    <IconButton onClick={() => onEdit(row)}>
+                      <EditIcon color="primary" />
+                    </IconButton>
+                  )}
+                  {perms?.can_delete && (
+                    <IconButton onClick={() => onDelete(row.id)}>
+                      <DeleteIcon color="error" />
+                    </IconButton>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

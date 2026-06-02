@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
 import { getAuthHeaders } from '../../../../config/Config';
+import { useAuth } from '../../../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import '../Sources/sources.scss';
 
 const apiBase = '/api';
 
 const RejectionReasons = ({ isOpen, onClose }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [items, setItems] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -13,6 +18,9 @@ const RejectionReasons = ({ isOpen, onClose }) => {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editing, setEditing] = useState({ id: null, title: '', code: '' });
+
+  const addInputRef = useRef(null);
+  const editInputRef = useRef(null);
 
   const genCode = (title) => title.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').slice(0, 50);
 
@@ -30,6 +38,18 @@ const RejectionReasons = ({ isOpen, onClose }) => {
   };
 
   useEffect(() => { if (isOpen) fetchReasons(); }, [isOpen]);
+
+  useEffect(() => {
+    if (showAddModal && addInputRef.current) {
+      setTimeout(() => addInputRef.current.focus(), 50);
+    }
+  }, [showAddModal]);
+
+  useEffect(() => {
+    if (showEditModal && editInputRef.current) {
+      setTimeout(() => editInputRef.current.focus(), 50);
+    }
+  }, [showEditModal]);
 
   const handleAdd = async () => {
     if (!newTitle.trim()) { alert('Please enter a title'); return; }
@@ -76,6 +96,9 @@ const RejectionReasons = ({ isOpen, onClose }) => {
   };
 
   const handleKeyPress = (e) => { if (e.key === 'Enter') handleAdd(); };
+  
+  const handleEditKeyPress = (e) => { if (e.key === 'Enter') handleUpdate(); };
+
   if (!isOpen) return null;
 
   return (
@@ -84,7 +107,9 @@ const RejectionReasons = ({ isOpen, onClose }) => {
         <div className="tandc-dialog-header">
           <div className="title">Rejection Reasons</div>
           <div className="actions">
+            {perms?.can_create && (
             <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            )}
             <button className="close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -101,12 +126,16 @@ const RejectionReasons = ({ isOpen, onClose }) => {
                   {item.title}
                 </div>
                 <div className="item-actions">
+                  {perms?.can_update && (
                   <button className="icon-button edit" onClick={() => openEdit(item)} title="Edit reason">
                     <FaEdit />
                   </button>
+                  )}
+                  {perms?.can_delete && (
                   <button className="icon-button delete" onClick={() => handleDelete(item.id)} title="Delete reason">
                     <FaTrash />
                   </button>
+                  )}
                 </div>
               </div>
             ))
@@ -126,7 +155,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
               <div className="tandc-dialog-body">
                 <div className="form-row">
                   <label htmlFor="reason-input">Rejection Reason</label>
-                  <input id="reason-input" type="text" placeholder="Enter title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyPress={handleKeyPress} autoFocus />
+                  <input ref={addInputRef} id="reason-input" type="text" placeholder="Enter title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyPress={handleKeyPress} />
                 </div>
               </div>
 
@@ -150,7 +179,7 @@ const RejectionReasons = ({ isOpen, onClose }) => {
               <div className="tandc-dialog-body">
                 <div className="form-row">
                   <label>Title</label>
-                  <input type="text" value={editing.title} onChange={(e) => setEditing(prev => ({ ...prev, title: e.target.value }))} autoFocus />
+                  <input ref={editInputRef} type="text" value={editing.title} onChange={(e) => setEditing(prev => ({ ...prev, title: e.target.value }))} onKeyPress={handleEditKeyPress} />
                 </div>
               </div>
 

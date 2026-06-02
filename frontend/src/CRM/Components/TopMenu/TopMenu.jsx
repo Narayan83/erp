@@ -17,6 +17,7 @@ import LeadDetails from '../LeadDetails/LeadDetails';
 import Pagination from '../../../CommonComponents/Pagination';
 import { BASE_URL, getAuthHeaders } from '../../../config/Config' 
 import {useAuth} from '../../../context/AuthContext';
+ 
 
 // Assigned to options will be loaded from backend users
 // (fallback to a small static list while loading)
@@ -61,7 +62,9 @@ const LOCAL_STORAGE_KEY = 'displayPreferences';
 
 const TopMenu = () => {
   // -------------------- State --------------------
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -104,8 +107,9 @@ const TopMenu = () => {
   const [filterSource, setFilterSource] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterState, setFilterState] = useState('');
+	const [masterSourceOptions, setMasterSourceOptions] = useState([]);
 
-  const sourceOptions = useMemo(() => {
+  const leadSourceOptions = useMemo(() => {
     const setS = new Set();
     (leads || []).forEach(l => {
       const s = l.source || l.Source || l.sourceName || l.SourceName || '';
@@ -115,6 +119,20 @@ const TopMenu = () => {
     });
     return Array.from(setS).sort().map(s => ({ value: s, label: s }));
   }, [leads]);
+
+	const sourceOptions = useMemo(() => {
+	  const merged = new Map();
+	  [...masterSourceOptions, ...leadSourceOptions].forEach((option) => {
+		if (!option) return;
+		const value = String(option.value || option.label || '').trim();
+		if (!value) return;
+		const key = value.toLowerCase();
+		if (!merged.has(key)) {
+		  merged.set(key, { value, label: String(option.label || value).trim() || value });
+		}
+	  });
+	  return Array.from(merged.values()).sort((a, b) => a.label.localeCompare(b.label));
+	}, [leadSourceOptions, masterSourceOptions]);
 
   const cityOptions = useMemo(() => {
     const setC = new Set();
@@ -170,6 +188,37 @@ const TopMenu = () => {
     return () => { window.removeEventListener('lead:interaction.saved', handler); };
   }, []);
 
+  useEffect(() => {
+    const fetchLeadSources = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/lead-sources`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      const normalized = list
+      .map((item) => {
+        const value = String(item?.name || item?.Name || item?.label || item?.value || '').trim();
+        return value ? { value, label: value } : null;
+      })
+      .filter(Boolean);
+      setMasterSourceOptions(normalized);
+    } catch (err) {
+      console.error('Failed to fetch lead sources:', err);
+      setMasterSourceOptions([]);
+    }
+    };
+
+    fetchLeadSources();
+
+    const refreshLeadSources = () => {
+    fetchLeadSources();
+    };
+
+    window.addEventListener('leads:imported', refreshLeadSources);
+    return () => {
+    window.removeEventListener('leads:imported', refreshLeadSources);
+    };
+  }, []);
+
   // Listen for leads import events (same-tab via CustomEvent and cross-tab via storage events)
   useEffect(() => {
     const onLeadsImported = (e) => {
@@ -194,14 +243,35 @@ const TopMenu = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/api/products?page=1&limit=1000`, { headers: getAuthHeaders() });
+    const res = await fetch(`${BASE_URL}/api/lead-products?active=true`, { headers: getAuthHeaders() });
         const data = await res.json();
-        setProducts(data.data || []);
+    const raw = data.data || data || [];
+    const normalized = Array.isArray(raw)
+      ? raw.map((p) => ({ ID: p.id ?? p.ID, Name: p.name ?? p.Name }))
+      : [];
+    setProducts(normalized);
       } catch (err) {
         setProducts([]);
       }
     };
     fetchProducts();
+
+    const onLeadProductsUpdated = () => {
+      fetchProducts();
+    };
+    const onStorage = (e) => {
+      if (e.key === 'lead-products:updated') {
+        fetchProducts();
+      }
+    };
+
+    window.addEventListener('lead-products:updated', onLeadProductsUpdated);
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('lead-products:updated', onLeadProductsUpdated);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   // Fetch employees to populate assignedToOptions
@@ -256,6 +326,36 @@ const TopMenu = () => {
     }));
   }, [assignedToOptions]);
 
+  // Backfill product text when API payload has only product_id.
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+
+    setLeads((prev) => prev.map((l) => {
+      const existingProductText =
+        l.productName ||
+        l.ProductName ||
+        l.product_name ||
+        (typeof l.product === 'string' ? l.product : '') ||
+        '';
+
+      if (String(existingProductText).trim() !== '') return l;
+
+      const rawProductId = l.product_id ?? l.productId ?? l.ProductID;
+      const productId = Number(rawProductId);
+      if (isNaN(productId) || productId <= 0) return l;
+
+      const matched = products.find((p) => Number(p.ID ?? p.id) === productId);
+      const resolvedProductName = matched ? (matched.Name || matched.name || '') : '';
+      if (!resolvedProductName) return l;
+
+      return {
+        ...l,
+        product: resolvedProductName,
+        productName: resolvedProductName,
+      };
+    }));
+  }, [products]);
+
   // Collapse dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -279,8 +379,7 @@ const TopMenu = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showStatusDropdown, showViewDropdown]);
 
-  // If navigated here from dashboard with state, apply requested filters
-  const location = useLocation();
+    // If navigated here from dashboard with state, apply requested filters
   useEffect(() => {
     if (location && location.state && location.state.statusFilter) {
       setActiveStatusFilter(location.state.statusFilter);
@@ -312,13 +411,36 @@ const TopMenu = () => {
         // Extract assigned_to_id from multiple possible backend field names
         const assignedId = lead.assigned_to_id || lead.assignedToId || (lead.assignedTo && typeof lead.assignedTo === 'number' ? lead.assignedTo : undefined);
 
+        const assignedText =
+          lead.assignedToName ||
+          lead.assigned_to_name ||
+          (typeof lead.assignedTo === 'string' ? lead.assignedTo : '') ||
+          (lead.assigned_to && typeof lead.assigned_to === 'object'
+            ? (lead.assigned_to.name || lead.assigned_to.Name || lead.assigned_to.email || '')
+            : '');
+
+        const productText =
+          lead.productName ||
+          lead.ProductName ||
+          lead.product_name ||
+          lead.product_title ||
+          (typeof lead.product === 'string' ? lead.product : '') ||
+          (lead.product && typeof lead.product === 'object'
+            ? (lead.product.Name || lead.product.name || lead.product.title || lead.product.Title || lead.product.Code || '')
+            : '');
+
         return {
           ...lead,
           starred: !!starredMap[lead.id],
-          product: lead.productName || '',
+          product: productText,
+          productName: productText,
           assigned_to_id: assignedId,
-          assignedTo: assignedId ? String(assignedId) : '',  // Store just the ID as string for later resolution
+          assignedTo: assignedText || (assignedId ? String(assignedId) : ''),
+          assignedToName: assignedText,
           // Normalize field names to match case-sensitive keys
+          source: lead.source || lead.Source || lead.enquiry_source || '',
+          stage: lead.stage || lead.Stage || lead.lead_stage || '',
+          notes: lead.notes || lead.Notes || '',
           addressLine1: lead.addressLine1 || lead.addressline1 || lead.address_line1 || lead.formData?.addressLine1 || '',
           addressLine2: lead.addressLine2 || lead.addressline2 || lead.address_line2 || lead.formData?.addressLine2 || '',
           category: lead.category || lead.Category || lead.formData?.category || '',
@@ -387,24 +509,22 @@ const TopMenu = () => {
           if (assignedToObj) assigned_to_id = assignedToObj.id;
         }
       }
-      // Resolve product to a valid numeric product_id when possible to avoid FK errors
-      let product_id = undefined;
+      // Resolve lead-product display name
       let productNameForPayload = newLeadData.product;
       if (newLeadData.product) {
         // If product is an object, extract ID and Name
         if (typeof newLeadData.product === 'object' && newLeadData.product !== null) {
-          product_id = newLeadData.product.ID || newLeadData.product.id;
           productNameForPayload = newLeadData.product.Name || newLeadData.product.name || newLeadData.product.Code || '';
         } else {
-          // Try to parse as number first
+        // Try to parse as number first and map to product name
           const numProduct = Number(newLeadData.product);
           if (!isNaN(numProduct) && numProduct !== 0) {
-            product_id = numProduct;
+          const foundProduct = products.find(p => (p.ID && Number(p.ID) === numProduct) || (p.id && Number(p.id) === numProduct));
+          productNameForPayload = foundProduct ? (foundProduct.Name || foundProduct.name || String(newLeadData.product)) : String(newLeadData.product);
           } else {
             // try to find by product name in products list
             const foundProduct = products.find(p => (p.ID && String(p.ID) === String(newLeadData.product)) || (p.id && String(p.id) === String(newLeadData.product)) || (p.Name && p.Name === newLeadData.product) || (p.name && p.name === newLeadData.product));
             if (foundProduct) {
-              product_id = foundProduct.ID || foundProduct.id;
               productNameForPayload = foundProduct.Name || foundProduct.name || foundProduct.Code || newLeadData.product;
             }
           }
@@ -436,10 +556,8 @@ const TopMenu = () => {
         productName: productNameForPayload
       };
 
-      if (product_id !== undefined) payload.product_id = product_id;
       if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
-      // Only include productName in payload if we have a name text and no product_id
-      if (!product_id && productNameForPayload) {
+      if (productNameForPayload) {
         payload.productName = productNameForPayload;
       }
 
@@ -584,7 +702,7 @@ const TopMenu = () => {
   };
 
   const handleEditRow = (lead) => {
-    let assignedToName = lead.assignedTo;
+    let assignedToName = lead.assignedToName || lead.assigned_to_name || lead.assignedTo;
     if (typeof assignedToName === 'object' && assignedToName !== null) {
       assignedToName = assignedToName.Name || assignedToName.name || assignedToName.email || '';
     } else if (typeof assignedToName === 'number') {
@@ -592,18 +710,23 @@ const TopMenu = () => {
       assignedToName = found ? found.name : '';
     }
     // Extract product name from object if needed
-    let productName = lead.product;
+    let productName = lead.productName || lead.product_name || lead.product;
     if (typeof productName === 'object' && productName !== null) {
       productName = productName.Name || productName.name || productName.Code || '';
     }
     setEditLead({
       ...lead,
       assignedTo: assignedToName,
+      assignedToName: assignedToName,
       id: lead.id,
       addressLine1: lead.addressLine1 || '',
       addressLine2: lead.addressLine2 || '',
       category: lead.category || '',
       product: productName,
+      productName: productName,
+      source: lead.source || lead.Source || lead.enquiry_source || '',
+      stage: lead.stage || lead.Stage || lead.lead_stage || '',
+      notes: lead.notes || lead.Notes || '',
       tags: lead.tags || '',
       code: lead.code || '',
       requirement: lead.requirements || lead.requirement || '',
@@ -747,7 +870,8 @@ const TopMenu = () => {
     const year = date.getFullYear();
     const hours = String(date.getHours()).padStart(2, '0');
     const mins = String(date.getMinutes()).padStart(2, '0');
-    return `${day}-${month}-${year} ${hours}:${mins}`;
+    const secs = String(date.getSeconds()).padStart(2, '0');
+    return `${day}-${month}-${year} ${hours}:${mins}:${secs}`;
   };
 
   // Resolve the display name for assignedTo fields robustly
@@ -885,17 +1009,17 @@ const TopMenu = () => {
           }
         }
 
-        // Resolve product id if possible (by id or by name from loaded products)
-        // Accept both `product` and `productName` from imported objects
-        let product_id;
+        // Resolve product name text (from imported value or mapped ID)
         const productRaw = (l.productName !== undefined && l.productName !== null) ? l.productName : l.product;
+        let normalizedProductName;
         if (productRaw !== undefined && productRaw !== null && productRaw !== '') {
           const pnum = Number(productRaw);
           if (!isNaN(pnum)) {
-            product_id = pnum;
+          const foundProduct = products.find(p => (p.ID && Number(p.ID) === pnum) || (p.id && Number(p.id) === pnum));
+          normalizedProductName = foundProduct ? (foundProduct.Name || foundProduct.name || String(productRaw)) : String(productRaw);
           } else {
             const foundProduct = products.find(p => (p.ID && (String(p.ID) === String(productRaw) || p.Name === productRaw)) || (p.id && (String(p.id) === String(productRaw) || p.name === productRaw)));
-            if (foundProduct) product_id = foundProduct.ID || foundProduct.id;
+          normalizedProductName = foundProduct ? (foundProduct.Name || foundProduct.name || String(productRaw)) : String(productRaw);
           }
         }
 
@@ -914,7 +1038,7 @@ const TopMenu = () => {
           stage: l.stage || l.lead_stage || l.STATUS || 'New',
           potential: parseFloat((l.potential || l.estimated_value || '0').toString()) || 0,
           since: (() => {
-            const d = new Date(l.since || l.QUERY_TIME || l.enquiry_date || l.createdAt);
+            const d = new Date(l.since || l.queryTime || l.QUERY_TIME || l.enquiry_date || l.createdAt);
             return isNaN(d) ? new Date().toISOString() : d.toISOString();
           })(),
           website: l.website || '',
@@ -926,10 +1050,9 @@ const TopMenu = () => {
           tags: l.tags || (Array.isArray(l.lead_tags) ? l.lead_tags.join(',') : ''),
         };
 
-        if (product_id !== undefined) payload.product_id = product_id;
         if (assigned_to_id !== undefined) payload.assigned_to_id = assigned_to_id;
         // Also send textual values so backend can store exact CSV text when IDs are not resolvable
-        const sendProductText = (l.productName !== undefined && l.productName !== null && l.productName !== '') ? l.productName : l.product;
+        const sendProductText = normalizedProductName || ((l.productName !== undefined && l.productName !== null && l.productName !== '') ? l.productName : l.product);
         if (sendProductText !== undefined && sendProductText !== null && sendProductText !== '') payload.productName = sendProductText;
         const sendAssignedText = (l.assignedToName !== undefined && l.assignedToName !== null && l.assignedToName !== '') ? l.assignedToName : l.assignedTo;
         if (sendAssignedText !== undefined && sendAssignedText !== null && sendAssignedText !== '') payload.assignedToName = sendAssignedText;
@@ -1010,7 +1133,7 @@ const TopMenu = () => {
         } else if (field.key === 'potential') {
           value = lead.potential || '';
         } else if (field.key === 'since') {
-          value = formatDate(lead.since);
+          value = formatDateTime(lead.since);
         } else if (field.key === 'lastTalk' || field.key === 'nextTalk' || field.key === 'transferredOn') {
           value = formatDateStrict(lead[field.key], { hideIfNow: true });
         } else if (field.key === 'assignedTo') {
@@ -1622,8 +1745,8 @@ const TopMenu = () => {
                         } else if (field.key === 'potential') {
                           value = `₹${lead.potential || ''}`;
                         } else if (field.key === 'since') {
-                          // 'since' can be shown even if it's today
-                          value = formatDate(lead.since);
+                          // Show date + time (e.g. IndiaMART QUERY_TIME) so it differs from Created at on the same day
+                          value = formatDateTime(lead.since);
                         } else if (field.key === 'lastTalk') {
                           const recentInteraction = getLastTalkForLead(lead.id);
                           // Show very recent interactions immediately (don't hide 'now')
@@ -1740,23 +1863,12 @@ const TopMenu = () => {
             console.log('Imported leads received:', importedLeads);
             if (importedLeads && importedLeads.length > 0) {
               try {
-                // Filter out leads with missing required fields (Source, Since are required; Assigned To is optional)
+                // For IndiaMART import, only Name is mandatory.
                 const validLeads = importedLeads.filter(lead => {
-                  const business = lead.company || lead.business || '';
-                  const name = lead.name || lead.contact || '';
-                  const email = lead.email || '';
-                  const mobile = lead.phone || lead.mobile || '';
-                  const source = lead.source || lead.Source || lead.enquiry_source || 'IndiaMART';
-                  const since = lead.since || lead.Since || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString();
-
-                  if (!business || !name || !email || !mobile) {
+                  const name = String(lead.name || lead.contact || '').trim();
+                  if (!name) {
                     console.warn('Skipping lead with missing required fields:', {
-                      business,
                       name,
-                      email,
-                      mobile,
-                      source,
-                      since,
                       lead
                     });
                     return false;
@@ -1765,32 +1877,37 @@ const TopMenu = () => {
                 });
 
                 if (validLeads.length === 0) {
-                  alert('No valid leads to import. Make sure each lead has company, name, email, and mobile.');
+                  alert('No valid leads to import. Name is required for IndiaMART import.');
                   setShowImportDialog(false);
                   return;
                 }
 
+                const textOrNA = (value) => {
+                  const text = String(value ?? '').trim();
+                  return text === '' ? 'NA' : text;
+                };
+
                 // Prepare leads for backend import
                 const leadsToImport = validLeads.map(lead => ({
-                  business: lead.company || lead.business || '',
-                  name: lead.name || lead.contact || 'Unknown',
-                  email: lead.email || '',
-                  mobile: lead.phone || lead.mobile || '',
-                  product: lead.product || lead.productName || '',
-                  requirements: lead.message || lead.requirement || lead.requirements || '',
-                  source: lead.source || 'IndiaMART',
-                  stage: lead.stage || 'New',
-                  category: lead.category || '',
-                  city: lead.city || '',
-                  state: lead.state || '',
-                  country: lead.country || '',
-                  gstin: lead.gstin || '',
-                  addressLine1: lead.addressLine1 || '',
-                  addressLine2: lead.addressLine2 || '',
-                  designation: lead.designation || '',
+                  business: textOrNA(lead.company || lead.business),
+                  name: String(lead.name || lead.contact || '').trim(),
+                  email: textOrNA(lead.email),
+                  mobile: textOrNA(lead.phone || lead.mobile),
+                  productName: textOrNA(lead.productName || lead.product || lead.product_name || lead.QUERY_PRODUCT_NAME),
+                  requirements: textOrNA(lead.message || lead.requirement || lead.requirements),
+                  source: textOrNA(lead.source || lead.Source || lead.enquiry_source || 'IndiaMART'),
+                  stage: textOrNA(lead.stage || 'New'),
+                  category: textOrNA(lead.category || lead.QUERY_CATEGORY_NAME),
+                  city: textOrNA(lead.city || lead.SENDER_CITY),
+                  state: textOrNA(lead.state || lead.SENDER_STATE),
+                  country: textOrNA(lead.country || lead.buyer_country),
+                  gstin: textOrNA(lead.gstin),
+                  addressLine1: textOrNA(lead.addressLine1 || lead.buyer_address),
+                  addressLine2: textOrNA(lead.addressLine2),
+                  designation: textOrNA(lead.designation),
                   potential: parseInt(lead.estimatedValue || lead.potential || '0') || 0,
-                  tags: lead.tags || '',
-                  since: lead.since || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString()
+                  tags: textOrNA(lead.tags),
+                  since: lead.since || lead.queryTime || lead.QUERY_TIME || lead.enquiry_date || new Date().toISOString()
                 }));
 
                 // Call backend import endpoint with array directly

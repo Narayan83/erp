@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
 import { getAuthHeaders } from '../../../../config/Config';
+import { useAuth } from '../../../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import './sources.scss';
 
 const apiBase = '/api';
 
 const Sources = ({ isOpen, onClose }) => {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [sources, setSources] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
@@ -13,6 +18,9 @@ const Sources = ({ isOpen, onClose }) => {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSource, setEditingSource] = useState({ id: null, name: '', code: '', description: '' });
+
+  const addInputRef = useRef(null);
+  const editInputRef = useRef(null);
 
   const genCode = (name) => name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').slice(0, 50);
 
@@ -39,6 +47,18 @@ const Sources = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen) fetchSources();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (showAddModal && addInputRef.current) {
+      setTimeout(() => addInputRef.current.focus(), 50);
+    }
+  }, [showAddModal]);
+
+  useEffect(() => {
+    if (showEditModal && editInputRef.current) {
+      setTimeout(() => editInputRef.current.focus(), 50);
+    }
+  }, [showEditModal]);
 
   const handleAddSource = async () => {
     if (!newSourceName.trim()) { alert('Please enter a source name'); return; }
@@ -95,6 +115,9 @@ const Sources = ({ isOpen, onClose }) => {
   };
 
   const handleKeyPress = (e) => { if (e.key === 'Enter') handleAddSource(); };
+  
+  const handleEditKeyPress = (e) => { if (e.key === 'Enter') handleUpdateSource(); };
+
   if (!isOpen) return null;
 
   return (
@@ -103,7 +126,9 @@ const Sources = ({ isOpen, onClose }) => {
         <div className="tandc-dialog-header">
           <div className="title">Lead Sources</div>
           <div className="actions">
+            {perms?.can_create && (
             <button className="btn-add small" onClick={() => setShowAddModal(true)}>+ Add</button>
+            )}
             <button className="close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -120,12 +145,16 @@ const Sources = ({ isOpen, onClose }) => {
                   {source.name}
                 </div>
                 <div className="item-actions">
+                  {perms?.can_update && (
                   <button className="icon-button edit" onClick={() => openEdit(source)} title="Edit source">
                     <FaEdit />
                   </button>
+                  )}
+                  {perms?.can_delete && (
                   <button className="icon-button delete" onClick={() => handleDeleteSource(source.id)} title="Delete source">
                     <FaTrash />
                   </button>
+                  )}
                 </div>
               </div>
             ))
@@ -146,7 +175,7 @@ const Sources = ({ isOpen, onClose }) => {
             <div className="tandc-dialog-body">
               <div className="form-row">
                 <label htmlFor="source-input">Source</label>
-                <input id="source-input" type="text" placeholder="Enter source name" value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} onKeyPress={handleKeyPress} autoFocus />
+                <input ref={addInputRef} id="source-input" type="text" placeholder="Enter source name" value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} onKeyPress={handleKeyPress} />
               </div>
             </div>
 
@@ -170,7 +199,7 @@ const Sources = ({ isOpen, onClose }) => {
             <div className="tandc-dialog-body">
               <div className="form-row">
                 <label htmlFor="edit-source-name">Source</label>
-                <input id="edit-source-name" type="text" placeholder="Enter source name" value={editingSource.name} onChange={(e) => setEditingSource(prev => ({ ...prev, name: e.target.value }))} autoFocus />
+                <input ref={editInputRef} id="edit-source-name" type="text" placeholder="Enter source name" value={editingSource.name} onChange={(e) => setEditingSource(prev => ({ ...prev, name: e.target.value }))} onKeyPress={handleEditKeyPress} />
               </div>
             </div>
 

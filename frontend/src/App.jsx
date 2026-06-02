@@ -41,6 +41,7 @@ import Series from "./Admin Master/page/Series/Series";
 
 import EmployeeListPage from "./Employee/page/employee_list_page";
 import EmployeeFormPage from "./Employee/page/EmployeeFormPage";
+import ManageEmployees from "./Employee/page/ManageEmployees";
 import Department from "./Department/page/Department";
 import Designation from "./Designation/pages/Designations.jsx";
 import AssignUserToEmployee from "./AssignUserToEmployee/AssignUserToEmployee";
@@ -50,6 +51,7 @@ import LeadsDashboard from "./CRM/Components/LeadsDashboard/Dashboard";
 import AccountPage from "./CRM/Pages/Account/Account";
 import Customize from './CRM/Pages/Customize/Customize';
 import Report from './CRM/Pages/Reports/Report';
+import AllReports from './CRM/Pages/Reports/AllReports';
 import SalesInteractions from './CRM/Pages/Reports/SalesInteractions';
 import Followup from './CRM/Pages/Reports/Followup';
 import NoReports from './CRM/Pages/Reports/NoReports';
@@ -108,17 +110,17 @@ function AppLayout({ children }) {
       {isNoLayout ? (
         children
       ) : (
-        <>
+        <div className="erp-app">
           <Header />
-          <div className="main d-flex">
-            <div className={`main-side-bar-wraper ${isToggleSideBar === true ? 'toggle-menu' : ''}`}>
+          <div className="erp-body">
+            <aside className={`erp-sidebar ${isToggleSideBar ? "is-collapsed" : ""}`}>
               <MainSideBar />
-            </div>
-            <div className={`content ${isToggleSideBar === true ? 'toggle-menu' : ''}`}>
+            </aside>
+            <main className={`erp-main ${isToggleSideBar ? "sidebar-collapsed" : ""}`}>
               {children}
-            </div>
+            </main>
           </div>
-        </>
+        </div>
       )}
     </myContext.Provider>
   );
@@ -148,6 +150,7 @@ function App() {
             {/* Layout routes - Protected */}
             <Route element={<PrivateRoute><Outlet /></PrivateRoute>}>
               <Route path="/home" element={<HomePage />} />
+              <Route path="/dashboard" element={<HomePage />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
 
@@ -174,6 +177,7 @@ function App() {
               <Route path="/employeemaster" element={< EmployeeFormPage />} />
               <Route path="/employeemaster/:id" element={< EmployeeFormPage />} />
               <Route path="/employeemanagement" element={< EmployeeListPage />} />
+              <Route path="/manage-employees" element={<ManageEmployees />} />
               <Route path="/assignusertoemployee" element={<AssignUserToEmployee />} />
 
               <Route path="/departmentmaster" element={< Department />} />
@@ -191,6 +195,7 @@ function App() {
               <Route path="/account" element={<AccountPage />} />
               <Route path="/customize" element={<Customize />} />
               <Route path="/reports" element={<Report />} />
+              <Route path="/reports/all-reports" element={<AllReports />} />
               <Route path="/reports/sales-interactions" element={<SalesInteractions />} />
               <Route path="/reports/followups" element={<Followup />} />
               <Route path="/reports/no-reports" element={<NoReports />} />

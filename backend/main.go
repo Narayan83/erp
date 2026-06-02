@@ -7,6 +7,7 @@ import (
 	handler "erp.local/backend/handlers"
 	"erp.local/backend/initializers"
 	"erp.local/backend/middleware"
+	"erp.local/backend/models"
 	"erp.local/backend/seeds"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -17,6 +18,11 @@ func init() {
 
 	initializers.LoadEnviromentVariables()
 	initializers.ConnectToDb()
+	if err := initializers.DB.AutoMigrate(&models.CRMTag{}, &models.LeadCategory{}, &models.EmployeeUserRelation{}, &models.DocumentInteraction{}, &models.DocumentAction{}, &models.ServiceItem{}, &models.AuditLog{}); err != nil {
+		log.Fatalf("Failed to migrate tables: %v", err)
+	}
+	initializers.EnsureAuditLogsTable()
+	initializers.CreateRequiredDirectories()
 	seeds.SeedAll()
 }
 
@@ -47,6 +53,8 @@ func main() {
 	// Lead interactions and followups DB
 	handler.SetLeadInteractionDB(initializers.DB)
 	handler.SetLeadFollowupDB(initializers.DB)
+	handler.SetDocumentInteractionDB(initializers.DB)
+	handler.SetDocumentActionDB(initializers.DB)
 	handler.SetRolesDB(initializers.DB)
 	// Initialize role-management DB used by role permission handlers
 	handler.SetRolesManagementDB(initializers.DB)
@@ -78,8 +86,12 @@ func main() {
 	// CRM/Leads Config
 	handler.SetCRMTagDB(initializers.DB)
 	handler.SetLeadSourceDB(initializers.DB)
+	handler.SetLeadCategoryDB(initializers.DB)
+	handler.SetLeadProductDB(initializers.DB)
 	handler.SetRejectionReasonDB(initializers.DB)
 	handler.SetServiceItemDB(initializers.DB)
+	handler.SetAuditLogDB(initializers.DB)
+	initializers.EnsureAuditLogsTable()
 
 	// set up fiber
 	app := fiber.New()
@@ -203,15 +215,22 @@ func main() {
 	// Products
 	api.Post("/products", handler.CreateProduct)
 	api.Get("/products", handler.GetAllProducts)
+	api.Get("/products/codes", handler.GetProductCodes)
+	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
+	api.Get("/products/stats", handler.GetProductStats)
+	api.Post("/products/bulk-image", handler.BulkUploadProductImage)
+	api.Get("/products/bulk-update/columns", handler.GetProductBulkUpdateColumns)
+	api.Post("/products/bulk-update-column", handler.BulkUpdateProductColumn)
+	api.Get("/audit-logs", handler.ListAuditLogs)
+	api.Get("/audit_logs", handler.ListAuditLogs) // alias (underscore)
+	api.Get("/audit-logs/:id", handler.GetAuditLog)
 	api.Get("/products/:id", handler.GetProductByID)
 	// Soft delete (and restore) route for products
 	api.Delete("/products/:id", handler.DeleteProduct)
 	api.Put("/products/:id", handler.UpdateProduct)
-	api.Get("/products/autocomplete", handler.GetProductAutocomplete)
 	api.Post("/products/import", handler.ImportProducts)
 	api.Post("/users/import", handler.ImportUsers)
 	api.Post("/products/fix-sequence", handler.FixProductSequence)
-	api.Get("/products/stats", handler.GetProductStats)
 
 	// Product Variants
 	api.Get("/product_variants", handler.GetAllProduct_variant)
@@ -224,8 +243,8 @@ func main() {
 	api.Post("/users", handler.CreateUser)
 	api.Get("/users", handler.GetUsers)
 
-	// Specific user routes (must come before /:id)
-	// api.Get("/users/unassigned", handler.GetUnassignedUsers)
+	// Specific user routes (must come before /:id so "unassigned" is not captured as :id)
+	api.Get("/users/unassigned", handler.GetUnassignedUsers)
 	api.Put("/users/restore/:id", handler.RestoreUser)
 	api.Delete("/users/force/:id", handler.ForceDeleteUser)
 
@@ -274,6 +293,8 @@ func main() {
 	// api.Put("/quotations/:id", handler.UpdateQuotation)
 
 	app.Get("/api/quotations/count-scp/:series_id", handler.GetScpCountBySeriesID)
+	app.Get("/api/quotations/max-scp-count/doc-type/:document_type", handler.GetMaxScpCountByDocumentType)
+	app.Get("/api/quotations/max-scp-count/grouped-by-doc-type", handler.GetMaxScpCountGroupedByDocumentType)
 	app.Post("/api/quotations", handler.CreateQuotationTable)
 	app.Get("/api/quotations", handler.GetAllQuotationsTable)
 	app.Get("/api/quotations/:id", handler.GetQuotationTable)
@@ -331,6 +352,19 @@ func main() {
 	api.Put("/lead-followups/:id", handler.UpdateLeadFollowUp)
 	api.Delete("/lead-followups/:id", handler.DeleteLeadFollowUp)
 
+	// Document activity for quotations / sales documents
+	api.Post("/document-interactions", handler.CreateDocumentInteraction)
+	api.Get("/document-interactions", handler.GetDocumentInteractions)
+	api.Get("/document-interactions/:id", handler.GetDocumentInteraction)
+	api.Put("/document-interactions/:id", handler.UpdateDocumentInteraction)
+	api.Delete("/document-interactions/:id", handler.DeleteDocumentInteraction)
+
+	api.Post("/document-actions", handler.CreateDocumentAction)
+	api.Get("/document-actions", handler.GetDocumentActions)
+	api.Get("/document-actions/:id", handler.GetDocumentAction)
+	api.Put("/document-actions/:id", handler.UpdateDocumentAction)
+	api.Delete("/document-actions/:id", handler.DeleteDocumentAction)
+
 	// Lead Timeline
 	api.Get("/lead/:id/timeline", handler.GetLeadTimeline)
 
@@ -346,6 +380,20 @@ func main() {
 	api.Post("/lead-sources", handler.CreateLeadSource)
 	api.Put("/lead-sources/:id", handler.UpdateLeadSource)
 	api.Delete("/lead-sources/:id", handler.DeleteLeadSource)
+
+	// Lead categories
+	api.Get("/lead-categories", handler.GetLeadCategories)
+	api.Get("/lead-categories/:id", handler.GetLeadCategory)
+	api.Post("/lead-categories", handler.CreateLeadCategory)
+	api.Put("/lead-categories/:id", handler.UpdateLeadCategory)
+	api.Delete("/lead-categories/:id", handler.DeleteLeadCategory)
+
+	// Lead Products (CRM Product List)
+	api.Get("/lead-products", handler.GetLeadProducts)
+	api.Get("/lead-products/:id", handler.GetLeadProduct)
+	api.Post("/lead-products", handler.CreateLeadProduct)
+	api.Put("/lead-products/:id", handler.UpdateLeadProduct)
+	api.Delete("/lead-products/:id", handler.DeleteLeadProduct)
 
 	// Rejection Reasons
 	api.Post("/rejection-reasons", handler.CreateRejectionReason)
@@ -522,6 +570,12 @@ func main() {
 	api.Put("/organization-units/:id", handler.UpdateOrgUnit)
 	api.Delete("/organization-units/:id", handler.DeleteOrgUnit)
 
+	// Employee ↔ User assignment (paths must be before /employees/:id)
+	api.Get("/employee-user-mappings", handler.GetAllEmployeeUserMappings)
+	api.Post("/employees/assign-user", handler.AssignUserToEmployee)
+	api.Delete("/employees/remove-user", handler.RemoveUserFromEmployee)
+	api.Post("/employees/shift-users", handler.ShiftUsersToEmployee)
+
 	// Employees
 	api.Post("/employees", handler.CreateEmployeeAsUser)
 	api.Get("/employees", handler.GetEmployees)
@@ -545,6 +599,7 @@ func main() {
 	api.Delete("/employee-org-units/:id", handler.DeleteEmployeeOrgUnit)
 
 	// start server
+	log.Println("Audit logs API: GET /api/audit-logs")
 	log.Fatal(app.Listen(":8000"))
 
 }

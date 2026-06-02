@@ -4,12 +4,12 @@
 
 .left-sidebar {
   width: $sidebar-width-full;
-  background-color: $white;
-  position: fixed; // changed from absolute to fixed
+  background-color: #00070b;
+  position: fixed;
   transition: .2s ease-in;
   height: 100%;
   z-index: 11;
-  border-right: 1px solid rgb(229, 234, 239);
+  border-right: 1px solid #172428;
 
 
   .scroll-sidebar {
@@ -55,7 +55,7 @@
   ul {
     .sidebar-item {
       .sidebar-link {
-        color: $sidebar-text;
+        color: #eeeeee;
         display: flex;
         font-size: 15px;
         white-space: nowrap;
@@ -79,8 +79,8 @@
         }
 
         &:hover {
-          background-color: rgba($primary, 0.1);
-          color: $primary;
+          background-color: #0b181c;
+          color: #eeeeee;
 
           &.has-arrow::after {
             border-color: $primary;
@@ -104,7 +104,7 @@
       &.selected>.sidebar-link,
       >.sidebar-link.active {
         background-color: $primary;
-        color: $white;
+        color: #fff;
       }
 
     }

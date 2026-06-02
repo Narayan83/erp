@@ -13,6 +13,7 @@
 .employee-edit-modal {
   width: 100%;
   max-width: 500px;
+  max-height: min(90vh, 640px);
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.2);
@@ -26,6 +27,7 @@
 }
 
 .eem-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -54,6 +56,11 @@
 }
 
 .eem-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   padding: 10px 20px;
   background: #fbfdff;
 }
@@ -101,6 +108,7 @@
 }
 
 .eem-actions {
+  flex-shrink: 0;
   padding: 10px 20px;
   display: flex;
   justify-content: space-between;

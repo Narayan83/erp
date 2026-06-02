@@ -75,6 +75,11 @@ $danger: #dc3545;
         }
       }
 
+      .btn--excel {
+        background: #e8f5e9;
+        color: #1b5e20;
+        border: 1px solid #a5d6a7;
+      }
       .btn--print {
         background: #fff3e0;
         color: #e65100;
@@ -226,13 +231,40 @@ $danger: #dc3545;
       align-items: center;
       width: 100%;
 
-      input {
+      input,
+      button.customer-select-trigger {
         flex: 1;
         height: 36px;
         padding: 5px 12px;
         border: 1px solid #cdd2d6;
         border-radius: 4px;
         font-size: 13.75px;
+      }
+
+      /* Native <input> was triggering Edge "Saved info" on company names; use a button styled like the field. */
+      button.customer-select-trigger {
+        appearance: none;
+        margin: 0;
+        font: inherit;
+        color: inherit;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1.25;
+        box-sizing: border-box;
+
+        &:disabled {
+          cursor: not-allowed;
+          opacity: 0.65;
+        }
+      }
+
+      .customer-select-trigger-placeholder {
+        color: #6c757d;
+        font-weight: 400;
       }
     }
   }
@@ -537,6 +569,10 @@ $danger: #dc3545;
 
           &.seq-input {
             width: 60px;
+          }
+
+          &.revision-letter-input {
+            width: 50px;
           }
         }
 
@@ -2534,7 +2570,7 @@ select.form-control::-ms-expand {
 
         &.btn-delete {
           background: none;
-          color: #d32f2f ;
+          color: #d32f2f;
         }
       }
 
@@ -2645,7 +2681,6 @@ select.form-control::-ms-expand {
     margin: 0;
 
     .form-group {
-
       label {
         display: block;
         margin-bottom: 6px;
@@ -3383,6 +3418,21 @@ input[type="number"]::-webkit-inner-spin-button {
   &.select-customer-modal {
     width: 500px;
 
+    /* contenteditable search — not a native input, so Edge/Chrome "Saved info" does not attach */
+    .customer-search-fake-input {
+      cursor: text;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      outline: none;
+
+      &:empty::before {
+        content: attr(data-placeholder);
+        color: #6c757d;
+        pointer-events: none;
+      }
+    }
+
     .customer-list-container {
       max-height: 400px;
       overflow-y: auto;
@@ -3473,7 +3523,7 @@ input[type="number"]::-webkit-inner-spin-button {
   .modal-header {
     padding: 10px !important;
 
-    .btn-layout{
+    .btn-layout {
       background: rgb(255, 153, 0);
       border: none;
       border-radius: 5px;
@@ -3727,6 +3777,11 @@ input[type="number"] {
 .edit-disabled textarea {
   pointer-events: none;
   opacity: 0.6;
+}
+
+.edit-disabled .final-actions-footer button {
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .modal-overlay {

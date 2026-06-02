@@ -8,9 +8,12 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { BASE_URL }  from "../../../config/Config";
 import "./subcategory.scss";
 import {useAuth} from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const SubcategoryPage = () => {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [subcategories, setSubcategories] = useState([]);
   const [filter, setFilter] = useState("");
   const [formData, setFormData] = useState({ id: null, name: "" });

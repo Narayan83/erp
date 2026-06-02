@@ -3,9 +3,12 @@ import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 export default function HsnTable({ data, onEdit, onDelete, page = 0, rowsPerPage = 5 }) {
-  const { perms } = useAuth();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   return (
     <TableContainer component={Paper}>
       <Table size="small" sx={{ tableLayout: 'fixed', '& .MuiTableCell-head': { textAlign: 'center' } }}>
@@ -42,7 +45,7 @@ export default function HsnTable({ data, onEdit, onDelete, page = 0, rowsPerPage
                 })()}
               </TableCell>
               <TableCell align="right" sx={{ py: 0.5, width: 120, textAlign: 'right' }}>
-                {perms?.can_edit && (
+                {perms?.can_update && (
                   <IconButton size="small" onClick={() => onEdit(hsn)}><EditIcon fontSize="small" /></IconButton>
                 )}
                 {perms?.can_delete && (

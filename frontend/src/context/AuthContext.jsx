@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { BASE_URL } from '../config/Config';
@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [menus, setMenus] = useState([]);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
@@ -51,28 +52,53 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    // Monitor token changes
+    // Monitor token changes — keep axios default header in sync (login only updated localStorage before)
     useEffect(() => {
         if (token) {
             localStorage.setItem('token', token);
-            fetchMenus(); // Fetch menus when token changes/is set
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            fetchMenus();
         } else {
             localStorage.removeItem('token');
+            delete axios.defaults.headers.common['Authorization'];
             setMenus([]);
         }
     }, [token]);
 
-    const fetchMenus = async () => {
+    const detectSuperAdmin = (items) => {
+        for (const item of items) {
+            if (item.permissions?.can_all === true) return true;
+            if (item.children && item.children.length > 0) {
+                if (detectSuperAdmin(item.children)) return true;
+            }
+        }
+        return false;
+    };
+
+    const fetchMenus = useCallback(async () => {
         try {
-            // Avoid fetching if no token (though axios interceptor might handle it, better to be safe)
-            if (!axios.defaults.headers.common['Authorization']) return;
+            // Must not rely on axios.defaults alone: after client-side login defaults were never set
+            if (!localStorage.getItem('token')) return;
 
             const response = await axios.get(`${BASE_URL}/api/my-menus`);
             setMenus(response.data);
+            setIsSuperAdmin(detectSuperAdmin(response.data));
         } catch (error) {
             console.error("Failed to fetch menus", error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        const onMenusChanged = () => {
+            fetchMenus();
+        };
+        window.addEventListener('menuCreated', onMenusChanged);
+        window.addEventListener('menusUpdated', onMenusChanged);
+        return () => {
+            window.removeEventListener('menuCreated', onMenusChanged);
+            window.removeEventListener('menusUpdated', onMenusChanged);
+        };
+    }, [fetchMenus]);
 
     const login = async (email, password) => {
         try {
@@ -97,7 +123,7 @@ export const AuthProvider = ({ children }) => {
             setUser(data.user);
             // fetchMenus will be triggered by token useEffect
 
-            navigate("/home");
+            navigate("/dashboard");
             return { success: true };
         } catch (error) {
             return { success: false, message: error.message };
@@ -109,15 +135,25 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setMenus([]);
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("isAuthenticated");
+        delete axios.defaults.headers.common['Authorization'];
         navigate("/login");
     };
 
+    const normalizePath = (p) => {
+        if (p == null || typeof p !== 'string') return '';
+        if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1);
+        return p;
+    };
+
     const getPermissions = (path) => {
+        const needle = normalizePath(path);
         // flatten the menu tree to find the permission for the path
         let perms = null;
         const find = (items) => {
             for (const item of items) {
-                if (item.url === path) {
+                if (normalizePath(item.url) === needle) {
                     perms = item.permissions;
                     return true;
                 }
@@ -128,11 +164,14 @@ export const AuthProvider = ({ children }) => {
             return false;
         };
         find(menus);
+        if (!perms && isSuperAdmin) {
+            return { can_view: true, can_create: true, can_update: true, can_delete: true };
+        }
         return perms || { can_view: false, can_create: false, can_update: false, can_delete: false };
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, menus, getPermissions, loading, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, menus, isSuperAdmin, getPermissions, refetchMenus: fetchMenus, loading, isAuthenticated: !!token }}>
             {children}
         </AuthContext.Provider>
     );

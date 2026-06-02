@@ -1,39 +1,424 @@
-import React, { useState, useEffect } from 'react';
-import Select from 'react-select';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import Select, { components as RsComponents } from 'react-select';
 import axios from 'axios';
-import { BASE_URL } from '../../../config/Config';
+import { BASE_URL, getAuthHeaders } from '../../../config/Config';
 import countries from '../../../User/utils/countries.js';
 import stateList from '../../../User/utils/state_list.json';
 import cities from '../../../User/utils/cities-name-list.json';
 import './_add_lead.scss';
 
-const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentProducts = [], assignedToOptions: parentAssignedToOptions = [] }) => {
-  const [formData, setFormData] = useState({
-    business: '',
-    prefix: 'Mr.',
-    firstName: '',
-    lastName: '',
-    designation: '',
-    mobile: '',
-    email: '',
-    website: '',
-    addressLine1: '',
-    addressLine2: '',
-    country: '',
-    city: '',
-    state: '',
-    gstin: '',
-    source: '',
-    since: '',
-    requirement: '',
-    category: '',
-    product: '',
-    potential: '',
-    assignedTo: '',
-    stage: '',
-    notes: '',
-    tags: ''
+/** Opaque input names — Chrome maps name="business"/"email"/"tel" to "Saved info" / address autofill */
+const LEAD_INPUT_NAMES = {
+  business: 'fld_x9k2m',
+  firstName: 'fld_x9k3m',
+  lastName: 'fld_x9k4m',
+  designation: 'fld_x9k5m',
+  mobile: 'fld_x9k6m',
+  email: 'fld_x9k7m',
+  website: 'fld_x9k8m',
+  addressLine1: 'fld_q2w8n1',
+  addressLine2: 'fld_q2w8n2',
+  city: 'fld_q2w8n3',
+  state: 'fld_q2w8n4',
+  gstin: 'fld_x9kdm',
+  requirement: 'fld_x9kem',
+  product: 'fld_x9kfm',
+  potential: 'fld_x9kgm',
+  notes: 'fld_x9khm',
+};
+
+const LEAD_NAME_BY_INPUT = Object.fromEntries(
+  Object.entries(LEAD_INPUT_NAMES).map(([formKey, domName]) => [domName, formKey])
+);
+
+/** Standard tokens Chrome uses for "Saved info" — decoy fields absorb autofill before real inputs */
+const CHROME_AUTOFILL_DECOY_TOKENS = [
+  'email',
+  'username',
+  'name',
+  'given-name',
+  'family-name',
+  'tel',
+  'organization',
+  'street-address',
+  'address-line1',
+  'address-line2',
+  'address-level1',
+  'address-level2',
+  'postal-code',
+  'country',
+];
+
+/**
+ * Chrome "Saved info" targets <input>/<textarea>; a single-line contenteditable div avoids that
+ * while staying keyboard-accessible and label-associated via id.
+ */
+function LeadPlainLineField({ id, value, onValueChange, className, ariaInvalid }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || document.activeElement === el) return;
+    const v = value == null ? '' : String(value);
+    if (el.textContent !== v) el.textContent = v;
+  }, [value]);
+
+  return (
+    <div
+      ref={ref}
+      id={id}
+      role="textbox"
+      tabIndex={0}
+      contentEditable
+      suppressContentEditableWarning
+      className={className}
+      aria-multiline="false"
+      aria-invalid={ariaInvalid ? 'true' : 'false'}
+      onInput={(e) => {
+        const t = (e.currentTarget.textContent ?? '')
+          .replace(/\r?\n/g, ' ')
+          .replace(/\u00a0/g, ' ');
+        onValueChange(t);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.preventDefault();
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const plain = (e.clipboardData.getData('text/plain') || '').replace(/\r?\n/g, ' ');
+        const el = ref.current;
+        if (!el) return;
+        el.focus();
+        if (typeof document.execCommand === 'function') {
+          document.execCommand('insertText', false, plain);
+        } else {
+          const merged = `${el.textContent ?? ''}${plain}`;
+          el.textContent = merged;
+          onValueChange(merged.replace(/\u00a0/g, ' '));
+        }
+      }}
+      data-lpignore="true"
+      data-1p-ignore="true"
+    />
+  );
+}
+
+const DEFAULT_FORM_DATA = {
+  business: '',
+  prefix: 'Mr.',
+  firstName: '',
+  lastName: '',
+  designation: '',
+  mobile: '',
+  email: '',
+  website: '',
+  addressLine1: '',
+  addressLine2: '',
+  country: '',
+  city: '',
+  state: '',
+  gstin: '',
+  source: '',
+  since: '',
+  requirement: '',
+  category: '',
+  product: '',
+  potential: '',
+  assignedTo: '',
+  stage: '',
+  notes: '',
+  tags: ''
+};
+
+const PREFIX_OPTIONS = ['Mr.', 'Ms.', 'Mrs.'];
+const DEFAULT_CATEGORY_OPTIONS = [];
+const STAGE_OPTIONS = ['New', 'Discussion', 'Appointment', 'Demo', 'Proposal', 'Qualified', 'Unqualified', 'Decided', 'Inactive', 'Rejected'];
+
+const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+const LEAD_EMAIL_PLACEHOLDER = 'NA';
+const EMAIL_REGEX = /\S+@\S+\.\S+/;
+
+const isLeadEmailValid = (value) => {
+  const normalizedValue = normalizeWhitespace(value);
+
+  if (!normalizedValue) return true;
+
+  return normalizedValue.toUpperCase() === LEAD_EMAIL_PLACEHOLDER || EMAIL_REGEX.test(normalizedValue);
+};
+
+const buildLeadContactName = ({ prefix, firstName, lastName, business }) => {
+  const normalizedFirstName = normalizeWhitespace(firstName);
+  const normalizedLastName = normalizeWhitespace(lastName);
+  const normalizedBusiness = normalizeWhitespace(business);
+  const nameParts = [normalizedFirstName, normalizedLastName].filter(Boolean);
+
+  if (nameParts.length === 0) return normalizedBusiness;
+
+  return [normalizeWhitespace(prefix), ...nameParts].filter(Boolean).join(' ');
+};
+
+const COUNTRY_OPTION_VALUES = countries
+  .map((country) => normalizeWhitespace(country?.name))
+  .filter(Boolean);
+
+const STATE_OPTION_VALUES = Object.values(stateList)
+  .map((state) => normalizeWhitespace(state))
+  .filter(Boolean);
+
+const CITY_OPTION_VALUES = cities
+  .map((city) => normalizeWhitespace(city))
+  .filter(Boolean);
+
+const createSelectLookup = (items = [], labelKeys = [], aliasKeys = []) => {
+  const labels = [];
+  const lookup = {};
+
+  const register = (candidate, label) => {
+    const normalizedCandidate = normalizeWhitespace(candidate);
+    const normalizedLabel = normalizeWhitespace(label);
+
+    if (!normalizedCandidate || !normalizedLabel) return;
+
+    lookup[normalizedCandidate.toLowerCase()] = normalizedLabel;
+  };
+
+  items.forEach((item) => {
+    const label = normalizeWhitespace(
+      labelKeys.map((key) => item?.[key]).find((value) => normalizeWhitespace(value))
+    );
+
+    if (!label) return;
+
+    labels.push(label);
+    register(label, label);
+
+    aliasKeys.forEach((key) => {
+      register(item?.[key], label);
+    });
   });
+
+  return {
+    options: Array.from(new Set(labels)),
+    lookup
+  };
+};
+
+const extractSelectCandidates = (value) => {
+  if (value === undefined || value === null) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap(extractSelectCandidates).filter(Boolean);
+  }
+
+  if (typeof value === 'object') {
+    return [
+      value.name,
+      value.Name,
+      value.title,
+      value.Title,
+      value.label,
+      value.Label,
+      value.value,
+      value.Value,
+      value.code,
+      value.Code,
+      value.id,
+      value.ID
+    ].flatMap(extractSelectCandidates).filter(Boolean);
+  }
+
+  const normalized = normalizeWhitespace(value);
+  if (!normalized) return [];
+
+  const parts = normalized.includes(',')
+    ? normalized.split(',').map((part) => normalizeWhitespace(part)).filter(Boolean)
+    : [];
+
+  return [normalized, ...parts];
+};
+
+const normalizeSelectValue = (value, options = [], lookup = {}) => {
+  const candidates = extractSelectCandidates(value);
+  if (candidates.length === 0) return '';
+
+  for (const candidate of candidates) {
+    const mapped = lookup[normalizeWhitespace(candidate).toLowerCase()];
+    if (mapped) return mapped;
+  }
+
+  const normalizedOptions = options.map((option) => normalizeWhitespace(option)).filter(Boolean);
+  if (normalizedOptions.length === 0) return candidates[0];
+
+  for (const candidate of candidates) {
+    const match = normalizedOptions.find((option) => option.toLowerCase() === candidate.toLowerCase());
+    if (match) return match;
+  }
+
+  return candidates[0];
+};
+
+const splitLeadName = (leadData) => {
+  const resolveKnownPrefix = (value) => {
+    const normalized = normalizeWhitespace(value).replace(/\./g, '').toLowerCase();
+    if (!normalized) return '';
+
+    if (normalized === 'mr') return 'Mr.';
+    if (normalized === 'ms') return 'Ms.';
+    if (normalized === 'mrs') return 'Mrs.';
+
+    return '';
+  };
+
+  const splitFromSource = (source) => {
+    const nameSource = normalizeWhitespace(source);
+    if (!nameSource) return { parsedPrefix: '', parsedFirstName: '', parsedLastName: '' };
+
+    const parts = nameSource.split(' ').filter(Boolean);
+    if (parts.length === 0) return { parsedPrefix: '', parsedFirstName: '', parsedLastName: '' };
+
+    const matchedPrefix = resolveKnownPrefix(parts[0]);
+    if (matchedPrefix) {
+      return {
+        parsedPrefix: matchedPrefix,
+        parsedFirstName: parts[1] || '',
+        parsedLastName: parts.slice(2).join(' ')
+      };
+    }
+
+    return {
+      parsedPrefix: '',
+      parsedFirstName: parts[0] || '',
+      parsedLastName: parts.slice(1).join(' ')
+    };
+  };
+
+  const explicitPrefix = resolveKnownPrefix(leadData?.prefix || leadData?.salutation);
+  const sanitizeNamePart = (value) => {
+    const normalized = normalizeWhitespace(value);
+    if (!normalized) return '';
+
+    const token = normalized.toLowerCase();
+    if (token === 'na' || token === 'n/a' || token === '-') return '';
+
+    return normalized;
+  };
+
+  let prefix = explicitPrefix || 'Mr.';
+  let firstName = sanitizeNamePart(
+    leadData?.firstName || leadData?.firstname || leadData?.first_name || leadData?.FirstName || ''
+  );
+  let lastName = sanitizeNamePart(
+    leadData?.lastName || leadData?.lastname || leadData?.last_name || leadData?.LastName || ''
+  );
+
+  const { parsedPrefix, parsedFirstName, parsedLastName } = splitFromSource(
+    leadData?.contact || leadData?.name || leadData?.Name
+  );
+
+  if (!firstName && !lastName) {
+    if (parsedPrefix) prefix = parsedPrefix;
+    firstName = parsedFirstName;
+    lastName = parsedLastName;
+  } else if (parsedFirstName) {
+    const existingFull = normalizeWhitespace([firstName, lastName].filter(Boolean).join(' '));
+    const parsedFull = normalizeWhitespace([parsedFirstName, parsedLastName].filter(Boolean).join(' '));
+
+    // Repair cases where imported first/last is a suffix of the full contact name.
+    if (!firstName || (parsedFull && existingFull && parsedFull.toLowerCase().endsWith(existingFull.toLowerCase()) && parsedFull.length > existingFull.length)) {
+      if (parsedPrefix) prefix = parsedPrefix;
+      firstName = parsedFirstName;
+      lastName = parsedLastName;
+    }
+  }
+
+  return { prefix, firstName, lastName };
+};
+
+const resolveInitialAssignedTo = (leadData) => {
+  const rawValue =
+    leadData?.assigned_to_id ??
+    leadData?.assignedToId ??
+    leadData?.AssignedToID ??
+    leadData?.assignedTo ??
+    leadData?.assignedToName ??
+    leadData?.assigned_to_name;
+  if (rawValue === undefined || rawValue === null) return '';
+
+  if (typeof rawValue === 'object') {
+    return rawValue.id || rawValue.ID || rawValue.value || rawValue.Value || rawValue.name || rawValue.Name || '';
+  }
+
+  return rawValue;
+};
+
+const resolveInitialProduct = (leadData) => {
+  const productId = leadData?.product_id ?? leadData?.productId ?? leadData?.ProductID;
+  if (productId !== undefined && productId !== null && productId !== '') return productId;
+
+  const textValue =
+    leadData?.productName ??
+    leadData?.product_name ??
+    leadData?.ProductName ??
+    leadData?.productname;
+  if (textValue !== undefined && textValue !== null && String(textValue).trim() !== '') {
+    return textValue;
+  }
+
+  const productObj = leadData?.product;
+  if (productObj && typeof productObj === 'object') {
+    return productObj.ID || productObj.id || productObj.Name || productObj.name || productObj.Code || productObj.code || '';
+  }
+
+  const rawValue = leadData?.product;
+  if (rawValue === undefined || rawValue === null) return '';
+  return rawValue;
+};
+
+const buildInitialFormData = (leadData, sourceOptions = [], categoryOptions = [], tagsOptions = [], sourceLookup = {}, tagsLookup = {}) => {
+  if (!leadData) {
+    return { ...DEFAULT_FORM_DATA };
+  }
+
+  const { prefix, firstName, lastName } = splitLeadName(leadData);
+  const normalizedCountry = normalizeSelectValue(
+    leadData.country || leadData.Country,
+    COUNTRY_OPTION_VALUES
+  );
+  const isIndiaSelected = normalizedCountry.toLowerCase() === 'india';
+
+  return {
+    business: leadData.business || leadData.Business || '',
+    prefix: normalizeSelectValue(prefix, PREFIX_OPTIONS) || 'Mr.',
+    firstName,
+    lastName,
+    designation: leadData.designation || leadData.Designation || '',
+    mobile: leadData.mobile || leadData.Mobile || '',
+    email: leadData.email || leadData.Email || '',
+    website: leadData.website || leadData.Website || '',
+    addressLine1: leadData.addressLine1 || leadData.AddressLine1 || leadData.addressline1 || '',
+    addressLine2: leadData.addressLine2 || leadData.AddressLine2 || leadData.addressline2 || '',
+    country: normalizedCountry,
+    city: isIndiaSelected
+      ? normalizeSelectValue(leadData.city || leadData.City, CITY_OPTION_VALUES)
+      : leadData.city || leadData.City || '',
+    state: isIndiaSelected
+      ? normalizeSelectValue(leadData.state || leadData.State, STATE_OPTION_VALUES)
+      : leadData.state || leadData.State || '',
+    gstin: leadData.gstin || leadData.GSTIN || '',
+    source: normalizeSelectValue(leadData.source || leadData.Source || leadData.enquiry_source, sourceOptions, sourceLookup),
+    since: leadData.since || leadData.Since || '',
+    requirement: leadData.requirements || leadData.requirement || '',
+    category: normalizeSelectValue(leadData.category || leadData.Category || leadData.lead_category, categoryOptions),
+    product: resolveInitialProduct(leadData),
+    potential: leadData.potential || leadData.Potential || '',
+    assignedTo: resolveInitialAssignedTo(leadData),
+    stage: normalizeSelectValue(leadData.stage || leadData.Stage || leadData.lead_stage, STAGE_OPTIONS),
+    notes: leadData.notes || leadData.Notes || '',
+    tags: normalizeSelectValue(leadData.tags || leadData.Tags || leadData.lead_tags, tagsOptions, tagsLookup)
+  };
+};
+
+const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentProducts = [], assignedToOptions: parentAssignedToOptions = [] }) => {
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
 
   const [errors, setErrors] = useState({});
   const [leads, setLeads] = useState([]);
@@ -41,8 +426,59 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   const [saveError, setSaveError] = useState('');
   const [isProductOthers, setIsProductOthers] = useState(false);
   const [sourceOptions, setSourceOptions] = useState([]);
+  const [sourceLookup, setSourceLookup] = useState({});
+  const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [tagsOptions, setTagsOptions] = useState([]);
+  const [tagsLookup, setTagsLookup] = useState({});
   const [assignedToOptions, setAssignedToOptions] = useState(Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0 ? parentAssignedToOptions : []);
+
+  const normalizeProductsList = (list) => {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((p) => ({
+        ID: p?.id ?? p?.ID,
+        Name: p?.name ?? p?.Name,
+        Code: p?.code ?? p?.Code,
+      }))
+      .filter((p) => p.ID || p.Name);
+  };
+
+  /**
+   * Chrome ignores autocomplete=off for address-style fields; new-password suppresses Saved info.
+   * type=search avoids email/tel-style heuristics on the filter box.
+   */
+  const selectAntiAutofillComponents = useMemo(
+    () => ({
+      Input: (props) => (
+        <RsComponents.Input
+          {...props}
+          type="search"
+          autoComplete="new-password"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          data-lpignore="true"
+          data-1p-ignore="true"
+        />
+      ),
+    }),
+    []
+  );
+
+  /**
+   * New name/id on each modal open breaks Chrome's saved-field mapping; useLayoutEffect runs before paint.
+   * Real fields use data-lead-field so handleChange does not depend on DOM name.
+   */
+  const [leadFieldInstanceId, setLeadFieldInstanceId] = useState('');
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setLeadFieldInstanceId('');
+      return;
+    }
+    setLeadFieldInstanceId(`ln_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 11)}`);
+  }, [isOpen]);
+
+  const leadDom = (key) => `${LEAD_INPUT_NAMES[key]}_${leadFieldInstanceId}`;
 
   // Helper function to normalize mobile number to 10 digits
   const normalizeMobile = (mobile) => {
@@ -54,130 +490,105 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   };
 
   useEffect(() => {
-    if (leadData) {
-      // Try to split contact/name into prefix, firstName, lastName
-      let prefix = 'Mr.';
-      let firstName = '';
-      let lastName = '';
-      const nameSource = leadData.contact || leadData.name || '';
-      if (nameSource) {
-        const parts = nameSource.split(' ');
-        if (['Mr.', 'Ms.', 'Mrs.'].includes(parts[0])) {
-          prefix = parts[0];
-          firstName = parts[1] || '';
-          lastName = parts.slice(2).join(' ');
-        } else {
-          firstName = parts[0] || '';
-          lastName = parts.slice(1).join(' ');
-        }
-      }
-      
-      // Map assignedTo (name, id, or object) to id
-      let assignedToId = '';
-      if (leadData.assignedTo) {
-        if (typeof leadData.assignedTo === 'number') {
-          assignedToId = leadData.assignedTo;
-        } else if (typeof leadData.assignedTo === 'string') {
-          // Try to match by ID first (if it's a numeric string)
-          const asNum = Number(leadData.assignedTo);
-          if (!isNaN(asNum)) {
-            assignedToId = asNum;
-          } else {
-            // Try to match by name (case-insensitive)
-            const found = assignedToOptions.find(opt => 
-              opt.name && opt.name.toLowerCase() === leadData.assignedTo.toLowerCase()
-            );
-            assignedToId = found ? found.id : '';
-          }
-        } else if (typeof leadData.assignedTo === 'object' && leadData.assignedTo !== null) {
-          assignedToId = leadData.assignedTo.id || '';
-        }
-      } else if (leadData.assigned_to_id) {
-        assignedToId = leadData.assigned_to_id;
-      }
-      
-      // Map product (id, name, or object) to id
-      let productId = '';
-      if (leadData.product) {
-        if (typeof leadData.product === 'number' || typeof leadData.product === 'string') {
-          // If it's a number or numeric string, try to find by ID
-          const asNum = Number(leadData.product);
-          if (!isNaN(asNum)) {
-            const found = products.find(p => p.ID === asNum || p.id === asNum);
-            productId = found ? (found.ID || found.id) : asNum;
-          } else {
-            // If it's a non-numeric string, try to find by name (case-insensitive)
-            const found = products.find(
-              p => (p.Name && p.Name.toLowerCase() === leadData.product.toLowerCase()) ||
-                   (p.name && p.name.toLowerCase() === leadData.product.toLowerCase())
-            );
-            productId = found ? (found.ID || found.id) : leadData.product;
-          }
-        } else if (typeof leadData.product === 'object' && leadData.product !== null) {
-          productId = leadData.product.ID || leadData.product.id || '';
-        }
-      } else if (leadData.product_id) {
-        productId = leadData.product_id;
-      }
-      
-      setFormData({
-        business: leadData.business || '',
-        prefix,
-        firstName,
-        lastName,
-        designation: leadData.designation || '',
-        mobile: normalizeMobile(leadData.mobile || ''),
-        email: leadData.email || '',
-        website: leadData.website || '',
-        addressLine1: leadData.addressLine1 || leadData.AddressLine1 || leadData.addressLine1 || '',
-        addressLine2: leadData.addressLine2 || leadData.AddressLine2 || leadData.addressLine2 || '',
-        country: leadData.country || '',
-        city: leadData.city || '',
-        state: leadData.state || '',
-        gstin: leadData.gstin || '',
-        source: leadData.source || '',
-        since: leadData.since || '',
-        requirement: leadData.requirements || leadData.requirement || '',
-        category: leadData.category || '',
-        product: productId,
-        potential: leadData.potential || '',
-        assignedTo: assignedToId,
-        stage: leadData.stage || '',
-        notes: leadData.notes || '',
-        tags: leadData.tags || leadData.Tags || ''
-      });
-    } else {
-      setFormData({
-        business: '',
-        prefix: 'Mr.',
-        firstName: '',
-        lastName: '',
-        designation: '',
-        mobile: '',
-        email: '',
-        website: '',
-        addressLine1: '',
-        addressLine2: '',
-        country: '',
-        city: '',
-        state: '',
-        gstin: '',
-        source: '',
-        since: '',
-        requirement: '',
-        category: '',
-        product: '',
-        potential: '',
-        assignedTo: '',
-        stage: '',
-        notes: '',
-        tags: ''
-      });
+    if (!isOpen) return;
+
+    const nextFormData = buildInitialFormData(leadData, sourceOptions, leadCategoryOptions, tagsOptions, sourceLookup, tagsLookup);
+    nextFormData.mobile = normalizeMobile(nextFormData.mobile);
+
+    setFormData(nextFormData);
+    setErrors({});
+    setSaveError('');
+    setIsProductOthers(false);
+  }, [leadData, isOpen]);
+
+  useEffect(() => {
+    if (Array.isArray(parentAssignedToOptions) && parentAssignedToOptions.length > 0) {
+      setAssignedToOptions(parentAssignedToOptions);
     }
-  }, [leadData, isOpen, products, assignedToOptions]);
+  }, [parentAssignedToOptions]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setFormData((prev) => {
+      const nextPrefix = normalizeSelectValue(prev.prefix, PREFIX_OPTIONS) || 'Mr.';
+      const nextSource = normalizeSelectValue(prev.source, sourceOptions, sourceLookup);
+      const nextCategory = normalizeSelectValue(prev.category, leadCategoryOptions);
+      const nextStage = normalizeSelectValue(prev.stage, STAGE_OPTIONS);
+      const nextTags = normalizeSelectValue(prev.tags, tagsOptions, tagsLookup);
+
+      if (
+        nextPrefix === prev.prefix &&
+        nextSource === prev.source &&
+        nextCategory === prev.category &&
+        nextStage === prev.stage &&
+        nextTags === prev.tags
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        prefix: nextPrefix,
+        source: nextSource,
+        category: nextCategory,
+        stage: nextStage,
+        tags: nextTags
+      };
+    });
+  }, [isOpen, sourceOptions, sourceLookup, tagsOptions, tagsLookup]);
+
+  const handlePlainLineChange = (fieldKey) => (text) => {
+    setFormData((prev) => ({ ...prev, [fieldKey]: text }));
+    setErrors((prev) => {
+      if (!prev[fieldKey]) return prev;
+      if (String(text).trim()) {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      }
+      return prev;
+    });
+  };
+
+  const handleCountrySelect = (option) => {
+    const nextCountry = normalizeSelectValue(option?.value, COUNTRY_OPTION_VALUES);
+    const isIndiaSelected = nextCountry.toLowerCase() === 'india';
+
+    setFormData((prev) => ({
+      ...prev,
+      country: nextCountry,
+      state: isIndiaSelected ? normalizeSelectValue(prev.state, STATE_OPTION_VALUES) : prev.state,
+      city: isIndiaSelected ? normalizeSelectValue(prev.city, CITY_OPTION_VALUES) : prev.city
+    }));
+  };
+
+  const updateSelectField = (fieldName, rawValue, options = [], lookup = {}, fallbackValue = '') => {
+    const normalizedValue = normalizeSelectValue(rawValue, options, lookup) || fallbackValue;
+
+    setFormData((prev) => ({
+      ...prev,
+      [fieldName]: normalizedValue
+    }));
+
+    setErrors((prev) => {
+      if (!prev[fieldName]) return prev;
+
+      if (normalizedValue && String(normalizedValue).trim()) {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      }
+
+      return prev;
+    });
+  };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const dataKey = e.target.getAttribute('data-lead-field');
+    const rawName = e.target.name;
+    const name = dataKey || LEAD_NAME_BY_INPUT[rawName] || rawName;
+    const { value } = e.target;
     let newValue = value;
     if (name === 'mobile') {
       newValue = value.replace(/[^0-9]/g, '').slice(0, 10);
@@ -205,7 +616,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       }
 
       if (name === 'email') {
-        if (/\S+@\S+\.\S+/.test(newValue)) delete next.email;
+        if (isLeadEmailValid(newValue)) delete next.email;
         return next;
       }
 
@@ -231,19 +642,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       newErrors.business = 'Business is required';
     }
     
-    if (!formData.firstName.trim()) {
-      newErrors.name = 'First name is required';
-    }
-    
     if (!formData.mobile.trim()) {
       newErrors.mobile = 'Mobile number is required';
     } else if (!/^[0-9]{10}$/.test(formData.mobile)) {
       newErrors.mobile = 'Enter a valid 10-digit mobile number';
     }
     
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    if (!isLeadEmailValid(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
 
@@ -252,20 +657,16 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       newErrors.source = 'Source is required';
     }
 
-    // Validate since (required)
-    if (!formData.since || String(formData.since).trim() === '') {
-      newErrors.since = 'Since (date) is required';
-    } else {
+    // Validate since only when provided
+    if (formData.since && String(formData.since).trim() !== '') {
       const d = new Date(formData.since);
       if (isNaN(d)) {
         newErrors.since = 'Enter a valid date for Since';
       }
     }
 
-    // Validate assignedTo (required). Allow matching by id or name (case-insensitive)
-    if (!formData.assignedTo || !String(formData.assignedTo).trim()) {
-      newErrors.assignedTo = 'Assignee is required';
-    } else {
+    // Validate assignedTo only when provided. Allow matching by id or name (case-insensitive)
+    if (formData.assignedTo && String(formData.assignedTo).trim()) {
       const matchAssigned = assignedToOptions.some(opt =>
         String(opt.id) === String(formData.assignedTo) ||
         (opt.name && opt.name.toLowerCase() === String(formData.assignedTo).toLowerCase())
@@ -273,11 +674,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
       if (!matchAssigned) newErrors.assignedTo = 'Please select a valid assignee';
     }
 
-    // Validate product (required). Allow matching by id or name (case-insensitive)
-    // If "Others" is selected (isProductOthers), allow any non-empty custom product name
-    if (!formData.product || !String(formData.product).trim()) {
-      newErrors.product = 'Product is required';
-    } else if (!isProductOthers) {
+    // Validate product only when provided. Allow matching by id or name (case-insensitive)
+    if (formData.product && String(formData.product).trim() && !isProductOthers) {
       const matchProduct = products.some(p =>
         String(p.ID) === String(formData.product) ||
         String(p.id) === String(formData.product) ||
@@ -304,9 +702,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   // Fetch products from backend
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/products`, { params: { page: 1, limit: 1000 } });
+      const res = await axios.get(`${BASE_URL}/api/lead-products`, {
+        params: { active: true },
+        headers: getAuthHeaders(),
+      });
       const productList = res.data.data || res.data || [];
-      setProducts(Array.isArray(productList) ? productList : []);
+      const normalizedProducts = normalizeProductsList(productList);
+      setProducts(normalizedProducts);
     } catch (err) {
       console.error('Error fetching products:', err);
       setProducts([]);
@@ -315,8 +717,20 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
 
   useEffect(() => {
     fetchLeads();
-    fetchProducts();
   }, []);
+
+  useEffect(() => {
+    const normalizedParentProducts = normalizeProductsList(parentProducts);
+    if (normalizedParentProducts.length > 0) {
+      setProducts(normalizedParentProducts);
+    }
+  }, [parentProducts]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (Array.isArray(parentProducts) && parentProducts.length > 0) return;
+    fetchProducts();
+  }, [isOpen, parentProducts]);
 
   // Add new lead to backend
   const handleSubmit = async (e) => {
@@ -324,10 +738,20 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     setSaveError('');
     if (validateForm()) {
       try {
+        const normalizedPrefix = normalizeSelectValue(formData.prefix, PREFIX_OPTIONS) || 'Mr.';
+        const normalizedSource = normalizeSelectValue(formData.source, sourceOptions, sourceLookup);
+        const normalizedCategory = normalizeSelectValue(formData.category, leadCategoryOptions);
+        const normalizedStage = normalizeSelectValue(formData.stage, STAGE_OPTIONS);
+        const normalizedTags = normalizeSelectValue(formData.tags, tagsOptions, tagsLookup);
+
         // Normalize mobile number before saving
         const normalizedMobile = normalizeMobile(formData.mobile);
-        
-        const contact = `${formData.prefix} ${formData.firstName}${formData.lastName ? ' ' + formData.lastName : ''}`.trim();
+        const contact = buildLeadContactName({
+          prefix: normalizedPrefix,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          business: formData.business,
+        });
         
         // Resolve assigned_to_id from numeric id or name
         let assigned_to_id = undefined;
@@ -341,19 +765,15 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           }
         }
 
-        // Resolve product_id from numeric id or name
-        // If "Others" is selected (isProductOthers), use the custom product name without resolving to an ID
-        let product_id = undefined;
+        // Resolve selected lead-product name
         let productName = '';
         if (formData.product && formData.product !== '') {
           if (isProductOthers) {
-            // Custom product entered by user - no product_id, just use the name
+          // Custom product entered by user
             productName = formData.product;
-            product_id = undefined;
           } else {
             const asNum = Number(formData.product);
             if (!isNaN(asNum)) {
-              product_id = asNum;
               // Find product name by ID
               const foundProduct = products.find(p => (p.ID === asNum || p.id === asNum));
               productName = foundProduct ? (foundProduct.Name || foundProduct.name || '') : '';
@@ -365,7 +785,6 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 (p.name && p.name.toLowerCase() === String(formData.product).toLowerCase())
               );
               if (found) {
-                product_id = found.ID || found.id;
                 productName = found.Name || found.name || '';
               }
             }
@@ -380,14 +799,20 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           business: formData.business,
           contact,
           name: contact, // Include both for backend compatibility
+          prefix: normalizedPrefix,
+          salutation: normalizedPrefix,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           designation: formData.designation,
           mobile: normalizedMobile,
           email: formData.email,
           city: formData.city,
           state: formData.state,
           country: formData.country,
-          source: formData.source || 'Filling Form',
-          stage: formData.stage,
+          source: normalizedSource || 'Filling Form',
+          enquiry_source: normalizedSource || 'Filling Form',
+          stage: normalizedStage,
+          lead_stage: normalizedStage,
           potential,
           since: formData.since ? new Date(formData.since).toISOString() : new Date().toISOString(),
           gstin: formData.gstin,
@@ -396,17 +821,15 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
           notes: formData.notes,
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
-          category: formData.category,
-          tags: formData.tags
+          category: normalizedCategory,
+          lead_category: normalizedCategory,
+          tags: normalizedTags,
+          lead_tags: normalizedTags
         };
         
         // Only add assigned_to_id if it's valid
         if (assigned_to_id !== undefined) {
           payload.assigned_to_id = assigned_to_id;
-        }
-        
-        if (product_id !== undefined) {
-          payload.product_id = product_id;
         }
         
         // Include productName for display
@@ -469,32 +892,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
               // pass created lead back to parent so it can update its table immediately
               onAddLeadSubmit(created || null);
             }
-            setFormData({
-              business: '',
-              prefix: 'Mr.',
-              firstName: '',
-              lastName: '',
-              designation: '',
-              mobile: '',
-              email: '',
-              website: '',
-              addressLine1: '',
-              addressLine2: '',
-              country: '',
-              city: '',
-              state: '',
-              gstin: '',
-              source: '',
-              since: '',
-              requirement: '',
-              category: '',
-              product: '',
-              potential: '',
-              assignedTo: '',
-              stage: '',
-              notes: '',
-              tags: ''
-            });
+            setFormData({ ...DEFAULT_FORM_DATA });
+            setIsProductOthers(false);
             setErrors({});
             onClose();
             return;
@@ -518,32 +917,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         
         const created = res.data;
         await fetchLeads();
-        setFormData({
-          business: '',
-          prefix: '',
-          firstName: '',
-          lastName: '',
-          designation: '',
-          mobile: '',
-          email: '',
-          website: '',
-          addressLine1: '',
-          addressLine2: '',
-          country: '',
-          city: '',
-          state: '',
-          gstin: '',
-          source: '',
-          since: '',
-          requirement: '',
-          category: '',
-          product: '',
-          potential: '',
-          assignedTo: '',
-          stage: '',
-          notes: '',
-          tags: ''
-        });
+        setFormData({ ...DEFAULT_FORM_DATA });
+        setIsProductOthers(false);
         setErrors({});
         setSaveError('');
         if (typeof onAddLeadSubmit === 'function') {
@@ -551,7 +926,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
         }
         onClose();
       } catch (err) {
-        console.error('Error saving lead:', err);
+        console.error('Error saving lead:', err, err?.response?.data);
         const errorData = err.response?.data || {};
         const errorMessage = errorData.error || errorData.message || 'Failed to save lead';
         const detail = errorData.detail ? `: ${errorData.detail}` : '';
@@ -563,15 +938,18 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     }
   };
 
-  const prefixOptions = ['Mr.', 'Ms.', 'Mrs.'];
-  const categoryOptions = ['Software', 'Hardware', 'Services', 'Consulting', 'Training'];
-  const stageOptions = ['Discussion', 'Appointment', 'Demo', 'Proposal', 'Decided', 'Inactive'];
+  const prefixOptions = PREFIX_OPTIONS;
+  const categoryOptions = leadCategoryOptions;
+  const stageOptions = STAGE_OPTIONS;
 
   // Fetch employees to populate the Assigned To dropdown.
   // Fetch from backend and use fetched employees as the authoritative list.
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/employees`, { params: { page: 1, limit: 1000 } });
+      const res = await axios.get(`${BASE_URL}/api/employees`, {
+        params: { page: 1, limit: 1000 },
+        headers: getAuthHeaders(),
+      });
       const list = res.data.data || res.data || [];
 
       const mapped = (Array.isArray(list) ? list : [])
@@ -591,25 +969,37 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
 
   const fetchSources = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/lead-sources`);
-      const data = res.data;
-      if (Array.isArray(data)) {
-        setSourceOptions(data.map(s => s.name || s.Name));
-      }
+      const res = await axios.get(`${BASE_URL}/api/lead-sources`, { headers: getAuthHeaders() });
+      const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const normalized = createSelectLookup(
+        data,
+        ['name', 'Name', 'label', 'Label', 'value', 'Value'],
+        ['id', 'ID', 'code', 'Code', 'description', 'Description']
+      );
+      setSourceOptions(normalized.options);
+      setSourceLookup(normalized.lookup);
     } catch (err) {
       console.error('Error fetching sources:', err);
+      setSourceOptions([]);
+      setSourceLookup({});
     }
   };
 
   const fetchTags = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/crm-tags`);
-      const data = res.data;
-      if (Array.isArray(data)) {
-        setTagsOptions(data.map(t => t.title || t.Title));
-      }
+      const res = await axios.get(`${BASE_URL}/api/crm-tags`, { headers: getAuthHeaders() });
+      const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const normalized = createSelectLookup(
+        data,
+        ['title', 'Title', 'name', 'Name', 'label', 'Label', 'value', 'Value'],
+        ['id', 'ID', 'code', 'Code']
+      );
+      setTagsOptions(normalized.options);
+      setTagsLookup(normalized.lookup);
     } catch (err) {
       console.error('Error fetching tags:', err);
+      setTagsOptions([]);
+      setTagsLookup({});
     }
   };
 
@@ -622,9 +1012,26 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
   useEffect(() => {
     if (isOpen) {
       fetchSources();
+      fetchLeadCategories();
       fetchTags();
     }
   }, [isOpen]);
+
+  const fetchLeadCategories = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/lead-categories`, { headers: getAuthHeaders() });
+      const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const normalized = createSelectLookup(
+        data,
+        ['name', 'Name', 'label', 'Label', 'value', 'Value'],
+        ['id', 'ID', 'code', 'Code', 'description', 'Description']
+      );
+      setLeadCategoryOptions(normalized.options);
+    } catch (err) {
+      console.error('Error fetching lead categories:', err);
+      setLeadCategoryOptions([]);
+    }
+  };
 
   // Prepare options for react-select
   const countryOptions = countries.map(c => ({ value: c.name, label: c.name }));
@@ -639,25 +1046,79 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
     { value: 'others', label: 'Others' }
   ];
 
+  const normalizedFormProduct = normalizeWhitespace(formData.product);
+  const hasProductInOptions = !normalizedFormProduct
+    ? true
+    : productOptions.some((o) => {
+        const optionVal = normalizeWhitespace(o.value);
+        const optionLabel = normalizeWhitespace((o.label || '').replace(/\s*\([^)]*\)\s*$/, ''));
+        return optionVal.toLowerCase() === normalizedFormProduct.toLowerCase() || optionLabel.toLowerCase() === normalizedFormProduct.toLowerCase();
+      });
+
+  const effectiveProductOptions = hasProductInOptions || !normalizedFormProduct
+    ? productOptions
+    : [{ value: normalizedFormProduct, label: normalizedFormProduct }, ...productOptions];
+
   const assignedOptions = assignedToOptions.map(a => ({
     value: a.id,
     label: a.name || String(a.id)
   }));
 
-  const selectedCountryOption = countryOptions.find(o => o.value === formData.country) || null;
-  const selectedStateOption = stateOptions.find(o => o.value === formData.state) || null;
-  const selectedCityOption = cityOptions.find(o => o.value === formData.city) || null;
+  const normalizedAssigned = normalizeWhitespace(formData.assignedTo);
+  const hasAssignedInOptions = !normalizedAssigned
+    ? true
+    : assignedOptions.some((o) => {
+        const ov = normalizeWhitespace(o.value);
+        const ol = normalizeWhitespace(o.label);
+        return ov.toLowerCase() === normalizedAssigned.toLowerCase() || ol.toLowerCase() === normalizedAssigned.toLowerCase();
+      });
+
+  const effectiveAssignedOptions = hasAssignedInOptions || !normalizedAssigned
+    ? assignedOptions
+    : [{ value: normalizedAssigned, label: normalizedAssigned }, ...assignedOptions];
+
+  const selectedCountryValue = normalizeSelectValue(formData.country, COUNTRY_OPTION_VALUES);
+  const isIndiaSelected = selectedCountryValue.toLowerCase() === 'india';
+  const selectedStateValue = isIndiaSelected
+    ? normalizeSelectValue(formData.state, STATE_OPTION_VALUES)
+    : normalizeWhitespace(formData.state);
+  const selectedCityValue = isIndiaSelected
+    ? normalizeSelectValue(formData.city, CITY_OPTION_VALUES)
+    : normalizeWhitespace(formData.city);
+  const selectedCountryOption = countryOptions.find(o => o.value === selectedCountryValue) || null;
+  const selectedStateOption = stateOptions.find(o => o.value === selectedStateValue) || null;
+  const selectedCityOption = cityOptions.find(o => o.value === selectedCityValue) || null;
+  const selectedPrefixValue = normalizeSelectValue(formData.prefix, prefixOptions) || 'Mr.';
+  const selectedSourceValue = normalizeSelectValue(formData.source, sourceOptions, sourceLookup);
+  const selectedCategoryValue = normalizeSelectValue(formData.category, categoryOptions);
+  const selectedStageValue = normalizeSelectValue(formData.stage, stageOptions);
+  const selectedTagsValue = normalizeSelectValue(formData.tags, tagsOptions, tagsLookup);
+
+  const effectiveSourceOptions = Array.from(new Set([...(sourceOptions || []), ...(selectedSourceValue ? [selectedSourceValue] : [])]));
+  const effectiveCategoryOptions = Array.from(new Set([...(categoryOptions || []), ...(selectedCategoryValue ? [selectedCategoryValue] : [])]));
+  const effectiveStageOptions = Array.from(new Set([...(stageOptions || []), ...(selectedStageValue ? [selectedStageValue] : [])]));
+  const effectiveTagOptions = Array.from(new Set([...(tagsOptions || []), ...(selectedTagsValue ? [selectedTagsValue] : [])]));
   
-  const selectedProductOption = formData.product 
-    ? productOptions.find(o => {
-        const oVal = Number(o.value) || String(o.value).toLowerCase();
-        const fVal = Number(formData.product) || String(formData.product).toLowerCase();
-        return oVal === fVal || String(oVal) === String(fVal);
+  const selectedProductOption = formData.product
+    ? effectiveProductOptions.find((o) => {
+        const formRaw = normalizeWhitespace(formData.product).toLowerCase();
+        const optionValueRaw = normalizeWhitespace(o?.value).toLowerCase();
+        const optionLabelRaw = normalizeWhitespace((o?.label || '').replace(/\s*\([^)]*\)\s*$/, '')).toLowerCase();
+
+        // Numeric ID compare when both sides are numeric
+        const optionAsNum = Number(o?.value);
+        const formAsNum = Number(formData.product);
+        if (!isNaN(optionAsNum) && !isNaN(formAsNum) && optionAsNum === formAsNum) {
+          return true;
+        }
+
+        // Text compare by value or displayed label
+        return optionValueRaw === formRaw || optionLabelRaw === formRaw;
       }) || null
     : null;
     
   const selectedAssignedOption = formData.assignedTo
-    ? assignedOptions.find(o => {
+    ? effectiveAssignedOptions.find(o => {
         const oVal = Number(o.value);
         const fVal = Number(formData.assignedTo);
         if (!isNaN(oVal) && !isNaN(fVal)) {
@@ -679,79 +1140,138 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
               <button className="close-button" onClick={onClose}>&times;</button>
             </div>
             {saveError && <div className="error-message" style={{color:'red',marginBottom:'8px'}}>{saveError}</div>}
-            <form onSubmit={handleSubmit}>
+            <form
+              key={leadFieldInstanceId || 'lead-form'}
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-form-type="other"
+              onSubmit={handleSubmit}
+            >
+              <div className="lead-autofill-decoys" aria-hidden="true">
+                {CHROME_AUTOFILL_DECOY_TOKENS.map((ac, i) => (
+                  <input
+                    key={`${ac}-${i}-${leadFieldInstanceId}`}
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete={ac}
+                    name={`hp_${ac}_${leadFieldInstanceId}`}
+                    defaultValue=""
+                  />
+                ))}
+              </div>
               <div className="form-section">
                 <h3>Core Data</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Business <span className="required">*</span></label>
+                    <label htmlFor={leadDom('business')}>Business <span className="required">*</span></label>
                     <input
-                      type="text"
-                      name="business"
+                      id={leadDom('business')}
+                      type="search"
+                      name={leadDom('business')}
+                      data-lead-field="business"
                       value={formData.business}
                       onChange={handleChange}
-                      className={errors.business ? 'error' : ''}
+                      className={`lead-field-no-autofill ${errors.business ? 'error' : ''}`}
                       aria-invalid={errors.business ? 'true' : 'false'}
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                     />
                     {errors.business && <span className="input-error-inside">{errors.business}</span>}
                   </div>
                   
                   <div className="form-group">
-                    <label>Name <span className="required">*</span></label>
+                    <label htmlFor={leadDom('firstName')}>Name</label>
                     <div className="name-inputs">
-                      <select 
-                        name="prefix" 
-                        value={formData.prefix} 
-                        onChange={handleChange}
+                      <select
+                        name="prefix"
+                        value={selectedPrefixValue}
+                        onChange={(e) => updateSelectField('prefix', e.target.value, prefixOptions, {}, 'Mr.')}
+                        autoComplete="off"
                       >
                         {prefixOptions.map(option => (
                           <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
                       <input
-                        type="text"
-                        name="firstName"
+                        type="search"
+                        id={leadDom('firstName')}
+                        name={leadDom('firstName')}
+                        data-lead-field="firstName"
                         placeholder="First Name"
                         value={formData.firstName}
                         onChange={handleChange}
-                        className={errors.name ? 'error' : ''}
-                        aria-invalid={errors.name ? 'true' : 'false'}
+                        className="lead-field-no-autofill"
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                       <input
-                        type="text"
-                        name="lastName"
+                        type="search"
+                        id={leadDom('lastName')}
+                        name={leadDom('lastName')}
+                        data-lead-field="lastName"
                         placeholder="Last Name (Optional)"
                         value={formData.lastName}
                         onChange={handleChange}
+                        className="lead-field-no-autofill"
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
-                      {errors.name && <span className="input-error-inside">{errors.name}</span>}
                     </div>
                   </div>
                 </div>
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Designation</label>
+                    <label htmlFor={leadDom('designation')}>Designation</label>
                     <input
-                      type="text"
-                      name="designation"
+                      id={leadDom('designation')}
+                      type="search"
+                      name={leadDom('designation')}
+                      data-lead-field="designation"
                       value={formData.designation}
                       onChange={handleChange}
+                      className="lead-field-no-autofill"
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                     />
                   </div>
                   
                   <div className="form-group">
-                    <label>Mobile <span className="required">*</span></label>
+                    <label htmlFor={leadDom('mobile')}>Mobile <span className="required">*</span></label>
                     <div className="mobile-input">
                       <span className="prefix">+91</span>
                       <input
-                        type="text"
-                        name="mobile"
+                        id={leadDom('mobile')}
+                        type="search"
+                        name={leadDom('mobile')}
+                        data-lead-field="mobile"
                         value={formData.mobile}
                         onChange={handleChange}
                         maxLength="10"
-                        className={errors.mobile ? 'error' : ''}
+                        className={`lead-field-no-autofill ${errors.mobile ? 'error' : ''}`}
                         aria-invalid={errors.mobile ? 'true' : 'false'}
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        inputMode="numeric"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                     </div>
                     {errors.mobile && <span className="input-error-inside">{errors.mobile}</span>}
@@ -760,49 +1280,67 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Email <span className="required">*</span></label>
+                    <label htmlFor={leadDom('email')}>Email</label>
                     <div className="email-input">
                       <input
-                        type="email"
-                        name="email"
+                        id={leadDom('email')}
+                        type="search"
+                        name={leadDom('email')}
+                        data-lead-field="email"
                         value={formData.email}
                         onChange={handleChange}
-                        className={errors.email ? 'error' : ''}
+                        className={`lead-field-no-autofill ${errors.email ? 'error' : ''}`}
                         aria-invalid={errors.email ? 'true' : 'false'}
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        inputMode="email"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                     </div>
                     {errors.email && <span className="input-error-inside">{errors.email}</span>}
                   </div>
                   
                   <div className="form-group">
-                    <label>Website</label>
+                    <label htmlFor={leadDom('website')}>Website</label>
                     <input
-                      type="text"
-                      name="website"
+                      id={leadDom('website')}
+                      type="search"
+                      name={leadDom('website')}
+                      data-lead-field="website"
                       value={formData.website}
                       onChange={handleChange}
+                      className="lead-field-no-autofill"
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                     />
                   </div>
                 </div>
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Address Line 1</label>
-                    <input
-                      type="text"
-                      name="addressLine1"
+                    <label htmlFor={leadDom('addressLine1')}>Address Line 1</label>
+                    <LeadPlainLineField
+                      id={leadDom('addressLine1')}
                       value={formData.addressLine1}
-                      onChange={handleChange}
+                      onValueChange={handlePlainLineChange('addressLine1')}
+                      className="lead-field-no-autofill lead-plain-editable"
                     />
                   </div>
                   
                   <div className="form-group">
-                    <label>Address Line 2</label>
-                    <input
-                      type="text"
-                      name="addressLine2"
+                    <label htmlFor={leadDom('addressLine2')}>Address Line 2</label>
+                    <LeadPlainLineField
+                      id={leadDom('addressLine2')}
                       value={formData.addressLine2}
-                      onChange={handleChange}
+                      onValueChange={handlePlainLineChange('addressLine2')}
+                      className="lead-field-no-autofill lead-plain-editable"
                     />
                   </div>
                 </div>
@@ -813,7 +1351,8 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     <Select
                       options={countryOptions}
                       value={selectedCountryOption}
-                      onChange={(opt) => setFormData(prev => ({ ...prev, country: opt ? opt.value : '' }))}
+                      onChange={handleCountrySelect}
+                      components={selectAntiAutofillComponents}
                       isSearchable
                       placeholder="Select country"
                       className="react-select-container"
@@ -825,12 +1364,17 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                   </div>
                   
                   <div className="form-group">
-                    <label>City</label>
-                    {formData.country === 'India' ? (
+                    {isIndiaSelected ? (
+                      <label>City</label>
+                    ) : (
+                      <label htmlFor={leadDom('city')}>City</label>
+                    )}
+                    {isIndiaSelected ? (
                       <Select
                         options={cityOptions}
                         value={selectedCityOption}
-                        onChange={(opt) => setFormData(prev => ({ ...prev, city: opt ? opt.value : '' }))}
+                        onChange={(opt) => updateSelectField('city', opt?.value, CITY_OPTION_VALUES)}
+                        components={selectAntiAutofillComponents}
                         isSearchable
                         placeholder="Select city"
                         className="react-select-container"
@@ -840,11 +1384,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                         isClearable
                       />
                     ) : (
-                      <input
-                        type="text"
-                        name="city"
+                      <LeadPlainLineField
+                        id={leadDom('city')}
                         value={formData.city}
-                        onChange={handleChange}
+                        onValueChange={handlePlainLineChange('city')}
+                        className="lead-field-no-autofill lead-plain-editable"
                       />
                     )}
                   </div>
@@ -852,12 +1396,17 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>State</label>
-                    {formData.country === 'India' ? (
+                    {isIndiaSelected ? (
+                      <label>State</label>
+                    ) : (
+                      <label htmlFor={leadDom('state')}>State</label>
+                    )}
+                    {isIndiaSelected ? (
                       <Select
                         options={stateOptions}
                         value={selectedStateOption}
-                        onChange={(opt) => setFormData(prev => ({ ...prev, state: opt ? opt.value : '' }))}
+                        onChange={(opt) => updateSelectField('state', opt?.value, STATE_OPTION_VALUES)}
+                        components={selectAntiAutofillComponents}
                         isSearchable
                         placeholder="Select state"
                         className="react-select-container"
@@ -867,22 +1416,31 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                         isClearable
                       />
                     ) : (
-                      <input
-                        type="text"
-                        name="state"
+                      <LeadPlainLineField
+                        id={leadDom('state')}
                         value={formData.state}
-                        onChange={handleChange}
+                        onValueChange={handlePlainLineChange('state')}
+                        className="lead-field-no-autofill lead-plain-editable"
                       />
                     )}
                   </div>
                   
                   <div className="form-group">
-                    <label>GSTIN</label>
+                    <label htmlFor={leadDom('gstin')}>GSTIN</label>
                     <input
-                      type="text"
-                      name="gstin"
+                      id={leadDom('gstin')}
+                      type="search"
+                      name={leadDom('gstin')}
+                      data-lead-field="gstin"
                       value={formData.gstin}
                       onChange={handleChange}
+                      className="lead-field-no-autofill"
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="characters"
+                      spellCheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                     />
                   </div>
                 </div>
@@ -894,9 +1452,15 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 <div className="form-row">
                   <div className="form-group">
                     <label>Source <span className="required">*</span></label>
-                    <select name="source" value={formData.source} onChange={handleChange} className={errors.source ? 'error' : ''}>
+                    <select
+                      name="source"
+                      value={selectedSourceValue}
+                      onChange={(e) => updateSelectField('source', e.target.value, sourceOptions, sourceLookup)}
+                      className={errors.source ? 'error' : ''}
+                      autoComplete="off"
+                    >
                       <option value="">Select Source</option>
-                      {sourceOptions.map(option => (
+                      {effectiveSourceOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
@@ -904,13 +1468,14 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                   </div>
                   
                   <div className="form-group">
-                    <label>Since <span className="required">*</span></label>
+                    <label>Since</label>
                     <input
                       type="date"
                       name="since"
                       value={formData.since ? formData.since.slice(0, 10) : ''}
                       onChange={handleChange}
                       className={errors.since ? 'error' : ''}
+                      autoComplete="off"
                     />
                     {errors.since && <span className="input-error-inside">{errors.since}</span>}
                   </div>
@@ -918,12 +1483,21 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Requirement</label>
+                    <label htmlFor={leadDom('requirement')}>Requirement</label>
                     <input
-                      type="text"
-                      name="requirement"
+                      id={leadDom('requirement')}
+                      type="search"
+                      name={leadDom('requirement')}
+                      data-lead-field="requirement"
                       value={formData.requirement}
                       onChange={handleChange}
+                      className="lead-field-no-autofill"
+                      autoComplete="new-password"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                     />
                   </div>
                   
@@ -931,11 +1505,12 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     <label>Category</label>
                     <select
                       name="category"
-                      value={formData.category}
-                      onChange={handleChange}
+                      value={selectedCategoryValue}
+                      onChange={(e) => updateSelectField('category', e.target.value, categoryOptions)}
+                      autoComplete="off"
                     >
                       <option value="">Select Category</option>
-                      {categoryOptions.map(option => (
+                      {effectiveCategoryOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
@@ -944,12 +1519,13 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 
                 <div className="form-row">
                     <div className="form-group">
-                      <label>Product <span className="required">*</span></label>
+                      <label>Product</label>
                         <div className="product-input">
                           {!isProductOthers ? (
                             <Select
-                              options={productOptions}
+                              options={effectiveProductOptions}
                               value={selectedProductOption}
+                              components={selectAntiAutofillComponents}
                               onChange={(opt) => {
                                 const val = opt ? opt.value : '';
                                 if (val === 'others') {
@@ -971,18 +1547,26 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                               }}
                               menuPortalTarget={document.body}
                               menuPosition="fixed"
-                              isClearable={false}
+                              isClearable
                             />
                           ) : (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
                               <input
-                                type="text"
-                                name="product"
+                                id={leadDom('product')}
+                                type="search"
+                                name={leadDom('product')}
+                                data-lead-field="product"
                                 placeholder="Enter product name"
                                 value={formData.product}
                                 onChange={handleChange}
-                                className={errors.product ? 'error' : ''}
+                                className={`lead-field-no-autofill ${errors.product ? 'error' : ''}`}
                                 style={{ flex: 1 }}
+                                autoComplete="new-password"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck="false"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                               />
                               <button
                                 type="button"
@@ -1010,13 +1594,20 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     </div>
                   
                   <div className="form-group">
-                    <label>Potential (Rs.)</label>
+                    <label htmlFor={leadDom('potential')}>Potential (Rs.)</label>
                     <div className="potential-input">
                       <input
-                        type="text"
-                        name="potential"
+                        id={leadDom('potential')}
+                        type="search"
+                        name={leadDom('potential')}
+                        data-lead-field="potential"
                         value={formData.potential}
                         onChange={handleChange}
+                        className="lead-field-no-autofill"
+                        autoComplete="new-password"
+                        inputMode="decimal"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                     </div>
                   </div>
@@ -1024,10 +1615,11 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Assigned To <span className="required">*</span></label>
+                    <label>Assigned To</label>
                     <Select
-                      options={assignedOptions}
+                      options={effectiveAssignedOptions}
                       value={selectedAssignedOption}
+                      components={selectAntiAutofillComponents}
                       onChange={(opt) => {
                         setFormData(prev => ({ ...prev, assignedTo: opt ? opt.value : '' }));
                         if (opt) setErrors(prev => { const n = { ...prev }; delete n.assignedTo; return n; });
@@ -1041,7 +1633,7 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                         placeholder: base => ({ ...base, color: errors.assignedTo ? '#d9534f' : base.color })
                       }}
                       menuPortalTarget={document.body}
-                      isClearable={false}
+                      isClearable
                     />
                     {errors.assignedTo && <span className="input-error-inside">{errors.assignedTo}</span>}
                   </div>
@@ -1050,11 +1642,12 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                     <label>Stage</label>
                     <select
                       name="stage"
-                      value={formData.stage}
-                      onChange={handleChange}
+                      value={selectedStageValue}
+                      onChange={(e) => updateSelectField('stage', e.target.value, stageOptions)}
+                      autoComplete="off"
                     >
                       <option value="">Select Stage</option>
-                      {stageOptions.map(option => (
+                      {effectiveStageOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
@@ -1064,9 +1657,14 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tags</label>
-                    <select name="tags" value={formData.tags} onChange={handleChange}>
+                    <select
+                      name="tags"
+                      value={selectedTagsValue}
+                      onChange={(e) => updateSelectField('tags', e.target.value, tagsOptions, tagsLookup)}
+                      autoComplete="off"
+                    >
                       <option value="">Select Tag</option>
-                      {tagsOptions.map(option => (
+                      {effectiveTagOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
@@ -1074,12 +1672,21 @@ const AddLead = ({ isOpen, onClose, onAddLeadSubmit, leadData, products: parentP
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Notes</label>
+                    <label htmlFor={leadDom('notes')}>Notes</label>
                     <input
-                        type="text"
-                        name="notes"
+                        id={leadDom('notes')}
+                        type="search"
+                        name={leadDom('notes')}
+                        data-lead-field="notes"
                         value={formData.notes}
                         onChange={handleChange}
+                        className="lead-field-no-autofill"
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                   </div>
                 </div>

@@ -5,8 +5,7 @@ import { AiOutlineDatabase } from 'react-icons/ai';
 import { FaUsers } from 'react-icons/fa';
 import { FiBarChart2 } from 'react-icons/fi';
 import { GiGears } from 'react-icons/gi';
-import { useNavigate } from "react-router-dom";
-import { BASE_URL } from '../../../config/Config';
+import { useAuth } from '../../../context/AuthContext';
 import './Login.scss';
 
 
@@ -18,7 +17,7 @@ function LoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -41,28 +40,11 @@ function LoginPage() {
         throw new Error("Please enter a valid email address");
       }
 
-      // Make API call to login endpoint
-      const response = await fetch(`${BASE_URL}/api/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(loginData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+      const result = await login(loginData.email, loginData.password);
+      if (!result.success) {
+        throw new Error(result.message || "Login failed");
       }
-
-      // Store the token in localStorage
-      localStorage.setItem("token", data.token);
       localStorage.setItem("isAuthenticated", "true");
-      
-      // Redirect to dashboard
-      navigate("/dashboard");
-      
     } catch (err) {
       setIsLoading(false);
       setError(err.message || "Login failed. Please try again.");

@@ -65,8 +65,12 @@ func GetEmployeeHierarchies(c *fiber.Ctx) error {
 	query.Offset(offset).Limit(limit).Order("id desc").
 		Preload("Manager").
 		Preload("Manager.User").
+		Preload("Manager.Department").
+		Preload("Manager.Designation").
 		Preload("Employee").
 		Preload("Employee.User").
+		Preload("Employee.Department").
+		Preload("Employee.Designation").
 		Find(&items)
 
 	return c.JSON(fiber.Map{

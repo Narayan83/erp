@@ -5,8 +5,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../../../context/AuthContext";
 
-export default function CategoryTable({ categories, onEdit, onDelete, page, rowsPerPage }) {
-  const { perms } = useAuth();
+
+export default function CategoryTable({ categories, onEdit, onDelete, page, rowsPerPage, perms }) {
+
   return (
     <TableContainer component={Paper}>
       <Table size="small">

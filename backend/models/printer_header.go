@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 type PrinterHeader struct {
 	ID uint `gorm:"primaryKey" json:"id"`
@@ -16,7 +20,8 @@ type PrinterHeader struct {
 	Email   string `json:"email"`
 	Website string `json:"website"`
 
-	LogoData string `gorm:"type:text" json:"logo_data"` // store only the logo image as base64 or file path
+	LogoData  string         `gorm:"type:text" json:"logo_data"`                // currently selected logo image
+	LogosData datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"logos_data"` // all uploaded logo images
 
 	Alignment string `json:"alignment"` // left, center, right
 

@@ -3,11 +3,21 @@ package seeds
 import (
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"erp.local/backend/initializers"
 	"erp.local/backend/models"
+	"erp.local/backend/rolemenu"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
+
+// menuSeedForce returns true if ERP_FORCE_MENU_SEED is set to 1/true/yes (re-run default inserts on non-empty DB).
+func menuSeedForce() bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv("ERP_FORCE_MENU_SEED")))
+	return v == "1" || v == "true" || v == "yes"
+}
 
 func SeedAll() {
 	SeedRoles()
@@ -15,85 +25,75 @@ func SeedAll() {
 	SeedMenus()
 }
 
+// SeedMenus: (1) dedupe duplicate root URLs, (2) seed only on empty DB unless forced,
+// (3) sync role permission orphans + frontend menus JSON + seeds/menus_default.json from DB.
+//
+// Live menu data is stored in the database. menus_default.json is rewritten from the DB whenever
+// menus change (see handlers) and on startup so it stays aligned with the app.
 func SeedMenus() {
-	menus := []models.Menu{
-		{MenuName: "Dashboard", URL: "/home", Icon: "LayoutDashboard", SortOrder: 1, IsActive: true},
-
-		// Catalog / Products Module
-		{MenuName: "Catalog", URL: "/catalog", Icon: "Package", SortOrder: 2, IsActive: true, Children: []models.Menu{
-			{MenuName: "Product List", URL: "/ProductMaster", Icon: "List", SortOrder: 1, IsActive: true},
-			{MenuName: "Add Product", URL: "/ManageProduct", Icon: "PlusCircle", SortOrder: 2, IsActive: true},
-			{MenuName: "Categories", URL: "/ManageCategory", Icon: "ListTree", SortOrder: 3, IsActive: true},
-			{MenuName: "Sub Categories", URL: "/ManageSubcategory", Icon: "ListMusic", SortOrder: 4, IsActive: true},
-			{MenuName: "Tags", URL: "/ManageTag", Icon: "Tag", SortOrder: 5, IsActive: true},
-			{MenuName: "Units/Stores/Taxes", URL: "/ManageUnitStoreTax", Icon: "Settings2", SortOrder: 6, IsActive: true},
-			{MenuName: "Series Master", URL: "/ManageSeries", Icon: "Type", SortOrder: 7, IsActive: true},
-		}},
-
-		// Sales / CRM Module
-		{MenuName: "CRM & Sales", URL: "/crm", Icon: "ShoppingCart", SortOrder: 3, IsActive: true, Children: []models.Menu{
-			{MenuName: "Leads Dashboard", URL: "/leads-dashboard", Icon: "BarChart", SortOrder: 1, IsActive: true},
-			{MenuName: "CRM Master", URL: "/crm-master", Icon: "Database", SortOrder: 2, IsActive: true},
-			{MenuName: "Quotations", URL: "/quotation-list", Icon: "FileText", SortOrder: 3, IsActive: true},
-			{MenuName: "Create Quotation", URL: "/quotation", Icon: "PlusSquare", SortOrder: 4, IsActive: true},
-			{MenuName: "Accounts", URL: "/account", Icon: "User", SortOrder: 5, IsActive: true},
-			{MenuName: "Sales Config", URL: "/sales-configuration", Icon: "Sliders", SortOrder: 6, IsActive: true},
-		}},
-
-		// CRM Reports
-		{MenuName: "CRM Reports", URL: "/reports", Icon: "PieChart", SortOrder: 4, IsActive: true, Children: []models.Menu{
-			{MenuName: "Sales Interactions", URL: "/reports/sales-interactions", Icon: "MessageCircle", SortOrder: 1, IsActive: true},
-			{MenuName: "Followups", URL: "/reports/followups", Icon: "Clock", SortOrder: 2, IsActive: true},
-			{MenuName: "Travel Report", URL: "/reports/travel-report", Icon: "Map", SortOrder: 3, IsActive: true},
-		}},
-
-		// HR / Employee Module
-		{MenuName: "HR Management", URL: "/hr", Icon: "Users2", SortOrder: 5, IsActive: true, Children: []models.Menu{
-			{MenuName: "Employee List", URL: "/employeemanagement", Icon: "Users", SortOrder: 1, IsActive: true},
-			{MenuName: "Add Employee", URL: "/employeemaster", Icon: "UserPlus", SortOrder: 2, IsActive: true},
-			{MenuName: "Employee Hierarchy", URL: "/empHierarchy", Icon: "GitMerge", SortOrder: 3, IsActive: true},
-			{MenuName: "Departments", URL: "/departmentmaster", Icon: "Building", SortOrder: 4, IsActive: true},
-			{MenuName: "Designations", URL: "/designation", Icon: "Award", SortOrder: 5, IsActive: true},
-			{MenuName: "Organization Units", URL: "/orgunits", Icon: "Network", SortOrder: 6, IsActive: true},
-			{MenuName: "User Assignment", URL: "/assignusertoemployee", Icon: "UserCheck", SortOrder: 7, IsActive: true},
-		}},
-
-		// User & Role Management (Admin)
-		{MenuName: "User & Roles", URL: "/admin-master", Icon: "ShieldAlert", SortOrder: 6, IsActive: true, Children: []models.Menu{
-			{MenuName: "User List", URL: "/users", Icon: "Users", SortOrder: 1, IsActive: true},
-			{MenuName: "Role Creation", URL: "/rolecreation", Icon: "ShieldPlus", SortOrder: 2, IsActive: true},
-			{MenuName: "Existing Roles", URL: "/existingroles", Icon: "Shield", SortOrder: 3, IsActive: true},
-			{MenuName: "Role Permissions", URL: "/rolemanagement", Icon: "Lock", SortOrder: 4, IsActive: true},
-			{MenuName: "User-Role Map", URL: "/usermanagement", Icon: "Link", SortOrder: 5, IsActive: true},
-			{MenuName: "Menu Creation", URL: "/menucreation", Icon: "Menu", SortOrder: 6, IsActive: true},
-			{MenuName: "Existing Menus", URL: "/existingmenus", Icon: "List", SortOrder: 7, IsActive: true},
-			{MenuName: "Audit Logs", URL: "/auditlogs", Icon: "FileClock", SortOrder: 8, IsActive: true},
-		}},
-
-		// Company Master Module
-		{MenuName: "Company Master", URL: "/company-master", Icon: "Building2", SortOrder: 7, IsActive: true, Children: []models.Menu{
-			{MenuName: "Company Management", URL: "/companies", Icon: "Home", SortOrder: 1, IsActive: true},
-			{MenuName: "Branch Management", URL: "/branches", Icon: "MapPin", SortOrder: 2, IsActive: true},
-			{MenuName: "Bank Management", URL: "/banks", Icon: "Landmark", SortOrder: 3, IsActive: true},
-		}},
-
-		// General Settings
-		{MenuName: "Settings", URL: "/settings-root", Icon: "Settings", SortOrder: 8, IsActive: true, Children: []models.Menu{
-			{MenuName: "Profile", URL: "/profile", Icon: "User", SortOrder: 1, IsActive: true},
-			{MenuName: "App Settings", URL: "/settings", Icon: "sliders", SortOrder: 2, IsActive: true},
-			{MenuName: "Addresses", URL: "/address", Icon: "MapPin", SortOrder: 3, IsActive: true},
-			{MenuName: "ERP Reports", URL: "/erpreport", Icon: "FileBarChart", SortOrder: 4, IsActive: true},
-		}},
+	if err := DedupeRootMenusByURL(initializers.DB); err != nil {
+		log.Printf("DedupeRootMenusByURL: %v", err)
 	}
 
-	for _, m := range menus {
-		var existing models.Menu
-		if err := initializers.DB.Where("menu_name = ? AND url = ?", m.MenuName, m.URL).First(&existing).Error; err != nil {
-			if err := initializers.DB.Create(&m).Error; err != nil {
-				log.Printf("Failed to seed menu %s: %v", m.MenuName, err)
-			} else {
-				fmt.Printf("Seeded Menu: %s\n", m.MenuName)
+	var menuCount int64
+	if err := initializers.DB.Model(&models.Menu{}).Count(&menuCount).Error; err != nil {
+		log.Printf("SeedMenus: count menus: %v", err)
+	}
+
+	if menuCount == 0 {
+		roots, err := LoadMenusSeedFromJSONFile()
+		if err != nil {
+			log.Printf("SeedMenus: load menus_default.json: %v", err)
+			roots = nil
+		}
+		if len(roots) > 0 {
+			if err := SeedMenusFromJSONRoots(initializers.DB, roots); err != nil {
+				log.Printf("SeedMenus: from JSON: %v — falling back to hardcoded defaults", err)
+				seedHardcodedMenuRoots(initializers.DB)
 			}
+		} else {
+			seedHardcodedMenuRoots(initializers.DB)
+		}
+	} else if menuSeedForce() {
+		fmt.Println("SeedMenus: ERP_FORCE_MENU_SEED set — filling missing default roots from code.")
+		seedHardcodedMenuRoots(initializers.DB)
+	} else {
+		fmt.Println("SeedMenus: menus table is not empty — skipping inserts (DB is source of truth). Set ERP_FORCE_MENU_SEED=1 to fill gaps from code.")
+	}
+
+	if err := rolemenu.SyncRemoveOrphanedPermissionKeys(initializers.DB); err != nil {
+		log.Printf("SyncRemoveOrphanedPermissionKeys: %v", err)
+	}
+	if err := rolemenu.ExportMenusJSONFile(initializers.DB, rolemenu.MenusExportPath()); err != nil {
+		log.Printf("ExportMenusJSONFile: %v", err)
+	}
+	if err := SaveMenusSeedJSONFromDB(initializers.DB); err != nil {
+		log.Printf("SaveMenusSeedJSONFromDB: %v", err)
+	}
+	TryCreateUniqueRootURLIndex(initializers.DB)
+}
+
+func seedHardcodedMenuRoots(db *gorm.DB) {
+	for _, m := range menuSeedHardcodedDefaults() {
+		var existing models.Menu
+		q := db.Model(&models.Menu{}).Where("parent_id IS NULL")
+		if m.URL != "" {
+			q = q.Where("url = ?", m.URL)
+		} else {
+			q = q.Where("menu_name = ?", m.MenuName)
+		}
+		r := q.Limit(1).Find(&existing)
+		if r.Error != nil {
+			log.Printf("Failed to look up menu %s: %v", m.MenuName, r.Error)
+			continue
+		}
+		if r.RowsAffected > 0 {
+			continue
+		}
+		if err := db.Create(&m).Error; err != nil {
+			log.Printf("Failed to seed menu %s: %v", m.MenuName, err)
+		} else {
+			fmt.Printf("Seeded Menu: %s\n", m.MenuName)
 		}
 	}
 }
@@ -121,9 +121,9 @@ func SeedRoles() {
 func SeedAdminUser() {
 	var count int64
 	initializers.DB.Model(&models.User{}).Count(&count)
-	if count > 0 {
-		return // Users exist, skip
-	}
+	// if count > 0 {
+	// 	return // Users exist, skip
+	// }
 
 	// Create Super Admin User
 	hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
@@ -140,6 +140,17 @@ func SeedAdminUser() {
 		Usercode:      stringPtr("ADM001"),
 	}
 
+	var existingUser models.User
+	ur := initializers.DB.Where("email = ?", admin.Email).Limit(1).Find(&existingUser)
+	if ur.Error != nil {
+		log.Printf("Failed to look up admin user: %v", ur.Error)
+		return
+	}
+	if ur.RowsAffected > 0 {
+		fmt.Printf("Admin user already exists, skipping seed.\n")
+		return
+	}
+
 	if err := initializers.DB.Create(&admin).Error; err != nil {
 		log.Printf("Failed to create admin user: %v", err)
 		return
@@ -148,16 +159,23 @@ func SeedAdminUser() {
 
 	// Assign Super Admin Role
 	var role models.Role
-	if err := initializers.DB.Where("role_name = ?", "Super Admin").First(&role).Error; err == nil {
-		mapping := models.UserRoleMapping{
-			UserID: admin.ID,
-			RoleID: role.ID,
-		}
-		if err := initializers.DB.Create(&mapping).Error; err != nil {
-			log.Printf("Failed to assign role to admin: %v", err)
-		} else {
-			fmt.Printf("Assigned Super Admin role to user\n")
-		}
+	rr := initializers.DB.Where("role_name = ?", "Super Admin").Limit(1).Find(&role)
+	if rr.Error != nil {
+		log.Printf("Failed to look up Super Admin role: %v", rr.Error)
+		return
+	}
+	if rr.RowsAffected == 0 {
+		log.Printf("Super Admin role not found; assign role manually to admin user\n")
+		return
+	}
+	mapping := models.UserRoleMapping{
+		UserID: admin.ID,
+		RoleID: role.ID,
+	}
+	if err := initializers.DB.Create(&mapping).Error; err != nil {
+		log.Printf("Failed to assign role to admin: %v", err)
+	} else {
+		fmt.Printf("Assigned Super Admin role to user\n")
 	}
 }
 

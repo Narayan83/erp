@@ -338,7 +338,10 @@ func CreateEmployee(c *fiber.Ctx) error {
 }
 
 func GetEmployees(c *fiber.Ctx) error {
-	var items []models.Employee
+	// New behaviour: return all users that are marked as employees (is_employee = true)
+	// and also return any matching Employee rows (empData) for additional fields like empcode
+	var users []models.User
+	var empItems []models.Employee
 	var total int64
 
 	page := c.QueryInt("page", 1)
@@ -347,58 +350,86 @@ func GetEmployees(c *fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	query := employeeDB.Model(&models.Employee{})
-
+	// Query users table for users flagged as employees
+	userQuery := employeeDB.Model(&models.User{}).Where("is_employee = ?", true)
 	if search != "" {
-		query = query.Where("work_email ILIKE ? OR emp_code ILIKE ?", "%"+search+"%", "%"+search+"%")
+		// search across firstname/lastname/email/mobile
+		like := "%" + search + "%"
+		userQuery = userQuery.Where("firstname ILIKE ? OR lastname ILIKE ? OR email ILIKE ? OR mobile_number ILIKE ?", like, like, like, like)
 	}
 
-	query.Count(&total)
+	// count total matching users
+	userQuery.Count(&total)
 
-	query.Offset(offset).Limit(limit).
+	// fetch paginated users with associations
+	if err := userQuery.Offset(offset).Limit(limit).
 		Order("id desc").
-		Preload("Department").
-		Preload("Designation").
-		Preload("User").
-		Preload("User.Addresses").
-		Preload("User.BankAccounts").
-		Preload("User.Documents").
-		Find(&items)
+		Preload("Addresses").
+		Preload("BankAccounts").
+		Preload("Documents").
+		Find(&users).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 
-	// Extract only user data
-	users := make([]models.User, 0)
-	for _, emp := range items {
-		users = append(users, emp.User)
+	// Collect user IDs and fetch any corresponding Employee rows
+	userIDs := make([]uint, 0, len(users))
+	for _, u := range users {
+		userIDs = append(userIDs, u.ID)
+	}
+
+	if len(userIDs) > 0 {
+		if err := employeeDB.Where("user_id IN ?", userIDs).
+			Preload("Department").
+			Preload("Designation").
+			Preload("User").
+			Find(&empItems).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 	}
 
 	return c.JSON(fiber.Map{
 		"data":    users,
-		"empData": items,
+		"empData": empItems,
 		"total":   total,
 		"page":    page,
 		"limit":   limit,
 	})
 }
 
-// GetNonHeadEmployees returns employees who are not department heads (or just all employees as a fallback)
+// GetNonHeadEmployees returns employees with nested user fields flattened for UIs that need employee id as value (e.g. Assign User to Employee).
+// Response is a JSON array; clients that expect { data: [...] } also accept a raw array via resp.data.
 func GetNonHeadEmployees(c *fiber.Ctx) error {
 	var items []models.Employee
 
-	// In a real implementation, you might filter out managers from EmployeeHierarchy
-	// For now, we return all employees with their User details
-	if err := employeeDB.Preload("User").Find(&items).Error; err != nil {
+	if err := employeeDB.Preload("User").Order("id asc").Find(&items).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Extract only user data for the frontend
-	users := make([]models.User, 0)
+	out := make([]fiber.Map, 0, len(items))
 	for _, emp := range items {
-		users = append(users, emp.User)
+		u := emp.User
+		row := fiber.Map{
+			"id":            emp.ID,
+			"user_id":       emp.UserID,
+			"firstname":     u.Firstname,
+			"lastname":      u.Lastname,
+			"email":         u.Email,
+			"mobile_number": u.MobileNumber,
+			"work_email":    emp.WorkEmail,
+		}
+		if u.Salutation != nil {
+			row["salutation"] = *u.Salutation
+		}
+		if u.Usercode != nil {
+			row["usercode"] = *u.Usercode
+		}
+		if emp.EmpCode != nil {
+			row["empcode"] = *emp.EmpCode
+		}
+		out = append(out, row)
 	}
 
-	return c.JSON(fiber.Map{
-		"data": users,
-	})
+	return c.JSON(out)
 }
 
 func GetEmployee(c *fiber.Ctx) error {
@@ -488,9 +519,12 @@ func DeleteEmployee(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	if err := employeeDB.Delete(&item).Error; err != nil {
+	item.DepartmentID = nil
+	item.DesignationID = nil
+
+	if err := employeeDB.Save(&item).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"message": "Employee deleted successfully"})
+	return c.JSON(fiber.Map{"message": "Employee unassigned from department and designation successfully"})
 }

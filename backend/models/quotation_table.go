@@ -48,14 +48,18 @@ type QuotationTable struct {
 	ValidUntil *time.Time `json:"valid_until,omitempty"`
 
 	// ?? Amounts
-	TotalAmount    float64  `gorm:"not null" json:"total_amount"`
-	Discount       *float64 `json:"discount,omitempty"`
-	TaxAmount      float64  `gorm:"not null" json:"tax_amount"`
-	RoundoffAmount float64  `gorm:"not null" json:"roundoff_amount"`
-	GrandTotal     float64  `gorm:"not null" json:"grand_total"`
+	TotalAmount     float64  `gorm:"not null" json:"total_amount"`
+	Discount        *float64 `json:"discount,omitempty"`
+	TaxAmount       float64  `gorm:"not null" json:"tax_amount"`
+	IncludeRoundoff bool     `gorm:"not null;default:false" json:"include_roundoff"`
+	RoundoffAmount  float64  `gorm:"not null" json:"roundoff_amount"`
+	GrandTotal      float64  `gorm:"not null" json:"grand_total"`
 
 	// ?? Status
 	Status QuotationStatuses `gorm:"type:varchar(20);not null" json:"status"`
+
+	// QuoteStatus: document lifecycle — C=Creation, M=Modification (edit save), R=Revise (new row)
+	QuoteStatus string `gorm:"type:varchar(1);not null;default:C;column:quote_status" json:"quote_status,omitempty"`
 
 	// ?? Audit
 	CreatedBy uint      `json:"created_by"`

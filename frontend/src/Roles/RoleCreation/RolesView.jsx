@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL, getAuthHeaders } from '../../config/Config';
+import { useAuth } from '../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -35,6 +37,9 @@ function Roles() {
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const navigate = useNavigate();
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
 
   useEffect(() => {
     fetchRoles();
@@ -170,14 +175,16 @@ function Roles() {
                 </Select>
               </FormControl>
               
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<Add />}
-                onClick={() => navigate("/roles_create/new")}
-              >
-                Add New Role
-              </Button>
+              {perms?.can_create && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Add />}
+                  onClick={() => navigate("/roles_create/new")}
+                >
+                  Add New Role
+                </Button>
+              )}
             </Box>
           </Box>
           
@@ -239,20 +246,24 @@ function Roles() {
                             {role.isDefault ? <Check color="primary" /> : null}
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleEdit(role.id)}
-                              disabled={role.isDefault}
-                            >
-                              <Edit />
-                            </IconButton>
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(role.id)}
-                              disabled={role.isDefault}
-                            >
-                              <Delete />
-                            </IconButton>
+                            {perms?.can_update && (
+                              <IconButton
+                                color="primary"
+                                onClick={() => handleEdit(role.id)}
+                                disabled={role.isDefault}
+                              >
+                                <Edit />
+                              </IconButton>
+                            )}
+                            {perms?.can_delete && (
+                              <IconButton
+                                color="error"
+                                onClick={() => handleDelete(role.id)}
+                                disabled={role.isDefault}
+                              >
+                                <Delete />
+                              </IconButton>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))

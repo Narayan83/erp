@@ -16,7 +16,8 @@ func main() {
 	// Note: Employee is now a separate table
 	// Uncomment below if you need to drop and recreate the table
 	// initializers.DB.Exec(`DROP TABLE IF EXISTS employees CASCADE;`)
-	initializers.DB.Exec(`DROP TABLE IF EXISTS employee_user_relations CASCADE;`)
+	// Do not drop employee_user_relations here — it stores Assign User to Employee mappings.
+	// initializers.DB.Exec(`DROP TABLE IF EXISTS employee_user_relations CASCADE;`)
 
 	// Pre-migration: Handle new NOT NULL columns for existing quotation_tables records
 	// This section handles columns that were added after initial data was inserted
@@ -265,6 +266,24 @@ func main() {
 				}
 			}
 
+			// Handle include_roundoff column (default to false for existing records)
+			var includeRoundoffExists bool
+			initializers.DB.Raw(`
+				SELECT EXISTS (
+					SELECT 1 FROM information_schema.columns 
+					WHERE table_name = 'quotation_tables' AND column_name = 'include_roundoff'
+				)
+			`).Scan(&includeRoundoffExists)
+
+			if !includeRoundoffExists {
+				log.Println("Adding include_roundoff column to quotation_tables...")
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ADD COLUMN include_roundoff boolean`)
+				// For existing records, set to true if roundoff_amount is non-zero, false otherwise
+				initializers.DB.Exec(`UPDATE quotation_tables SET include_roundoff = (roundoff_amount != 0) WHERE include_roundoff IS NULL`)
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN include_roundoff SET NOT NULL`)
+				initializers.DB.Exec(`ALTER TABLE quotation_tables ALTER COLUMN include_roundoff SET DEFAULT false`)
+			}
+
 			log.Println("Pre-migration column setup completed.")
 		}
 	}
@@ -290,6 +309,7 @@ func main() {
 		&models.Tag{},
 		&models.Product{},
 		&models.ProductVariant{},
+		&models.AuditLog{},
 		&models.User{},
 		&models.UserAddress{},
 		&models.UserBankAccount{},
@@ -305,8 +325,13 @@ func main() {
 		&models.Size{},
 		&models.Lead{},
 		&models.LeadSource{},
+		&models.LeadCategory{},
+		&models.LeadProduct{},
 		&models.LeadInteraction{},
 		&models.LeadFollowUp{},
+		&models.DocumentInteraction{},
+		&models.DocumentAction{},
+		&models.CRMTag{},
 		&models.RoleManagement{},
 		&models.Role{},
 		&models.Menu{},
@@ -340,6 +365,7 @@ func main() {
 		&models.Department{},
 		&models.OrganizationUnit{},
 		&models.Employee{},
+		&models.EmployeeUserRelation{},
 		&models.EmployeeHierarchy{},
 		&models.EmployeeOrganizationUnit{},
 		&models.RejectionReason{},
@@ -404,6 +430,19 @@ func main() {
 			initializers.DB.Exec(`ALTER TABLE quotation_table_items ADD COLUMN is_service boolean DEFAULT false`)
 			initializers.DB.Exec(`ALTER TABLE quotation_table_items ALTER COLUMN is_service SET NOT NULL`)
 		}
+	}
+
+	// quotation_tables.quote_status: C=creation, M=modification, R=revise
+	var quoteStatusColExists bool
+	initializers.DB.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema = 'public' AND table_name = 'quotation_tables' AND column_name = 'quote_status'
+		)
+	`).Scan(&quoteStatusColExists)
+	if !quoteStatusColExists {
+		log.Println("Adding quote_status column to quotation_tables (default C)...")
+		initializers.DB.Exec(`ALTER TABLE quotation_tables ADD COLUMN quote_status varchar(1) NOT NULL DEFAULT 'C'`)
 	}
 
 	// Ensure ON DELETE CASCADE for product_variants.product_id -> products.id
@@ -508,7 +547,7 @@ func main() {
 	// initializers.DB.Exec(`
 	// 	CREATE INDEX IF NOT EXISTS idx_employee_user_relations_user_id ON employee_user_relations(user_id);
 	// `)
-	initializers.DB.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_departments_head_id ON departments(head_id);
-	`)
+	// initializers.DB.Exec(`
+	// 	CREATE INDEX IF NOT EXISTS idx_departments_head_id ON departments(head_id);
+	// `)
 }

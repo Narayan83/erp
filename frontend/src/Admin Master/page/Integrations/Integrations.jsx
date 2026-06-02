@@ -3,6 +3,8 @@ import axios from "axios";
 import { BASE_URL } from "../../../config/Config";
 import "../Email/Email.scss";
 import "./Integrations.scss";
+import { useAuth } from "../../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const INDiamart_INIT = { mobileNumber: "", apiKey: "" };
 const RAZORPAY_INIT = { keyId: "", keySecret: "" };
@@ -11,6 +13,9 @@ const RENAV_INIT = { mobile: "" };
 const ACRES_INIT = { username: "", password: "" };
 
 export default function Integrations({ isOpen = false, onClose = () => {}, onSaveIntegration }) {
+  const { getPermissions } = useAuth();
+  const location = useLocation();
+  const perms = getPermissions(location.pathname);
   const [indiamart, setIndiamart] = useState(INDiamart_INIT);
   const [razorpay, setRazorpay] = useState(RAZORPAY_INIT);
   const [trade, setTrade] = useState(TRADE_INIT);
@@ -109,7 +114,9 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
                   <div className="tandc-item"><div className="tandc-name">Mobile: {indiamartSavedData.mobileNumber}</div></div>
                   <div className="tandc-item"><div className="tandc-name">Key: {indiamartSavedData.apiKey}</div></div>
                   <div className="integration-actions">
-                    <button className="btn-primary small yellow" onClick={() => { setIndiamart(indiamartSavedData); setIndiamartSaved(false); }}>Edit</button>
+                    {perms?.can_update && (
+                      <button className="btn-primary small yellow" onClick={() => { setIndiamart(indiamartSavedData); setIndiamartSaved(false); }}>Edit</button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -131,7 +138,9 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
                   <div className="tandc-item"><div className="tandc-name">Key ID: {razorpaySavedData.keyId}</div></div>
                   <div className="tandc-item"><div className="tandc-name">Key Secret: {razorpaySavedData.keySecret}</div></div>
                   <div className="integration-actions">
-                    <button className="btn-primary small yellow" onClick={() => { setRazorpay(razorpaySavedData); setRazorpaySaved(false); }}>Edit</button>
+                    {perms?.can_update && (
+                      <button className="btn-primary small yellow" onClick={() => { setRazorpay(razorpaySavedData); setRazorpaySaved(false); }}>Edit</button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -154,7 +163,9 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
                   <div className="tandc-item"><div className="tandc-name">Profile ID: {tradeSavedData.profileId}</div></div>
                   <div className="tandc-item"><div className="tandc-name">Key: {tradeSavedData.key}</div></div>
                   <div className="integration-actions">
-                    <button className="btn-primary small yellow" onClick={() => { setTrade(tradeSavedData); setTradeSaved(false); }}>Edit</button>
+                    {perms?.can_update && (
+                      <button className="btn-primary small yellow" onClick={() => { setTrade(tradeSavedData); setTradeSaved(false); }}>Edit</button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -176,7 +187,9 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
                 <>
                   <div className="tandc-item"><div className="tandc-name">Mobile: {renavSavedData.mobile}</div></div>
                   <div className="integration-actions">
-                    <button className="btn-primary small yellow" onClick={() => { setRenav(renavSavedData); setRenavSaved(false); }}>Edit</button>
+                    {perms?.can_update && (
+                      <button className="btn-primary small yellow" onClick={() => { setRenav(renavSavedData); setRenavSaved(false); }}>Edit</button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -204,7 +217,9 @@ export default function Integrations({ isOpen = false, onClose = () => {}, onSav
                 <>
                   <div className="tandc-item"><div className="tandc-name">Username: {acresSavedData.username}</div></div>
                   <div className="integration-actions">
-                    <button className="btn-primary small yellow" onClick={() => { setAcres(acresSavedData); setAcresSaved(false); }}>Edit</button>
+                    {perms?.can_update && (
+                      <button className="btn-primary small yellow" onClick={() => { setAcres(acresSavedData); setAcresSaved(false); }}>Edit</button>
+                    )}
                   </div>
                 </>
               ) : (

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"time"
 
 	"erp.local/backend/models"
@@ -22,6 +23,7 @@ type CreateLeadFollowUpRequest struct {
 	Notes        string `json:"notes"`
 	FollowUpOn   string `json:"followup_on"`
 	AssignedToID *uint  `json:"assigned_to_id"`
+	Source       string `json:"source"`
 }
 
 type UpdateLeadFollowUpRequest struct {
@@ -49,6 +51,7 @@ func CreateLeadFollowUp(c *fiber.Ctx) error {
 		LeadID:       body.LeadID,
 		Title:        body.Title,
 		Notes:        body.Notes,
+		Source:       body.Source,
 		AssignedToID: body.AssignedToID,
 	}
 
@@ -73,6 +76,12 @@ func GetLeadFollowUps(c *fiber.Ctx) error {
 
 	if leadID != 0 {
 		query = query.Where("lead_id = ?", leadID)
+	}
+
+	// By default exclude followups created from quotations
+	incl := strings.ToLower(c.Query("include_quotation", "false"))
+	if !(incl == "1" || incl == "true") {
+		query = query.Where("(source IS NULL OR trim(source) = '' OR source != ?)", "quotation")
 	}
 
 	query.Order("follow_up_on asc").Find(&followups)
