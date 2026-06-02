@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Stepper, Step, StepLabel,
-  Button, Box, Typography, Paper
+  Box, Typography, Paper
 } from "@mui/material";
 import ProductStepForm from "./ProductStepForm";
 import VariantStepForm from "./VariantStepForm";
@@ -43,19 +43,16 @@ export default function ProductMultiStepForm({ onSuccess }) {
     <section className="right-content">
        <Paper sx={{ p: 3 }}>
         <Box display="flex" justifyContent="end" gap={2} alignItems="center">
-          {/* <Button
-            variant="outlined"
-            onClick={resetForm}
-            sx={{ mr: 2 }}  >
-              Reset Form
-           </Button> */}
-          <Button
-            variant="contained"
-            color="warning"
+          {/* Reset form (useful during development) */}
+          <button
+            type="button"
+            className="btn btn-secondary"
             onClick={() => navigate("/ProductMaster")}
-            sx={{ mr: 2 }} >
-              View Products
-            </Button>
+            style={{ marginRight: 16 }}
+            aria-label="View Products"
+          >
+            View Products
+          </button>
         </Box>
        </Paper>
       <Paper sx={{ p: 3 }}>

@@ -26,7 +26,7 @@ import {
 import { Settings as SettingsIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { BASE_URL } from "../../Config";
+import { BASE_URL } from "../../config/Config";
 
 export default function Address() {
   const navigate = useNavigate();
@@ -91,6 +91,42 @@ export default function Address() {
     });
   };
 
+  // Helper: format country and country_code together
+  const formatCountryWithCode = (country, country_code) => {
+    const getNameAndCode = (c, cc) => {
+      let name = '';
+      let code = '';
+      if (c && typeof c === 'object') {
+        name = c.name || c.country || c.label || c.title || '';
+        code = c.code || c.dial_code || c.dialCode || c.country_code || c.phone_code || '';
+      } else if (typeof c === 'string') {
+        if (/^\+/.test(c) || /^\d+$/.test(c)) code = c;
+        else name = c;
+      }
+      if (cc && typeof cc === 'object') {
+        code = code || cc.code || cc.dial_code || cc.dialCode || cc.country_code || cc.phone_code || '';
+        name = name || cc.name || cc.country || cc.label || '';
+      } else if (typeof cc === 'string') {
+        if (!code) {
+          if (/^\+/.test(cc) || /^\d+$/.test(cc)) code = cc;
+          else name = name || cc;
+        } else {
+          name = name || cc;
+        }
+      }
+      return { name, code };
+    };
+    const { name, code } = getNameAndCode(country, country_code);
+    
+    const codeStr = code ? String(code).trim() : '';
+    const codeFormatted = codeStr ? (codeStr.startsWith('+') ? codeStr : ('+' + codeStr.replace(/^\+/, ''))) : '';
+    
+    if (name && codeFormatted) return `${name} ${codeFormatted}`;
+    if (name) return name;
+    if (codeFormatted) return codeFormatted;
+    return '';
+  };
+
   // Helper to read a value for a given field name from the address object.
   // This is updated to work with our modified data structure that comes from user data
   const getFieldValue = (address, field) => {
@@ -133,6 +169,13 @@ export default function Address() {
       }
       
       return address.name || address.AddressTitle || '';
+    }
+    
+    // Special handling for Country field to show country + code
+    if (field === "Country") {
+      const country = address.Country || address.country || '';
+      const countryCode = address.CountryCode || address.country_code || address.countrycode || '';
+      return formatCountryWithCode(country, countryCode);
     }
     
     // For non-user fields, try direct lookup
@@ -238,6 +281,7 @@ export default function Address() {
             District: user.district || user.District || '',
             State: user.state || user.State || '',
             Country: user.country || user.Country || '',
+            CountryCode: user.country_code || user.CountryCode || user.countrycode || '',
             Pincode: user.pincode || user.Pincode || '',
             // Include the original user object for reference
             originalUser: user

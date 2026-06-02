@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom"; // ✅ include useParams
-import { BASE_URL } from "../../Config";
+import { BASE_URL, getAuthHeaders } from "../../config/Config";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
@@ -35,15 +35,9 @@ function RoleCreation() {
       if (id) {
         setIsLoading(true);
         try {
-          const token = localStorage.getItem("token") || "";
-          const headers = {
-            "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` }),
-          };
-
           const response = await fetch(`${BASE_URL}/roles/${id}`, {
             method: "GET",
-            headers: headers,
+            headers: getAuthHeaders(),
             credentials: "include",
           });
 
@@ -116,24 +110,11 @@ function RoleCreation() {
     setIsLoading(true);
 
     try {
-      // Get token from localStorage (or use empty string if not present)
-      const token = localStorage.getItem("token") || "";
-      console.log("Current token:", token); // Debug log
-
-      const headers = {
-        "Content-Type": "application/json",
-      };
-
-      // Only add Authorization header if token exists
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
       console.log("Request payload:", roleData); // Debug log
 
       const response = await fetch(`${BASE_URL}/roles`, {
         method: "POST",
-        headers: headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(roleData),
         credentials: "include",
       });

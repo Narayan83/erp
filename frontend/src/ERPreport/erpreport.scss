@@ -1,0 +1,607 @@
+/* ERPreport form styles */
+:root {
+  --primary-color: #2563eb;
+  --primary-dark: #1d4ed8;
+  --secondary-color: #64748b;
+  --accent-color: #f59e0b;
+  --background-color: #f8fafc;
+  --surface-color: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.erp-report-wrap {
+  font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--background-color);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  display: flex;
+  width: 100vw;
+  max-width: 100%;
+  flex-direction: column;
+}
+
+.erp-header h1 {
+  margin: 0 0 16px 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary-color);
+  text-align: center;
+}
+
+.erp-form {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  margin: 0 20px;
+}
+
+.erp-form .row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.erp-form .id-row label,
+.erp-form .row label {
+  width: 140px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.erp-form input[type="text"],
+.erp-form input[type="file"],
+.erp-form input,
+.erp-form textarea {
+  flex: 1 1 auto;
+  padding: 12px 16px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-color);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.erp-form input:focus,
+.erp-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.section-title {
+  margin-top: 20px;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--primary-color);
+  border-bottom: 2px solid var(--accent-color);
+  padding-bottom: 8px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.form-header .field {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  width: 750px;
+}
+
+.form-header label {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.column {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid var(--border-light);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.column-title {
+  font-size: 20px;
+  font-weight: 800;
+  //   text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-title.small {
+  margin: 12px 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.address-block {
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+  margin-bottom: 16px;
+}
+
+.address-line,
+.address-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.address-line label,
+.address-row label {
+  width: 130px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.phones-col {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.phones-col .phone-input {
+  flex: 1;
+}
+
+/* Ensure the actual input inside .phone-input fills the available width */
+.phones-col .phone-input input {
+  width: 100%;
+  display: block;
+}
+
+.phones-col label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.form-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 24px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-left label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.footer-left input,
+.footer-left select {
+  padding: 12px 16px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-color);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.footer-left input:focus,
+.footer-left select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.footer-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-right > label {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.category-grid {
+  display: grid;
+  /* Force exactly 3 rows; items will flow into additional columns as needed */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  grid-template-rows: repeat(3, minmax(40px, auto));
+  gap: 12px 0px; /* vertical gap 12px, horizontal gap 20px */
+  background: var(--surface-color);
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  /* limit to 4 rows visible and make scrollable if more */
+  max-height: calc((40px * 4) + (12px * 3)); /* four rows plus vertical gaps */
+  overflow-y: auto;
+}
+
+.category-checkbox {
+  display: flex;
+  align-items: center; /* center checkbox and label vertically */
+  gap: 20px; /* increase gap between checkbox and label */
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.category-checkbox:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.05),
+    rgba(37, 99, 235, 0.08)
+  );
+  color: var(--text-primary);
+}
+
+.category-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+  /* aligned via flexbox; removed manual margin-top hack */
+}
+.category-checkbox input[type="checkbox"] {
+  margin: 0;
+  flex: 0 0 auto; /* prevent checkbox from stretching */
+}
+.category-checkbox span {
+  display: inline-block;
+  flex: 0 1 auto; /* let the label text size naturally */
+  margin-left: 10px; /* small fallback gap if flex gap isn't applied */
+  position: relative;
+  top: -3px;
+}
+.category-checkbox input[type="checkbox"]:checked + span {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.category-search {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.category-search:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.06);
+}
+
+.selected-categories {
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.05),
+    rgba(37, 99, 235, 0.08)
+  );
+  padding: 10px 12px;
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+  margin-top: 8px;
+}
+
+.phones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.phone-input label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.descriptions .desc-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.descriptions label {
+  width: 140px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.file-upload {
+  background: var(--surface-color);
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.file-upload:hover {
+  border-color: var(--primary-color);
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.02),
+    rgba(37, 99, 235, 0.05)
+  );
+}
+
+.file-upload input[type="file"] {
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.file-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+  /* Show max 3 items, then enable scrolling. Calculated as:
+     (item-height * 3) + (gap between items * 2) + padding-top */
+  max-height: calc(
+    (var(--file-item-height, 56px) * 3) + (var(--file-item-gap, 8px) * 2) + 16px
+  );
+  overflow-y: auto;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  /* Fix each item's height so the list calculation is predictable */
+  height: var(--file-item-height, 50px);
+  min-height: var(--file-item-height, 50px);
+  font-size: 14px;
+  background: var(--background-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  border-left: 3px solid var(--primary-color);
+}
+
+.file-item:last-child {
+  margin-bottom: 0;
+}
+
+.file-item:hover {
+  background-color: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.05),
+    rgba(37, 99, 235, 0.08)
+  );
+}
+
+.file-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  flex: 1;
+  word-break: break-word;
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.btn-link:hover {
+  color: #b91c1c;
+  text-decoration: underline;
+}
+
+.form-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  background: var(--surface-color);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.btn.primary {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--primary-dark) 100%
+  );
+  color: #ffffff;
+  border-color: var(--primary-color);
+}
+
+/* Place Reset (normal .btn) at left and Save (.btn.primary) at right */
+.form-actions .btn {
+  order: 1;
+}
+.form-actions .btn.primary {
+  order: 2;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, #1e40af 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+@media (max-width: 900px) {
+  .erp-report-wrap {
+    padding: 0;
+  }
+
+  .erp-header h1 {
+    font-size: 24px;
+  }
+
+  .erp-form {
+    padding: 15px;
+    margin: 0;
+  }
+
+  .erp-form .row,
+  .address-row,
+  .descriptions .desc-row,
+  .address-line {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .erp-form .row label,
+  .address-row label,
+  .descriptions label,
+  .address-line label {
+    width: auto;
+  }
+
+  .form-header {
+    flex-direction: column;
+  }
+
+  .form-header .field {
+    width: auto;
+
+  }
+
+  .two-columns {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .phones {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-footer {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .footer-left {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 500px) {
+  .category-grid {
+    grid-template-columns: 1fr 1fr; /* two columns for small screens */
+    gap: 8px 2px; /* reduced gaps */
+    grid-auto-flow: row; /* flow into rows to make grid predictable */
+    grid-auto-columns: 1fr;
+    grid-template-rows: none; /* remove forced rows */
+    max-height: none; /* allow full height, avoid clipping */
+    overflow: visible; /* no inner scroll on small screens */
+    padding: 8px;
+  }
+
+  .category-checkbox {
+    padding: 6px; /* smaller touch area to fit two columns */
+    gap: 12px;
+    font-size: 13px;
+    border-radius: 6px;
+
+    span {
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+  }
+
+  .category-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+  }
+
+  .category-search {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .selected-categories {
+    font-size: 12px;
+    padding: 8px;
+  }
+}

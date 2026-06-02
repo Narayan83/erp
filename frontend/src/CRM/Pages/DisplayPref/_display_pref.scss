@@ -18,9 +18,9 @@
   box-shadow: 0 8px 32px rgba(0,0,0,0.18);
   padding: 10px 20px;
   min-width: 500px;
-  max-width: 750px;
-  min-height: 45vh;
-  max-height: 60vh;
+  max-width: 800px;
+  min-height: 35vh;
+  max-height: 50vh;
   width: 100%;
   font-family: 'Segoe UI', Arial, sans-serif;
   display: flex;
@@ -31,6 +31,7 @@
 
 // Modal header
 .modal-header {
+  background-color: transparent !important;
   display: flex;
   width: 100%;
   padding: 0!important;
@@ -45,6 +46,10 @@
     cursor: pointer;
     color: #888;
   }
+}
+
+.modal-body {
+  background-color: transparent !important;
 }
 
 // Checkbox grid layout

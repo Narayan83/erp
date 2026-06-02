@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -109,28 +111,31 @@ func UpdateUnit(c *fiber.Ctx) error {
 }
 
 func DeleteUnit(c *fiber.Ctx) error {
-	{
-		id := c.Params("id")
-		if id == "" || id == "undefined" {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID: empty or undefined"})
-		}
-
-		// First check if the unit exists
-		var unit models.Unit
-		if err := unitsDB.First(&unit, id).Error; err != nil {
-			return c.Status(404).JSON(fiber.Map{"error": "Unit not found"})
-		}
-
-		// Find products using this unit and set their unit_id to NULL
-		if err := unitsDB.Model(&models.Product{}).Where("unit_id = ?", id).Update("unit_id", nil).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to update products: " + err.Error()})
-		}
-
-		// Now, delete the unit
-		if err := unitsDB.Delete(&unit).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete unit: " + err.Error()})
-		}
-
-		return c.SendStatus(204)
+	id := c.Params("id")
+	if id == "" || id == "undefined" {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID: empty or undefined"})
 	}
+
+	// First check if the unit exists
+	var unit models.Unit
+	if err := unitsDB.First(&unit, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Unit not found"})
+	}
+
+	// Check references in products
+	var prodCount int64
+	if err := unitsDB.Model(&models.Product{}).Where("unit_id = ?", id).Count(&prodCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if prodCount > 0 {
+		return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Cannot delete Unit: it is used in %d product(s)", prodCount)})
+	}
+
+	// Now, delete the unit
+	if err := unitsDB.Delete(&unit).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete unit: " + err.Error()})
+	}
+
+	return c.SendStatus(204)
 }

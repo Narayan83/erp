@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../../styles/menu_creation.scss";
-import { BASE_URL }  from "../../../Config";
+import { BASE_URL }  from "../../../config/Config";
+import { FaPlus, FaEdit } from "react-icons/fa";
 
 const MenuCreation = ({ onAddMenu, isEditing, editingMenu, onUpdateMenu, onCancel }) => {
   const [menuName, setMenuName] = useState("");
@@ -197,155 +198,178 @@ const loadMenus = async () => {
 
   return (
     <div className={`menu-creation-container ${isEditing ? 'embedded' : ''}`}>
-      <h1 className="menu-title">{isEditing ? "Edit Menu" : "Menu Creation"}</h1>
+      <h1 className="menu-title">
+        {isEditing ? <FaEdit /> : <FaPlus />}
+        {isEditing ? "Edit Menu" : "Menu Creation"}
+      </h1>
       <form className="menu-form" onSubmit={handleSubmit}>
-        <label className="menu-label">Menu Name *</label>
-        <input
-          className="menu-input"
-          type="text"
-          placeholder="Enter menu name"
-          value={menuName}
-          onChange={(e) => setMenuName(e.target.value)}
-          disabled={loading}
-          required
-        />
-
-        <label className="menu-label">URL</label>
-        <input
-          className="menu-input"
-          type="text"
-          placeholder="Enter URL path (e.g., /dashboard)"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          disabled={loading}
-        />
-
-        <label className="menu-label">Icon</label>
-        <input
-          className="menu-input"
-          type="text"
-          placeholder="Enter icon class name (e.g., fa fa-home)"
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          disabled={loading}
-        />
-
-        <label className="menu-label">Parent Menu</label>
-        <select
-          className="menu-input"
-          value={parentId}
-          onChange={(e) => setParentId(e.target.value)}
-          disabled={loading}
-        >
-          <option value="">No Parent (Top Level)</option>
-          {parentMenus.map(menu => (
-            <option key={menu.id} value={menu.id}>
-              {menu.menu_name}
-            </option>
-          ))}
-        </select>
-
-        <label className="menu-label">Sort Order</label>
-        <input
-          className="menu-input"
-          type="number"
-          placeholder="Sort order"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
-          disabled={loading}
-        />
-
-        <label className="menu-label">Menu Type</label>
-        <select
-          className="menu-input"
-          value={menuType}
-          onChange={(e) => setMenuType(e.target.value)}
-          disabled={loading}
-        >
-          <option value="main">Main Menu</option>
-          <option value="sub">Sub Menu</option>
-          <option value="footer">Footer Menu</option>
-          <option value="sidebar">Sidebar Menu</option>
-        </select>
-
-        <div className="checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={() => setIsActive(!isActive)}
-              disabled={loading}
-            />
-            Active
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={requiresAuth}
-              onChange={() => setRequiresAuth(!requiresAuth)}
-              disabled={loading}
-            />
-            Requires Authentication
-          </label>
+        <div className="menu-field">
+          <label className="menu-label">Menu Name *</label>
+          <input
+            className="menu-input"
+            type="text"
+            placeholder="Enter menu name"
+            value={menuName}
+            onChange={(e) => setMenuName(e.target.value)}
+            disabled={loading}
+            required
+          />
         </div>
 
-        <label className="menu-label">Permissions</label>
-        <div className="permissions-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={permissions.all}
-              onChange={() => handlePermissionChange("all")}
-              disabled={loading}
-            />
-            All
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={permissions.view}
-              onChange={() => handlePermissionChange("view")}
-              disabled={loading}
-            />
-            View
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={permissions.create}
-              onChange={() => handlePermissionChange("create")}
-              disabled={loading}
-            />
-            Create
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={permissions.update}
-              onChange={() => handlePermissionChange("update")}
-              disabled={loading}
-            />
-            Update
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={permissions.delete}
-              onChange={() => handlePermissionChange("delete")}
-              disabled={loading}
-            />
-            Delete
-          </label>
+        <div className="menu-field">
+          <label className="menu-label">URL Path</label>
+          <input
+            className="menu-input"
+            type="text"
+            placeholder="e.g., /dashboard"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={loading}
+          />
         </div>
 
-        <label className="menu-label">Remarks</label>
-        <textarea
-          className="menu-textarea"
-          placeholder="Enter description (optional)"
-          value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
-          disabled={loading}
-        />
+        <div className="menu-field">
+          <label className="menu-label">Icon Class</label>
+          <input
+            className="menu-input"
+            type="text"
+            placeholder="e.g., fa fa-home"
+            value={icon}
+            onChange={(e) => setIcon(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+
+        <div className="menu-field">
+          <label className="menu-label">Parent Menu</label>
+          <select
+            className="menu-input"
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            disabled={loading}
+          >
+            <option value="">No Parent (Top Level)</option>
+            {parentMenus.map(menu => (
+              <option key={menu.id} value={menu.id}>
+                {menu.menu_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="menu-field">
+          <label className="menu-label">Sort Order</label>
+          <input
+            className="menu-input"
+            type="number"
+            placeholder="0"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
+            disabled={loading}
+          />
+        </div>
+
+        <div className="menu-field">
+          <label className="menu-label">Menu Category</label>
+          <select
+            className="menu-input"
+            value={menuType}
+            onChange={(e) => setMenuType(e.target.value)}
+            disabled={loading}
+          >
+            <option value="main">Main Menu</option>
+            <option value="sub">Sub Menu</option>
+            <option value="sidebar">Sidebar Menu</option>
+            <option value="footer">Footer Menu</option>
+          </select>
+        </div>
+
+        <div className="full-width">
+          <label className="menu-label">Status & Settings</label>
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={() => setIsActive(!isActive)}
+                disabled={loading}
+              />
+              <span>Menu is Active</span>
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={requiresAuth}
+                onChange={() => setRequiresAuth(!requiresAuth)}
+                disabled={loading}
+              />
+              <span>Requires Authentication</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="full-width">
+          <label className="menu-label">Permissions Scope</label>
+          <div className="permissions-group">
+            <label className="permission-label">
+              <input
+                type="checkbox"
+                checked={permissions.all}
+                onChange={() => handlePermissionChange("all")}
+                disabled={loading}
+              />
+              <span>Select All</span>
+            </label>
+            <label className="permission-label">
+              <input
+                type="checkbox"
+                checked={permissions.view}
+                onChange={() => handlePermissionChange("view")}
+                disabled={loading}
+              />
+              <span>View</span>
+            </label>
+            <label className="permission-label">
+              <input
+                type="checkbox"
+                checked={permissions.create}
+                onChange={() => handlePermissionChange("create")}
+                disabled={loading}
+              />
+              <span>Create</span>
+            </label>
+            <label className="permission-label">
+              <input
+                type="checkbox"
+                checked={permissions.update}
+                onChange={() => handlePermissionChange("update")}
+                disabled={loading}
+              />
+              <span>Update</span>
+            </label>
+            <label className="permission-label">
+              <input
+                type="checkbox"
+                checked={permissions.delete}
+                onChange={() => handlePermissionChange("delete")}
+                disabled={loading}
+              />
+              <span>Delete</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="full-width">
+          <label className="menu-label">Description / Remarks</label>
+          <textarea
+            className="menu-textarea"
+            placeholder="Add internal notes about this menu item..."
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            disabled={loading}
+            rows={3}
+          />
+        </div>
 
         <div className="form-buttons">
           {isEditing && (
@@ -355,7 +379,7 @@ const loadMenus = async () => {
               onClick={onCancel}
               disabled={loading}
             >
-              Cancel
+              Discard Changes
             </button>
           )}
           <button

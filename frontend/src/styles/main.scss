@@ -20,9 +20,10 @@ body {
   color: $body-color;
   background-color: $body-bg;
 }
+
 // TOP BAR SCSS
 header {
-  background: #0072F9;
+  background: #0072f9;
   // background: linear-gradient(38deg,rgba(3, 29, 55, 1) 0%, rgba(8, 120, 206, 1) 77%);
   width: 100%;
   height: 60px;
@@ -30,6 +31,7 @@ header {
   top: 0;
   left: 0;
   z-index: 100;
+
   .row {
     margin: 0 !important;
   }
@@ -43,12 +45,14 @@ header .logo {
 header .logo img {
   width: $logo-width;
 }
+
 header .logo span {
   font-size: map-get($font-sizes, 7);
   font-weight: $font-weight-bold;
   color: $white;
   margin-left: 5px;
 }
+
 header .rounded-circle {
   min-width: 40px !important;
   width: 40px !important;
@@ -88,6 +92,7 @@ header .rounded-circle:hover svg {
 .my-account {
   max-height: 40px;
   text-align: left !important;
+
   .user-image {
     .rounded-circle {
       display: flex;
@@ -97,6 +102,7 @@ header .rounded-circle:hover svg {
       position: relative;
       cursor: pointer;
       border: 2px solid $white;
+
       img {
         width: 100%;
         object-fit: cover;
@@ -108,6 +114,7 @@ header .rounded-circle:hover svg {
     padding-left: 15px;
     padding-top: 20px;
     cursor: pointer;
+
     h4 {
       font-size: map-get($font-sizes, 3) !important;
       font-weight: $font-weight-bold;
@@ -117,6 +124,7 @@ header .rounded-circle:hover svg {
       overflow: hidden;
       color: $white;
     }
+
     p {
       color: #f2f2f2;
       margin-top: 0;
@@ -131,7 +139,6 @@ header .rounded-circle:hover svg {
 // SIDE BAR SCSS
 
 .main {
- 
   .main-side-bar-wraper {
     width: 20%;
     flex: 0 0 20%;
@@ -146,27 +153,31 @@ header .rounded-circle:hover svg {
       position: fixed;
       top: 60px;
       left: 0;
-      background: #031D37;
-      background: linear-gradient(38deg,rgba(3, 29, 55, 1) 100%, rgba(8, 120, 206, 1) 77%);
+      background: #031d37;
+      background: linear-gradient(38deg,
+          rgba(3, 29, 55, 1) 100%,
+          rgba(8, 120, 206, 1) 77%);
       transition: all 0.5s ease-in-out;
 
       ul {
-          margin-left: 0 !important;
-          margin-bottom: 0 !important;
-          padding-left: 0 !important;
-          list-style: none !important;
-          border-left: none !important;
+        margin-left: 0 !important;
+        margin-bottom: 0 !important;
+        padding-left: 0 !important;
+        list-style: none !important;
+        border-left: none !important;
 
         li {
           list-style: none;
+
           button {
             text-align: left;
             justify-content: left;
-            color: $white;
+            color: $white !important;
             align-items: center;
             padding: 12px 15px !important;
             text-transform: capitalize;
             font-weight: $font-weight-bold;
+
             .icon {
               display: flex;
               align-items: center;
@@ -174,6 +185,7 @@ header .rounded-circle:hover svg {
               width: 25px;
               height: 25px;
               margin-right: 10px;
+
               svg {
                 color: $white;
                 font-size: map-get($font-sizes, 6);
@@ -187,12 +199,14 @@ header .rounded-circle:hover svg {
               justify-content: center;
               width: 25px;
               height: 25px;
+
               svg {
                 color: $white;
                 font-size: map-get($font-sizes, 6);
               }
             }
           }
+
           button:hover {
             background-color: #37d9eb;
           }
@@ -200,6 +214,7 @@ header .rounded-circle:hover svg {
 
         .active {
           background-color: #1b5974;
+
           .icon svg {
             color: $white;
           }
@@ -209,7 +224,9 @@ header .rounded-circle:hover svg {
           .submenu {
             opacity: 1;
             height: auto;
-            transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
+            transition:
+              opacity 0.3s ease-in-out,
+              height 0.3s ease-in-out;
             padding: 0px 25px !important;
             position: relative;
 
@@ -249,7 +266,9 @@ header .rounded-circle:hover svg {
       height: 0;
       opacity: 0;
       overflow: hidden;
-      transition: opacity 0.5s ease-in-out, height 0.5s ease-in-out;
+      transition:
+        opacity 0.5s ease-in-out,
+        height 0.5s ease-in-out;
     }
 
     .colapse {
@@ -266,14 +285,17 @@ header .rounded-circle:hover svg {
   }
 
   .content {
+    // margin-top: 60px;
     width: 80%;
     flex: 0 0 80%;
     transition: all 0.3s ease-in-out;
     background: #fff;
-    min-height: 100vh;
+    max-height: 100vh;
 
     .right-content {
-      padding: 85px 25px;
+      padding: 5px;
+      width: 100vw;
+      max-width: 100%;
     }
   }
 }
@@ -281,6 +303,7 @@ header .rounded-circle:hover svg {
 .main-side-bar-wraper.toggle-menu {
   width: 0;
   flex: 0 0 0%;
+
   .sidebar {
     left: -100%;
   }
@@ -296,12 +319,14 @@ header .rounded-circle:hover svg {
   .form-items {
     display: flex;
     flex-direction: column;
+
     label {
       color: $dark;
       font-size: map-get($font-sizes, 4);
       font-weight: 600;
       margin: 5px 5px;
     }
+
     input {
       background: $white;
       color: $gray-600;
@@ -318,6 +343,7 @@ header .rounded-circle:hover svg {
     input:focus {
       border: 2px solid #1872c3;
     }
+
     select {
       background: $white;
       color: $gray-600;
@@ -333,6 +359,7 @@ header .rounded-circle:hover svg {
     select:focus {
       border: 2px solid #1872c3;
     }
+
     textarea {
       background: $white;
       color: $gray-600;
@@ -352,7 +379,8 @@ header .rounded-circle:hover svg {
 
     /* Style all radio buttons */
     input[type="radio"] {
-      appearance: none; /* Remove default radio look */
+      appearance: none;
+      /* Remove default radio look */
       width: 18px;
       height: 18px;
       border: 2px solid #333;
@@ -375,9 +403,11 @@ header .rounded-circle:hover svg {
       background-color: #333;
       border-radius: 50%;
     }
+
     input[type="radio"]:focus {
       border: 2px solid #1c1c1c;
     }
+
     .checkbox-container {
       label {
         font-size: 12px;
@@ -386,11 +416,13 @@ header .rounded-circle:hover svg {
 
     /* Style all checkboxes */
     input[type="checkbox"] {
-      appearance: none; /* Remove default checkbox */
+      appearance: none;
+      /* Remove default checkbox */
       width: 18px;
       height: 18px;
       border: 2px solid #333;
-      border-radius: 4px; /* Square corners, reduce or set to 0 for sharper edges */
+      border-radius: 4px;
+      /* Square corners, reduce or set to 0 for sharper edges */
       position: relative;
       cursor: pointer;
       vertical-align: middle;
@@ -414,10 +446,12 @@ header .rounded-circle:hover svg {
       border: 2px solid #1c1c1c;
     }
   }
+
   .form-buttons {
     display: flex;
     align-items: center;
     margin-top: 28px;
+
     button {
       margin-bottom: 0;
     }
@@ -430,6 +464,7 @@ header .rounded-circle:hover svg {
       margin-left: 10px;
       width: 100%;
     }
+
     button.cancel {
       background-color: $red;
       font-size: map-get($font-sizes, 2);
@@ -485,6 +520,7 @@ header .rounded-circle:hover svg {
 
 .table {
   background: $white !important;
+
   .thead-dark {
     background-color: rgba($color: #b48bf3, $alpha: 0.8);
     color: $white;
@@ -495,9 +531,11 @@ header .rounded-circle:hover svg {
   th {
     padding: 0px 5px;
   }
+
   tbody {
     tr {
       border-color: rgba($color: #000000, $alpha: 0.2) !important;
+
       td {
         padding: 2px 2px;
       }
@@ -511,6 +549,7 @@ header .rounded-circle:hover svg {
         background-color: $gray-300;
         margin-right: 5px;
         margin-left: 2px;
+
         svg {
           color: #330346;
           font-size: map-get($font-sizes, 3);
@@ -525,9 +564,11 @@ header .rounded-circle:hover svg {
 .gray-button-300 {
   background-color: $gray-300 !important;
 }
+
 .gray-button-600 {
   background-color: $gray-600 !important;
 }
+
 .gray-button-900 {
   background-color: $gray-900 !important;
   color: $white !important;
@@ -541,16 +582,22 @@ header .rounded-circle:hover svg {
 }
 
 .shadow-small {
-  box-shadow: rgba(0, 0, 0, 0.02) 0px 1px 3px 0px,
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0px 1px 3px 0px,
     rgba(27, 31, 35, 0.15) 0px 0px 0px 1px;
 }
+
 .shadow-medium {
   box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
 }
+
 .shadow-large {
-  box-shadow: rgba(0, 0, 0, 0.25) 0px 54px 55px,
-    rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px,
-    rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;
+  box-shadow:
+    rgba(0, 0, 0, 0.25) 0px 54px 55px,
+    rgba(0, 0, 0, 0.12) 0px -12px 30px,
+    rgba(0, 0, 0, 0.12) 0px 4px 6px,
+    rgba(0, 0, 0, 0.17) 0px 12px 13px,
+    rgba(0, 0, 0, 0.09) 0px -3px 5px;
 }
 
 // responsive styles

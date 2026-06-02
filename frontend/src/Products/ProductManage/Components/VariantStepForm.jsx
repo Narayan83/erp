@@ -12,7 +12,7 @@ import {
 import { Edit } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 import VariantFormDialog from "./VariantFormDialog";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 
 export default function VariantStepForm({ variants, setVariants, onBack, onNext, editIndex, setEditIndex, sizes = [] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -292,17 +292,17 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Color Code</TableCell>
-            <TableCell>Size</TableCell>
-            <TableCell>SKU</TableCell>
-            <TableCell>Barcode</TableCell>
-            <TableCell>Purchase Cost</TableCell>
-            <TableCell>Sales Price</TableCell>
-            <TableCell>Stock</TableCell>
-            <TableCell>Lead Time</TableCell>
-            <TableCell>Images</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Action</TableCell>
+            <TableCell align="center">Color Code</TableCell>
+            <TableCell align="center">Size</TableCell>
+            <TableCell align="center">SKU</TableCell>
+            <TableCell align="center">Barcode</TableCell>
+            <TableCell align="center">Purchase Cost</TableCell>
+            <TableCell align="center">Sales Price</TableCell>
+            <TableCell align="center">Stock</TableCell>
+            <TableCell align="center">Lead Time</TableCell>
+            <TableCell align="center">Images</TableCell>
+            <TableCell align="center">Status</TableCell>
+            <TableCell align="center">Action</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -310,7 +310,7 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
             const colorInfo = ralColors.find(c => c.value === v.color);
             return (
               <TableRow key={idx}>
-                <TableCell>
+                <TableCell align="center">
                   <Box display="flex" alignItems="center" gap={1}>
                     <Box
                       sx={{
@@ -329,14 +329,14 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
                     </Box>
                   </Box>
                 </TableCell>
-                <TableCell>{v.size}</TableCell>
-                <TableCell>{v.sku}</TableCell>
-                <TableCell>{v.barcode}</TableCell>
-                <TableCell>₹{v.purchaseCost}</TableCell>
-                <TableCell>₹{v.stdSalesPrice}</TableCell>
-                <TableCell>{v.stock}</TableCell>
-                <TableCell>{v.leadTime} days</TableCell>
-                <TableCell>
+                <TableCell align="center">{v.size}</TableCell>
+                <TableCell align="center">{v.sku}</TableCell>
+                <TableCell align="center">{v.barcode}</TableCell>
+                <TableCell align="center">₹{v.purchaseCost}</TableCell>
+                <TableCell align="center">₹{v.stdSalesPrice}</TableCell>
+                <TableCell align="center">{v.stock}</TableCell>
+                <TableCell align="center">{v.leadTime} days</TableCell>
+                <TableCell align="center">
                   {Array.isArray(v.images) && v.images.length > 0 ? (
                     <Box display="flex" gap={0.5}>
                       {v.images.slice(0, 3).map((img, j) => (
@@ -367,7 +367,7 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
                     "—"
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell align="center">
                   <Typography 
                     variant="body2" 
                     sx={{ 
@@ -378,7 +378,7 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
                     {v.isActive !== false ? 'Active' : 'Inactive'}
                   </Typography>
                 </TableCell>
-                <TableCell>
+                <TableCell align="center">
                   <IconButton size="small" onClick={() => handleEdit(idx)}>
                     <Edit fontSize="small" />
                   </IconButton>
@@ -391,7 +391,14 @@ export default function VariantStepForm({ variants, setVariants, onBack, onNext,
 
       <Box mt={2} display="flex" justifyContent="space-between">
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={onNext}>Next</Button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onNext}
+          aria-label="Next"
+        >
+          Next
+        </button>
       </Box>
 
       <VariantFormDialog

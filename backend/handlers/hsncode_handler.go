@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"strings"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -84,6 +87,41 @@ func UpdateHsnCode(c *fiber.Ctx) error {
 
 func DeleteHsnCode(c *fiber.Ctx) error {
 	id := c.Params("id")
+
+	// Ensure HSN exists
+	var hsn models.HsnCode
+	if err := hsnDB.First(&hsn, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "HSN not found"})
+	}
+
+	code := hsn.Code
+
+	// Check references in products (Product.HsnSacCode) and quotation items (QuotationTableItems.HsnCode)
+	var prodCount int64
+	if err := hsnDB.Model(&models.Product{}).Where("hsn_sac_code = ?", code).Count(&prodCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var quoteCount int64
+	if err := hsnDB.Model(&models.QuotationTableItems{}).Where("hsn_code = ?", code).Count(&quoteCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if prodCount > 0 || quoteCount > 0 {
+		msg := "Cannot delete HSN: it is used"
+		details := []string{}
+		if prodCount > 0 {
+			details = append(details, fmt.Sprintf("%d product(s)", prodCount))
+		}
+		if quoteCount > 0 {
+			details = append(details, fmt.Sprintf("%d quotation item(s)", quoteCount))
+		}
+		if len(details) > 0 {
+			msg = msg + " in " + strings.Join(details, " and ")
+		}
+		return c.Status(400).JSON(fiber.Map{"error": msg})
+	}
+
 	if err := hsnDB.Delete(&models.HsnCode{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

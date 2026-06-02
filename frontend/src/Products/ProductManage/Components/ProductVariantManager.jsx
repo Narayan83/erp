@@ -1,24 +1,10 @@
 import { useEffect, useState } from "react";
-import {
-  Typography,
-  Box,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Button,
-  Divider,
-  Paper,
-} from "@mui/material";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 import VariantEditDialog from "./VariantEditDialog"; // reuse
-import { Edit } from "@mui/icons-material";
-import { Delete } from "@mui/icons-material";
-import { Star as StarIcon, StarBorder as StarBorderIcon } from '@mui/icons-material';
 import { useNavigate } from "react-router-dom";
+import './productvariantmanager.scss';
 
 
 export default function ProductVariantManager() {
@@ -410,56 +396,57 @@ export default function ProductVariantManager() {
 
   return (
     <section className="right-content">
-      <Paper sx={{ p: 3 }}>
+      <div className="variant-manager-paper">
         {variantError && (
-          <div style={{ color: 'red', marginBottom: 10 }}>{variantError}</div>
+          <div className="variant-error">{variantError}</div>
         )}
-        <Typography variant="h6">
+        <h2 className="product-title">
           Product: {product.Name} ({product.Code})
-        </Typography>
-        <Typography variant="subtitle2">
+        </h2>
+        <p className="product-subtitle">
           HSN: {product.HsnSacCode}, GST: {product.GstPercent}%
-        </Typography>
-        <Typography variant="body2">
+        </p>
+        <p className="product-info">
           Importance: {product.Importance} | Store: {product.Store?.Name}
-        </Typography>
+        </p>
 
-        <Divider sx={{ my: 2 }} />
+        <hr className="divider" />
 
-        <Box display="flex" justifyContent="space-between" mb={2}>
-          <Typography variant="subtitle1">Product Variants</Typography>
-          <Box display="flex" gap={1}>
-            <Button variant="contained" onClick={handleAddClick}>
-            + Add Variant
-            </Button>
-            <Button variant="contained" color="warning"  onClick={() => {
+        <div className="header-section">
+          <h3 className="variants-title">Product Variants</h3>
+          <div className="button-group">
+            <button className="btn btn-primary" onClick={handleAddClick}>
+              + Add Variant
+            </button>
+            <button className="btn btn-warning" onClick={() => {
                navigate(`/ProductMaster`)
-            }} >
-                 View  Products
-            </Button>
-          </Box>
-        </Box>
+            }}>
+              View Products
+            </button>
+          </div>
+        </div>
 
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Color</TableCell>
-              <TableCell>Size</TableCell>
-              <TableCell>SKU</TableCell>
-              <TableCell>Barcode</TableCell>
-              <TableCell>Purchase Cost</TableCell>
-              <TableCell>Sales Price</TableCell>
-              <TableCell>Stock</TableCell>
-              <TableCell>Lead Time</TableCell>
-              <TableCell>Images</TableCell>
-              <TableCell>Active</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+        <div className="table-responsive">
+          <table className="variants-table">
+          <thead>
+            <tr>
+              <th className="col-color">Color</th>
+              <th className="col-size">Size</th>
+              <th className="col-sku">SKU</th>
+              <th className="col-barcode">Barcode</th>
+              <th className="col-purchase">Purchase Cost</th>
+              <th className="col-sales">Sales Price</th>
+              <th className="col-stock">Stock</th>
+              <th className="col-leadtime">Lead Time</th>
+              <th className="col-images">Images</th>
+              <th className="col-active">Active</th>
+              <th className="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
             {product.Variants.map((v, idx) => (
-              <TableRow key={idx}>
-                <TableCell>
+              <tr key={idx}>
+                <td className="color-cell col-color">
                   {(() => {
                     // Find color data by hex or RAL code
                     let colorData = ralColors.find(c => c.hex.toLowerCase() === (v.Color || '').toLowerCase());
@@ -468,36 +455,32 @@ export default function ProductVariantManager() {
                       colorData = ralColors.find(c => c.value.toLowerCase() === (v.Color || '').toLowerCase());
                     }
                     return (
-                      <Box display="flex" alignItems="center" gap={0.5}>
+                      <div className="color-display">
                         {/* Color visual indicator */}
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: 1,
-                            border: '1px solid #ccc',
+                        <div
+                          className="color-swatch"
+                          style={{
                             backgroundColor: colorData ? colorData.hex : (v.Color || '#ffffff'),
-                            flexShrink: 0
                           }}
                         />
                         {/* Color code and name */}
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                        <span className="color-text">
                           {colorData ? `${colorData.value} - ${colorData.name.split(' - ')[1]}` : (v.Color || 'N/A')}
-                        </Typography>
-                      </Box>
+                        </span>
+                      </div>
                     );
                   })()}
-                </TableCell>
-                <TableCell>{v.Size}</TableCell>
-                <TableCell>{v.SKU}</TableCell>
-                <TableCell>{v.Barcode}</TableCell>
-                <TableCell>{v.PurchaseCost}</TableCell>
-                <TableCell>{v.StdSalesPrice}</TableCell>
-                <TableCell>{v.Stock}</TableCell>
-                <TableCell>{v.LeadTime}</TableCell>
-                <TableCell>
+                </td>
+                <td className="col-size">{v.Size}</td>
+                <td className="col-sku">{v.SKU}</td>
+                <td className="col-barcode">{v.Barcode}</td>
+                <td className="col-purchase">{v.PurchaseCost}</td>
+                <td className="col-sales">{v.StdSalesPrice}</td>
+                <td className="col-stock">{v.Stock}</td>
+                <td className="col-leadtime">{v.LeadTime}</td>
+                <td className="images-cell col-images">
                   {Array.isArray(v.Images) && v.Images.length > 0 ? (
-                    <Box display="flex" gap={1} alignItems="center">
+                    <div className="images-container">
                       {v.Images.slice(0, 3).map((img, i) => {
                         // Enhanced debugging for image paths
                         // If img is an absolute URL, use as is; else construct relative path
@@ -524,17 +507,11 @@ export default function ProductVariantManager() {
                         
                         const isMain = (typeof v.MainImageIndex === 'number' && v.MainImageIndex === i) || (v.MainImage && v.MainImage === img);
                         return (
-                          <Box key={i} sx={{ position: 'relative', display: 'inline-block' }}>
+                          <div key={i} className="image-wrapper">
                             <img
                               src={imgSrc}
                               alt={`variant-${v.ID || i}-img-${i}`}
-                              style={{
-                                width: 40,
-                                height: 40,
-                                objectFit: 'cover',
-                                borderRadius: 4,
-                                border: '1px solid #ccc',
-                              }}
+                              className="variant-image"
                               onLoad={() => console.log(`Successfully loaded image ${i} for ${v.SKU}`)}
                               onError={(e) => {
                                 console.error(`Failed to load image for ${v.SKU}:`, {
@@ -572,42 +549,53 @@ export default function ProductVariantManager() {
                             />
                             {/* Read-only: non-interactive main-image indicator (no click/hover effect) */}
                             {isMain && (
-                              <Box sx={{ position: 'absolute', top: 2, right: 2, minWidth: 0, padding: 0, bgcolor: 'rgba(255,255,255,0.8)', borderRadius: 0.5 }} title="Main image">
-                                <StarIcon sx={{ color: 'orange' }} fontSize="small" />
-                              </Box>
+                              <div className="main-image-indicator" title="Main image">
+                                ⭐
+                              </div>
                             )}
-                          </Box>
+                          </div>
                         );
                       })}
-                      {v.Images.length > 3 && <Typography variant="caption">+{v.Images.length - 3} more</Typography>}
-                    </Box>
+                      {v.Images.length > 3 && <span className="more-images">+{v.Images.length - 3} more</span>}
+                    </div>
                   ) : (
-                    <Typography variant="caption" color="textSecondary">No images</Typography>
+                    <span className="no-images">No images</span>
                   )}
-                </TableCell>
-                <TableCell>{v.IsActive ? "Yes" : "No"}</TableCell>
-                <TableCell>
-                  <Button
-                    size="small"
+                </td>
+                <td className="col-active">{v.IsActive ? "Yes" : "No"}</td>
+                <td className="actions-cell col-actions">
+                  <button
+                    type="button"
+                    className="btn btn-edit"
+                    title={`Edit ${v.SKU}`}
+                    aria-label={`Edit ${v.SKU}`}
                     onClick={() => {
                       setEditIndex(idx);
                       setDialogOpen(true);
                     }}
                   >
-                    <Edit fontSize="small" />
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/>
+                      <path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-delete"
+                    title={`Delete ${v.SKU}`}
+                    aria-label={`Delete ${v.SKU}`}
                     onClick={() => handleDelete(idx)}
                   >
-                    <Delete fontSize="small" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-9l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+          </table>
+        </div>
 
         <VariantEditDialog
           open={dialogOpen}
@@ -622,7 +610,7 @@ export default function ProductVariantManager() {
           }
           sizes={sizes}
         />
-      </Paper>
+      </div>
     </section>
   );
 }

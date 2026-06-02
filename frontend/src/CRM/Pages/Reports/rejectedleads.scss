@@ -1,0 +1,38 @@
+@use "../../Styles/variable" as *;
+
+// Additional styles specific to rejected leads report
+// The main styles are inherited from _sales_interactions.scss
+
+.sales-interactions-container {
+  // Highlight rejected reason column
+  .si-table {
+    tbody tr {
+      td:nth-child(8) {
+        // Rejection reason column
+        font-weight: 500;
+        color: #dc3545;
+      }
+    }
+  }
+
+  // Add a subtle indicator for rejected leads
+  .rejected-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #dc3545;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+}
+
+// Additional utility styles for rejected leads
+.rejection-badge {
+  background: #dc3545;
+  color: $primary-white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import debounce from "lodash.debounce";
 import { Autocomplete, TextField, CircularProgress } from "@mui/material";
-import { BASE_URL } from "../../../Config";
+import { BASE_URL } from "../../../config/Config";
 
 const AsyncCategoryAutocomplete = ({ value, onChange, categories }) => {
   const [inputValue, setInputValue] = useState("");

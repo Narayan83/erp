@@ -1,0 +1,68 @@
+.upload-btn {
+  background: #ffefcc;
+  border: 1px solid #f0dca6;
+  padding: 8px 10px;
+  border-radius: 4px;
+  color: #6a4e00;
+  font-weight: 600;
+}
+.muted.small {
+  font-size: 13px;
+  color: #666;
+}
+
+/* Additional small adjustments for QR modal to match digital-sign */
+.thumb {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  padding: 6px;
+  border-radius: 4px;
+}
+.file-name {
+  font-size: 12px;
+  color: #777;
+  margin-top: 8px;
+}
+.thumb-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.btn-crop,
+.btn-remove {
+  background: transparent;
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.btn-crop {
+  color: #333;
+}
+.btn-remove {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+.btn-save {
+  background: #28a745;
+  border: 0;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-save[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

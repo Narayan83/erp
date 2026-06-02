@@ -3,6 +3,9 @@ package handler
 import (
 	"erp.local/backend/models"
 
+	"fmt"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
@@ -121,9 +124,14 @@ func DeleteTag(c *fiber.Ctx) error {
 	{
 		id := c.Params("id")
 		if err := tagsDB.Delete(&models.Tag{}, id).Error; err != nil {
-			{
-				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			// Check if it's a foreign key constraint violation
+			if strings.Contains(err.Error(), "23503") || strings.Contains(strings.ToLower(err.Error()), "foreign key") {
+				// Count how many products are associated with this tag
+				var count int64
+				tagsDB.Model(&models.Product{}).Where("id IN (SELECT product_id FROM product_tags WHERE tag_id = ?)", id).Count(&count)
+				return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Cannot delete Tag: it is used in %d product(s)", count)})
 			}
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.SendStatus(204)
 	}

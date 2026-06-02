@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"strings"
+
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -133,9 +136,14 @@ func DeleteSubcategorie(c *fiber.Ctx) error {
 	{
 		id := c.Params("id")
 		if err := subcategoriesDB.Delete(&models.Subcategory{}, id).Error; err != nil {
-			{
-				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			// Check if it's a foreign key constraint violation
+			if strings.Contains(err.Error(), "23503") || strings.Contains(strings.ToLower(err.Error()), "foreign key") {
+				// Count how many products reference this subcategory
+				var count int64
+				subcategoriesDB.Model(&models.Product{}).Where("subcategory_id = ?", id).Count(&count)
+				return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Cannot delete Subcategory: it is used in %d product(s)", count)})
 			}
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.SendStatus(204)
 	}

@@ -5,7 +5,7 @@ import Skeleton from '@mui/material/Skeleton';
 import { MdOutlineClear, MdEdit, MdDelete, MdVisibility } from "react-icons/md";
 import { IoMdMail, IoMdPerson, IoMdCall } from "react-icons/io";
 import './Registration.scss';
-import { BASE_URL } from '../../Config';
+import { BASE_URL, getAuthHeaders } from '../../config/Config';
 
 const RegistrationView = () => {
   const [users, setUsers] = useState([]);
@@ -19,7 +19,7 @@ const RegistrationView = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/registration_view`);
+      const response = await fetch(`${BASE_URL}/registration_view`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
@@ -45,6 +45,7 @@ const RegistrationView = () => {
       try {
         const response = await fetch(`${BASE_URL}/registration/${userId}`, {
           method: 'DELETE',
+          headers: getAuthHeaders(),
         });
         
         if (!response.ok) {

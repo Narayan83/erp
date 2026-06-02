@@ -49,14 +49,27 @@ export function DynamicDialog({
       </DialogContent>
       <DialogActions>
         {actions.map((action, idx) => (
-          <Button
-            key={idx}
-            onClick={action.onClick}
-            variant={action.variant || "text"}
-            color={action.color || (type === "error" ? "error" : "primary")}
-          >
-            {action.label}
-          </Button>
+          action.plain ? (
+            <button
+              key={idx}
+              type="button"
+              className={action.className || 'btn btn-primary'}
+              onClick={action.onClick}
+              aria-label={action.label}
+              style={action.style || {}}
+            >
+              {action.label}
+            </button>
+          ) : (
+            <Button
+              key={idx}
+              onClick={action.onClick}
+              variant={action.variant || "text"}
+              color={action.color || (type === "error" ? "error" : "primary")}
+            >
+              {action.label}
+            </Button>
+          )
         ))}
       </DialogActions>
     </Dialog>

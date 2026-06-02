@@ -1,14 +1,12 @@
 import React, { useState } from "react";
-import Button from "@mui/material/Button";
 import { MdOutlineClear } from "react-icons/md";
 import { IoMdLock, IoMdMail } from "react-icons/io";
 import { AiOutlineDatabase } from 'react-icons/ai';
 import { FaUsers } from 'react-icons/fa';
 import { FiBarChart2 } from 'react-icons/fi';
 import { GiGears } from 'react-icons/gi';
-import Skeleton from '@mui/material/Skeleton';
 import { useNavigate } from "react-router-dom";
-import { BASE_URL } from '../../../Config';
+import { BASE_URL } from '../../../config/Config';
 import './Login.scss';
 
 
@@ -129,7 +127,7 @@ function LoginPage() {
             <div className="error-message">{error}</div>
           )}
 
-          <form onSubmit={handleSubmit} className="login-form">
+          <form autoComplete="off" onSubmit={handleSubmit} className="login-form">
             <label className="label">Email Address</label>
             <div className="input-with-icon">
               <IoMdMail className="input-icon" />
@@ -139,6 +137,7 @@ function LoginPage() {
                 name="email"
                 value={loginData.email}
                 onChange={handleInputChange}
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -152,37 +151,35 @@ function LoginPage() {
                 name="password"
                 value={loginData.password}
                 onChange={handleInputChange}
+                autoComplete="new-password"
                 required
               />
             </div>
 
             <div className="form-actions">
-              <Button
-                variant="contained"
-                color="primary"
+              <button
                 type="submit"
                 disabled={isLoading}
-                className="btn-login"
+                className={`btn-login ${isLoading ? 'loading' : ''}`}
               >
                 {isLoading ? (
                   <>
-                    <Skeleton variant="circular" width={14} height={14} />
-                    <span className="ml-8"> Logging in...</span>
+                    <span className="spinner" aria-hidden="true" />
+                    <span className="ml-8">Logging in...</span>
                   </>
                 ) : (
                   <span>Login</span>
                 )}
-              </Button>
+              </button>
 
-              <Button
-                variant="outlined"
-                color="secondary"
+              <button
+                type="button"
                 onClick={handleReset}
                 className="btn-reset"
               >
                 <span className="icon"><MdOutlineClear /></span>
                 Reset
-              </Button>
+              </button>
             </div>
 
             <div className="login-footer">

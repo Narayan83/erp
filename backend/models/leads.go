@@ -40,6 +40,12 @@ type Lead struct {
 	ProductID *uint   `json:"product_id"`
 	Product   Product `gorm:"foreignKey:ProductID" json:"product"`
 
+	// Text fields for storing names directly from import
+	AssignedToName string `json:"assignedToName"`
+	ProductName    string `json:"productName"`
+
+	RejectionReason string `json:"rejectionReason"`
+
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

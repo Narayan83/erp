@@ -1,0 +1,100 @@
+@use "../../Styles/variable" as *;
+@import "./_sales_interactions.scss";
+
+/* Followup-specific aliases and small overrides so both fu-* and si-* classes match */
+.followup-page {
+  padding: 10px;
+  margin-top: 60px;
+  width: 100vw;
+  max-width: 100%;
+
+  /* Use the same header layout as SalesInteractions */
+  .fu-header {
+    @extend .si-header;
+  }
+
+  /* Controls area maps to the .left/.right structure used in SalesInteractions */
+  .fu-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .filters {
+      @extend .filters;
+    }
+    .date-buttons {
+      @extend .date-buttons;
+    }
+  }
+
+  /* Place search on the right and use the same styling */
+  .fu-search {
+    @extend .right;
+
+    .search {
+      @extend .search;
+    }
+    .icon-btn {
+      @extend .icon-btn;
+    }
+  }
+
+  /* Table/list area reuse */
+  .fu-list {
+    @extend .si-table-wrap;
+  }
+  .fu-table {
+    @extend .si-table;
+  }
+}
+
+/* Highlight compatibility */
+.fu-highlight {
+  @extend .si-highlight;
+}
+
+/* Small tweaks for action buttons and status rows (keep consistent with Sales theme) */
+/* Target the table-specific actions cell with higher specificity so global rules don't override it */
+.si-table td.actions-cell {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.si-table td.actions-cell .icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.icon-btn.success {
+  background: #28a745;
+  color: #fff;
+  border: 1px solid #28a745;
+}
+
+.icon-btn.danger {
+  background: #fff;
+  color: #d9534f;
+  border: 1px solid #d9534f;
+}
+
+.icon-btn.danger:hover {
+  background: #d9534f;
+  color: #fff;
+}
+
+/* Row status colors */
+tr.done {
+  background: #eefbf1;
+}
+tr.cancelled {
+  background: #fff6f6;
+}

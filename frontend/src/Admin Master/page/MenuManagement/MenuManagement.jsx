@@ -3,7 +3,7 @@ import axios from "axios";
 import "../../styles/menu_management.scss";
 import { FaEdit, FaTrash, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import MenuCreation from "../MenuCreation/MenuCreation"; // Adjust the import based on your file structure
-import { BASE_URL } from "../../../Config"; // Add this import
+import { BASE_URL } from "../../../config/Config"; // Add this import
 
 const defaultOnEdit = () => {};
 
@@ -166,7 +166,7 @@ export default function ExistingMenus({ menus, setMenus, initialMenus, onEditMen
         <table className="menus-table">
           <thead>
             <tr>
-              <th onClick={handleSort} style={{ cursor: 'pointer' }}>
+              <th className="sortable-header" onClick={handleSort}>
                 Menu Name {sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />}
               </th>
               <th>URL</th>

@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type Product struct {
 	ID            uint   `gorm:"primaryKey"`
@@ -34,6 +36,6 @@ type Product struct {
 	Store       Store       `gorm:"constraint:OnDelete:SET NULL"`
 	Tax         Tax         `gorm:"constraint:OnDelete:SET NULL"`
 
-	Variants []ProductVariant `gorm:"foreignKey:ProductID"`
+	Variants []ProductVariant `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE"`
 	Tags     []Tag            `gorm:"many2many:product_tags"`
 }

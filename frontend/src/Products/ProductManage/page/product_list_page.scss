@@ -1,0 +1,1166 @@
+// Product List Page Styles
+
+/*
+  === SCSS Sections ===
+  1. Variables
+  2. Base / Utilities
+  3. Header & Summary (buttons, search)
+  4. Table & Column Layout
+  5. Filters & Autocomplete
+  6. Display Preferences (popover / modal)
+  7. Image Preview / Dialogs
+  8. Product Details & Form
+  9. Variants Table
+ 10. Empty / Loading states
+ 11. Dialog Actions
+ 12. Animations & Print
+*/
+
+/* -----------------------------
+   1) Variables
+   ----------------------------- */
+// (Placeholders for future variables; kept here for easier maintenance)
+$accent-500: #ff9800;
+$accent-600: #ff8a00;
+$primary-500: #1976d2;
+$text-muted: #999;
+$muted-bg: #f9f9f9;
+
+/* -----------------------------
+   2) Base / Utilities
+   ----------------------------- */
+/* Darker horizontal lines for tables on this page */
+table {
+  border-collapse: collapse;
+}
+
+/* Ensure SL column class-based widths apply for MUI table cells */
+table thead th.sl-header,
+table tbody td.sl-cell,
+table td.sl-filter {
+  width: 80px !important;
+  min-width: 40px !important;
+  max-width: 80px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Also target MUI-generated table cell classes to ensure our widths override inline/framework styles */
+.MuiTableCell-root.sl-header,
+.MuiTableCell-root.sl-cell,
+.MuiTableCell-root.sl-filter,
+th.MuiTableCell-root.sl-header,
+td.MuiTableCell-root.sl-cell,
+td.MuiTableCell-root.sl-filter {
+  width: 80px !important;
+  min-width: 40px !important;
+  max-width: 80px !important;
+  padding: 6px 8px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+/* Stronger header bottom and row separators for clarity */
+table thead th,
+table thead td,
+table tbody tr td {
+  border-bottom: 1px solid #999999 !important;
+}
+
+/* Table header color */
+table thead th,
+.variants-table thead th {
+  background-color: #cde2f8 !important;
+  border-bottom: 1px solid rgb(143, 123, 123) !important;
+}
+
+/* -----------------------------
+   3) Header & Summary (buttons, search)
+   ----------------------------- */
+
+/* Generic button used across header */
+.btn {
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  border-radius: 6px !important;
+
+  /* Accent/add-product appearance */
+  background: $accent-500;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.08s ease;
+}
+
+.btn:hover {
+  background: $accent-600;
+  box-shadow: none;
+  transform: none;
+}
+
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 13px;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e0e0e0;
+  border-top-color: $primary-500;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Summary box replacing MUI Box/Grid for quick actions */
+.summary-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+}
+
+.summary-left .summary-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.3;
+}
+.summary-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  /* Make buttons use inline-flex so icons and labels align nicely */
+  .btn,
+  .btn-add-product {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    height: 36px;
+    min-height: 36px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 6px !important;
+    border: none;
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      box-shadow 0.12s ease,
+      transform 0.08s ease;
+  }
+
+  /* Ensure SVGs / icons in buttons are consistent size and don't overflow */
+  .btn svg,
+  .btn img,
+  .btn-add-product svg,
+  .btn-add-product img {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    display: inline-block;
+  }
+
+  /* Small icon-only buttons (e.g., display, download icons) */
+  .icon-btn,
+  .btn.icon-only {
+    padding: 6px;
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    color: $primary-500;
+  }
+
+  /* Outline icon buttons inside summary (import/export/display) */
+  .btn.btn-outline {
+    padding: 6px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    color: $primary-500;
+  }
+
+  /* Primary add-product button gets stronger emphasis */
+  .btn-add-product {
+    background: $accent-500;
+    color: #fff;
+    padding: 8px 14px;
+    font-weight: 600;
+  }
+
+  .btn:hover,
+  .btn-add-product:hover {
+    background: $accent-600;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .btn-display-prefs,
+  .btn-import,
+  .btn-export,
+  .btn-settings {
+    border: 1px solid rgb(127, 127, 131) !important;
+    background: none;
+    padding: 6px 10px !important;
+
+    &:hover {
+      background: none;
+    }
+  }
+}
+
+/* Search field */
+.custom-search {
+  width: 360px;
+  padding: 8px 12px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.custom-search:focus {
+  outline: none;
+  border-color: $primary-500;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.06);
+}
+
+.search-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-clear {
+  padding: 6px 10px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: $primary-500;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.search-clear:hover {
+  background: rgba(25, 118, 210, 0.06);
+}
+
+.search-highlight {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 2px 1px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* Action buttons in table - display side by side */
+.action-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.action-buttons .MuiIconButton-root,
+.action-buttons button {
+  flex: 0 0 auto;
+  margin: 0 !important;
+}
+
+/* -----------------------------
+   4) Table & Column Layout
+   ----------------------------- */
+.MuiTable-root th:nth-child(4),
+.MuiTable-root td:nth-child(4) {
+  min-width: 160px !important;
+}
+.MuiTable-root th:nth-child(3),
+.MuiTable-root td:nth-child(3) {
+  min-width: 280px !important;
+}
+.MuiTable-root th:nth-child(11),
+.MuiTable-root td:nth-child(11) {
+  min-width: 140px !important;
+}
+.MuiTable-root th:nth-child(13),
+.MuiTable-root td:nth-child(13) {
+  min-width: 160px !important;
+}
+.MuiTable-root th:nth-child(23),
+.MuiTable-root td:nth-child(23) {
+  min-width: 180px !important;
+}
+.MuiTable-root th:nth-child(24),
+.MuiTable-root td:nth-child(24) {
+  min-width: 160px !important;
+}
+
+/* -----------------------------
+   5) Filters & Autocomplete
+   ----------------------------- */
+.filter-cell {
+  .filter-control {
+    position: relative;
+  }
+
+  .filter-input,
+  .filter-select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #999;
+    border-radius: 4px;
+    font-size: 13px;
+    height: 34px;
+    box-sizing: border-box;
+    background: #fff;
+  }
+
+  .filter-input:focus,
+  .filter-select:focus {
+    outline: none;
+    border-color: $primary-500;
+    box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.06);
+  }
+
+  .filter-loading {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #666;
+  }
+
+  .filter-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    z-index: 1200;
+    max-height: 220px;
+    overflow-y: auto;
+    border-radius: 6px;
+    padding: 6px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  }
+
+  .filter-dropdown-item {
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #222;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .filter-dropdown-item:hover,
+  .filter-dropdown-item:focus {
+    background: #f5f8fb;
+  }
+
+  /* WebKit */
+  .filter-dropdown::-webkit-scrollbar,
+  .MuiAutocomplete-listbox::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .filter-dropdown::-webkit-scrollbar-thumb,
+  .MuiAutocomplete-listbox::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 3px;
+  }
+  .filter-dropdown::-webkit-scrollbar-track,
+  .MuiAutocomplete-listbox::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Firefox */
+  .MuiAutocomplete-listbox {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  }
+}
+
+/* -----------------------------
+   6) Display Preferences (popover / modal)
+   ----------------------------- */
+.display-preferences-popover {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
+  gap: 8px;
+  align-items: center;
+  max-width: 100%;
+}
+.display-preferences-popover .select-all {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+}
+.display-preferences-popover .form-control-label {
+  margin: 0;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.display-preferences-popover .subtitle {
+  font-weight: 700;
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+/* -----------------------------
+   Inline-style → classes (moved from JSX)
+   ----------------------------- */
+/* Stock low indicator */
+.low-stock {
+  color: #d32f2f;
+  font-weight: 700;
+}
+
+/* Small thumbnail used in product list */
+.image-wrap {
+  display: inline-block;
+  position: relative;
+}
+.product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.product-image:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Variant color & images */
+.color-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  flex-shrink: 0;
+  background-color: var(--swatch-color);
+}
+.images-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.variant-image {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.variant-image:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.16);
+}
+/* Ensure main image badge icon uses smaller size as expected */
+.variants-table .main-image-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Instruction lists used in dialogs */
+.instruction-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* Product view modal specific tweaks that were inline */
+.product-view-modal .product-details-container {
+  background-color: white;
+  color: black;
+}
+.product-view-modal .loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Simple utility for file inputs on this page */
+.file-input {
+  margin-bottom: 16px;
+}
+
+/* Plain popover/modal used by DisplayPreferences */
+.dp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+  padding: 20px;
+}
+.dp-modal {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 95vw;
+  width: 900px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dp-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+.dp-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+.dp-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dp-modal-body {
+  padding: 12px 16px 16px 16px;
+  max-height: 70vh;
+  overflow: auto;
+}
+.dp-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+.form-control-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.form-control-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* Product view modal (replacement for MUI Dialog in product details) */
+.product-view-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1600;
+  padding: 20px;
+}
+.product-view-modal .product-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 1200px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.product-view-modal .product-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  gap: 12px;
+}
+.product-view-modal .product-title {
+  font-size: 18px;
+  margin: 0;
+}
+.product-view-modal .modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #333;
+}
+.product-view-modal .modal-close:hover {
+  color: #000;
+}
+.product-view-modal .product-details-container {
+  padding: 16px 20px;
+}
+.product-view-modal .variants-table thead th {
+  text-align: center;
+  font-weight: 700;
+}
+.product-view-modal .variants-table td,
+.product-view-modal .variants-table th {
+  padding: 10px 12px;
+  text-align: center;
+}
+.product-view-modal .no-variants,
+.product-view-modal .text-muted {
+  color: #777;
+  padding: 12px 16px;
+}
+.product-view-modal .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Ensure loader uses existing loader style */
+.product-view-modal .loading-state .loader {
+  width: 36px;
+  height: 36px;
+  border: 4px solid #e0e0e0;
+  border-top-color: $primary-500;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.preview-image,
+img {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+  background: #c4d9f8ff;
+  width: 100%;
+  object-fit: contain;
+}
+.MuiDialogActions-root {
+  background: #fff !important;
+  justify-content: center !important;
+  padding: 12px 16px !important;
+  border-top: 1px solid #f0f0f0 !important;
+  gap: 8px !important;
+}
+.preview-button,
+.MuiButton-root {
+  color: $primary-500 !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  &:hover {
+    background-color: rgba(25, 118, 210, 0.06) !important;
+  }
+}
+
+/* -----------------------------
+   8) Product Details & Form
+   ----------------------------- */
+.product-details-container {
+  padding: 20px;
+  background: #f5f5f5;
+}
+.product-details-container .product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+.product-details-container .product-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+.product-status {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.product-status.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #4caf50;
+}
+.product-status.inactive {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #f44336;
+}
+
+.product-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  column-gap: 16px;
+  row-gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+  .product-form .form-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .product-form .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .product-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.product-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Grid column helpers */
+.product-form .form-field.col-20 {
+  grid-column: span 1;
+}
+.product-form .form-field.col-40 {
+  grid-column: span 2;
+}
+.product-form .form-field.col-60 {
+  grid-column: span 3;
+}
+.product-form .form-field.col-100 {
+  grid-column: 1 / -1;
+}
+
+/* Responsive caps - ensure spans don't exceed columns on narrower screens */
+@media (max-width: 1200px) {
+  .product-form .form-field.col-60 {
+    grid-column: span 3;
+  }
+  .product-form .form-field.col-40 {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 768px) {
+  .product-form .form-field.col-60,
+  .product-form .form-field.col-40 {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 480px) {
+  .product-form .form-field {
+    grid-column: 1 / -1;
+  }
+}
+
+.product-form .form-field .field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.product-form .field-input,
+.product-form .form-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  background: #f9f9f9;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.product-form .field-input:hover,
+.product-form .form-field select:hover {
+  border-color: #bbb;
+}
+
+.product-form .field-input:focus,
+.product-form .form-field select:focus {
+  outline: none;
+  border-color: $primary-500;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.product-form textarea.field-input {
+  min-height: 90px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* Error state */
+.product-form .form-field.error .field-input,
+.product-form .form-field.error select {
+  border-color: #f44336;
+  background: #ffebee;
+}
+
+.product-form .form-field .error-message {
+  color: #f44336;
+  font-size: 12px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* -----------------------------
+   9) Variants Table (detailed table rules)
+   ----------------------------- */
+
+.variants-section .section-header {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+  padding: 0;
+  border-top: 1px solid #e0e0e0;
+
+  .section-title {
+    color: #333;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+}
+.variants-section .variant-count {
+  margin-left: auto;
+  background: #e3f2fd;
+  color: $primary-500;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.variants-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.variants-table thead {
+  background: #f5f5f5;
+  border-bottom: 2px solid #e0e0e0;
+}
+.variants-table thead th {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Column width overrides for predictable layout */
+.variants-table thead th:nth-child(1),
+tbody td:nth-child(1) {
+  width: 220px;
+}
+.variants-table thead th:nth-child(2),
+tbody td:nth-child(2) {
+  width: 80px;
+}
+.variants-table thead th:nth-child(3),
+tbody td:nth-child(3) {
+  width: 210px;
+}
+.variants-table thead th:nth-child(4),
+tbody td:nth-child(4) {
+  width: 150px;
+}
+.variants-table thead th:nth-child(5),
+tbody td:nth-child(5) {
+  width: 150px;
+}
+.variants-table thead th:nth-child(6),
+tbody td:nth-child(6) {
+  width: 80px;
+}
+.variants-table thead th:nth-child(7),
+tbody td:nth-child(7) {
+  width: 120px;
+}
+.variants-table thead th:nth-child(8),
+tbody td:nth-child(8) {
+  width: 120px;
+}
+
+.variants-table tbody tr {
+  border-bottom: 1px solid #e0e0e0 !important;
+  transition: background-color 0.2s ease;
+}
+.variants-table tbody tr:hover {
+  background-color: #fafafa;
+}
+.variants-table tbody td {
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: #333;
+  box-sizing: border-box;
+}
+
+/* Color cell with swatch */
+.variants-table tbody td:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+/* Image cell rules */
+.variants-table td.images-cell {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.variants-table .image-container {
+  position: relative;
+  display: inline-block;
+}
+.variants-table .image-container img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  transition: transform 0.2s ease;
+}
+.variants-table .image-container img:hover {
+  transform: scale(1.05);
+}
+.variants-table .main-image-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.variants-table .main-image-badge svg {
+  width: 16px;
+  height: 16px;
+  color: $accent-500;
+}
+
+/* Data cell behaviors */
+.variants-table td.data-cell {
+  word-break: break-word;
+}
+.variants-table td.data-cell.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -----------------------------
+   10) Empty / Loading states
+   ----------------------------- */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+}
+.empty-state .empty-icon {
+  font-size: 64px;
+  color: #ddd;
+  margin-bottom: 16px;
+}
+.empty-state .empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 8px;
+}
+.empty-state .empty-description {
+  font-size: 14px;
+  color: #bbb;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+.loading-state .spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.loading-state .loader {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: $primary-500;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading-state .loading-text {
+  color: #999;
+  font-size: 14px;
+}
+
+/* -----------------------------
+   11) Dialog Actions
+   ----------------------------- */
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px;
+  background: #f9f9f9;
+  border-top: 1px solid #e0e0e0;
+}
+.dialog-actions button {
+  padding: 8px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+.dialog-actions button.btn-primary {
+  background: $primary-500;
+  color: #fff;
+  border: none;
+}
+.dialog-actions button.btn-primary:hover {
+  background: #1565c0;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+}
+.dialog-actions button.btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+  border: 1px solid #d0d0d0;
+}
+.dialog-actions button.btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+/* Import preview specific actions - replace MUI buttons with project buttons and layout */
+.import-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+}
+.import-preview-actions .btn-secondary {
+  margin-right: auto;
+  background: transparent;
+  color: $primary-500;
+}
+.import-preview-actions .btn-secondary:hover {
+  background: rgba(25, 118, 210, 0.04);
+}
+.import-preview-actions .btn-primary {
+  min-width: 150px;
+  padding: 8px 20px;
+}
+.import-preview-actions .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hide MUI Button root inside this dialog so only our native buttons show */
+.import-preview-dialog .MuiButton-root {
+  display: none !important;
+}
+
+/* -----------------------------
+   12) Animations & Print
+   ----------------------------- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media print {
+  .product-details-container {
+    background-color: white;
+    padding: 0;
+  }
+  .product-details-container .product-header {
+    page-break-after: avoid;
+  }
+  .variants-section {
+    page-break-inside: avoid;
+  }
+}

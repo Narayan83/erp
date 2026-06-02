@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 
 	"erp.local/backend/models"
 	"github.com/gofiber/fiber/v2"
@@ -106,13 +107,44 @@ func UpdateTax(c *fiber.Ctx) error {
 }
 
 func DeleteTax(c *fiber.Ctx) error {
-	{
-		id := c.Params("id")
-		if err := taxesDB.Delete(&models.Tax{}, id).Error; err != nil {
-			{
-				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-			}
+	id := c.Params("id")
+
+	// Check references in products and quotation items
+	var prodCount int64
+	if err := taxesDB.Model(&models.Product{}).Where("tax_id = ?", id).Count(&prodCount).Error; err != nil {
+		if strings.Contains(err.Error(), "does not exist") {
+			prodCount = 0
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.SendStatus(204)
 	}
+
+	var quoteCount int64
+	if err := taxesDB.Model(&models.QuotationTableItems{}).Where("tax_id = ?", id).Count(&quoteCount).Error; err != nil {
+		if strings.Contains(err.Error(), "does not exist") {
+			quoteCount = 0
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+
+	if prodCount > 0 || quoteCount > 0 {
+		msg := "Cannot delete Tax: it is used"
+		details := []string{}
+		if prodCount > 0 {
+			details = append(details, fmt.Sprintf("%d product(s)", prodCount))
+		}
+		if quoteCount > 0 {
+			details = append(details, fmt.Sprintf("%d quotation item(s)", quoteCount))
+		}
+		if len(details) > 0 {
+			msg = msg + " in " + strings.Join(details, " and ")
+		}
+		return c.Status(400).JSON(fiber.Map{"error": msg})
+	}
+
+	if err := taxesDB.Delete(&models.Tax{}, id).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.SendStatus(204)
 }
