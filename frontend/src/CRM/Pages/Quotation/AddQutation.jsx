@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 // removed CiSearch import (search button removed)
 import { IoMdPrint, IoIosSearch } from "react-icons/io";
 import { IoDocumentText } from "react-icons/io5";
